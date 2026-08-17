@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>2048</title>
+<meta name="description" content="브라우저에서 바로 하는 2048">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🎲</text></svg>">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="app">
+  <header class="head">
+    <div class="title-row">
+      <h1>2048</h1>
+      <a class="back" href="../../">← 목록</a>
+    </div>
+    <div class="score-row">
+      <div class="score-box">
+        <span class="score-label">점수</span>
+        <span class="score-value" id="score">0</span>
+        <span class="score-gain" id="gain" aria-hidden="true"></span>
+      </div>
+      <div class="score-box">
+        <span class="score-label">최고</span>
+        <span class="score-value" id="best">0</span>
+      </div>
+      <button class="btn" id="new-game" type="button">새 게임</button>
+    </div>
+  </header>
+
+  <div class="board" id="board">
+    <div class="cells" id="cells" aria-hidden="true"></div>
+    <div class="tiles" id="tiles"></div>
+    <div class="overlay" id="overlay" hidden>
+      <p class="overlay-text" id="overlay-text"></p>
+      <div class="overlay-actions" id="overlay-actions"></div>
+    </div>
+  </div>
+
+  <p class="hint">방향키 · WASD · 스와이프로 조작</p>
+</main>
+
+<script src="logic.js"></script>
+<script src="main.js"></script>
+</body>
+</html>

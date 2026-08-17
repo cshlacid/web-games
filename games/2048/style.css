@@ -1,0 +1,266 @@
+:root {
+  --bg: #faf8ef;
+  --fg: #776e65;
+  --board-bg: #bbada0;
+  --cell-bg: #cdc1b4;
+  --btn-bg: #8f7a66;
+  --btn-fg: #f9f6f2;
+  --box-bg: #bbada0;
+  --tile-fg-dark: #776e65;
+  --tile-fg-light: #f9f6f2;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1a1714;
+    --fg: #d8cfc6;
+    --board-bg: #3a322c;
+    --cell-bg: #4a4038;
+    --btn-bg: #8f7a66;
+    --box-bg: #3a322c;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  display: flex;
+  justify-content: center;
+  padding: clamp(12px, 4vmin, 32px);
+  /* 스와이프로 조작하므로 브라우저의 당겨서 새로고침·스크롤을 막는다. */
+  overscroll-behavior: none;
+  touch-action: manipulation;
+}
+
+.app {
+  width: min(100%, 520px);
+  display: flex;
+  flex-direction: column;
+  gap: clamp(10px, 2.5vmin, 18px);
+}
+
+.title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(36px, 9vmin, 56px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.back {
+  color: inherit;
+  opacity: 0.6;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.back:hover { opacity: 1; }
+
+.score-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.score-box {
+  position: relative;
+  background: var(--box-bg);
+  color: var(--tile-fg-light);
+  border-radius: 8px;
+  padding: 6px 14px;
+  min-width: 84px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.score-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  opacity: 0.75;
+}
+
+.score-value {
+  font-size: clamp(18px, 4.5vmin, 24px);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 점수 증가분은 박스 위로 떠오르며 사라진다. 레이아웃에 영향을 주면 안 되므로
+   absolute로 띄운다. */
+.score-gain {
+  position: absolute;
+  inset-inline: 0;
+  top: 4px;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--fg);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.score-gain.run { animation: gain 620ms ease-out; }
+
+@keyframes gain {
+  0% { opacity: 0.9; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-32px); }
+}
+
+.btn {
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  border: 0;
+  border-radius: 8px;
+  /* 점수 줄에서는 stretch로 높이가 잡히지만 오버레이 안에서는 아니다.
+     세로 패딩이 없으면 오버레이 버튼이 납작하게 눌린다. */
+  padding: 11px 18px;
+  font-size: 15px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.score-row .btn { margin-inline-start: auto; }
+
+.btn:hover { filter: brightness(1.08); }
+.btn:active { transform: translateY(1px); }
+
+.board {
+  --gap: clamp(7px, 2vmin, 13px);
+  --cell: clamp(60px, 17vmin, 106px);
+  --step: calc(var(--cell) + var(--gap));
+  position: relative;
+  width: calc(4 * var(--cell) + 5 * var(--gap));
+  height: calc(4 * var(--cell) + 5 * var(--gap));
+  padding: var(--gap);
+  margin-inline: auto;
+  background: var(--board-bg);
+  border-radius: 12px;
+  /* 스와이프 중 페이지가 따라 움직이지 않게 한다. */
+  touch-action: none;
+  user-select: none;
+}
+
+.cells {
+  display: grid;
+  grid-template-columns: repeat(4, var(--cell));
+  grid-auto-rows: var(--cell);
+  gap: var(--gap);
+}
+
+.cells div {
+  background: var(--cell-bg);
+  border-radius: 8px;
+}
+
+.tiles {
+  position: absolute;
+  inset: var(--gap);
+}
+
+.tile {
+  position: absolute;
+  width: var(--cell);
+  height: var(--cell);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  font-size: calc(var(--cell) * 0.46);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  background: #eee4da;
+  color: var(--tile-fg-dark);
+  transform: translate(calc(var(--col) * var(--step)), calc(var(--row) * var(--step)));
+  transition: transform 110ms ease-in-out;
+}
+
+/* 자릿수가 늘어나면 칸을 넘치므로 단계적으로 줄인다. */
+.tile.d3 { font-size: calc(var(--cell) * 0.38); }
+.tile.d4 { font-size: calc(var(--cell) * 0.30); }
+.tile.d5 { font-size: calc(var(--cell) * 0.24); }
+
+.tile.v4 { background: #ede0c8; }
+.tile.v8 { background: #f2b179; color: var(--tile-fg-light); }
+.tile.v16 { background: #f59563; color: var(--tile-fg-light); }
+.tile.v32 { background: #f67c5f; color: var(--tile-fg-light); }
+.tile.v64 { background: #f65e3b; color: var(--tile-fg-light); }
+.tile.v128 { background: #edcf72; color: var(--tile-fg-light); }
+.tile.v256 { background: #edcc61; color: var(--tile-fg-light); }
+.tile.v512 { background: #edc850; color: var(--tile-fg-light); }
+.tile.v1024 { background: #edc53f; color: var(--tile-fg-light); }
+.tile.v2048 { background: #edc22e; color: var(--tile-fg-light); }
+.tile.vsuper { background: #3c3a32; color: var(--tile-fg-light); }
+
+.tile.spawn { animation: spawn 140ms ease-out; }
+.tile.pop { animation: pop 140ms ease-out; }
+
+@keyframes spawn {
+  0% { opacity: 0; scale: 0.4; }
+  100% { opacity: 1; scale: 1; }
+}
+
+/* scale만 애니메이션한다. transform을 쓰면 위치 지정용 translate를 덮어써서
+   타일이 좌상단으로 튄다. */
+@keyframes pop {
+  0% { scale: 1; }
+  55% { scale: 1.16; }
+  100% { scale: 1; }
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  animation: fade 260ms ease-out;
+}
+
+/* display를 지정한 클래스가 브라우저 기본 [hidden] 규칙을 이기므로, hidden일 때를
+   직접 꺼줘야 한다. 없으면 오버레이가 항상 화면을 덮는다. */
+.overlay[hidden] { display: none; }
+
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+
+.overlay-text {
+  margin: 0;
+  font-size: clamp(28px, 7vmin, 40px);
+  font-weight: 800;
+}
+
+.overlay-actions { display: flex; gap: 10px; }
+
+.hint {
+  margin: 0;
+  text-align: center;
+  font-size: 13px;
+  opacity: 0.6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tile { transition-duration: 1ms; }
+  .tile.spawn, .tile.pop, .score-gain.run, .overlay { animation-duration: 1ms; }
+}
