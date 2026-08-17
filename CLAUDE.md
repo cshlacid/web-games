@@ -1,116 +1,75 @@
 # CLAUDE.md
 
-Guidance for AI assistants working in this repository.
+이 저장소에서 작업하는 AI 어시스턴트를 위한 지침.
 
-## Status: pre-code
+## 언어
 
-**This repository currently contains no application code.** As of the latest
-commit the entire tree is:
+- **모든 대화와 코드 주석은 한국어로 작성한다.** 커밋 메시지와 PR 본문도 한국어를
+  기본으로 한다.
+- 식별자(변수·함수·파일명)는 영어를 유지한다. 언어 규칙은 사람이 읽는 산문에
+  적용되며, 코드 자체에는 적용되지 않는다.
 
-```
-README.md    # one line: "# web-games"
-CLAUDE.md    # this file
-```
+## 주석 및 문서 작성 원칙
 
-There is no `package.json`, no build tooling, no source directory, no tests, no
-CI configuration, and no open issues or pull requests describing intended work.
+- **주석은 자명하지 않은 이유(why)만 적는다.** 코드가 무엇을 하는지는 코드가 이미
+  말하고 있으므로 다시 적지 않는다. 그 선택을 한 이유, 시도했지만 실패한 대안,
+  겉보기에 불필요해 보이는 코드가 필요한 이유가 주석의 대상이다.
+- **이 파일도 같은 규칙을 따른다.** 트리를 열어 보면 알 수 있는 것(디렉터리 목록,
+  설치된 의존성, 존재하는 파일), 설정 파일에 이미 적혀 있는 것은 여기에 옮겨
+  적지 않는다. 이 파일에는 코드를 읽어도 알 수 없는 것만 남긴다 — 결정의 배경,
+  아직 정해지지 않은 것, 저장소 밖의 워크플로.
+- 규칙을 무효화하는 변경을 할 때는 같은 커밋에서 이 파일을 고친다.
 
-Practical consequences:
+## 아직 정해지지 않은 것
 
-- **Do not assume a stack.** Nothing here establishes a framework, language,
-  bundler, or package manager. If a task requires one and the user has not said
-  which, ask before scaffolding — the first choice made here will be hard to
-  undo cheaply.
-- **Do not invent commands.** There are no build, test, lint, or dev-server
-  commands to run yet. If you need one, create it deliberately and document it
-  in the [Commands](#commands) section below in the same change.
-- **Treat the sections below marked _(to fill in)_ as a checklist.** Whoever
-  lands the first real code should update them in that same commit, so this file
-  never describes a repository that doesn't exist.
+이 저장소에는 애플리케이션 코드가 없고, 의도를 설명하는 이슈나 PR도 없다. 저장소
+이름과 README가 밝히는 유일한 방향은 "브라우저에서 플레이하는 게임"이다.
 
-## Intended scope
+- **스택이 정해지지 않았다.** 프레임워크·패키지 매니저·빌드 도구 중 무엇도 확정된
+  바 없다. 작업에 필요하다면 임의로 고르지 말고 사용자에게 먼저 확인한다. 여기서의
+  첫 선택은 되돌리는 비용이 크다.
+- **가장 먼저 답해야 할 질문: 게임 여러 개를 담은 하나의 앱인가, 한 저장소에 담긴
+  독립적인 게임 여러 개인가?** 이 결정이 디렉터리 구조, 빌드 설정, 의존성 공유,
+  배포 방식을 모두 결정한다. 정해지는 순간 이 파일에 먼저 기록하고 그 위에 코드를
+  쌓는다.
+- 빌드·테스트·린트 명령이 존재하지 않는다. 필요하면 만들고, **같은 변경 안에서**
+  아래 명령 절에 기록한다. 없는 명령을 추측해서 실행하지 않는다.
 
-The repository name (`web-games`) and its README are the only statements of
-intent: browser-playable games. Nothing further has been committed — the number
-of games, whether they share a runtime or are independent, and how they are
-served are all still open.
+## 명령
 
-When that shape is decided, record it here before building on it. In particular
-write down the answer to: **is this one app containing many games, or many
-independent games in one repo?** That single decision drives directory layout,
-build configuration, dependency sharing, and deploy strategy, and it is the
-thing a future assistant will most need stated plainly.
+_(작성 대기)_ — install, dev 서버, build, test, lint, typecheck의 정확한 실행
+명령. 패키지 매니저까지 포함해 적는다.
 
-## Repository layout
+전체 스위트 명령과 **단일 테스트 실행 명령을 함께** 적는다. 실패한 테스트 하나를
+반복 실행하는 것이 실제로 가장 흔한 작업이고, 그때 전체 스위트를 돌리는 것은 낭비다.
 
-_(to fill in)_ — describe the top-level directories and what belongs in each
-once they exist. Until then, place new work thoughtfully rather than by
-convention-guessing, and document the layout you chose here.
+## 규칙
 
-## Commands
+_(작성 대기)_ — 네이밍, 모듈 경계, 상태 관리, 에셋 처리. 일관성을 맞출 코드가
+생긴 뒤에 채운다.
 
-_(to fill in)_ — the canonical invocations for install, dev server, build,
-test, lint, and typecheck. Prefer listing the exact command line, including the
-package manager, e.g.:
+스택과 무관하게 지금부터 적용되는 것:
 
-```
-# install       <command>
-# dev server    <command>
-# build         <command>
-# test          <command>   (single test: <command>)
-# lint          <command>
-# typecheck     <command>
-```
+- 기존 파일을 수정할 때는 그 파일의 관용구와 주석 밀도를 따른다. 다른 스타일을
+  끌어오지 않는다.
+- 첫 코드가 들어올 때 포매터와 린트 설정을 함께 넣는다. 스타일 논의를 사람이
+  손으로 하지 않게 하려는 것이다.
 
-Record the single-test invocation alongside the full-suite one — iterating on
-one failing test is the common case, and running the whole suite for it wastes
-time.
+## Git 워크플로
 
-## Conventions
+기본 브랜치는 `main`.
 
-_(to fill in)_ — naming, module boundaries, state management, asset handling,
-and formatting rules, once there is code to be consistent with.
+- **`main`에 직접 커밋하지 않는다.** 기능 브랜치에서 작업하고 그 브랜치를 push한다.
+- 어시스턴트 세션은 작업할 브랜치를 지정받는다. 사용자가 달리 말하지 않으면 지정된
+  브랜치에만 push한다.
+- `git push -u origin <branch-name>` 형태로 push한다. 네트워크 오류일 때만 지수
+  백오프(2s, 4s, 8s, 16s)로 재시도한다.
+- **명시적으로 요청받지 않으면 PR을 열지 않는다.** 브랜치를 push한 것이 PR을 열어도
+  된다는 뜻은 아니다.
+- 브랜치의 PR이 이미 머지됐다면 그 위에 커밋을 쌓지 않는다. 최신 `main`에서 브랜치를
+  다시 만들고(`git fetch origin main && git checkout -B <branch> origin/main`) 새
+  변경으로 취급한다.
 
-Two conventions apply from the start, regardless of stack:
-
-- **Match surrounding code.** When editing an existing file, mirror its
-  idiom, naming, and comment density rather than importing a different style.
-- **Formatting is a tool's job, not a reviewer's.** When the first code lands,
-  add a formatter and a lint config so style questions stop being discussed by
-  hand.
-
-## Git workflow
-
-The default branch is `main`.
-
-- **Never commit directly to `main`.** Work on a feature branch and push that.
-- Assistant sessions are assigned a specific branch to develop on; push only to
-  that branch unless the user says otherwise.
-- Push with `git push -u origin <branch-name>`. On network failure, retry with
-  exponential backoff (2s, 4s, 8s, 16s) rather than switching approach.
-- **Open a pull request only when explicitly asked.** Pushing a branch is not an
-  invitation to open a PR.
-- If a branch's PR has already merged, do not stack new commits on it. Reset the
-  branch onto the latest `main` (`git fetch origin main && git checkout -B
-  <branch> origin/main`) and treat the follow-up as a fresh change.
-
-There is no CI configured yet, so a green checkmark is not available as a
-correctness signal. Until CI exists, run whatever checks the repo has locally
-and say plainly in your report what you ran and what the output was.
-
-## Reporting work
-
-- State outcomes as they are. If tests fail, include the output; if a step was
-  skipped, say which and why.
-- When something is genuinely done and verified, say so without hedging.
-- Don't describe this repository as having structure, tooling, or conventions
-  that this file does not yet document — check the tree before making claims
-  about it.
-
-## Maintaining this file
-
-This file is only useful while it is accurate. Update it in the same change
-that invalidates it — adding a build command, choosing a framework, creating
-the first source directory, adding CI. If you find a section that no longer
-matches the tree, fix the section as part of your current task rather than
-working around it.
+CI가 없으므로 초록색 체크로 정합성을 확인할 수 없다. CI가 생기기 전까지는 로컬에서
+가능한 검증을 돌리고, **무엇을 돌렸고 결과가 무엇이었는지** 보고에 그대로 적는다.
+테스트가 실패하면 출력을 함께 싣고, 건너뛴 단계가 있으면 어느 단계인지 밝힌다.
