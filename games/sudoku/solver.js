@@ -290,6 +290,34 @@ function solveLogically(puzzle, allowed = TECHNIQUE_NAMES) {
   return { solved: isComplete(state), broken: state.broken, used, state };
 }
 
+/**
+ * 지금 판에서 논리적으로 확정할 수 있는 다음 한 칸. 힌트가 "정답을 슬쩍 보여주는
+ * 것"이 아니라 "지금 무엇을 근거로 어디를 채울 수 있는지"가 되게 하려는 것이라,
+ * 채울 칸과 함께 그 근거가 된 기법 이름을 돌려준다.
+ */
+function nextPlacement(puzzle, allowed = TECHNIQUE_NAMES) {
+  const state = typeof puzzle === 'string' ? fromString(puzzle) : cloneState(puzzle);
+  if (state.broken) return null;
+  const techniques = TECHNIQUES.filter((t) => allowed.includes(t.name));
+  const before = state.values.slice();
+
+  while (!state.broken) {
+    let progressed = false;
+    for (const technique of techniques) {
+      if (!technique.run(state)) continue;
+      progressed = true;
+      for (let i = 0; i < CELLS; i++) {
+        if (!before[i] && state.values[i]) {
+          return { index: i, digit: state.values[i], technique: technique.name };
+        }
+      }
+      break;
+    }
+    if (!progressed) return null;
+  }
+  return null;
+}
+
 /** 끝까지 푸는 데 필요했던 가장 어려운 기법. 논리만으로 못 풀면 null. */
 function hardestTechnique(puzzle, allowed = TECHNIQUE_NAMES) {
   const result = solveLogically(puzzle, allowed);
@@ -336,7 +364,7 @@ const Solver = {
   TECHNIQUES, TECHNIQUE_NAMES,
   emptyState, cloneState, fromString, toString, isComplete,
   assign, eliminate, popcount, bitOf, digitOf,
-  solveLogically, hardestTechnique, countSolutions,
+  solveLogically, hardestTechnique, nextPlacement, countSolutions,
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = Solver;

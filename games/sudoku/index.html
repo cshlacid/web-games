@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>스도쿠</title>
+<meta name="description" content="힌트만으로 풀 수 있는 스도쿠. 찍어야 하는 판은 나오지 않는다">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🔢</text></svg>">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="app">
+  <header class="head">
+    <div class="title-row">
+      <h1>스도쿠</h1>
+      <div class="head-actions">
+        <button class="toggle" id="help-open" type="button" aria-pressed="false">도움말</button>
+        <a class="back" href="../../">← 목록</a>
+      </div>
+    </div>
+    <div class="status-row">
+      <div class="levels" id="levels" role="group" aria-label="난이도"></div>
+      <span class="timer" id="timer">0:00</span>
+    </div>
+  </header>
+
+  <div class="board-wrap">
+    <div class="board" id="board"></div>
+    <div class="veil" id="veil" hidden>만드는 중…</div>
+  </div>
+
+  <p class="toast" id="toast" role="status" aria-live="polite"></p>
+
+  <div class="pad">
+    <div class="digits" id="digits"></div>
+    <div class="tools">
+      <button class="tool" id="pencil" type="button" aria-pressed="false">
+        <span class="tool-icon">✎</span><span class="tool-label">연필</span>
+      </button>
+      <button class="tool" id="erase" type="button">
+        <span class="tool-icon">⌫</span><span class="tool-label">지우기</span>
+      </button>
+      <button class="tool" id="undo" type="button">
+        <span class="tool-icon">↶</span><span class="tool-label">되돌리기</span>
+      </button>
+      <button class="tool" id="hint" type="button">
+        <span class="tool-icon">?</span><span class="tool-label">힌트</span>
+      </button>
+      <button class="tool" id="new-game" type="button">
+        <span class="tool-icon">＋</span><span class="tool-label">새 판</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="sheet" id="result" hidden>
+    <p class="sheet-title" id="result-title"></p>
+    <p class="sheet-note" id="result-note"></p>
+    <div class="sheet-actions">
+      <button class="btn" id="again" type="button">한 판 더</button>
+    </div>
+  </div>
+
+  <div class="sheet" id="help" hidden>
+    <p class="sheet-title">규칙과 조작</p>
+    <ul class="help-list">
+      <li>가로줄·세로줄·3×3 상자마다 1~9가 한 번씩 들어갑니다.</li>
+      <li><b>이 게임의 모든 판은 주어진 숫자만으로 풀립니다.</b> 찍어야만 넘어가는
+        판은 나오지 않습니다 — 만들 때 논리로 끝까지 풀리는지 확인하고 내보냅니다.</li>
+      <li><b>연필</b>을 켜면 후보 숫자를 작게 적어둘 수 있습니다. 숫자를 확정하면
+        같은 줄·상자의 연필 표시에서 그 숫자가 자동으로 지워집니다.</li>
+      <li><b>힌트</b>는 정답을 보여주는 대신, 지금 논리로 확정할 수 있는 칸 하나와
+        그 근거가 된 기법을 알려줍니다.</li>
+      <li>키보드: 방향키로 이동, <b>1~9</b> 입력, <b>Shift+숫자</b>는 연필,
+        <b>Backspace</b> 지우기, <b>스페이스</b> 연필 전환, <b>Ctrl+Z</b> 되돌리기.</li>
+    </ul>
+    <div class="sheet-actions">
+      <button class="btn" id="help-close" type="button">닫기</button>
+    </div>
+  </div>
+</main>
+
+<script src="solver.js"></script>
+<script src="generator.js"></script>
+<script src="main.js"></script>
+</body>
+</html>

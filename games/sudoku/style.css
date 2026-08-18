@@ -1,0 +1,306 @@
+:root {
+  --bg: #faf8ef;
+  --fg: #3a3226;
+  --muted: #8d8578;
+  --line: #d6cec2;
+  --line-strong: #8d8578;
+  --cell-bg: #ffffff;
+  --given: #3a3226;
+  --entered: #2f6f9e;
+  --wrong: #c1503f;
+  --sel: #dbcdb4;
+  --peer: #efe8db;
+  --same: #cbb896;
+  --key-bg: #e5ded3;
+  --btn-bg: #8f7a66;
+  --btn-fg: #f9f6f2;
+  --sheet-bg: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1a1714;
+    --fg: #e4dcd2;
+    --muted: #9a9184;
+    --line: #3d352e;
+    --line-strong: #7a7166;
+    --cell-bg: #241f1b;
+    --given: #e4dcd2;
+    --entered: #7bb6de;
+    --wrong: #e0705c;
+    --sel: #5b4f3e;
+    --peer: #342e27;
+    --same: #4c4030;
+    --key-bg: #3a322c;
+    --sheet-bg: #241f1b;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  display: flex;
+  justify-content: center;
+  padding: clamp(10px, 3vmin, 24px) clamp(10px, 4vmin, 28px);
+  overscroll-behavior: none;
+  touch-action: manipulation;
+}
+
+.app {
+  width: min(100%, 440px);
+  display: flex;
+  flex-direction: column;
+  gap: clamp(8px, 2vmin, 14px);
+}
+
+.title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(26px, 6.5vmin, 36px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.head-actions { display: flex; align-items: baseline; gap: 14px; }
+
+.toggle {
+  border: 0; background: none; padding: 0;
+  color: inherit; font-family: inherit; font-size: 14px; font-weight: 600;
+  cursor: pointer; opacity: 0.6;
+}
+
+.toggle:hover { opacity: 1; }
+
+.back {
+  color: inherit; opacity: 0.6; text-decoration: none;
+  font-size: 14px; font-weight: 600;
+}
+
+.back:hover { opacity: 1; }
+
+.status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.levels { display: flex; gap: 6px; }
+
+.level {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 5px 12px;
+  cursor: pointer;
+}
+
+.level[aria-pressed="true"] {
+  background: var(--btn-bg);
+  border-color: var(--btn-bg);
+  color: var(--btn-fg);
+}
+
+.timer {
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.board-wrap { position: relative; }
+
+.board {
+  --cell: clamp(30px, min(9.6vmin, 44px), 44px);
+  display: grid;
+  grid-template-columns: repeat(9, var(--cell));
+  width: max-content;
+  margin-inline: auto;
+  border: 2px solid var(--line-strong);
+  background: var(--line);
+  gap: 1px;
+}
+
+.cell {
+  width: var(--cell);
+  height: var(--cell);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--cell-bg);
+  border: 0;
+  padding: 0;
+  font-family: inherit;
+  font-size: calc(var(--cell) * 0.56);
+  font-weight: 600;
+  color: var(--entered);
+  cursor: pointer;
+}
+
+/* 3×3 상자 경계. 격자 간격만으로는 상자가 구분되지 않는다. */
+.cell.box-top { box-shadow: inset 0 2px 0 var(--line-strong); }
+.cell.box-left { box-shadow: inset 2px 0 0 var(--line-strong); }
+.cell.box-top.box-left { box-shadow: inset 0 2px 0 var(--line-strong), inset 2px 0 0 var(--line-strong); }
+
+.cell.given { color: var(--given); font-weight: 800; }
+.cell.wrong { color: var(--wrong); }
+.cell.peer { background: var(--peer); }
+.cell.same { background: var(--same); }
+.cell.selected { background: var(--sel); }
+.cell.hinted { animation: flash 900ms ease-out; }
+
+@keyframes flash {
+  0%, 100% { background: var(--cell-bg); }
+  25% { background: #f4d35e; }
+}
+
+/* 연필 표시는 칸을 3×3으로 나눠 숫자 자리를 고정한다. 자리가 고정돼야 어떤
+   숫자가 빠졌는지 눈으로 셀 수 있다. */
+.marks {
+  position: absolute;
+  inset: 2px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  font-size: calc(var(--cell) * 0.24);
+  font-weight: 600;
+  color: var(--muted);
+  line-height: 1;
+  pointer-events: none;
+}
+
+.marks span { display: flex; align-items: center; justify-content: center; }
+
+.veil {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--bg) 75%, transparent);
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.veil[hidden] { display: none; }
+
+.toast {
+  margin: 0;
+  min-height: 20px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.pad { display: flex; flex-direction: column; gap: 8px; }
+
+.digits {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  gap: 5px;
+}
+
+.digit {
+  height: clamp(40px, 8vmin, 50px);
+  border: 0;
+  border-radius: 7px;
+  background: var(--key-bg);
+  color: inherit;
+  font-family: inherit;
+  font-size: clamp(17px, 4.2vmin, 21px);
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+}
+
+.digit:active { filter: brightness(0.92); }
+
+/* 다 쓴 숫자는 눌러도 소용이 없다. 지우지 않고 흐리게만 둔다 — 자리가 바뀌면
+   손가락이 헷갈린다. */
+.digit.done { opacity: 0.3; }
+
+.tools { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+
+.tool {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 7px 0;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.tool-icon { font-size: 17px; line-height: 1; }
+.tool-label { font-size: 11px; font-weight: 600; opacity: 0.8; }
+.tool:disabled { opacity: 0.35; cursor: default; }
+
+.tool[aria-pressed="true"] {
+  background: var(--btn-bg);
+  border-color: var(--btn-bg);
+  color: var(--btn-fg);
+}
+
+.sheet {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--sheet-bg);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sheet[hidden] { display: none; }
+
+.sheet-title { margin: 0; font-size: 19px; font-weight: 800; }
+.sheet-note { margin: 0; font-size: 14px; color: var(--muted); }
+.sheet-actions { display: flex; gap: 8px; }
+
+.btn {
+  flex: 1;
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  border: 0;
+  border-radius: 8px;
+  padding: 11px 16px;
+  font-size: 15px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.help-list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cell.hinted { animation-duration: 1ms; }
+}
