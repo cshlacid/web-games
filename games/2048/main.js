@@ -2,6 +2,7 @@
 
 (function () {
   const L = window.Game2048Logic;
+  const Sound = window.Game2048Sound;
   const BEST_KEY = 'web-games.2048.best';
   const MOVE_MS = 110; // style.css의 .tile transition과 맞춰야 한다.
 
@@ -16,6 +17,8 @@
     overlay: document.getElementById('overlay'),
     overlayText: document.getElementById('overlay-text'),
     overlayActions: document.getElementById('overlay-actions'),
+    toggleBgm: document.getElementById('toggle-bgm'),
+    toggleSfx: document.getElementById('toggle-sfx'),
   };
 
   for (let i = 0; i < L.SIZE * L.SIZE; i++) el.cells.appendChild(document.createElement('div'));
@@ -128,6 +131,7 @@
     if (!result.moved) return;
 
     state.busy = true;
+    Sound.play('move');
 
     // 1단계: 살아남는 타일과 흡수되는 타일을 모두 목적지로 보낸다.
     // 값 갱신을 여기서 하면 이동 중에 숫자가 바뀌어 보이므로 뒤로 미룬다.
@@ -149,6 +153,7 @@
       }
 
       state.grid = result.grid;
+      let loudest = 0;
       for (let r = 0; r < L.SIZE; r++) {
         for (let c = 0; c < L.SIZE; c++) {
           const tile = state.grid[r][c];
@@ -159,16 +164,20 @@
             styleTile(node, tile.value);
             place(node, r, c);
             node.classList.add('pop');
+            loudest = Math.max(loudest, tile.value);
           }
         }
       }
 
+      // 여러 쌍이 한 번에 합쳐져도 소리는 하나만 낸다. 겹쳐 울리면 시끄럽다.
+      if (loudest) Sound.play('merge', loudest);
       setScore(result.gained);
       spawnTile(true);
       state.busy = false;
 
       if (state.status === 'playing' && L.hasWon(state.grid)) {
         state.status = 'won';
+        Sound.play('win');
         showOverlay('2048 달성!', [
           { label: '계속하기', run: hideOverlay },
           { label: '새 게임', run: newGame },
@@ -177,6 +186,7 @@
       }
       if (!L.canMove(state.grid)) {
         state.status = 'over';
+        Sound.play('gameOver');
         showOverlay('게임 오버', [{ label: '다시 하기', run: newGame }]);
       }
     }, animMs());
@@ -189,6 +199,7 @@
 
   window.addEventListener('keydown', (event) => {
     if (event.metaKey || event.ctrlKey || event.altKey) return;
+    Sound.unlock();
     const direction = KEYS[event.key] || KEYS[event.key.toLowerCase()];
     if (!direction) return;
     event.preventDefault(); // 방향키로 페이지가 스크롤되지 않게 한다.
@@ -213,7 +224,28 @@
     else move(dy > 0 ? 'down' : 'up');
   }, { passive: true });
 
-  el.newGame.addEventListener('click', newGame);
+  el.newGame.addEventListener('click', () => {
+    Sound.play('click');
+    newGame();
+  });
+
+  // 브라우저 정책상 사용자 조작 없이는 소리를 낼 수 없다. 어떤 입력이든 처음
+  // 들어온 시점에 오디오를 깨운다. unlock()은 여러 번 불러도 안전하다.
+  document.addEventListener('pointerdown', () => Sound.unlock());
+  el.board.addEventListener('touchstart', () => Sound.unlock(), { passive: true });
+
+  function bindToggle(node, key, apply) {
+    node.setAttribute('aria-pressed', String(Sound.prefs[key]));
+    node.addEventListener('click', () => {
+      const on = !Sound.prefs[key];
+      apply(on);
+      node.setAttribute('aria-pressed', String(on));
+      Sound.play('click');
+    });
+  }
+
+  bindToggle(el.toggleBgm, 'bgm', (on) => Sound.setBgm(on));
+  bindToggle(el.toggleSfx, 'sfx', (on) => Sound.setSfx(on));
 
   newGame();
 })();

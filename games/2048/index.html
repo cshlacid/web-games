@@ -14,7 +14,11 @@
   <header class="head">
     <div class="title-row">
       <h1>2048</h1>
-      <a class="back" href="../../">← 목록</a>
+      <div class="head-actions">
+        <button class="toggle" id="toggle-bgm" type="button" aria-pressed="true">BGM</button>
+        <button class="toggle" id="toggle-sfx" type="button" aria-pressed="true">효과음</button>
+        <a class="back" href="../../">← 목록</a>
+      </div>
     </div>
     <div class="score-row">
       <div class="score-box">
@@ -43,6 +47,7 @@
 </main>
 
 <script src="logic.js"></script>
+<script src="audio.js"></script>
 <script src="main.js"></script>
 </body>
 </html>
