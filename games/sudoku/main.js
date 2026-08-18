@@ -3,6 +3,7 @@
 (function () {
   const S = window.SudokuSolver;
   const G = window.SudokuGenerator;
+  const Sound = window.SudokuSound;
   const SAVE_KEY = 'web-games.sudoku.game';
 
   const TECHNIQUE_LABEL = {
@@ -36,6 +37,8 @@
     help: document.getElementById('help'),
     helpOpen: document.getElementById('help-open'),
     helpClose: document.getElementById('help-close'),
+    toggleBgm: document.getElementById('toggle-bgm'),
+    toggleSfx: document.getElementById('toggle-sfx'),
   };
 
   const store = {
@@ -169,12 +172,15 @@
     snapshot();
     if (state.values[i] === digit) {
       state.values[i] = 0;
+      Sound.play('erase');
     } else {
       state.values[i] = digit;
       state.marks[i] = 0;
       // 확정한 숫자는 같은 줄·상자의 후보에서 빠진다. 손으로 지우게 두면
       // 연필 표시가 금세 거짓말을 한다.
       for (const peer of S.PEERS[i]) state.marks[peer] &= ~S.bitOf(digit);
+      // 규칙에 어긋나는 자리면 다른 소리를 낸다. 화면의 빨간색을 놓쳐도 귀로 걸린다.
+      Sound.play(conflicts().has(i) ? 'conflict' : 'place', digit);
     }
     afterChange();
   }
@@ -184,6 +190,7 @@
     if (state.done || isGiven(i) || state.values[i]) return;
     snapshot();
     state.marks[i] ^= S.bitOf(digit);
+    Sound.play('pencil');
     afterChange();
   }
 
@@ -194,6 +201,7 @@
     snapshot();
     state.values[i] = 0;
     state.marks[i] = 0;
+    Sound.play('erase');
     afterChange();
   }
 
@@ -202,6 +210,7 @@
     if (!last) return;
     state.values.set(last.values);
     state.marks.set(last.marks);
+    Sound.play('undo');
     save();
     render();
   }
@@ -219,6 +228,7 @@
     el.resultTitle.textContent = '다 풀었어요';
     el.resultNote.textContent = `${G.LEVELS[state.level].label} · ${formatTime(state.elapsed)}`;
     el.result.hidden = false;
+    Sound.play('win');
     save();
   }
 
@@ -235,6 +245,7 @@
       if (state.values[i] && state.values[i] !== Number(state.solution[i])) {
         state.selected = i;
         render();
+        Sound.play('conflict');
         toast('여기 숫자가 정답과 달라요. 먼저 고쳐야 이어서 풀 수 있어요');
         return;
       }
@@ -252,6 +263,7 @@
     cells[step.index].dataset.hinted = '1';
     setTimeout(() => { delete cells[step.index].dataset.hinted; render(); }, 900);
 
+    Sound.play('hint');
     toast(`${step.digit} — ${TECHNIQUE_LABEL[step.technique] || step.technique}`);
     afterChange();
   }
@@ -349,12 +361,16 @@
     render();
   });
 
-  el.pencil.addEventListener('click', () => { state.pencil = !state.pencil; render(); });
+  el.pencil.addEventListener('click', () => {
+    state.pencil = !state.pencil;
+    Sound.play('click');
+    render();
+  });
   el.erase.addEventListener('click', clearCell);
   el.undo.addEventListener('click', undo);
   el.hint.addEventListener('click', hint);
-  el.newGame.addEventListener('click', () => newGame());
-  el.again.addEventListener('click', () => newGame());
+  el.newGame.addEventListener('click', () => { Sound.play('click'); newGame(); });
+  el.again.addEventListener('click', () => { Sound.play('click'); newGame(); });
   el.helpOpen.addEventListener('click', () => {
     const open = el.help.hidden;
     el.help.hidden = !open;
@@ -368,6 +384,7 @@
   const MOVES = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -9, ArrowDown: 9 };
 
   window.addEventListener('keydown', (event) => {
+    Sound.unlock();
     if (event.key.toLowerCase() === 'z' && (event.ctrlKey || event.metaKey)) {
       event.preventDefault();
       undo();
@@ -400,6 +417,23 @@
       else place(digit);
     }
   });
+
+  // 브라우저 정책상 사용자 조작 전에는 소리를 낼 수 없다. unlock()은 여러 번
+  // 불러도 안전하므로 첫 입력마다 그냥 호출한다.
+  document.addEventListener('pointerdown', () => Sound.unlock());
+
+  function bindSoundToggle(node, key, apply) {
+    node.setAttribute('aria-pressed', String(Sound.prefs[key]));
+    node.addEventListener('click', () => {
+      const on = !Sound.prefs[key];
+      apply(on);
+      node.setAttribute('aria-pressed', String(on));
+      Sound.play('click');
+    });
+  }
+
+  bindSoundToggle(el.toggleBgm, 'bgm', (on) => Sound.setBgm(on));
+  bindSoundToggle(el.toggleSfx, 'sfx', (on) => Sound.setSfx(on));
 
   setInterval(() => {
     if (!state.running || state.done) return;

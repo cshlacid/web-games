@@ -116,6 +116,17 @@ h1 {
   color: var(--btn-fg);
 }
 
+.status-right {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.toggle.sound { font-size: 12px; }
+
+/* 취소선은 소리 토글에만 준다. 도움말 토글의 꺼짐은 "안 열림"이라 뜻이 다르다. */
+.toggle.sound[aria-pressed="false"] { opacity: 0.38; text-decoration: line-through; }
+
 .timer {
   font-size: 15px;
   font-weight: 700;
