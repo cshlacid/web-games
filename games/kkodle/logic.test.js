@@ -111,13 +111,16 @@ check('같은 날은 같은 단어', L.dailyIndex('2026-08-18', 100), L.dailyInd
 check('다른 날은 대체로 다른 단어',
   L.dailyIndex('2026-08-18', 269) !== L.dailyIndex('2026-08-19', 269), true);
 
-// 날짜별 인덱스가 목록 전체에 고르게 퍼지는지 (한쪽으로 쏠리면 같은 답이 자주 나온다)
-const seen = new Set();
-for (let i = 0; i < 269; i++) {
-  const d = new Date(Date.UTC(2026, 0, 1) + i * 86400000);
-  seen.add(L.dailyIndex(L.dateKey(d), WORDS.length));
+// 날짜별 인덱스가 목록 전체에 고르게 퍼지는지. 한쪽으로 쏠리면 같은 답이 자주
+// 돌아온다. 목록 크기가 바뀌어도 뜻이 유지되도록 비율로 본다.
+const DAYS = 365;
+const picks = [];
+for (let i = 0; i < DAYS; i++) {
+  const day = new Date(Date.UTC(2026, 0, 1) + i * 86400000);
+  picks.push(L.dailyIndex(L.dateKey(day), WORDS.length));
 }
-check('269일 동안 서로 다른 단어가 절반 이상', seen.size > 134, true);
+check('1년 동안 서로 다른 단어가 7할 이상', new Set(picks).size > DAYS * 0.7, true);
+check('어제와 같은 단어가 나오지 않음', picks.filter((v, i) => i > 0 && v === picks[i - 1]).length, 0);
 
 // --- 입력 검증 ---
 check('두 글자 한글', L.isValidGuess('사과'), true);

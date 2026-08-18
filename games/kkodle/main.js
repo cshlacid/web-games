@@ -255,6 +255,7 @@
     if (!state.daily) return;
     store.set(DAILY_KEY, {
       date: L.dateKey(),
+      answer: state.answer,
       words: state.rows.map((row) => row.word),
       status: state.status,
     });
@@ -263,6 +264,10 @@
   function restoreDaily() {
     const saved = store.get(DAILY_KEY, null);
     if (!saved || saved.date !== L.dateKey()) return false;
+    // 단어 목록이 바뀌면 같은 날짜라도 정답이 달라진다. 그때 남아 있던 진행을
+    // 복원하면 다른 문제의 추측을 새 정답으로 채점하게 된다. 정답이 적혀 있지
+    // 않은 예전 저장본도 같은 이유로 버린다 — 어느 문제의 기록인지 알 수 없다.
+    if (saved.answer !== state.answer) return false;
 
     for (const word of saved.words) {
       const slots = H.toSlots(word);
