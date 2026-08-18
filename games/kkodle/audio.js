@@ -186,6 +186,18 @@
     sfx[name](arg);
   }
 
+  // resume()의 반환값에 기대지 않는다. 프라미스를 돌려주지 않는 브라우저가
+  // 있고(사파리 구버전), 돌려주더라도 실제 재생이 시작될 때까지 해결하지 않는
+  // 경우가 있다. 예전에는 여기서 .then()을 부르다 TypeError가 나면서 BGM 시작이
+  // 통째로 죽었고, 토글 버튼을 눌러야만 소리가 나왔다. 시작 신호는 statechange가
+  // 책임지고, 여기서는 거부만 삼킨다 — 자동재생이 막히면 거부되는 것이 정상이다.
+  function safeResume() {
+    try {
+      const pending = ctx.resume();
+      if (pending && typeof pending.catch === 'function') pending.catch(() => {});
+    } catch { /* 무시 */ }
+  }
+
   function unlock() {
     if (!init()) return;
 
@@ -198,11 +210,16 @@
       source.start(0);
     }
 
-    // resume()의 반환값에 기대지 않는다. 프라미스를 돌려주지 않는 브라우저가
-    // 있고(사파리 구버전), 돌려주더라도 실제 재생이 시작될 때까지 해결하지 않는
-    // 경우가 있다. 예전에는 여기서 .then()을 부르다 TypeError가 나면서 BGM
-    // 시작이 통째로 죽었고, 토글 버튼을 눌러야만 소리가 나왔다.
-    try { ctx.resume(); } catch { /* 무시 */ }
+    safeResume();
+    if (ctx.state === 'running' && prefs.bgm) startBgm();
+  }
+
+  // 자동재생이 허용된 환경(사용자가 이 사이트에 소리를 허용했거나, 크롬의
+  // 미디어 관여도 점수가 충분한 경우)에서는 조작을 기다릴 이유가 없다. 막히면
+  // 컨텍스트가 suspended로 남고 첫 입력 때 statechange가 이어받는다.
+  function tryAutostart() {
+    if (!init()) return;
+    safeResume();
     if (ctx.state === 'running' && prefs.bgm) startBgm();
   }
 
@@ -212,7 +229,7 @@
     else if (prefs.bgm && ctx.state === 'running') startBgm();
   });
 
-  window.KkodleSound = {
+  const Sound = {
     prefs,
     unlock,
     play,
@@ -221,7 +238,7 @@
       save();
       if (!init()) return;
       if (on) {
-        if (ctx.state === 'suspended') ctx.resume();
+        safeResume();
         startBgm();
       } else {
         stopBgm();
@@ -232,4 +249,8 @@
       save();
     },
   };
+
+  window.KkodleSound = Sound;
+
+  tryAutostart();
 })();
