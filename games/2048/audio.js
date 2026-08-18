@@ -22,6 +22,11 @@
   let nextStepTime = 0;
   let step = 0;
 
+  // 음량은 여기서만 조정한다. 리미터가 뒤를 받치므로 1을 넘겨도 깨지지는
+  // 않지만, 올릴수록 리미터가 더 자주 눌러 소리가 답답해진다.
+  const BGM_LEVEL = 1.15;
+  const SFX_LEVEL = 0.9;
+
   const BPM = 88;
   const STEP = 60 / BPM / 2; // 8분음표
   const LOOKAHEAD = 0.12;
@@ -62,7 +67,7 @@
     bgmBus.connect(master);
 
     sfxBus = ctx.createGain();
-    sfxBus.gain.value = 0.9;
+    sfxBus.gain.value = SFX_LEVEL;
     sfxBus.connect(master);
 
     return ctx;
@@ -123,7 +128,7 @@
     step = 0;
     bgmBus.gain.cancelScheduledValues(ctx.currentTime);
     bgmBus.gain.setValueAtTime(0.0001, ctx.currentTime);
-    bgmBus.gain.exponentialRampToValueAtTime(0.7, ctx.currentTime + 1.2);
+    bgmBus.gain.exponentialRampToValueAtTime(BGM_LEVEL, ctx.currentTime + 1.2);
     timer = setInterval(scheduler, 25);
     scheduler();
   }
