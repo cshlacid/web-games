@@ -64,8 +64,8 @@ h1 {
 
 .head-actions {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  align-items: baseline;
+  gap: 14px;
 }
 
 .back {
@@ -78,29 +78,23 @@ h1 {
 
 .back:hover { opacity: 1; }
 
+/* 헤더의 목록 링크와 같은 무게로 둔다. 채움이나 테두리를 주면 "새 게임"
+   버튼과 경쟁해서, 자주 누르지도 않는 설정이 화면에서 제일 눈에 띈다. */
 .toggle {
-  border: 1px solid currentColor;
-  border-radius: 999px;
+  border: 0;
   background: none;
+  padding: 0;
   color: inherit;
   font-family: inherit;
-  font-size: 12px;
-  font-weight: 700;
-  padding: 5px 11px;
+  font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
-  opacity: 0.85;
+  opacity: 0.6;
 }
 
-/* 켜짐/꺼짐을 색이 아니라 채움으로 구분한다. 색만으로 구분하면 두 상태가
-   같아 보이는 사용자가 생긴다. */
-.toggle[aria-pressed="true"] {
-  background: var(--btn-bg);
-  border-color: var(--btn-bg);
-  color: var(--btn-fg);
-}
-
+/* 꺼짐은 취소선으로 알린다. 흐리기만 하면 그냥 옅은 글씨와 구분되지 않는다. */
 .toggle[aria-pressed="false"] {
-  opacity: 0.45;
+  opacity: 0.38;
   text-decoration: line-through;
 }
 

@@ -43,16 +43,26 @@
     if (!AudioCtx) return null;
     ctx = new AudioCtx();
 
+    // 게인을 귀에 들리는 수준까지 올리면 효과음과 BGM이 겹칠 때 1.0을 넘길 수
+    // 있다. 넘긴 만큼은 깨진 소리로 들리므로 마스터에 리미터를 물린다.
+    const limiter = ctx.createDynamicsCompressor();
+    limiter.threshold.value = -8;
+    limiter.knee.value = 6;
+    limiter.ratio.value = 12;
+    limiter.attack.value = 0.003;
+    limiter.release.value = 0.18;
+    limiter.connect(ctx.destination);
+
     master = ctx.createGain();
-    master.gain.value = 0.9;
-    master.connect(ctx.destination);
+    master.gain.value = 1;
+    master.connect(limiter);
 
     bgmBus = ctx.createGain();
     bgmBus.gain.value = 0;
     bgmBus.connect(master);
 
     sfxBus = ctx.createGain();
-    sfxBus.gain.value = 0.85;
+    sfxBus.gain.value = 0.9;
     sfxBus.connect(master);
 
     return ctx;
@@ -85,14 +95,14 @@
 
     if (beat === 0) {
       for (const note of chord.pad) {
-        tone(bgmBus, { freq: midi(note), at, dur: STEP * 8, type: 'sine', gain: 0.055, attack: 0.5 });
+        tone(bgmBus, { freq: midi(note), at, dur: STEP * 8, type: 'sine', gain: 0.13, attack: 0.5 });
       }
-      tone(bgmBus, { freq: midi(chord.bass), at, dur: STEP * 4, type: 'triangle', gain: 0.10, attack: 0.02 });
+      tone(bgmBus, { freq: midi(chord.bass), at, dur: STEP * 4, type: 'triangle', gain: 0.24, attack: 0.02 });
     }
 
     if (beat % 2 === 0) {
       const note = chord.arp[(beat / 2) % chord.arp.length];
-      tone(bgmBus, { freq: midi(note), at, dur: STEP * 1.6, type: 'triangle', gain: 0.035 });
+      tone(bgmBus, { freq: midi(note), at, dur: STEP * 1.6, type: 'triangle', gain: 0.12 });
     }
   }
 
@@ -113,7 +123,7 @@
     step = 0;
     bgmBus.gain.cancelScheduledValues(ctx.currentTime);
     bgmBus.gain.setValueAtTime(0.0001, ctx.currentTime);
-    bgmBus.gain.exponentialRampToValueAtTime(0.5, ctx.currentTime + 1.2);
+    bgmBus.gain.exponentialRampToValueAtTime(0.7, ctx.currentTime + 1.2);
     timer = setInterval(scheduler, 25);
     scheduler();
   }
@@ -131,7 +141,7 @@
   const sfx = {
     move() {
       const at = ctx.currentTime;
-      tone(sfxBus, { freq: 220, glide: 160, at, dur: 0.07, type: 'triangle', gain: 0.05 });
+      tone(sfxBus, { freq: 220, glide: 160, at, dur: 0.08, type: 'triangle', gain: 0.20 });
     },
     merge(value) {
       // 큰 수가 합쳐질수록 높은 음이 나게 해서 진행이 귀로도 느껴지게 한다.
@@ -139,24 +149,24 @@
       const scale = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21];
       const at = ctx.currentTime;
       const base = 60 + scale[Math.round(rank)];
-      tone(sfxBus, { freq: midi(base), at, dur: 0.22, type: 'triangle', gain: 0.16, attack: 0.008 });
-      tone(sfxBus, { freq: midi(base + 12), at: at + 0.04, dur: 0.16, type: 'sine', gain: 0.08 });
+      tone(sfxBus, { freq: midi(base), at, dur: 0.24, type: 'triangle', gain: 0.38, attack: 0.008 });
+      tone(sfxBus, { freq: midi(base + 12), at: at + 0.04, dur: 0.18, type: 'sine', gain: 0.20 });
     },
     win() {
       const at = ctx.currentTime;
       [60, 64, 67, 72].forEach((note, i) => {
-        tone(sfxBus, { freq: midi(note), at: at + i * 0.11, dur: 0.4, type: 'triangle', gain: 0.16 });
+        tone(sfxBus, { freq: midi(note), at: at + i * 0.11, dur: 0.4, type: 'triangle', gain: 0.34 });
       });
     },
     gameOver() {
       const at = ctx.currentTime;
       [57, 53, 48].forEach((note, i) => {
-        tone(sfxBus, { freq: midi(note), at: at + i * 0.16, dur: 0.5, type: 'sine', gain: 0.16 });
+        tone(sfxBus, { freq: midi(note), at: at + i * 0.16, dur: 0.5, type: 'sine', gain: 0.34 });
       });
     },
     click() {
       const at = ctx.currentTime;
-      tone(sfxBus, { freq: 520, glide: 660, at, dur: 0.09, type: 'sine', gain: 0.09 });
+      tone(sfxBus, { freq: 520, glide: 660, at, dur: 0.09, type: 'sine', gain: 0.22 });
     },
   };
 
@@ -169,8 +179,20 @@
   // 컨텍스트를 만들고 재개한다.
   function unlock() {
     if (!init()) return;
-    if (ctx.state === 'suspended') ctx.resume();
-    if (prefs.bgm) startBgm();
+
+    // iOS는 resume()만으로는 열리지 않고 실제 재생이 한 번 일어나야 한다.
+    // 길이 1샘플짜리 무음이면 충분하다.
+    if (!unlock.primed) {
+      unlock.primed = true;
+      const source = ctx.createBufferSource();
+      source.buffer = ctx.createBuffer(1, 1, ctx.sampleRate);
+      source.connect(ctx.destination);
+      source.start(0);
+    }
+
+    // resume()이 끝나기 전에는 currentTime이 멈춰 있어 예약 시각이 어긋난다.
+    const started = ctx.state === 'suspended' ? ctx.resume() : Promise.resolve();
+    started.then(() => { if (prefs.bgm) startBgm(); }).catch(() => { /* 무시 */ });
   }
 
   const Sound = {
