@@ -59,6 +59,7 @@ GitHub Pages가 `main` 브랜치의 루트를 그대로 서빙한다. 여기서 
 python3 -m http.server 8000   # 로컬 확인 (http://localhost:8000)
 node games/2048/logic.test.js   # 2048 규칙 테스트
 node games/kkodle/logic.test.js # 꼬들 자모 처리·판정 테스트
+node games/sudoku/logic.test.js # 스도쿠 기법·생성기 테스트
 ```
 
 게임별 테스트는 그 게임 폴더 안에 두고, 새로 만들면 여기에 명령을 추가한다.
