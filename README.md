@@ -29,6 +29,7 @@ python3 -m http.server 8000
 node games/2048/logic.test.js
 node games/kkodle/logic.test.js
 node games/sudoku/logic.test.js
+node games/doppelblock/logic.test.js
 ```
 
 ## 구조
