@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>꼬들</title>
+<meta name="description" content="두 글자 한글 단어를 여섯 번 안에 맞히는 게임">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🟩</text></svg>">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="app">
+  <header class="head">
+    <div class="title-row">
+      <h1>꼬들</h1>
+      <div class="head-actions">
+        <button class="toggle" id="mode" type="button" aria-pressed="true">오늘의 단어</button>
+        <button class="toggle" id="help-open" type="button" aria-pressed="false">도움말</button>
+        <a class="back" href="../../">← 목록</a>
+      </div>
+    </div>
+    <p class="subtitle" id="subtitle">두 글자 단어를 여섯 번 안에</p>
+  </header>
+
+  <div class="board" id="board"></div>
+
+  <p class="toast" id="toast" role="status" aria-live="polite"></p>
+
+  <div class="sheet" id="result" hidden>
+    <p class="sheet-title" id="result-title"></p>
+    <p class="sheet-answer" id="result-answer"></p>
+    <dl class="stats" id="stats"></dl>
+    <div class="sheet-actions">
+      <button class="btn" id="share" type="button">결과 복사</button>
+      <button class="btn ghost" id="again" type="button">연습 한 판 더</button>
+    </div>
+  </div>
+
+  <div class="keyboard" id="keyboard"></div>
+
+  <div class="sheet" id="help" hidden>
+    <p class="sheet-title">규칙</p>
+    <ul class="help-list">
+      <li>두 글자 단어를 여섯 번 안에 맞힙니다.</li>
+      <li>판정은 글자가 아니라 <b>자모 단위</b>입니다. 한 글자는 초성·중성·종성
+        세 칸으로 나뉘고, 칸마다 따로 색이 매겨집니다.</li>
+      <li><span class="chip correct"></span> 자리까지 맞음
+        &nbsp;<span class="chip present"></span> 단어에 있지만 자리가 다름
+        &nbsp;<span class="chip absent"></span> 없음</li>
+      <li>받침이 없는 것도 하나의 답입니다. 받침 칸이 초록이면 그 자리에 받침이
+        없다는 뜻입니다.</li>
+      <li>오늘의 단어는 매일 자정(KST)에 바뀌고, 모두에게 같습니다.</li>
+    </ul>
+    <div class="sheet-actions">
+      <button class="btn" id="help-close" type="button">닫기</button>
+    </div>
+  </div>
+</main>
+
+<script src="hangul.js"></script>
+<script src="words.js"></script>
+<script src="logic.js"></script>
+<script src="main.js"></script>
+</body>
+</html>

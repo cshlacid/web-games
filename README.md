@@ -9,6 +9,7 @@
 | 게임 | 설명 | 스택 |
 |---|---|---|
 | [2048](games/2048/) | 같은 숫자를 밀어 붙여 2048을 만든다 | 순수 HTML/CSS/JS |
+| [꼬들](games/kkodle/) | 두 글자 한글 단어를 여섯 번 안에 맞힌다 | 순수 HTML/CSS/JS |
 
 ## 로컬에서 실행
 
@@ -25,6 +26,7 @@ python3 -m http.server 8000
 
 ```bash
 node games/2048/logic.test.js
+node games/kkodle/logic.test.js
 ```
 
 ## 구조

@@ -1,0 +1,288 @@
+:root {
+  --bg: #faf8ef;
+  --fg: #3a3226;
+  --muted: #8d8578;
+  --line: #d6cec2;
+  --tile-bg: #ffffff;
+  --btn-bg: #8f7a66;
+  --btn-fg: #f9f6f2;
+  --key-bg: #e5ded3;
+  --sheet-bg: #ffffff;
+
+  /* 판정 색은 셋 다 중간 이상으로 어둡게 잡는다. 타일 글자가 흰색 하나로
+     고정되므로 어느 색 위에서도 읽혀야 한다. */
+  --correct: #5f9e57;
+  --present: #c3a83c;
+  --absent: #7b7f81;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1a1714;
+    --fg: #e4dcd2;
+    --muted: #9a9184;
+    --line: #3d352e;
+    --tile-bg: #241f1b;
+    --key-bg: #3a322c;
+    --sheet-bg: #241f1b;
+    --correct: #56894f;
+    --present: #a68f33;
+    --absent: #5f6365;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; min-height: 100%; }
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  display: flex;
+  justify-content: center;
+  padding: clamp(12px, 3vmin, 28px) clamp(12px, 4vmin, 32px) clamp(16px, 4vmin, 32px);
+  overscroll-behavior: none;
+  touch-action: manipulation;
+}
+
+.app {
+  width: min(100%, 460px);
+  display: flex;
+  flex-direction: column;
+  gap: clamp(12px, 2.5vmin, 20px);
+}
+
+.title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(28px, 7vmin, 40px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.head-actions {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+}
+
+.toggle {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: inherit;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  opacity: 0.6;
+}
+
+.toggle[aria-pressed="false"] { opacity: 0.38; }
+.toggle:hover { opacity: 1; }
+
+.back {
+  color: inherit;
+  opacity: 0.6;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.back:hover { opacity: 1; }
+
+.subtitle {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.board {
+  display: grid;
+  gap: clamp(6px, 1.6vmin, 10px);
+  justify-content: center;
+}
+
+.row {
+  display: grid;
+  /* 6줄이 키보드와 함께 한 화면에 들어가야 하므로 세로 길이로도 묶는다. */
+  grid-template-columns: repeat(2, clamp(52px, min(19vmin, 8.5vh), 84px));
+  gap: clamp(6px, 1.6vmin, 10px);
+}
+
+.tile {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  background: var(--tile-bg);
+  font-size: clamp(30px, 9vmin, 44px);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.tile.filled { border-color: var(--muted); }
+
+/* 한 글자를 초·중·종 세 칸으로 보여줘야 하는데, 칸을 나누면 글자를 읽을 수
+   없다. 배경을 세로 3등분해 칠하고 글자는 그 위에 얹는다. */
+.tile.judged {
+  border-color: transparent;
+  color: #fff;
+  background-image: linear-gradient(
+    to right,
+    var(--c1) 0 33.34%, var(--c2) 33.34% 66.67%, var(--c3) 66.67% 100%);
+}
+
+.tile.judged.no-jong {
+  /* 받침이 없으면 셋째 칸을 좁게 둔다. 같은 넓이로 칠하면 없는 받침이 있는
+     것처럼 보인다. */
+  background-image: linear-gradient(
+    to right,
+    var(--c1) 0 42%, var(--c2) 42% 84%, var(--c3) 84% 100%);
+}
+
+.tile.pop { animation: pop 180ms ease-out; }
+.row.shake { animation: shake 340ms ease-in-out; }
+
+@keyframes pop {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-7px); }
+  40% { transform: translateX(7px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+
+.toast {
+  margin: 0;
+  min-height: 20px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.keyboard {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.krow {
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+}
+
+.key {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: clamp(44px, 8vmin, 54px);
+  border: 0;
+  border-radius: 6px;
+  background: var(--key-bg);
+  color: inherit;
+  font-family: inherit;
+  font-size: clamp(15px, 3.6vmin, 18px);
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+}
+
+.key.wide { flex: 1.6 1 auto; font-size: 13px; }
+.key:active { filter: brightness(0.92); }
+.key[data-state="correct"] { background: var(--correct); color: #fff; }
+.key[data-state="present"] { background: var(--present); color: #fff; }
+.key[data-state="absent"] { background: var(--absent); color: #fff; opacity: 0.65; }
+.key[aria-pressed="true"] { outline: 2px solid var(--fg); outline-offset: -2px; }
+
+.sheet {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--sheet-bg);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* display를 지정한 클래스가 기본 [hidden]을 이기므로 직접 꺼준다. */
+.sheet[hidden] { display: none; }
+
+.sheet-title { margin: 0; font-size: 19px; font-weight: 800; }
+.sheet-answer { margin: 0; font-size: 15px; color: var(--muted); }
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin: 0;
+}
+
+.stats div { text-align: center; }
+.stats dt { font-size: 11px; color: var(--muted); font-weight: 700; }
+.stats dd { margin: 2px 0 0; font-size: 20px; font-weight: 800; }
+
+.sheet-actions { display: flex; gap: 8px; }
+
+.btn {
+  flex: 1;
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  border: 0;
+  border-radius: 8px;
+  padding: 11px 16px;
+  font-size: 15px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.btn.ghost {
+  background: none;
+  border: 1px solid var(--line);
+  color: inherit;
+}
+
+.btn:hover { filter: brightness(1.08); }
+
+.help-list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.chip {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  vertical-align: -2px;
+}
+
+.chip.correct { background: var(--correct); }
+.chip.present { background: var(--present); }
+.chip.absent { background: var(--absent); }
+
+@media (prefers-reduced-motion: reduce) {
+  .tile.pop, .row.shake { animation-duration: 1ms; }
+}
