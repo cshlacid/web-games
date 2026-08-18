@@ -4,6 +4,7 @@
   const H = window.KkodleHangul;
   const L = window.KkodleLogic;
   const WORDS = window.KkodleWords;
+  const Sound = window.KkodleSound;
 
   const DAILY_KEY = 'web-games.kkodle.daily';
   const STATS_KEY = 'web-games.kkodle.stats';
@@ -41,6 +42,8 @@
     share: document.getElementById('share'),
     again: document.getElementById('again'),
     help: document.getElementById('help'),
+    toggleBgm: document.getElementById('toggle-bgm'),
+    toggleSfx: document.getElementById('toggle-sfx'),
     helpOpen: document.getElementById('help-open'),
     helpClose: document.getElementById('help-close'),
   };
@@ -171,7 +174,10 @@
 
   function press(jamo) {
     if (state.status !== 'playing' || state.locked) return;
+    const before = H.blocksToText(state.blocks);
     state.blocks = H.input(state.blocks, jamo, L.WORD_LENGTH);
+    // 길이 초과로 무시된 입력에는 소리를 내지 않는다. 눌리지 않은 키다.
+    if (H.blocksToText(state.blocks) !== before) Sound.play('key');
     // 시프트는 한 글자만 적용된다. 키보드와 같은 감각을 유지한다.
     if (state.shiftOn) { state.shiftOn = false; paintKeyboard(); }
     drawCurrent();
@@ -179,7 +185,9 @@
 
   function back() {
     if (state.status !== 'playing' || state.locked) return;
+    const before = H.blocksToText(state.blocks);
     state.blocks = H.backspace(state.blocks);
+    if (H.blocksToText(state.blocks) !== before) Sound.play('back');
     drawCurrent();
   }
 
@@ -196,6 +204,7 @@
     const text = H.blocksToText(state.blocks);
     if (!L.isValidGuess(text)) {
       toast(H.blocksToText(state.blocks).length < 2 ? '두 글자를 채워주세요' : '완성된 두 글자여야 해요');
+      Sound.play('invalid');
       shake();
       return;
     }
@@ -208,6 +217,13 @@
     paintRow(state.rows.length - 1, text, marks);
     paintKeyboard();
 
+    // 글자마다 몇 칸이 맞았는지를 음높이로 들려준다.
+    const scores = [];
+    for (let i = 0; i < L.WORD_LENGTH; i++) {
+      scores.push(marks.slice(i * 3, i * 3 + 3).filter((m) => m === 'correct').length);
+    }
+    Sound.play('reveal', scores);
+
     if (text === state.answer) finish('won');
     else if (state.rows.length >= L.MAX_TRIES) finish('lost');
     else saveDaily();
@@ -215,6 +231,8 @@
 
   function finish(status) {
     state.status = status;
+    // 판정 공개음이 끝난 뒤에 울려야 둘이 뭉개지지 않는다.
+    setTimeout(() => Sound.play(status === 'won' ? 'win' : 'lose'), 380);
     if (state.daily) {
       saveDaily();
       recordStats(status === 'won' ? state.rows.length : 0);
@@ -328,6 +346,7 @@
 
   window.addEventListener('keydown', (event) => {
     if (event.metaKey || event.ctrlKey || event.altKey) return;
+    Sound.unlock();
     if (event.key === 'Enter') { event.preventDefault(); submit(); return; }
     if (event.key === 'Backspace') { event.preventDefault(); back(); return; }
     const jamo = CODE_TO_JAMO[event.code];
@@ -336,8 +355,25 @@
     press(event.shiftKey ? (SHIFTED[jamo] || jamo) : jamo);
   });
 
-  el.mode.addEventListener('click', () => start(!state.daily));
-  el.again.addEventListener('click', () => start(false));
+  el.mode.addEventListener('click', () => { Sound.play('click'); start(!state.daily); });
+  el.again.addEventListener('click', () => { Sound.play('click'); start(false); });
+
+  // 브라우저 정책상 사용자 조작 전에는 소리를 낼 수 없다. unlock()은 여러 번
+  // 불러도 안전하므로 첫 입력마다 그냥 호출한다.
+  document.addEventListener('pointerdown', () => Sound.unlock());
+
+  function bindSoundToggle(node, key, apply) {
+    node.setAttribute('aria-pressed', String(Sound.prefs[key]));
+    node.addEventListener('click', () => {
+      const on = !Sound.prefs[key];
+      apply(on);
+      node.setAttribute('aria-pressed', String(on));
+      Sound.play('click');
+    });
+  }
+
+  bindSoundToggle(el.toggleBgm, 'bgm', (on) => Sound.setBgm(on));
+  bindSoundToggle(el.toggleSfx, 'sfx', (on) => Sound.setSfx(on));
   el.helpOpen.addEventListener('click', () => {
     const open = el.help.hidden;
     el.help.hidden = !open;

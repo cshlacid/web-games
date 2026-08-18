@@ -99,11 +99,30 @@ h1 {
 
 .back:hover { opacity: 1; }
 
+.sub-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .subtitle {
   margin: 0;
   font-size: 13px;
   color: var(--muted);
 }
+
+.sound-toggles {
+  display: flex;
+  gap: 12px;
+  flex: none;
+}
+
+.sound-toggles .toggle { font-size: 13px; }
+
+/* 취소선은 소리 토글에만 준다. 모드·도움말 토글은 꺼짐이 "선택 안 함"일 뿐이라
+   같은 표시를 쓰면 뜻이 달라진다. */
+.sound-toggles .toggle[aria-pressed="false"] { text-decoration: line-through; }
 
 .board {
   display: grid;
