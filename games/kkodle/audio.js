@@ -15,8 +15,8 @@
   }
 
   // 음량은 여기서만 조정한다. 리미터가 뒤를 받치지만 올릴수록 더 자주 눌린다.
-  const BGM_LEVEL = 1.3;
-  const SFX_LEVEL = 0.9;
+  const BGM_LEVEL = 1.04;
+  const SFX_LEVEL = 0.72;
 
   const BPM = 72;
   const STEP = 60 / BPM / 2;
@@ -66,6 +66,12 @@
     sfxBus = ctx.createGain();
     sfxBus.gain.value = SFX_LEVEL;
     sfxBus.connect(master);
+
+    // 컨텍스트가 언제 열리는지는 브라우저마다 다르다. running이 되는 순간을
+    // 직접 듣는 것이 유일하게 확실한 신호다.
+    ctx.addEventListener('statechange', () => {
+      if (ctx.state === 'running' && prefs.bgm) startBgm();
+    });
 
     return ctx;
   }
@@ -192,9 +198,12 @@
       source.start(0);
     }
 
-    // resume()이 끝나기 전에는 currentTime이 멈춰 있어 예약 시각이 어긋난다.
-    const started = ctx.state === 'suspended' ? ctx.resume() : Promise.resolve();
-    started.then(() => { if (prefs.bgm) startBgm(); }).catch(() => { /* 무시 */ });
+    // resume()의 반환값에 기대지 않는다. 프라미스를 돌려주지 않는 브라우저가
+    // 있고(사파리 구버전), 돌려주더라도 실제 재생이 시작될 때까지 해결하지 않는
+    // 경우가 있다. 예전에는 여기서 .then()을 부르다 TypeError가 나면서 BGM
+    // 시작이 통째로 죽었고, 토글 버튼을 눌러야만 소리가 나왔다.
+    try { ctx.resume(); } catch { /* 무시 */ }
+    if (ctx.state === 'running' && prefs.bgm) startBgm();
   }
 
   document.addEventListener('visibilitychange', () => {
