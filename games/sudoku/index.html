@@ -13,19 +13,19 @@
 <main class="app">
   <header class="head">
     <div class="title-row">
+      <div class="head-nav">
+        <a class="back" href="../../">← 목록</a>
+        <button class="toggle" id="help-open" type="button" aria-pressed="false">도움말</button>
+      </div>
       <h1>스도쿠</h1>
       <div class="head-actions">
-        <button class="toggle" id="help-open" type="button" aria-pressed="false">도움말</button>
-        <a class="back" href="../../">← 목록</a>
+        <button class="toggle sound" id="toggle-bgm" type="button" aria-pressed="true">BGM</button>
+        <button class="toggle sound" id="toggle-sfx" type="button" aria-pressed="true">효과음</button>
       </div>
     </div>
     <div class="status-row">
       <div class="levels" id="levels" role="group" aria-label="난이도"></div>
-      <div class="status-right">
-        <button class="toggle sound" id="toggle-bgm" type="button" aria-pressed="true">BGM</button>
-        <button class="toggle sound" id="toggle-sfx" type="button" aria-pressed="true">효과음</button>
-        <span class="timer" id="timer">0:00</span>
-      </div>
+      <span class="timer" id="timer">0:00</span>
     </div>
   </header>
 

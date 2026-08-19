@@ -13,19 +13,19 @@
 <main class="app">
   <header class="head">
     <div class="title-row">
+      <div class="head-nav">
+        <a class="back" href="../../">← 목록</a>
+        <button class="toggle" id="help-open" type="button" aria-pressed="false">도움말</button>
+      </div>
       <h1>꼬들</h1>
       <div class="head-actions">
-        <button class="toggle" id="mode" type="button" aria-pressed="true">오늘의 단어</button>
-        <button class="toggle" id="help-open" type="button" aria-pressed="false">도움말</button>
-        <a class="back" href="../../">← 목록</a>
+        <button class="toggle sound" id="toggle-bgm" type="button" aria-pressed="true">BGM</button>
+        <button class="toggle sound" id="toggle-sfx" type="button" aria-pressed="true">효과음</button>
       </div>
     </div>
     <div class="sub-row">
       <p class="subtitle" id="subtitle">두 글자 단어를 여섯 번 안에</p>
-      <div class="sound-toggles">
-        <button class="toggle" id="toggle-bgm" type="button" aria-pressed="true">BGM</button>
-        <button class="toggle" id="toggle-sfx" type="button" aria-pressed="true">효과음</button>
-      </div>
+      <button class="toggle" id="mode" type="button" aria-pressed="true">오늘의 단어</button>
     </div>
   </header>
 
