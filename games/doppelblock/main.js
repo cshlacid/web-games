@@ -491,6 +491,7 @@
       snapshot();
       state.values[index] = R.BLOCK;
       state.marks[index] = 0;
+      clearPeerMarks(index, R.BLOCK);
       Sound.play('block');
       afterChange();
       return;
@@ -503,6 +504,7 @@
       snapshot();
       state.values[index] = R.BLOCK;
       state.marks[index] = 0;
+      clearPeerMarks(index, R.BLOCK);
       Sound.play('block');
       afterChange();
       return;
