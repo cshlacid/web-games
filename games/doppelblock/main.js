@@ -57,9 +57,13 @@
     running: false,
     done: false,
     doneLines: new Set(),
+    hinted: new Set(),
   };
 
   const digitsOf = () => R.digitCount(state.n);
+  // 연필 표시에 올 수 있는 값들. 검은 칸도 후보가 될 수 있어야 힌트가 "여기는
+  // 검은 칸일 수도 있다"까지 적어 줄 수 있다.
+  const markValues = () => [R.BLOCK, ...Array.from({ length: digitsOf() }, (_, k) => k + 1)];
   const rowOf = (i) => Math.floor(i / state.n);
   const colOf = (i) => i % state.n;
 
@@ -164,7 +168,7 @@
       if (brokenCells.has(i)) classes.push('wrong');
       if (i === selected) classes.push('selected');
       else if (rowOf(i) === rowOf(selected) || colOf(i) === colOf(selected)) classes.push('peer');
-      if (cell.dataset.hinted === '1') classes.push('hinted');
+      if (state.hinted.has(i)) classes.push('hinted');
       cell.className = classes.join(' ');
 
       if (value > 0) {
@@ -175,10 +179,12 @@
         cell.textContent = '';
         const grid = document.createElement('span');
         grid.className = 'marks';
-        grid.style.gridTemplateColumns = `repeat(${Math.min(3, digitsOf())}, 1fr)`;
-        for (let d = 1; d <= digitsOf(); d++) {
+        grid.style.gridTemplateColumns = `repeat(${Math.min(3, digitsOf() + 1)}, 1fr)`;
+        for (const value of markValues()) {
           const slot = document.createElement('span');
-          slot.textContent = (state.marks[i] & (1 << d)) ? d : '';
+          const on = state.marks[i] & S.bitOf(value);
+          if (value === R.BLOCK) slot.className = 'mark-block';
+          slot.textContent = on ? (value === R.BLOCK ? '■' : value) : '';
           grid.appendChild(slot);
         }
         cell.replaceChildren(grid);
@@ -262,10 +268,15 @@
     if (!persist) toastTimer = setTimeout(() => { el.toast.textContent = ''; }, 3600);
   }
 
+  /**
+   * 힌트 하이라이트도 여기서 함께 거둔다. 설명과 짚어 준 칸은 한 쌍이라
+   * 따로 사라지면 어느 칸 이야기였는지 알 수 없게 된다.
+   */
   function clearToast() {
     clearTimeout(toastTimer);
     el.toast.textContent = '';
     el.toast.classList.remove('persist');
+    if (state.hinted.size) { state.hinted.clear(); render(); }
   }
 
   const formatTime = (seconds) =>
@@ -279,14 +290,17 @@
   }
 
   /**
-   * 확정한 숫자를 같은 가로·세로 줄의 연필 표시에서 지운다. 손으로 지우게 두면
-   * 연필 표시가 금세 거짓말을 한다. 검은 칸은 숫자를 소비하지 않으므로 대상이
-   * 아니다.
+   * 방금 놓은 값 때문에 더는 성립하지 않는 연필 표시를 같은 가로·세로 줄에서
+   * 지운다. 손으로 지우게 두면 연필 표시가 금세 거짓말을 한다.
+   *
+   * 숫자는 줄마다 한 번뿐이므로 놓는 즉시 같은 줄에서 빠지지만, 검은 칸은 두
+   * 개까지 들어가므로 두 개가 다 찬 뒤에야 나머지 칸에서 뺄 수 있다.
    */
-  function clearPeerMarks(index, digit) {
-    const bit = 1 << digit;
+  function clearPeerMarks(index, value) {
     for (const kind of ['row', 'col']) {
       const line = lineCells(kind, kind === 'row' ? rowOf(index) : colOf(index));
+      if (value === R.BLOCK && line.filter((c) => state.values[c] === R.BLOCK).length < 2) continue;
+      const bit = S.bitOf(value);
       for (const cell of line) {
         if (cell !== index) state.marks[cell] &= ~bit;
       }
@@ -301,7 +315,7 @@
     const cleared = state.values[i] === value;
     state.values[i] = cleared ? R.UNKNOWN : value;
     if (state.values[i] !== R.UNKNOWN) state.marks[i] = 0;
-    if (!cleared && value !== R.BLOCK) clearPeerMarks(i, value);
+    if (!cleared) clearPeerMarks(i, value);
 
     if (cleared) Sound.play('erase');
     else if (brokenLinesAt(i)) Sound.play('conflict');
@@ -316,12 +330,12 @@
       || lineStatus('col', colOf(index)) === 'broken';
   }
 
-  function mark(digit) {
+  function mark(value) {
     const i = state.selected;
     if (state.done || state.values[i] !== R.UNKNOWN) return;
     clearToast();
     snapshot();
-    state.marks[i] ^= 1 << digit;
+    state.marks[i] ^= S.bitOf(value);
     Sound.play('pencil');
     afterChange();
   }
@@ -416,7 +430,7 @@
     const updates = [];
     for (const cell of cellsInLine) {
       if (state.values[cell] !== R.UNKNOWN) continue;
-      const mask = availableDigits(cell);
+      const mask = availableMarks(cell);
       if (mask !== state.marks[cell]) updates.push([cell, mask]);
     }
 
@@ -430,18 +444,24 @@
   }
 
   /**
-   * 그 칸의 가로·세로에 아직 안 쓰인 숫자들. 더블클릭과 단서 클릭이 함께 쓴다.
+   * 그 칸의 가로·세로만 보고 아직 가능한 값들. 더블탭과 단서 클릭이 함께 쓴다.
    *
    * 일부러 이 정도만 본다. 그 줄의 가능한 배치까지 따지면 후보가 너무 좁아져서
    * 사실상 대신 풀어주는 꼴이 된다 — 실제로 그렇게 만들었다가 되돌렸다.
    */
-  function availableDigits(index) {
+  function availableMarks(index) {
     const used = new Set();
+    let blockable = true;
     for (const kind of ['row', 'col']) {
       const line = lineCells(kind, kind === 'row' ? rowOf(index) : colOf(index));
-      for (const cell of line) if (state.values[cell] > 0) used.add(state.values[cell]);
+      let blocks = 0;
+      for (const cell of line) {
+        if (state.values[cell] > 0) used.add(state.values[cell]);
+        else if (state.values[cell] === R.BLOCK) blocks++;
+      }
+      if (blocks >= 2) blockable = false;
     }
-    let mask = 0;
+    let mask = blockable ? S.BLOCK_BIT : 0;
     for (let d = 1; d <= digitsOf(); d++) if (!used.has(d)) mask |= 1 << d;
     return mask;
   }
@@ -476,10 +496,10 @@
       return;
     }
 
-    const mask = availableDigits(index);
-    if (!mask) {
-      // 가로·세로에 숫자가 다 찼으면 그 칸은 숫자가 될 수 없다. 적을 후보가
-      // 없다고 멈추는 대신 순환의 다음 칸인 검은 칸으로 바로 넘어간다.
+    const mask = availableMarks(index);
+    if (mask === S.BLOCK_BIT) {
+      // 가로·세로에 숫자가 다 찼으면 남는 것은 검은 칸뿐이다. 후보 하나를 연필로
+      // 적게 하는 대신 순환의 다음 칸으로 바로 넘어간다.
       snapshot();
       state.values[index] = R.BLOCK;
       state.marks[index] = 0;
@@ -487,6 +507,7 @@
       afterChange();
       return;
     }
+    if (!mask) { toast('이 칸에 놓을 수 있는 값이 없어요'); return; }
 
     snapshot();
     state.marks[index] = mask;
@@ -499,6 +520,7 @@
     for (let i = 0; i < state.values.length; i++) {
       if (state.values[i] !== R.UNKNOWN && state.values[i] !== state.solution[i]) {
         state.selected = i;
+        state.hinted.clear();
         render();
         Sound.play('conflict');
         toast('여기 값이 정답과 달라요. 먼저 고쳐야 이어서 풀 수 있어요', true);
@@ -506,28 +528,36 @@
       }
     }
 
-    const step = S.nextStep(state.n, state.rowClues, state.colClues, state.values);
-    if (!step) { toast('더 짚어줄 칸을 찾지 못했어요'); return; }
+    const step = S.nextHint(state.n, state.rowClues, state.colClues, state.values, state.marks);
+    if (!step) { toast('더 짚어줄 것을 찾지 못했어요'); return; }
 
     snapshot();
-    state.values[step.cell] = step.value;
-    state.marks[step.cell] = 0;
-    if (step.value !== R.BLOCK) clearPeerMarks(step.cell, step.value);
-    state.selected = step.cell;
+    state.hinted.clear();
 
-    // 하이라이트를 지울 때 인덱스로 다시 찾으면 안 된다. 그 사이에 새 판을
-    // 만들면 격자가 통째로 새로 그려져 그 자리에 다른 칸이 있거나 아예 없다.
-    const hinted = cells[step.cell];
-    hinted.dataset.hinted = '1';
-    setTimeout(() => {
-      if (!hinted.isConnected) return;
-      delete hinted.dataset.hinted;
-      render();
-    }, 900);
+    if (step.kind === 'place') {
+      state.values[step.cell] = step.value;
+      state.marks[step.cell] = 0;
+      clearPeerMarks(step.cell, step.value);
+      state.selected = step.cell;
+      state.hinted.add(step.cell);
+      Sound.play('hint');
+      toast(`${S.valueName(step.value)} — ${step.detail}`, true);
+      afterChange();
+      return;
+    }
+
+    // 좁혀진 후보를 연필로 적어 둔다. 화면에 남지 않으면 다음 힌트가 같은
+    // 단계를 다시 알려 주게 되고, 힌트를 눌러도 제자리인 것처럼 보인다.
+    for (const { cell, mask } of step.cells) {
+      // 이미 적어 둔 것이 더 좁으면 그대로 두고 지울 것만 지운다. 다만 그
+      // 결과가 비면 플레이어의 표시가 틀렸다는 뜻이라 새 후보로 바로잡는다.
+      state.marks[cell] = (state.marks[cell] & mask) || mask;
+      state.hinted.add(cell);
+    }
+    state.selected = step.cells[0].cell;
 
     Sound.play('hint');
-    const what = step.value === R.BLOCK ? '검은 칸' : step.value;
-    toast(`${what} — ${step.detail}`, true);
+    toast(`${step.label} — ${step.detail}`, true);
     afterChange();
   }
 
@@ -562,6 +592,7 @@
     state.elapsed = saved.elapsed || 0;
     state.done = Boolean(saved.done);
     state.history = [];
+    state.hinted.clear();
     state.selected = state.values.findIndex((v) => v === R.UNKNOWN);
     if (state.selected < 0) state.selected = 0;
     state.running = !state.done;
@@ -604,6 +635,7 @@
       state.running = true;
       state.done = false;
       state.selected = 0;
+      state.hinted.clear();
       el.veil.hidden = true;
       el.timer.textContent = '0:00';
       el.helpRange.textContent = `1~${R.digitCount(n)}`;
@@ -648,7 +680,7 @@
     blockKey.type = 'button';
     blockKey.className = 'digit block-key';
     blockKey.textContent = '■';
-    blockKey.addEventListener('click', () => put(R.BLOCK));
+    blockKey.addEventListener('click', () => (state.pencil ? mark(R.BLOCK) : put(R.BLOCK)));
     el.digits.appendChild(blockKey);
 
     for (let d = 1; d <= digits; d++) {
@@ -740,7 +772,12 @@
 
     if (event.key === ' ') { event.preventDefault(); state.pencil = !state.pencil; render(); return; }
     if (event.key === 'Backspace' || event.key === 'Delete') { event.preventDefault(); clearCell(); return; }
-    if (event.key === '0' || event.key.toLowerCase() === 'b') { event.preventDefault(); put(R.BLOCK); return; }
+    if (event.key === '0' || event.key.toLowerCase() === 'b') {
+      event.preventDefault();
+      if (event.shiftKey || state.pencil) mark(R.BLOCK);
+      else put(R.BLOCK);
+      return;
+    }
     if (event.key >= '1' && event.key <= String(R.digitCount(state.n))) {
       event.preventDefault();
       const digit = Number(event.key);

@@ -88,19 +88,30 @@ for (let i = 0; i < 20; i++) {
   const { rowClues, colClues } = R.cluesOf(5, solution);
   if (!S.solveLogically(5, rowClues, colClues).solved) continue;
 
-  // 빈 판에서 힌트만 반복하면 끝까지 채워져야 한다.
+  // 빈 판에서 힌트만 반복하면 끝까지 채워져야 한다. 힌트는 후보를 좁히기만
+  // 하는 단계도 돌려주므로, 화면이 하듯 연필 표시에 받아 적어야 진행한다.
   const board = new Int8Array(25).fill(R.UNKNOWN);
+  const marks = new Uint16Array(25);
   let guard = 0;
-  while (guard++ < 60) {
-    const step = S.nextStep(5, rowClues, colClues, board);
+  while (guard++ < 400) {
+    const step = S.nextHint(5, rowClues, colClues, board, marks);
     if (!step) break;
+    if (step.kind === 'narrow') {
+      for (const { cell, mask } of step.cells) {
+        // 좁혀 준 후보에 정답이 남아 있지 않으면 힌트가 거짓말을 한 것이다.
+        if (!(mask & S.bitOf(solution[cell]))) hintWrong++;
+        marks[cell] = mask;
+      }
+      continue;
+    }
     if (step.value !== solution[step.cell]) hintWrong++;
     board[step.cell] = step.value;
+    marks[step.cell] = 0;
   }
   if (board.some((v) => v === R.UNKNOWN)) hintMissing++;
   else hintFinished++;
 }
-check('힌트가 정답과 다른 값을 짚지 않는다', hintWrong, 0);
+check('힌트가 정답과 어긋나지 않는다', hintWrong, 0);
 check('힌트만 반복하면 끝까지 채워진다', hintMissing, 0);
 check('힌트로 완성한 판이 있다', hintFinished > 0, true);
 
@@ -113,9 +124,47 @@ for (let i = 0; i < 200 && !sampleClues; i++) {
   if (S.solveLogically(5, clues.rowClues, clues.colClues).solved) sampleClues = clues;
 }
 check('설명 확인용 판을 찾았다', sampleClues !== null, true);
-const firstHint = S.nextStep(5, sampleClues.rowClues, sampleClues.colClues, new Int8Array(25).fill(R.UNKNOWN));
+const firstHint = S.nextHint(5, sampleClues.rowClues, sampleClues.colClues, new Int8Array(25).fill(R.UNKNOWN));
 check('힌트에 근거가 붙는다', typeof (firstHint && firstHint.detail), 'string');
 check('힌트에 기법 이름이 붙는다', S.TECHNIQUE_NAMES.includes(firstHint && firstHint.technique), true);
+
+// 아래 판은 힌트가 "배치가 5가지 남았다"는 한 문장으로 추론 네 단계를 건너뛰어
+// 읽어도 모르겠다는 말을 들은 실제 판이다. 첫 힌트는 사슬의 첫 고리인 가로 2줄
+// (합 9 → 2+3+4뿐 → 사이가 3칸)이어야 한다.
+const chainRows = [7, 9, 4, 2, 2, 2];
+const chainCols = [7, 0, 0, 7, 6, 4];
+const chainEmpty = new Int8Array(36).fill(R.UNKNOWN);
+const chainFirst = S.nextHint(6, chainRows, chainCols, chainEmpty, new Uint16Array(36));
+check('긴 사슬에서는 확정 대신 후보 좁히기부터 준다', chainFirst.kind, 'narrow');
+check('첫 힌트가 사슬의 첫 고리를 짚는다', `${chainFirst.line.kind}${chainFirst.line.index}`, 'row1');
+check('좁히기 힌트가 칸을 짚는다', chainFirst.cells.length > 0, true);
+check('좁히기 힌트에 빠지는 값이 적힌다', chainFirst.detail.includes('빠집니다'), true);
+
+// 받아 적은 뒤 같은 말을 또 하면 힌트를 눌러도 제자리인 것처럼 보인다.
+const chainMarks = new Uint16Array(36);
+for (const { cell, mask } of chainFirst.cells) chainMarks[cell] = mask;
+const chainSecond = S.nextHint(6, chainRows, chainCols, chainEmpty, chainMarks);
+check('적어 둔 후보와 같은 힌트를 다시 주지 않는다',
+  JSON.stringify(chainSecond) !== JSON.stringify(chainFirst), true);
+
+// 좁히기만 하는 단계가 섞여도 힌트만으로 끝까지 가야 한다.
+{
+  const board = new Int8Array(36).fill(R.UNKNOWN);
+  const marks = new Uint16Array(36);
+  let guard = 0;
+  while (guard++ < 1000) {
+    const step = S.nextHint(6, chainRows, chainCols, board, marks);
+    if (!step) break;
+    if (step.kind === 'narrow') {
+      for (const { cell, mask } of step.cells) marks[cell] = mask;
+      continue;
+    }
+    board[step.cell] = step.value;
+    marks[step.cell] = 0;
+  }
+  check('6×6 판도 힌트만으로 끝까지 채워진다', board.some((v) => v === R.UNKNOWN), false);
+  check('완성된 판이 규칙에 맞는다', R.validate(6, board, chainRows, chainCols), null);
+}
 
 // --- 모순된 판 ---
 const contradictory = S.solveLogically(4, [3, 3, 3, 3], [0, 0, 0, 0]);
