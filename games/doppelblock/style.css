@@ -1,0 +1,330 @@
+:root {
+  --bg: #f4f6f9;
+  --fg: #2c3542;
+  --muted: #7b8698;
+  --line: #cdd5e0;
+  --cell-bg: #ffffff;
+  --block: #8b95a6;
+  --clue-bg: #55637a;
+  --clue-fg: #f2f5f9;
+  --clue-done: #6f9e63;
+  --sel: #d9e4f2;
+  --peer: #e3ecf6;
+  --wrong: #c1503f;
+  --key-bg: #dfe5ee;
+  --btn-bg: #55637a;
+  --btn-fg: #f2f5f9;
+  --sheet-bg: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #171b21;
+    --fg: #dfe5ee;
+    --muted: #8892a3;
+    --line: #333c49;
+    --cell-bg: #212832;
+    --block: #6a7488;
+    --clue-bg: #39424f;
+    --clue-fg: #dfe5ee;
+    --clue-done: #5e8a54;
+    --sel: #38465c;
+    --peer: #2e3a4a;
+    --wrong: #e0705c;
+    --key-bg: #333c49;
+    --btn-bg: #4a5568;
+    --sheet-bg: #212832;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  display: flex;
+  justify-content: center;
+  padding: clamp(10px, 3vmin, 24px) clamp(10px, 4vmin, 28px);
+  overscroll-behavior: none;
+  touch-action: manipulation;
+}
+
+.app {
+  width: min(100%, 440px);
+  display: flex;
+  flex-direction: column;
+  gap: clamp(8px, 2vmin, 14px);
+}
+
+.title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(24px, 6vmin, 34px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.head-actions { display: flex; align-items: baseline; gap: 14px; }
+
+.toggle {
+  border: 0; background: none; padding: 0;
+  color: inherit; font-family: inherit; font-size: 14px; font-weight: 600;
+  cursor: pointer; opacity: 0.6;
+}
+.toggle:hover { opacity: 1; }
+
+.back {
+  color: inherit; opacity: 0.6; text-decoration: none;
+  font-size: 14px; font-weight: 600;
+}
+.back:hover { opacity: 1; }
+
+.picker-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.picker { display: flex; gap: 4px; }
+
+.pick {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.pick[aria-pressed="true"] {
+  background: var(--btn-bg);
+  border-color: var(--btn-bg);
+  color: var(--btn-fg);
+}
+
+.timer {
+  margin-inline-start: auto;
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.board-wrap { position: relative; }
+
+/* 격자 옆과 아래에 단서 줄이 한 칸씩 더 붙는다. */
+.board {
+  --cell: clamp(34px, min(11vmin, 52px), 52px);
+  display: grid;
+  gap: 2px;
+  width: max-content;
+  margin-inline: auto;
+}
+
+.cell, .clue, .corner {
+  width: var(--cell);
+  height: var(--cell);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  font-family: inherit;
+  font-weight: 700;
+  padding: 0;
+  border: 0;
+}
+
+.cell {
+  position: relative;
+  background: var(--cell-bg);
+  color: inherit;
+  font-size: calc(var(--cell) * 0.5);
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.cell.block { background: var(--block); box-shadow: none; }
+.cell.wrong { color: var(--wrong); }
+.cell.peer { background: var(--peer); }
+.cell.selected { background: var(--sel); box-shadow: inset 0 0 0 2px var(--btn-bg); }
+.cell.block.selected { box-shadow: inset 0 0 0 2px var(--btn-bg); }
+.cell.hinted { animation: flash 900ms ease-out; }
+
+@keyframes flash {
+  0%, 100% { background: var(--cell-bg); }
+  25% { background: #f0c674; }
+}
+
+/* 연필 표시는 자리를 고정해야 어떤 숫자가 빠졌는지 눈으로 셀 수 있다. */
+.marks {
+  position: absolute;
+  inset: 2px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  font-size: calc(var(--cell) * 0.24);
+  font-weight: 600;
+  color: var(--muted);
+  line-height: 1;
+  pointer-events: none;
+}
+.marks span { display: flex; align-items: center; justify-content: center; }
+
+.clue {
+  background: var(--clue-bg);
+  color: var(--clue-fg);
+  font-size: calc(var(--cell) * 0.42);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 그 줄이 규칙과 합을 모두 만족하면 단서를 지운 것으로 표시한다. */
+.clue.done { background: var(--clue-done); }
+.clue.broken { background: var(--wrong); }
+
+.corner { background: none; }
+
+.veil {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--bg) 75%, transparent);
+  font-weight: 700;
+  color: var(--muted);
+}
+.veil[hidden] { display: none; }
+
+.toast {
+  margin: 0;
+  min-height: 20px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+/* 앱의 조합 패널처럼, 고른 칸이 속한 줄의 합을 만들 수 있는 숫자 조합을 보여준다.
+   이 퍼즐에서 사람이 실제로 손에 쥐고 따지는 정보다. */
+.combos {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--cell-bg);
+  font-size: 13px;
+}
+.combos[hidden] { display: none; }
+
+.combo-line { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.combo-head { font-weight: 700; color: var(--muted); flex: none; }
+.combo-set {
+  display: inline-flex;
+  gap: 3px;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: var(--key-bg);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.combo-none { color: var(--muted); }
+
+.pad { display: flex; flex-direction: column; gap: 8px; }
+
+.digits { display: grid; gap: 5px; }
+
+.digit {
+  height: clamp(38px, 7.5vmin, 48px);
+  border: 0;
+  border-radius: 7px;
+  background: var(--key-bg);
+  color: inherit;
+  font-family: inherit;
+  font-size: clamp(16px, 4vmin, 20px);
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+}
+.digit:active { filter: brightness(0.92); }
+.digit.done { opacity: 0.3; }
+.digit.block-key { background: var(--block); color: #fff; }
+
+.tools { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+
+.tool {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 7px 0;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  cursor: pointer;
+}
+.tool-icon { font-size: 17px; line-height: 1; }
+.tool-label { font-size: 11px; font-weight: 600; opacity: 0.8; }
+.tool:disabled { opacity: 0.35; cursor: default; }
+.tool[aria-pressed="true"] {
+  background: var(--btn-bg);
+  border-color: var(--btn-bg);
+  color: var(--btn-fg);
+}
+
+.sheet {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--sheet-bg);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sheet[hidden] { display: none; }
+
+.sheet-title { margin: 0; font-size: 19px; font-weight: 800; }
+.sheet-note { margin: 0; font-size: 14px; color: var(--muted); }
+.sheet-actions { display: flex; gap: 8px; }
+
+.btn {
+  flex: 1;
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  border: 0;
+  border-radius: 8px;
+  padding: 11px 16px;
+  font-size: 15px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.help-list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cell.hinted { animation-duration: 1ms; }
+}

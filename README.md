@@ -11,6 +11,7 @@
 | [2048](games/2048/) | 같은 숫자를 밀어 붙여 2048을 만든다 | 순수 HTML/CSS/JS |
 | [꼬들](games/kkodle/) | 두 글자 한글 단어를 여섯 번 안에 맞힌다 | 순수 HTML/CSS/JS |
 | [스도쿠](games/sudoku/) | 힌트만으로 풀리는 판만 나온다 | 순수 HTML/CSS/JS |
+| [더블블록](games/doppelblock/) | 검은 칸 사이 숫자의 합을 맞힌다 | 순수 HTML/CSS/JS |
 
 ## 로컬에서 실행
 

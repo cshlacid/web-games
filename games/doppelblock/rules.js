@@ -1,5 +1,10 @@
 'use strict';
 
+// 브라우저에서는 클래식 스크립트가 전역 렉시컬 스코프를 공유한다. 파일마다
+// 최상위에 같은 이름을 선언하면 다른 파일과 충돌해 페이지 전체가 죽는다
+// (solver.js와 generator.js가 둘 다 const R을 두고 있었다). IIFE로 가둔다.
+(function () {
+
 // Doppelblock(= Smashed Sums)의 규칙 모델과 완전 탐색 솔버.
 //
 // 규칙: N×N 격자에서 모든 행과 열에 검은 칸이 정확히 두 개씩 들어가고, 나머지
@@ -246,3 +251,5 @@ const Rules = {
 
 if (typeof module !== 'undefined' && module.exports) module.exports = Rules;
 if (typeof window !== 'undefined') window.DoppelRules = Rules;
+
+})();

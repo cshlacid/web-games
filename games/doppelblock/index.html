@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>더블블록</title>
+<meta name="description" content="줄마다 검은 칸 두 개. 그 사이 숫자의 합을 맞히는 퍼즐">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>⬛</text></svg>">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="app">
+  <header class="head">
+    <div class="title-row">
+      <h1>더블블록</h1>
+      <div class="head-actions">
+        <button class="toggle" id="help-open" type="button" aria-pressed="false">도움말</button>
+        <a class="back" href="../../">← 목록</a>
+      </div>
+    </div>
+    <div class="picker-row">
+      <div class="picker" id="sizes" role="group" aria-label="크기"></div>
+      <div class="picker" id="levels" role="group" aria-label="난이도"></div>
+      <span class="timer" id="timer">0:00</span>
+    </div>
+  </header>
+
+  <div class="board-wrap">
+    <div class="board" id="board"></div>
+    <div class="veil" id="veil" hidden>만드는 중…</div>
+  </div>
+
+  <p class="toast" id="toast" role="status" aria-live="polite"></p>
+
+  <div class="combos" id="combos" hidden></div>
+
+  <div class="pad">
+    <div class="digits" id="digits"></div>
+    <div class="tools">
+      <button class="tool" id="pencil" type="button" aria-pressed="false">
+        <span class="tool-icon">✎</span><span class="tool-label">연필</span>
+      </button>
+      <button class="tool" id="erase" type="button">
+        <span class="tool-icon">⌫</span><span class="tool-label">지우기</span>
+      </button>
+      <button class="tool" id="undo" type="button">
+        <span class="tool-icon">↶</span><span class="tool-label">되돌리기</span>
+      </button>
+      <button class="tool" id="hint" type="button">
+        <span class="tool-icon">?</span><span class="tool-label">힌트</span>
+      </button>
+      <button class="tool" id="new-game" type="button">
+        <span class="tool-icon">＋</span><span class="tool-label">새 판</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="sheet" id="result" hidden>
+    <p class="sheet-title" id="result-title"></p>
+    <p class="sheet-note" id="result-note"></p>
+    <div class="sheet-actions">
+      <button class="btn" id="again" type="button">한 판 더</button>
+    </div>
+  </div>
+
+  <div class="sheet" id="help" hidden>
+    <p class="sheet-title">규칙</p>
+    <ul class="help-list">
+      <li>모든 <b>가로줄과 세로줄에 검은 칸이 정확히 두 개</b>씩 들어갑니다.</li>
+      <li>나머지 칸에는 <b id="help-range">1~4</b>를 줄마다 한 번씩 채웁니다.</li>
+      <li>줄 끝의 숫자는 <b>검은 칸 두 개 사이에 있는 숫자들의 합</b>입니다.
+        바깥쪽 숫자는 세지 않습니다.</li>
+      <li>합이 <b>0</b>이면 두 검은 칸이 붙어 있다는 뜻이고, 합이 최대값이면
+        검은 칸이 양 끝에 있다는 뜻입니다.</li>
+      <li><b>이 게임의 모든 판은 주어진 단서만으로 풀립니다.</b> 찍어야만 넘어가는
+        판은 나오지 않습니다.</li>
+      <li>칸을 고르면 그 줄의 합을 만들 수 있는 <b>숫자 조합</b>이 아래에 표시됩니다.</li>
+      <li>키보드: 방향키 이동, <b>1~6</b> 입력, <b>0</b> 또는 <b>B</b> 검은 칸,
+        <b>Shift+숫자</b> 연필, <b>Backspace</b> 지우기, <b>스페이스</b> 연필 전환.</li>
+    </ul>
+    <div class="sheet-actions">
+      <button class="btn" id="help-close" type="button">닫기</button>
+    </div>
+  </div>
+</main>
+
+<script src="rules.js"></script>
+<script src="solver.js"></script>
+<script src="generator.js"></script>
+<script src="main.js"></script>
+</body>
+</html>

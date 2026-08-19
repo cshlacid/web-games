@@ -1,5 +1,10 @@
 'use strict';
 
+// 브라우저에서는 클래식 스크립트가 전역 렉시컬 스코프를 공유한다. 파일마다
+// 최상위에 같은 이름을 선언하면 다른 파일과 충돌해 페이지 전체가 죽는다
+// (solver.js와 generator.js가 둘 다 const R을 두고 있었다). IIFE로 가둔다.
+(function () {
+
 const R = (typeof require !== 'undefined' && typeof module !== 'undefined')
   ? require('./rules.js')
   : window.DoppelRules;
@@ -94,3 +99,5 @@ const Generator = { LEVELS, SIZES, CHEAP, MEDIUM_LIMIT, levelsFor, generate, mul
 
 if (typeof module !== 'undefined' && module.exports) module.exports = Generator;
 if (typeof window !== 'undefined') window.DoppelGenerator = Generator;
+
+})();
