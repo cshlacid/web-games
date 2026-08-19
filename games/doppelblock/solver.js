@@ -171,9 +171,10 @@ function blockPairs(state) {
     }
 
     if (changed) {
+      const gaps = [...new Set(feasible.map(([i, j]) => j - i - 1))].sort((x, y) => x - y);
       const detail = feasible.length === 1
         ? `${lineName(line)}에서 단서를 만족시킬 수 있는 검은 칸 자리는 한 쌍뿐입니다.`
-        : `${lineName(line)}에서는 검은 칸 사이에 올 수 있는 칸 수가 단서로 제한되어, 검은 칸을 놓을 수 없는 자리가 걸러집니다.`;
+        : `${lineName(line)}에서 단서를 만들려면 검은 칸 사이가 ${gaps.join('칸 또는 ')}칸이어야 합니다.`;
       return { line, detail };
     }
   }
@@ -303,9 +304,12 @@ function lineArrangements(state) {
     let changed = false;
     for (let p = 0; p < state.n; p++) changed = restrict(state, line.cells[p], union[p]) || changed;
     if (changed) {
+      // 배치 수만 말하면 "5가지"가 무엇의 5가지인지 알 수 없다. 사람이 손으로
+      // 따지는 단위는 숫자 순서까지가 아니라 검은 칸 두 자리이므로 함께 센다.
+      const spots = new Set(viable.map((a) => a.reduce((acc, v, p) => (v === R.BLOCK ? `${acc},${p}` : acc), ''))).size;
       return {
         line,
-        detail: `${lineName(line)}에서 단서를 만족시키는 배치가 아직 ${viable.length}가지 남았는데, 그 배치들과 지금까지 좁혀 둔 후보를 함께 보면 놓을 수 없는 값이 걸러집니다.`,
+        detail: `${lineName(line)}에서 단서를 만족시키는 배치는 ${viable.length}가지(검은 칸 자리로는 ${spots}가지) 남았습니다. 그 배치 어디에도 나오지 않는 값은 놓을 수 없습니다.`,
       };
     }
   }
@@ -384,12 +388,53 @@ function hardestTechnique(n, rowClues, colClues, allowed = TECHNIQUE_NAMES) {
   return hardest;
 }
 
+const valueName = (value) => (value === R.BLOCK ? '검은 칸' : String(value));
+
+// 주격 조사는 앞말 받침에 따라 갈린다. 숫자는 소리 내어 읽은 형태로 따진다 —
+// 화면에는 아라비아 숫자로 보이지만 읽히는 것은 우리말이다. 지금 쓰는 숫자는
+// 1~4뿐이지만, 판이 커지면 조용히 틀린 조사가 붙으므로 미리 채워 둔다.
+const HAS_FINAL = {
+  '검은 칸': true,
+  1: true, 2: false, 3: true, 4: false, 5: false,
+  6: true, 7: true, 8: true, 9: false,
+};
+const withSubject = (name) => `${name}${HAS_FINAL[name] ? '이' : '가'}`;
+
 /**
- * 지금 판에서 논리적으로 확정할 수 있는 다음 한 칸과 그 근거.
- * 힌트가 "정답을 슬쩍 보여주는 것"이 아니라 "무엇을 근거로 어디를 채울 수
- * 있는지"가 되게 하려는 것이다.
+ * 이번 단계에서 어느 칸의 무엇이 빠졌는지. 기법의 근거만 읽어서는 화면의 어디를
+ * 봐야 하는지 알 수 없어서, 결론을 줄 안의 자리 번호로 되짚어 준다.
  */
-function nextStep(n, rowClues, colClues, placed, allowed = TECHNIQUE_NAMES) {
+function removalSummary(line, cells, before, after, digits) {
+  const groups = new Map();
+  for (const cell of cells) {
+    const removed = before[cell] & ~after[cell];
+    if (!removed) continue;
+    if (!groups.has(removed)) groups.set(removed, []);
+    groups.get(removed).push(line.cells.indexOf(cell) + 1);
+  }
+
+  const parts = [];
+  for (const [removed, spots] of groups) {
+    const names = valuesOf(removed, digits).map(valueName);
+    const head = names.slice(0, -1);
+    const tail = withSubject(names[names.length - 1]);
+    parts.push(`${spots.join('·')}번 칸에서 ${[...head, tail].join('·')} 빠집니다`);
+  }
+  return parts.length ? ` 그래서 ${parts.join(', ')}.` : '';
+}
+
+/**
+ * 지금 판에서 논리적으로 알아낼 수 있는 다음 한 걸음과 그 근거.
+ *
+ * 칸이 확정될 때까지 기법을 돌려 버리면 한 번의 힌트에 추론 열 단계가 압축된다.
+ * 실제로 네 줄에 걸친 사슬이 한 문장으로 나와서 읽어도 모르겠다는 말을 들었다.
+ * 그래서 후보가 좁혀지는 순간마다 끊어 돌려주고, 확정까지 간 경우에만 값을
+ * 알려 준다.
+ *
+ * marks(플레이어의 연필 표시)는 "이미 아는 단계인가"를 가리는 데만 쓰고 추론에는
+ * 넣지 않는다. 잘못 적어 둔 후보를 근거로 삼으면 힌트가 거짓말을 하게 된다.
+ */
+function nextHint(n, rowClues, colClues, placed, marks = null, allowed = TECHNIQUE_NAMES) {
   const state = createState(n, rowClues, colClues);
   for (let i = 0; i < placed.length; i++) {
     if (placed[i] !== R.UNKNOWN) restrict(state, i, bitOf(placed[i]));
@@ -397,9 +442,10 @@ function nextStep(n, rowClues, colClues, placed, allowed = TECHNIQUE_NAMES) {
   if (state.broken) return null;
 
   const techniques = TECHNIQUES.filter((t) => allowed.includes(t.name));
-  const before = gridOf(state);
 
+  // 기법이 무언가 바꿀 때마다 후보 비트가 실제로 줄어들므로 이 반복은 끝난다.
   while (!state.broken) {
+    const before = state.cands.slice();
     let outcome = null;
     let technique = null;
     for (const candidate of techniques) {
@@ -408,21 +454,37 @@ function nextStep(n, rowClues, colClues, placed, allowed = TECHNIQUE_NAMES) {
     }
     if (!outcome || state.broken) return null;
 
-    const after = gridOf(state);
-    for (let i = 0; i < after.length; i++) {
-      if (before[i] === R.UNKNOWN && after[i] !== R.UNKNOWN) {
-        // 기법 설명만으로는 "그래서 이 칸이 왜 그 값인가"가 연결되지 않는다.
-        // 근거와 결론을 한 문장으로 이어 준다.
-        const label = after[i] === R.BLOCK ? '검은 칸' : after[i];
-        return {
-          cell: i,
-          value: after[i],
-          technique: technique.name,
-          label: technique.label,
-          detail: `${outcome.detail} 그래서 이 칸에 남는 것은 ${label}뿐입니다.`,
-        };
-      }
+    const touched = [];
+    for (let i = 0; i < before.length; i++) {
+      if (before[i] !== state.cands[i] && placed[i] === R.UNKNOWN) touched.push(i);
     }
+
+    const settled = touched.find((i) => popcount(state.cands[i]) === 1);
+    if (settled !== undefined) {
+      const value = (state.cands[settled] & BLOCK_BIT) ? R.BLOCK : Math.log2(state.cands[settled]);
+      return {
+        kind: 'place',
+        cell: settled,
+        value,
+        technique: technique.name,
+        label: technique.label,
+        detail: `${outcome.detail} 그래서 이 칸에 남는 것은 ${valueName(value)}뿐입니다.`,
+      };
+    }
+
+    // 플레이어가 적어 둔 후보에서 지울 것이 없으면 이미 아는 단계다. 그대로
+    // 알려 주면 힌트를 눌러도 아무 일도 안 일어나는 것처럼 보인다.
+    const fresh = touched.filter((i) => !marks || !marks[i] || (marks[i] & ~state.cands[i]));
+    if (fresh.length === 0) continue;
+
+    return {
+      kind: 'narrow',
+      line: { kind: outcome.line.kind, index: outcome.line.index },
+      cells: fresh.map((i) => ({ cell: i, mask: state.cands[i] })),
+      technique: technique.name,
+      label: technique.label,
+      detail: outcome.detail + removalSummary(outcome.line, fresh, before, state.cands, state.digits),
+    };
   }
   return null;
 }
@@ -452,7 +514,7 @@ const Solver = {
   BLOCK_BIT, bitOf, popcount, valuesOf,
   TECHNIQUES, TECHNIQUE_NAMES,
   createState, cloneState, gridOf, isSolved, viableArrangements,
-  solveLogically, hardestTechnique, grade, nextStep, clueCombinations,
+  solveLogically, hardestTechnique, grade, nextHint, clueCombinations, valueName,
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = Solver;

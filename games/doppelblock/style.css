@@ -17,6 +17,7 @@
   --btn-bg: #55637a;
   --btn-fg: #f2f5f9;
   --sheet-bg: #ffffff;
+  --hint-ring: #c9962f;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -38,6 +39,7 @@
     --key-bg: #333c49;
     --btn-bg: #4a5568;
     --sheet-bg: #212832;
+    --hint-ring: #d8a13a;
   }
 }
 
@@ -177,7 +179,15 @@ h1 {
 .cell.block { background: var(--block); box-shadow: none; }
 .cell.block.peer { background: var(--block-peer); }
 .cell.block.selected { background: var(--block-sel); box-shadow: inset 0 0 0 2px var(--btn-bg); }
-.cell.hinted { animation: flash 900ms ease-out; }
+/* 힌트가 짚은 칸. 설명이 사라질 때까지 남긴다 — 한 번에 여러 칸이 좁혀지는
+   경우가 있어, 반짝하고 마는 표시로는 어디를 봐야 하는지 놓친다. 검은 칸이나
+   선택 표시 위에서도 보이도록 그것들과 같은 구체성으로 둔다. */
+.cell.hinted,
+.cell.block.hinted,
+.cell.selected.hinted {
+  animation: flash 900ms ease-out;
+  box-shadow: inset 0 0 0 2px var(--hint-ring);
+}
 
 @keyframes flash {
   0%, 100% { background: var(--cell-bg); }
@@ -197,6 +207,8 @@ h1 {
   pointer-events: none;
 }
 .marks span { display: flex; align-items: center; justify-content: center; }
+/* ■는 같은 크기로 두면 숫자 후보 사이에서 혼자 튄다. */
+.marks .mark-block { font-size: 0.72em; }
 
 .clue {
   background: var(--clue-bg);
