@@ -249,10 +249,23 @@
   }
 
   let toastTimer = null;
-  function toast(message) {
+
+  /**
+   * persist를 주면 시간이 지나도 지우지 않는다. 힌트 설명은 읽는 데 시간이
+   * 걸리는데 몇 초 만에 사라지면 무슨 근거였는지 다시 볼 방법이 없다. 대신
+   * 다음 동작에서 지운다.
+   */
+  function toast(message, persist = false) {
     el.toast.textContent = message;
+    el.toast.classList.toggle('persist', persist);
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => { el.toast.textContent = ''; }, 3600);
+    if (!persist) toastTimer = setTimeout(() => { el.toast.textContent = ''; }, 3600);
+  }
+
+  function clearToast() {
+    clearTimeout(toastTimer);
+    el.toast.textContent = '';
+    el.toast.classList.remove('persist');
   }
 
   const formatTime = (seconds) =>
@@ -283,6 +296,7 @@
   function put(value) {
     const i = state.selected;
     if (state.done) return;
+    clearToast();
     snapshot();
     const cleared = state.values[i] === value;
     state.values[i] = cleared ? R.UNKNOWN : value;
@@ -305,6 +319,7 @@
   function mark(digit) {
     const i = state.selected;
     if (state.done || state.values[i] !== R.UNKNOWN) return;
+    clearToast();
     snapshot();
     state.marks[i] ^= 1 << digit;
     Sound.play('pencil');
@@ -314,6 +329,7 @@
   function clearCell() {
     const i = state.selected;
     if (state.done) return;
+    clearToast();
     if (state.values[i] === R.UNKNOWN && !state.marks[i]) return;
     snapshot();
     state.values[i] = R.UNKNOWN;
@@ -325,6 +341,7 @@
   function undo() {
     const last = state.history.pop();
     if (!last) return;
+    clearToast();
     state.values.set(last.values);
     state.marks.set(last.marks);
     Sound.play('undo');
@@ -437,6 +454,7 @@
    */
   function cycleCell(index) {
     if (state.done) return;
+    clearToast();
     const value = state.values[index];
     if (value > 0) return;
 
@@ -483,7 +501,7 @@
         state.selected = i;
         render();
         Sound.play('conflict');
-        toast('여기 값이 정답과 달라요. 먼저 고쳐야 이어서 풀 수 있어요');
+        toast('여기 값이 정답과 달라요. 먼저 고쳐야 이어서 풀 수 있어요', true);
         return;
       }
     }
@@ -509,7 +527,7 @@
 
     Sound.play('hint');
     const what = step.value === R.BLOCK ? '검은 칸' : step.value;
-    toast(`${what} — ${step.detail}`);
+    toast(`${what} — ${step.detail}`, true);
     afterChange();
   }
 
@@ -664,6 +682,8 @@
     event.preventDefault();
     cycleCell(Number(cell.dataset.index));
   });
+
+  el.toast.addEventListener('click', clearToast);
 
   el.pencil.addEventListener('click', () => {
     state.pencil = !state.pencil;

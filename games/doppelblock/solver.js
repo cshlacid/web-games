@@ -88,6 +88,9 @@ function viableArrangements(state, line) {
   return out;
 }
 
+// 설명에 어느 줄인지가 빠지면 사용자가 화면에서 근거를 되짚을 수 없다.
+const lineName = (line) => `${line.kind === 'row' ? '가로' : '세로'} ${line.index + 1}줄(합 ${line.clue})`;
+
 // --- 기법들. 무언가 바뀌면 그 사실을 설명과 함께 돌려준다. ---
 
 /** 후보가 하나뿐인 칸은 그 값으로 확정된다. 화면상으로는 이미 확정이라 설명거리가 없다. */
@@ -112,7 +115,7 @@ function eliminate(state) {
       }
       if (changed) {
         const digit = Math.log2(mask);
-        return { line, cell, detail: `이 줄에는 ${digit}이 이미 있으니 같은 줄의 다른 칸에는 올 수 없습니다.` };
+        return { line, cell, detail: `${lineName(line)}에 이미 ${digit}이 있으니 같은 줄의 다른 칸에는 ${digit}이 올 수 없습니다.` };
       }
     }
   }
@@ -169,8 +172,8 @@ function blockPairs(state) {
 
     if (changed) {
       const detail = feasible.length === 1
-        ? `단서 ${line.clue}을 만족시킬 수 있는 검은 칸 자리는 한 쌍뿐입니다.`
-        : `단서 ${line.clue}으로는 검은 칸 사이 칸 수가 정해지므로, 놓을 수 없는 자리가 걸러집니다.`;
+        ? `${lineName(line)}에서 단서를 만족시킬 수 있는 검은 칸 자리는 한 쌍뿐입니다.`
+        : `${lineName(line)}에서는 검은 칸 사이에 올 수 있는 칸 수가 단서로 제한되어, 검은 칸을 놓을 수 없는 자리가 걸러집니다.`;
       return { line, detail };
     }
   }
@@ -190,7 +193,7 @@ function maxClue(state) {
       changed = restrict(state, line.cells[p], ~BLOCK_BIT) || changed;
     }
     if (changed) {
-      return { line, detail: `단서 ${line.clue}는 이 줄의 숫자를 모두 더한 값이라, 검은 칸은 양 끝뿐입니다.` };
+      return { line, detail: `${lineName(line)}의 단서는 그 줄의 숫자를 모두 더한 값이라, 검은 칸은 양 끝일 수밖에 없습니다.` };
     }
   }
   return null;
@@ -207,7 +210,7 @@ function blocksPlaced(state) {
       changed = restrict(state, cell, ~BLOCK_BIT) || changed;
     }
     if (changed) {
-      return { line, detail: '이 줄의 검은 칸 두 개가 이미 정해졌으니 나머지 칸은 모두 숫자입니다.' };
+      return { line, detail: `${lineName(line)}의 검은 칸 두 개가 이미 정해졌으니 나머지 칸은 모두 숫자입니다.` };
     }
   }
   return null;
@@ -222,7 +225,7 @@ function hiddenSingle(state) {
       if (spots.length !== 1) continue;
       if (state.cands[spots[0]] === bit) continue;
       if (restrict(state, spots[0], bit)) {
-        return { line, cell: spots[0], detail: `이 줄에서 ${d}이 들어갈 수 있는 칸이 여기뿐입니다.` };
+        return { line, cell: spots[0], detail: `${lineName(line)}에서 ${d}이 들어갈 수 있는 칸이 여기뿐입니다.` };
       }
     }
   }
@@ -276,8 +279,8 @@ function combinations(state) {
     for (const cell of outside) changed = restrict(state, cell, outsideUnion | BLOCK_BIT) || changed;
     if (changed) {
       const detail = found === 1
-        ? `검은 칸 사이 ${inside.length}칸의 합이 ${line.clue}이 되는 조합은 하나뿐입니다.`
-        : `검은 칸 사이 ${inside.length}칸의 합이 ${line.clue}이 되는 조합은 ${found}가지이고, 어디에도 없는 숫자는 사이에 올 수 없습니다.`;
+        ? `${lineName(line)}은 검은 칸 사이 ${inside.length}칸의 합이 ${line.clue}이 되어야 하는데, 그런 조합은 하나뿐입니다.`
+        : `${lineName(line)}은 검은 칸 사이 ${inside.length}칸의 합이 ${line.clue}이 되어야 하고, 그런 조합 ${found}가지 어디에도 없는 숫자는 사이에 올 수 없습니다.`;
       return { line, detail };
     }
   }
@@ -302,7 +305,7 @@ function lineArrangements(state) {
     if (changed) {
       return {
         line,
-        detail: `이 줄에서 아직 가능한 배치는 ${viable.length}가지이고, 그 어디에도 나오지 않는 값은 놓을 수 없습니다.`,
+        detail: `${lineName(line)}에서 단서를 만족시키는 배치가 아직 ${viable.length}가지 남았는데, 그 배치들과 지금까지 좁혀 둔 후보를 함께 보면 놓을 수 없는 값이 걸러집니다.`,
       };
     }
   }
@@ -408,12 +411,15 @@ function nextStep(n, rowClues, colClues, placed, allowed = TECHNIQUE_NAMES) {
     const after = gridOf(state);
     for (let i = 0; i < after.length; i++) {
       if (before[i] === R.UNKNOWN && after[i] !== R.UNKNOWN) {
+        // 기법 설명만으로는 "그래서 이 칸이 왜 그 값인가"가 연결되지 않는다.
+        // 근거와 결론을 한 문장으로 이어 준다.
+        const label = after[i] === R.BLOCK ? '검은 칸' : after[i];
         return {
           cell: i,
           value: after[i],
           technique: technique.name,
           label: technique.label,
-          detail: outcome.detail,
+          detail: `${outcome.detail} 그래서 이 칸에 남는 것은 ${label}뿐입니다.`,
         };
       }
     }

@@ -233,7 +233,20 @@ h1 {
   text-align: center;
   font-size: 14px;
   font-weight: 600;
+  line-height: 1.5;
   color: var(--muted);
+}
+
+/* 힌트 설명처럼 남겨 두는 안내는 여러 줄이 되므로, 읽을 것이 있다는 게
+   보이도록 상자에 담고 눌러서 닫을 수 있게 한다. */
+.toast.persist {
+  text-align: left;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--cell-bg);
+  color: var(--fg);
+  cursor: pointer;
 }
 
 /* 앱의 조합 패널처럼, 고른 칸이 속한 줄의 합을 만들 수 있는 숫자 조합을 보여준다.
