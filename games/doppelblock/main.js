@@ -664,6 +664,14 @@
 
   // --- 입력 연결 ---
 
+  // 같은 칸을 짧은 간격으로 두 번 누르면 순환으로 친다.
+  //
+  // dblclick 이벤트에 맡기지 않는 이유: iOS 사파리는 탭 두 번에 dblclick을 주지
+  // 않는 경우가 있어 아이폰에서 기능이 통째로 먹통이 된다. 크로미움의 아이폰
+  // 에뮬레이션은 dblclick을 만들어 주기 때문에 테스트로도 잡히지 않았다.
+  const DOUBLE_TAP_MS = 400;
+  let lastTap = { index: -1, at: 0 };
+
   el.board.addEventListener('click', (event) => {
     const clue = event.target.closest('.clue');
     if (clue) {
@@ -672,15 +680,19 @@
     }
     const cell = event.target.closest('.cell');
     if (!cell) return;
-    state.selected = Number(cell.dataset.index);
-    render();
-  });
 
-  el.board.addEventListener('dblclick', (event) => {
-    const cell = event.target.closest('.cell');
-    if (!cell) return;
-    event.preventDefault();
-    cycleCell(Number(cell.dataset.index));
+    const index = Number(cell.dataset.index);
+    const now = Date.now();
+    if (lastTap.index === index && now - lastTap.at < DOUBLE_TAP_MS) {
+      // 한 쌍을 소비한다. 그러지 않으면 이어지는 한 번의 탭에도 또 돈다.
+      lastTap = { index: -1, at: 0 };
+      cycleCell(index);
+      return;
+    }
+
+    lastTap = { index, at: now };
+    state.selected = index;
+    render();
   });
 
   el.toast.addEventListener('click', clearToast);
