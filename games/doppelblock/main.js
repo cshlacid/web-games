@@ -431,6 +431,56 @@
     afterChange();
   }
 
+  /**
+   * 칸을 더블클릭할 때마다 빈 칸 → 연필 후보 → 검은 칸 → 빈 칸으로 돈다.
+   *
+   * 여기서 적는 후보는 가로·세로에 이미 놓인 숫자만 빼는 단순 계산이다. 단서를
+   * 눌러 채우는 쪽은 그 줄의 가능한 배치까지 따지므로 훨씬 좁다. 둘을 일부러
+   * 다르게 뒀다 — 이쪽은 "일단 다 적어두고 시작"이고, 저쪽은 "지금까지의 추론을
+   * 반영해서 적어줘"다.
+   *
+   * 숫자가 놓인 칸은 순환에 넣지 않는다. 더블클릭 한 번에 확신하고 넣은 값이
+   * 사라지면 곤란하다.
+   */
+  function cycleCell(index) {
+    if (state.done) return;
+    const value = state.values[index];
+    if (value > 0) return;
+
+    if (value === R.BLOCK) {
+      snapshot();
+      state.values[index] = R.UNKNOWN;
+      state.marks[index] = 0;
+      Sound.play('erase');
+      afterChange();
+      return;
+    }
+
+    if (state.marks[index]) {
+      snapshot();
+      state.values[index] = R.BLOCK;
+      state.marks[index] = 0;
+      Sound.play('block');
+      afterChange();
+      return;
+    }
+
+    const used = new Set();
+    for (const kind of ['row', 'col']) {
+      const line = lineCells(kind, kind === 'row' ? rowOf(index) : colOf(index));
+      for (const cell of line) if (state.values[cell] > 0) used.add(state.values[cell]);
+    }
+
+    let mask = 0;
+    for (let d = 1; d <= digitsOf(); d++) if (!used.has(d)) mask |= 1 << d;
+    if (!mask) { toast('가로·세로에 숫자가 다 차서 적을 후보가 없어요'); return; }
+
+    snapshot();
+    state.marks[index] = mask;
+    Sound.play('autofill');
+    afterChange();
+  }
+
   function hint() {
     if (state.done) return;
     for (let i = 0; i < state.values.length; i++) {
@@ -611,6 +661,13 @@
     if (!cell) return;
     state.selected = Number(cell.dataset.index);
     render();
+  });
+
+  el.board.addEventListener('dblclick', (event) => {
+    const cell = event.target.closest('.cell');
+    if (!cell) return;
+    event.preventDefault();
+    cycleCell(Number(cell.dataset.index));
   });
 
   el.pencil.addEventListener('click', () => {
