@@ -382,6 +382,36 @@ function hardestTechnique(n, rowClues, colClues, allowed = TECHNIQUE_NAMES) {
 }
 
 /**
+ * 한 줄에 대해, 지금 놓인 값을 감안했을 때 각 칸에 들어갈 수 있는 값.
+ *
+ * 전체 전파를 돌리면 안 된다. 이 퍼즐의 판은 논리로 끝까지 풀리도록 만들어지므로
+ * 빈 판에서 전파를 끝까지 돌리면 모든 칸이 하나로 확정되고, 후보를 보여주려던
+ * 것이 정답을 통째로 보여주는 일이 된다. 그래서 이미 놓인 값으로부터의 기본
+ * 소거까지만 하고, 나머지는 그 줄의 가능한 배치로만 좁힌다 — 사람이 그 단서
+ * 하나를 보고 따질 수 있는 범위와 같다.
+ */
+function lineCandidates(n, rowClues, colClues, placed, kind, index) {
+  const state = createState(n, rowClues, colClues);
+  for (let i = 0; i < placed.length; i++) {
+    if (placed[i] !== R.UNKNOWN) restrict(state, i, bitOf(placed[i]));
+  }
+  if (state.broken) return null;
+
+  while (!state.broken && eliminate(state)) { /* 놓인 값에서 오는 소거만 */ }
+  if (state.broken) return null;
+
+  const line = state.lines.find((candidate) => candidate.kind === kind && candidate.index === index);
+  const viable = viableArrangements(state, line);
+  if (viable.length === 0) return null;
+
+  const union = new Array(n).fill(0);
+  for (const arrangement of viable) {
+    for (let p = 0; p < n; p++) union[p] |= bitOf(arrangement[p]);
+  }
+  return line.cells.map((cell, p) => state.cands[cell] & union[p]);
+}
+
+/**
  * 지금 판에서 논리적으로 확정할 수 있는 다음 한 칸과 그 근거.
  * 힌트가 "정답을 슬쩍 보여주는 것"이 아니라 "무엇을 근거로 어디를 채울 수
  * 있는지"가 되게 하려는 것이다.
@@ -446,7 +476,7 @@ const Solver = {
   BLOCK_BIT, bitOf, popcount, valuesOf,
   TECHNIQUES, TECHNIQUE_NAMES,
   createState, cloneState, gridOf, isSolved, viableArrangements,
-  solveLogically, hardestTechnique, grade, nextStep, clueCombinations,
+  solveLogically, hardestTechnique, grade, lineCandidates, nextStep, clueCombinations,
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = Solver;

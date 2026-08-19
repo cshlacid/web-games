@@ -85,14 +85,20 @@
         el.board.appendChild(cell);
         cells.push(cell);
       }
-      const clue = document.createElement('div');
+      const clue = document.createElement('button');
+      clue.type = 'button';
       clue.className = 'clue';
+      clue.dataset.kind = 'row';
+      clue.dataset.index = r;
       el.board.appendChild(clue);
       rowClueNodes.push(clue);
     }
     for (let c = 0; c < state.n; c++) {
-      const clue = document.createElement('div');
+      const clue = document.createElement('button');
+      clue.type = 'button';
       clue.className = 'clue';
+      clue.dataset.kind = 'col';
+      clue.dataset.index = c;
       el.board.appendChild(clue);
       colClueNodes.push(clue);
     }
@@ -354,6 +360,51 @@
     save();
   }
 
+  /**
+   * 단서를 누르면 그 줄의 빈 칸에 지금 가능한 숫자를 연필로 적는다. 값을
+   * 정해주지는 않으므로 푸는 재미는 남고, 후보를 손으로 적는 수고만 덜어준다.
+   * 이미 값이나 검은 칸이 놓인 칸은 건드리지 않는다.
+   */
+  function fillLineCandidates(kind, index) {
+    if (state.done) return;
+    if (lineStatus(kind, index) === 'done') { toast('이미 끝난 줄이에요'); return; }
+
+    for (let i = 0; i < state.values.length; i++) {
+      if (state.values[i] !== R.UNKNOWN && state.values[i] !== state.solution[i]) {
+        state.selected = i;
+        render();
+        Sound.play('conflict');
+        toast('판에 정답과 다른 값이 있어요. 먼저 고쳐야 후보를 적을 수 있어요');
+        return;
+      }
+    }
+
+    const candidates = S.lineCandidates(
+      state.n, state.rowClues, state.colClues, state.values, kind, index);
+    if (!candidates) { toast('지금 판에서는 후보를 계산할 수 없어요'); return; }
+
+    const cellsInLine = lineCells(kind, index);
+    const updates = [];
+    for (let p = 0; p < cellsInLine.length; p++) {
+      const cell = cellsInLine[p];
+      if (state.values[cell] !== R.UNKNOWN) continue;
+      // 연필 표시는 숫자만 보여주므로 검은 칸 후보는 뺀다.
+      let mask = 0;
+      for (let d = 1; d <= digitsOf(); d++) {
+        if (candidates[p] & (1 << d)) mask |= 1 << d;
+      }
+      if (mask !== state.marks[cell]) updates.push([cell, mask]);
+    }
+
+    if (updates.length === 0) { toast('이 줄에 새로 적을 후보가 없어요'); return; }
+
+    snapshot();
+    for (const [cell, mask] of updates) state.marks[cell] = mask;
+    Sound.play('autofill');
+    toast(`${kind === 'row' ? '가로' : '세로'} ${index + 1}줄 ${updates.length}칸에 후보를 적었어요`);
+    afterChange();
+  }
+
   function hint() {
     if (state.done) return;
     for (let i = 0; i < state.values.length; i++) {
@@ -524,6 +575,11 @@
   // --- 입력 연결 ---
 
   el.board.addEventListener('click', (event) => {
+    const clue = event.target.closest('.clue');
+    if (clue) {
+      fillLineCandidates(clue.dataset.kind, Number(clue.dataset.index));
+      return;
+    }
     const cell = event.target.closest('.cell');
     if (!cell) return;
     state.selected = Number(cell.dataset.index);

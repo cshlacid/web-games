@@ -57,6 +57,13 @@
       pencil(now, tone) {
         tone({ freq: 880, at: now, dur: 0.04, type: 'sine', gain: 0.10 });
       },
+      // 후보를 한꺼번에 적을 때. 연필음을 여러 번 겹치면 시끄러워서 짧게
+      // 훑고 지나가는 소리 하나로 대신한다.
+      autofill(now, tone) {
+        [76, 79, 83].forEach((note, i) => {
+          tone({ freq: midi(note), at: now + i * 0.035, dur: 0.16, type: 'sine', gain: 0.13 });
+        });
+      },
       erase(now, tone) {
         tone({ freq: 320, glide: 230, at: now, dur: 0.07, type: 'triangle', gain: 0.14 });
       },
