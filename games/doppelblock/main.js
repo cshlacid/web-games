@@ -265,6 +265,21 @@
     if (state.history.length > 200) state.history.shift();
   }
 
+  /**
+   * 확정한 숫자를 같은 가로·세로 줄의 연필 표시에서 지운다. 손으로 지우게 두면
+   * 연필 표시가 금세 거짓말을 한다. 검은 칸은 숫자를 소비하지 않으므로 대상이
+   * 아니다.
+   */
+  function clearPeerMarks(index, digit) {
+    const bit = 1 << digit;
+    for (const kind of ['row', 'col']) {
+      const line = lineCells(kind, kind === 'row' ? rowOf(index) : colOf(index));
+      for (const cell of line) {
+        if (cell !== index) state.marks[cell] &= ~bit;
+      }
+    }
+  }
+
   function put(value) {
     const i = state.selected;
     if (state.done) return;
@@ -272,6 +287,7 @@
     const cleared = state.values[i] === value;
     state.values[i] = cleared ? R.UNKNOWN : value;
     if (state.values[i] !== R.UNKNOWN) state.marks[i] = 0;
+    if (!cleared && value !== R.BLOCK) clearPeerMarks(i, value);
 
     if (cleared) Sound.play('erase');
     else if (brokenLinesAt(i)) Sound.play('conflict');
@@ -423,6 +439,7 @@
     snapshot();
     state.values[step.cell] = step.value;
     state.marks[step.cell] = 0;
+    if (step.value !== R.BLOCK) clearPeerMarks(step.cell, step.value);
     state.selected = step.cell;
 
     // 하이라이트를 지울 때 인덱스로 다시 찾으면 안 된다. 그 사이에 새 판을
