@@ -66,6 +66,7 @@ node games/kkodle/logic.test.js # 꼬들 자모 처리·판정 테스트
 node games/sudoku/logic.test.js # 스도쿠 기법·생성기 테스트
 node games/doppelblock/logic.test.js  # 더블블록 규칙·완전 탐색 테스트
 node games/doppelblock/solver.test.js # 더블블록 논리 기법·힌트 테스트
+node games/doppelblock/generator.test.js # 더블블록 생성기·난이도 테스트
 ```
 
 게임별 테스트는 그 게임 폴더 안에 두고, 새로 만들면 여기에 명령을 추가한다.

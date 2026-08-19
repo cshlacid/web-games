@@ -68,7 +68,7 @@ for (let i = 0; i < 120; i++) {
   const { rowClues, colClues } = R.cluesOf(5, solution);
   for (const name of S.solveLogically(5, rowClues, colClues).used) fired.add(name);
 }
-for (const name of ['blocksPlaced', 'blocksForced', 'hiddenSingle', 'lineArrangements']) {
+for (const name of ['eliminate', 'blockPairs', 'blocksPlaced', 'hiddenSingle', 'lineArrangements']) {
   check(`${name} 기법이 쓰인다`, fired.has(name), true);
 }
 
@@ -104,9 +104,15 @@ check('힌트가 정답과 다른 값을 짚지 않는다', hintWrong, 0);
 check('힌트만 반복하면 끝까지 채워진다', hintMissing, 0);
 check('힌트로 완성한 판이 있다', hintFinished > 0, true);
 
-// 힌트에는 근거 설명이 붙어야 한다.
-const sample = R.randomSolution(5);
-const sampleClues = R.cluesOf(5, sample);
+// 힌트에는 근거 설명이 붙어야 한다. 논리로 안 풀리는 판에서는 힌트가 없는 것이
+// 정상이므로, 풀리는 판을 골라서 확인한다.
+let sampleClues = null;
+for (let i = 0; i < 200 && !sampleClues; i++) {
+  const sample = R.randomSolution(5);
+  const clues = R.cluesOf(5, sample);
+  if (S.solveLogically(5, clues.rowClues, clues.colClues).solved) sampleClues = clues;
+}
+check('설명 확인용 판을 찾았다', sampleClues !== null, true);
 const firstHint = S.nextStep(5, sampleClues.rowClues, sampleClues.colClues, new Int8Array(25).fill(R.UNKNOWN));
 check('힌트에 근거가 붙는다', typeof (firstHint && firstHint.detail), 'string');
 check('힌트에 기법 이름이 붙는다', S.TECHNIQUE_NAMES.includes(firstHint && firstHint.technique), true);

@@ -31,6 +31,7 @@ node games/kkodle/logic.test.js
 node games/sudoku/logic.test.js
 node games/doppelblock/logic.test.js
 node games/doppelblock/solver.test.js
+node games/doppelblock/generator.test.js
 ```
 
 ## 구조

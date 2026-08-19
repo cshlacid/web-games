@@ -93,6 +93,85 @@ function nakedSingle(state) {
   return null; // 확정 자체는 후보 마스크로 표현되므로 따로 할 일이 없다
 }
 
+/** 확정된 숫자는 같은 줄의 다른 칸에 올 수 없다. 가장 기본적인 소거. */
+function eliminate(state) {
+  for (const line of state.lines) {
+    for (const cell of line.cells) {
+      const mask = state.cands[cell];
+      if (mask & BLOCK_BIT) continue;
+      if (popcount(mask) !== 1) continue;
+      let changed = false;
+      for (const other of line.cells) {
+        if (other === cell) continue;
+        changed = restrict(state, other, ~mask) || changed;
+      }
+      if (changed) {
+        const digit = Math.log2(mask);
+        return { line, cell, detail: `이 줄에는 ${digit}이 이미 있으니 같은 줄의 다른 칸에는 올 수 없습니다.` };
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * 검은 칸 두 자리를 어디에 둘 수 있는지부터 따진다. 사이가 k칸이면 그 합은
+ * 가장 작은 숫자 k개의 합과 가장 큰 숫자 k개의 합 사이여야 하므로, 단서만으로도
+ * 불가능한 자리 조합이 걸러진다. 사람이 "단서 3이면 사이가 한두 칸"이라고
+ * 먼저 따지는 것과 같은 추론이다.
+ *
+ * "검은 칸 후보가 두 곳만 남으면 둘 다 검은 칸"이라는 별도 기법을 두었다가
+ * 지웠다. 후보가 둘이면 가능한 쌍도 하나뿐이라 여기서 그대로 확정된다.
+ */
+function blockPairs(state) {
+  const digits = state.digits;
+  const minSum = (k) => (k * (k + 1)) / 2;
+  const maxSum = (k) => {
+    let sum = 0;
+    for (let d = digits; d > digits - k; d--) sum += d;
+    return sum;
+  };
+
+  for (const line of state.lines) {
+    const canBlock = [];
+    for (let p = 0; p < state.n; p++) {
+      if (state.cands[line.cells[p]] & BLOCK_BIT) canBlock.push(p);
+    }
+
+    const feasible = [];
+    for (let a = 0; a < canBlock.length; a++) {
+      for (let b = a + 1; b < canBlock.length; b++) {
+        const between = canBlock[b] - canBlock[a] - 1;
+        if (line.clue < minSum(between) || line.clue > maxSum(between)) continue;
+        feasible.push([canBlock[a], canBlock[b]]);
+      }
+    }
+    if (feasible.length === 0) {
+      state.broken = true;
+      return { line, detail: '이 줄에는 검은 칸을 놓을 자리가 남아 있지 않습니다.' };
+    }
+
+    const possible = new Set();
+    for (const [i, j] of feasible) { possible.add(i); possible.add(j); }
+
+    let changed = false;
+    for (let p = 0; p < state.n; p++) {
+      if (!possible.has(p)) changed = restrict(state, line.cells[p], ~BLOCK_BIT) || changed;
+    }
+    if (feasible.length === 1) {
+      for (const p of feasible[0]) changed = restrict(state, line.cells[p], BLOCK_BIT) || changed;
+    }
+
+    if (changed) {
+      const detail = feasible.length === 1
+        ? `단서 ${line.clue}을 만족시킬 수 있는 검은 칸 자리는 한 쌍뿐입니다.`
+        : `단서 ${line.clue}으로는 검은 칸 사이 칸 수가 정해지므로, 놓을 수 없는 자리가 걸러집니다.`;
+      return { line, detail };
+    }
+  }
+  return null;
+}
+
 /** 단서가 그 줄의 숫자 총합이면 검은 칸은 양 끝일 수밖에 없다. */
 function maxClue(state) {
   const total = R.lineTotal(state.n);
@@ -124,21 +203,6 @@ function blocksPlaced(state) {
     }
     if (changed) {
       return { line, detail: '이 줄의 검은 칸 두 개가 이미 정해졌으니 나머지 칸은 모두 숫자입니다.' };
-    }
-  }
-  return null;
-}
-
-/** 검은 칸이 들어갈 수 있는 자리가 두 개만 남았다면 그 둘이 검은 칸이다. */
-function blocksForced(state) {
-  for (const line of state.lines) {
-    const possible = line.cells.filter((c) => state.cands[c] & BLOCK_BIT);
-    if (possible.length !== 2) continue;
-    if (possible.every((c) => state.cands[c] === BLOCK_BIT)) continue;
-    let changed = false;
-    for (const cell of possible) changed = restrict(state, cell, BLOCK_BIT) || changed;
-    if (changed) {
-      return { line, detail: '이 줄에서 검은 칸이 들어갈 수 있는 자리가 두 곳뿐이라 둘 다 검은 칸입니다.' };
     }
   }
   return null;
@@ -244,9 +308,10 @@ function lineArrangements(state) {
 // 기법"으로 하므로, 매번 앞에서부터 다시 시도해야 각 단계에서 실제로 필요했던
 // 최소한의 추론이 기록된다.
 const TECHNIQUES = [
+  { name: 'eliminate', label: '같은 줄 소거', run: eliminate },
   { name: 'maxClue', label: '최대 단서', run: maxClue },
+  { name: 'blockPairs', label: '검은 칸 자리 따지기', run: blockPairs },
   { name: 'blocksPlaced', label: '검은 칸 확정', run: blocksPlaced },
-  { name: 'blocksForced', label: '검은 칸 자리 압축', run: blocksForced },
   { name: 'hiddenSingle', label: '숨은 단수', run: hiddenSingle },
   { name: 'combinations', label: '조합 따지기', run: combinations },
   { name: 'lineArrangements', label: '배치 좁히기', run: lineArrangements },
@@ -273,6 +338,33 @@ function solveLogically(n, rowClues, colClues, allowed = TECHNIQUE_NAMES) {
   }
 
   return { solved: isSolved(state), broken: state.broken, used, state, grid: gridOf(state) };
+}
+
+/**
+ * 난이도 채점. 이 퍼즐에서 "배치 좁히기"는 고급 기법이 아니라 기본 기법이라,
+ * 어떤 기법이 필요했는지보다 그 기법이 몇 번 필요했는지가 체감 난이도에 가깝다.
+ * 한 번도 필요 없었다면 나머지 값싼 추론만으로 풀린 판이다.
+ */
+function grade(n, rowClues, colClues) {
+  const state = createState(n, rowClues, colClues);
+  let arrangementCalls = 0;
+  let hardest = null;
+
+  while (!state.broken) {
+    let progressed = false;
+    for (const technique of TECHNIQUES) {
+      if (!technique.run(state)) continue;
+      if (technique.name === 'lineArrangements') arrangementCalls++;
+      if (hardest === null || TECHNIQUE_NAMES.indexOf(technique.name) > TECHNIQUE_NAMES.indexOf(hardest)) {
+        hardest = technique.name;
+      }
+      progressed = true;
+      break;
+    }
+    if (!progressed) break;
+  }
+
+  return { solved: isSolved(state), arrangementCalls, hardest, grid: gridOf(state) };
 }
 
 /** 끝까지 푸는 데 필요했던 가장 어려운 기법. 논리만으로 못 풀면 null. */
@@ -349,7 +441,7 @@ const Solver = {
   BLOCK_BIT, bitOf, popcount, valuesOf,
   TECHNIQUES, TECHNIQUE_NAMES,
   createState, cloneState, gridOf, isSolved, viableArrangements,
-  solveLogically, hardestTechnique, nextStep, clueCombinations,
+  solveLogically, hardestTechnique, grade, nextStep, clueCombinations,
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = Solver;
