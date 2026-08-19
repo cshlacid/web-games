@@ -380,10 +380,21 @@
    * 단서를 누르면 그 줄의 빈 칸에 지금 가능한 숫자를 연필로 적는다. 값을
    * 정해주지는 않으므로 푸는 재미는 남고, 후보를 손으로 적는 수고만 덜어준다.
    * 이미 값이나 검은 칸이 놓인 칸은 건드리지 않는다.
+   *
+   * 검은 칸 두 개가 아직 정해지지 않은 줄에서는 동작하지 않는다. 그 상태에서
+   * 빈 칸에 숫자 후보를 적으면 검은 칸이 될 수도 있는 자리에 "여기는 숫자"라고
+   * 잘못 말하는 셈이 된다.
    */
   function fillLineCandidates(kind, index) {
     if (state.done) return;
     if (lineStatus(kind, index) === 'done') { toast('이미 끝난 줄이에요'); return; }
+
+    const cellsInLine = lineCells(kind, index);
+    const blocks = cellsInLine.filter((cell) => state.values[cell] === R.BLOCK).length;
+    if (blocks !== 2) {
+      toast(`검은 칸 두 개를 먼저 정해야 후보를 적을 수 있어요 (지금 ${blocks}개)`);
+      return;
+    }
 
     for (let i = 0; i < state.values.length; i++) {
       if (state.values[i] !== R.UNKNOWN && state.values[i] !== state.solution[i]) {
@@ -399,7 +410,6 @@
       state.n, state.rowClues, state.colClues, state.values, kind, index);
     if (!candidates) { toast('지금 판에서는 후보를 계산할 수 없어요'); return; }
 
-    const cellsInLine = lineCells(kind, index);
     const updates = [];
     for (let p = 0; p < cellsInLine.length; p++) {
       const cell = cellsInLine[p];
