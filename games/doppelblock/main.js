@@ -4,6 +4,7 @@
   const R = window.DoppelRules;
   const S = window.DoppelSolver;
   const G = window.DoppelGenerator;
+  const Sound = window.DoppelSound;
   const SAVE_KEY = 'web-games.doppelblock.game';
 
   const el = {
@@ -28,6 +29,8 @@
     helpOpen: document.getElementById('help-open'),
     helpClose: document.getElementById('help-close'),
     helpRange: document.getElementById('help-range'),
+    toggleBgm: document.getElementById('toggle-bgm'),
+    toggleSfx: document.getElementById('toggle-sfx'),
   };
 
   const store = {
@@ -53,6 +56,7 @@
     elapsed: 0,
     running: false,
     done: false,
+    doneLines: new Set(),
   };
 
   const digitsOf = () => R.digitCount(state.n);
@@ -259,9 +263,21 @@
     const i = state.selected;
     if (state.done) return;
     snapshot();
-    state.values[i] = state.values[i] === value ? R.UNKNOWN : value;
+    const cleared = state.values[i] === value;
+    state.values[i] = cleared ? R.UNKNOWN : value;
     if (state.values[i] !== R.UNKNOWN) state.marks[i] = 0;
+
+    if (cleared) Sound.play('erase');
+    else if (brokenLinesAt(i)) Sound.play('conflict');
+    else Sound.play(value === R.BLOCK ? 'block' : 'digit', value);
+
     afterChange();
+  }
+
+  /** 이 칸이 속한 줄 중 하나라도 규칙을 어겼는가. 소리를 고르는 데만 쓴다. */
+  function brokenLinesAt(index) {
+    return lineStatus('row', rowOf(index)) === 'broken'
+      || lineStatus('col', colOf(index)) === 'broken';
   }
 
   function mark(digit) {
@@ -269,6 +285,7 @@
     if (state.done || state.values[i] !== R.UNKNOWN) return;
     snapshot();
     state.marks[i] ^= 1 << digit;
+    Sound.play('pencil');
     afterChange();
   }
 
@@ -279,6 +296,7 @@
     snapshot();
     state.values[i] = R.UNKNOWN;
     state.marks[i] = 0;
+    Sound.play('erase');
     afterChange();
   }
 
@@ -287,14 +305,41 @@
     if (!last) return;
     state.values.set(last.values);
     state.marks.set(last.marks);
+    Sound.play('undo');
+    syncDoneLines();
     save();
     render();
   }
 
+  /** 지금 완성된 줄들의 집합. 새로 완성된 줄이 생기면 소리로 알린다. */
+  function currentDoneLines() {
+    const done = new Set();
+    for (const kind of ['row', 'col']) {
+      for (let i = 0; i < state.n; i++) {
+        if (lineStatus(kind, i) === 'done') done.add(`${kind}-${i}`);
+      }
+    }
+    return done;
+  }
+
+  function syncDoneLines() {
+    state.doneLines = currentDoneLines();
+  }
+
   function afterChange() {
+    const before = state.doneLines;
+    const after = currentDoneLines();
+    // 완성이 풀렸다가 다시 완성되는 것도 새 완성으로 친다. 되돌리기로 줄어드는
+    // 경우에는 울리지 않아야 하므로 크기 비교가 아니라 원소로 따진다.
+    const fresh = [...after].some((key) => !before.has(key));
+    state.doneLines = after;
+
     save();
     render();
+    // 마지막 수는 줄도 완성시키므로, 먼저 완주 여부를 판정해 두 소리가 겹치는
+    // 것을 막는다. 완주했다면 승리음만 울린다.
     checkDone();
+    if (fresh && !state.done) Sound.play('lineDone');
   }
 
   function checkDone() {
@@ -305,6 +350,7 @@
     el.resultTitle.textContent = '다 풀었어요';
     el.resultNote.textContent = `${state.n}×${state.n} ${G.LEVELS[state.level].label} · ${formatTime(state.elapsed)}`;
     el.result.hidden = false;
+    Sound.play('win');
     save();
   }
 
@@ -314,6 +360,7 @@
       if (state.values[i] !== R.UNKNOWN && state.values[i] !== state.solution[i]) {
         state.selected = i;
         render();
+        Sound.play('conflict');
         toast('여기 값이 정답과 달라요. 먼저 고쳐야 이어서 풀 수 있어요');
         return;
       }
@@ -337,6 +384,7 @@
       render();
     }, 900);
 
+    Sound.play('hint');
     const what = step.value === R.BLOCK ? '검은 칸' : step.value;
     toast(`${what} — ${step.detail}`);
     afterChange();
@@ -380,6 +428,7 @@
     buildPickers();
     buildDigits();
     buildBoard();
+    syncDoneLines();
     if (state.done) {
       el.resultTitle.textContent = '다 풀었어요';
       el.resultNote.textContent = `${state.n}×${state.n} ${G.LEVELS[state.level].label} · ${formatTime(state.elapsed)}`;
@@ -417,6 +466,7 @@
       el.veil.hidden = true;
       el.timer.textContent = '0:00';
       el.helpRange.textContent = `1~${R.digitCount(n)}`;
+      syncDoneLines();
       save();
       render();
     }, 0));
@@ -480,12 +530,16 @@
     render();
   });
 
-  el.pencil.addEventListener('click', () => { state.pencil = !state.pencil; render(); });
+  el.pencil.addEventListener('click', () => {
+    state.pencil = !state.pencil;
+    Sound.play('click');
+    render();
+  });
   el.erase.addEventListener('click', clearCell);
   el.undo.addEventListener('click', undo);
   el.hint.addEventListener('click', hint);
-  el.newGame.addEventListener('click', () => newGame());
-  el.again.addEventListener('click', () => newGame());
+  el.newGame.addEventListener('click', () => { Sound.play('click'); newGame(); });
+  el.again.addEventListener('click', () => { Sound.play('click'); newGame(); });
   el.helpOpen.addEventListener('click', () => {
     const open = el.help.hidden;
     el.help.hidden = !open;
@@ -497,6 +551,7 @@
   });
 
   window.addEventListener('keydown', (event) => {
+    Sound.unlock();
     if (event.key.toLowerCase() === 'z' && (event.ctrlKey || event.metaKey)) {
       event.preventDefault(); undo(); return;
     }
@@ -526,6 +581,23 @@
       else put(digit);
     }
   });
+
+  // 브라우저 정책상 사용자 조작 전에는 소리를 낼 수 없다. unlock()은 여러 번
+  // 불러도 안전하므로 첫 입력마다 그냥 호출한다.
+  document.addEventListener('pointerdown', () => Sound.unlock());
+
+  function bindSoundToggle(node, key, apply) {
+    node.setAttribute('aria-pressed', String(Sound.prefs[key]));
+    node.addEventListener('click', () => {
+      const on = !Sound.prefs[key];
+      apply(on);
+      node.setAttribute('aria-pressed', String(on));
+      Sound.play('click');
+    });
+  }
+
+  bindSoundToggle(el.toggleBgm, 'bgm', (on) => Sound.setBgm(on));
+  bindSoundToggle(el.toggleSfx, 'sfx', (on) => Sound.setSfx(on));
 
   setInterval(() => {
     if (!state.running || state.done) return;

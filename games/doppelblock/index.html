@@ -22,6 +22,8 @@
     <div class="picker-row">
       <div class="picker" id="sizes" role="group" aria-label="크기"></div>
       <div class="picker" id="levels" role="group" aria-label="난이도"></div>
+      <button class="toggle sound" id="toggle-bgm" type="button" aria-pressed="true">BGM</button>
+      <button class="toggle sound" id="toggle-sfx" type="button" aria-pressed="true">효과음</button>
       <span class="timer" id="timer">0:00</span>
     </div>
   </header>
@@ -88,6 +90,8 @@
 <script src="rules.js"></script>
 <script src="solver.js"></script>
 <script src="generator.js"></script>
+<script src="../../shared/audio.js"></script>
+<script src="audio.js"></script>
 <script src="main.js"></script>
 </body>
 </html>
