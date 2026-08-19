@@ -459,7 +459,16 @@
     }
 
     const mask = availableDigits(index);
-    if (!mask) { toast('가로·세로에 숫자가 다 차서 적을 후보가 없어요'); return; }
+    if (!mask) {
+      // 가로·세로에 숫자가 다 찼으면 그 칸은 숫자가 될 수 없다. 적을 후보가
+      // 없다고 멈추는 대신 순환의 다음 칸인 검은 칸으로 바로 넘어간다.
+      snapshot();
+      state.values[index] = R.BLOCK;
+      state.marks[index] = 0;
+      Sound.play('block');
+      afterChange();
+      return;
+    }
 
     snapshot();
     state.marks[index] = mask;
