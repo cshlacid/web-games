@@ -54,12 +54,20 @@ body {
   gap: clamp(12px, 2.5vmin, 20px);
 }
 
+/* 게임마다 헤더가 제각각이면 게임을 옮겨 다닐 때 목록으로 돌아가는 길을 매번
+   다시 찾게 된다. 네 게임 모두 목록은 왼쪽 위, 이름은 가운데로 맞춘다.
+   양옆을 1fr로 묶으면 좌우 내용의 폭이 달라도 이름이 화면 한가운데에 온다. */
 .title-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 10px;
 }
+
+.title-row h1 { text-align: center; }
+.title-row .head-nav { justify-self: start; }
+.head-nav { display: flex; align-items: center; gap: 14px; }
+.title-row .head-actions { justify-self: end; }
 
 h1 {
   margin: 0;
@@ -103,7 +111,8 @@ h1 {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px 12px;
+  flex-wrap: wrap;
 }
 
 .subtitle {
@@ -112,17 +121,11 @@ h1 {
   color: var(--muted);
 }
 
-.sound-toggles {
-  display: flex;
-  gap: 12px;
-  flex: none;
-}
-
-.sound-toggles .toggle { font-size: 13px; }
-
 /* 취소선은 소리 토글에만 준다. 모드·도움말 토글은 꺼짐이 "선택 안 함"일 뿐이라
-   같은 표시를 쓰면 뜻이 달라진다. */
-.sound-toggles .toggle[aria-pressed="false"] { text-decoration: line-through; }
+   같은 표시를 쓰면 뜻이 달라진다. 모드 토글이 소리 토글과 한 묶음에 들어와서
+   자리가 아니라 클래스로 가른다. */
+.toggle.sound { font-size: 13px; }
+.toggle.sound[aria-pressed="false"] { text-decoration: line-through; }
 
 .board {
   display: grid;

@@ -58,12 +58,20 @@ body {
   gap: clamp(8px, 2vmin, 14px);
 }
 
+/* 게임마다 헤더가 제각각이면 게임을 옮겨 다닐 때 목록으로 돌아가는 길을 매번
+   다시 찾게 된다. 네 게임 모두 목록은 왼쪽 위, 이름은 가운데로 맞춘다.
+   양옆을 1fr로 묶으면 좌우 내용의 폭이 달라도 이름이 화면 한가운데에 온다. */
 .title-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 10px;
 }
+
+.title-row h1 { text-align: center; }
+.title-row .head-nav { justify-self: start; }
+.head-nav { display: flex; align-items: center; gap: 14px; }
+.title-row .head-actions { justify-self: end; }
 
 h1 {
   margin: 0;
@@ -114,12 +122,6 @@ h1 {
   background: var(--btn-bg);
   border-color: var(--btn-bg);
   color: var(--btn-fg);
-}
-
-.status-right {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
 }
 
 .toggle.sound { font-size: 12px; }
