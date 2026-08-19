@@ -5,6 +5,8 @@
   --line: #cdd5e0;
   --cell-bg: #ffffff;
   --block: #8b95a6;
+  --block-peer: #78849a;
+  --block-sel: #5f6d87;
   --clue-bg: #55637a;
   --clue-fg: #f2f5f9;
   --clue-done: #6f9e63;
@@ -25,6 +27,8 @@
     --line: #333c49;
     --cell-bg: #212832;
     --block: #6a7488;
+    --block-peer: #7c8aa4;
+    --block-sel: #93a1bd;
     --clue-bg: #39424f;
     --clue-fg: #dfe5ee;
     --clue-done: #5e8a54;
@@ -161,11 +165,16 @@ h1 {
   box-shadow: inset 0 0 0 1px var(--line);
 }
 
-.cell.block { background: var(--block); box-shadow: none; }
 .cell.wrong { color: var(--wrong); }
 .cell.peer { background: var(--peer); }
 .cell.selected { background: var(--sel); box-shadow: inset 0 0 0 2px var(--btn-bg); }
-.cell.block.selected { box-shadow: inset 0 0 0 2px var(--btn-bg); }
+
+/* 검은 칸 규칙은 강조 규칙보다 뒤에 와야 한다. 앞에 두면 같은 특정도라 순서에
+   밀려 강조 배경이 블록을 덮어버리고, 블록을 놓았는지 아닌지 구분이 안 된다.
+   강조는 배경을 갈아끼우는 대신 블록 색을 밝기만 달리해서 표시한다. */
+.cell.block { background: var(--block); box-shadow: none; }
+.cell.block.peer { background: var(--block-peer); }
+.cell.block.selected { background: var(--block-sel); box-shadow: inset 0 0 0 2px var(--btn-bg); }
 .cell.hinted { animation: flash 900ms ease-out; }
 
 @keyframes flash {
