@@ -377,8 +377,8 @@
   }
 
   /**
-   * 단서를 누르면 그 줄의 빈 칸에 지금 가능한 숫자를 연필로 적는다. 값을
-   * 정해주지는 않으므로 푸는 재미는 남고, 후보를 손으로 적는 수고만 덜어준다.
+   * 단서를 누르면 그 줄의 빈 칸에 후보를 한꺼번에 적는다. 더블클릭을 칸마다
+   * 반복하는 것과 같고, 후보 계산도 같다 — 가로·세로에 놓인 숫자만 뺀다.
    * 이미 값이나 검은 칸이 놓인 칸은 건드리지 않는다.
    *
    * 검은 칸 두 개가 아직 정해지지 않은 줄에서는 동작하지 않는다. 그 상태에서
@@ -396,29 +396,10 @@
       return;
     }
 
-    for (let i = 0; i < state.values.length; i++) {
-      if (state.values[i] !== R.UNKNOWN && state.values[i] !== state.solution[i]) {
-        state.selected = i;
-        render();
-        Sound.play('conflict');
-        toast('판에 정답과 다른 값이 있어요. 먼저 고쳐야 후보를 적을 수 있어요');
-        return;
-      }
-    }
-
-    const candidates = S.lineCandidates(
-      state.n, state.rowClues, state.colClues, state.values, kind, index);
-    if (!candidates) { toast('지금 판에서는 후보를 계산할 수 없어요'); return; }
-
     const updates = [];
-    for (let p = 0; p < cellsInLine.length; p++) {
-      const cell = cellsInLine[p];
+    for (const cell of cellsInLine) {
       if (state.values[cell] !== R.UNKNOWN) continue;
-      // 연필 표시는 숫자만 보여주므로 검은 칸 후보는 뺀다.
-      let mask = 0;
-      for (let d = 1; d <= digitsOf(); d++) {
-        if (candidates[p] & (1 << d)) mask |= 1 << d;
-      }
+      const mask = availableDigits(cell);
       if (mask !== state.marks[cell]) updates.push([cell, mask]);
     }
 
@@ -432,12 +413,24 @@
   }
 
   /**
-   * 칸을 더블클릭할 때마다 빈 칸 → 연필 후보 → 검은 칸 → 빈 칸으로 돈다.
+   * 그 칸의 가로·세로에 아직 안 쓰인 숫자들. 더블클릭과 단서 클릭이 함께 쓴다.
    *
-   * 여기서 적는 후보는 가로·세로에 이미 놓인 숫자만 빼는 단순 계산이다. 단서를
-   * 눌러 채우는 쪽은 그 줄의 가능한 배치까지 따지므로 훨씬 좁다. 둘을 일부러
-   * 다르게 뒀다 — 이쪽은 "일단 다 적어두고 시작"이고, 저쪽은 "지금까지의 추론을
-   * 반영해서 적어줘"다.
+   * 일부러 이 정도만 본다. 그 줄의 가능한 배치까지 따지면 후보가 너무 좁아져서
+   * 사실상 대신 풀어주는 꼴이 된다 — 실제로 그렇게 만들었다가 되돌렸다.
+   */
+  function availableDigits(index) {
+    const used = new Set();
+    for (const kind of ['row', 'col']) {
+      const line = lineCells(kind, kind === 'row' ? rowOf(index) : colOf(index));
+      for (const cell of line) if (state.values[cell] > 0) used.add(state.values[cell]);
+    }
+    let mask = 0;
+    for (let d = 1; d <= digitsOf(); d++) if (!used.has(d)) mask |= 1 << d;
+    return mask;
+  }
+
+  /**
+   * 칸을 더블클릭할 때마다 빈 칸 → 연필 후보 → 검은 칸 → 빈 칸으로 돈다.
    *
    * 숫자가 놓인 칸은 순환에 넣지 않는다. 더블클릭 한 번에 확신하고 넣은 값이
    * 사라지면 곤란하다.
@@ -465,14 +458,7 @@
       return;
     }
 
-    const used = new Set();
-    for (const kind of ['row', 'col']) {
-      const line = lineCells(kind, kind === 'row' ? rowOf(index) : colOf(index));
-      for (const cell of line) if (state.values[cell] > 0) used.add(state.values[cell]);
-    }
-
-    let mask = 0;
-    for (let d = 1; d <= digitsOf(); d++) if (!used.has(d)) mask |= 1 << d;
+    const mask = availableDigits(index);
     if (!mask) { toast('가로·세로에 숫자가 다 차서 적을 후보가 없어요'); return; }
 
     snapshot();
