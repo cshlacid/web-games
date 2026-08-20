@@ -10,7 +10,7 @@
   const el = {
     board: document.getElementById('board'),
     veil: document.getElementById('veil'),
-    sizes: document.getElementById('sizes'),
+    size: document.getElementById('size'),
     levels: document.getElementById('levels'),
     timer: document.getElementById('timer'),
     toast: document.getElementById('toast'),
@@ -581,7 +581,7 @@
 
   function restore() {
     const saved = store.get(null);
-    if (!saved || !G.SIZES.includes(saved.n) || !G.levelsFor(saved.n).includes(saved.level)) return false;
+    if (!saved || !G.SIZES.includes(saved.n) || !G.LEVEL_NAMES.includes(saved.level)) return false;
     if (!Array.isArray(saved.solution) || saved.solution.length !== saved.n * saved.n) return false;
 
     state.n = saved.n;
@@ -602,6 +602,7 @@
     buildPickers();
     buildDigits();
     buildBoard();
+    el.size.textContent = `${state.n}×${state.n}`;
     syncDoneLines();
     if (state.done) {
       el.resultTitle.textContent = '다 풀었어요';
@@ -613,22 +614,23 @@
 
   // --- 새 판 ---
 
-  function newGame(n = state.n, level = state.level) {
-    if (!G.levelsFor(n).includes(level)) level = G.levelsFor(n)[0];
-    state.n = n;
+  function newGame(level = state.level) {
     state.level = level;
     el.veil.hidden = false;
     el.result.hidden = true;
     buildPickers();
-    buildDigits();
-    buildBoard();
 
-    // 판을 만드는 데 걸리는 시간이 크기에 따라 크게 튄다. 노트북에서 재 보면
-    // 6×6 쉬움이 판당 60ms를 넘을 때가 있고, 7×7은 논리로 풀리는 판이 1.8%뿐이라
-    // 다시 뽑는 횟수가 늘어 최악이 0.8초에 이른다. 화면이 멈춘 것처럼 보이지
-    // 않도록 "만드는 중"을 먼저 그리고 다음 프레임에 만든다.
+    // 판을 만드는 데 걸리는 시간이 난이도에 따라 자릿수로 튄다. 노트북에서 재
+    // 보면 쉬움·보통은 중앙값 몇 ms인데, 어려움은 무작위 판 1000개에 하나꼴이라
+    // 중앙값 0.2초에 최악 1.4초다. 화면이 멈춘 것처럼 보이지 않도록 "만드는 중"을
+    // 먼저 그리고 다음 프레임에 만든다.
     requestAnimationFrame(() => setTimeout(() => {
-      const made = G.generate(n, level);
+      const made = G.generate(level);
+      const n = made.n;
+      state.n = n;
+      // 크기는 판을 만들고 나서야 정해지므로 격자도 그때 세운다.
+      buildDigits();
+      buildBoard();
       state.rowClues = made.rowClues;
       state.colClues = made.colClues;
       state.solution = made.solution;
@@ -642,6 +644,7 @@
       state.hinted.clear();
       el.veil.hidden = true;
       el.timer.textContent = '0:00';
+      el.size.textContent = `${n}×${n}`;
       setDigitRange(n);
       syncDoneLines();
       save();
@@ -652,25 +655,15 @@
   // --- 버튼 만들기 ---
 
   function buildPickers() {
-    el.sizes.replaceChildren();
-    for (const size of G.SIZES) {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'pick';
-      button.textContent = `${size}×${size}`;
-      button.setAttribute('aria-pressed', String(size === state.n));
-      button.addEventListener('click', () => newGame(size, state.level));
-      el.sizes.appendChild(button);
-    }
-
     el.levels.replaceChildren();
-    for (const level of G.levelsFor(state.n)) {
+    for (const level of G.LEVEL_NAMES) {
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'pick';
       button.textContent = G.LEVELS[level].label;
+      button.title = G.LEVELS[level].note;
       button.setAttribute('aria-pressed', String(level === state.level));
-      button.addEventListener('click', () => newGame(state.n, level));
+      button.addEventListener('click', () => newGame(level));
       el.levels.appendChild(button);
     }
   }
@@ -826,6 +819,6 @@
     setDigitRange(state.n);
     render();
   } else {
-    newGame(6, 'easy');
+    newGame('easy');
   }
 })();

@@ -316,6 +316,122 @@ function lineArrangements(state) {
   return null;
 }
 
+/**
+ * 여기까지의 기법은 전부 한 줄만 본다. 그리고 배치 좁히기는 한 줄에서 뽑아낼
+ * 수 있는 정보의 한계치다 — 그 줄의 가능한 배치를 전부 모아 칸별 합집합을
+ * 구하므로, 한 줄만 보는 더 강한 기법은 존재하지 않는다. 더 가려면 가로와
+ * 세로를 함께 보는 수밖에 없다.
+ *
+ * 쓰는 논리는 자리 세기다. 숫자는 줄마다 정확히 한 번, 검은 칸은 정확히 두 번
+ * 나온다. 그래서 가로줄 몇 개를 골랐을 때 그 줄들이 내놓아야 할 개수와, 그
+ * 값이 갈 수 있는 세로줄들이 받을 수 있는 개수가 딱 맞아떨어지면, 그 세로줄의
+ * 남은 자리는 전부 고른 가로줄 차지다. 나머지 가로줄은 거기에 올 수 없다.
+ *
+ * 고르는 줄은 세 개까지만 본다. 넷 이상은 경우의 수가 빠르게 늘어나는데,
+ * 실측으로 새로 잡히는 판이 거의 없었고 사람이 손으로 따질 수 있는 크기도
+ * 넘어선다. 설명할 수 없는 힌트는 이 게임에서 쓸모가 없다.
+ */
+const CROSS_MAX_LINES = 3;
+
+function crossLines(state) {
+  const n = state.n;
+  const targets = [{ value: R.BLOCK, need: 2 }];
+  for (let d = 1; d <= state.digits; d++) targets.push({ value: d, need: 1 });
+
+  for (const { value, need } of targets) {
+    const bit = bitOf(value);
+    for (const from of ['row', 'col']) {
+      const at = (a, b) => (from === 'row' ? a * n + b : b * n + a);
+
+      // a줄이 아직 몇 개를 더 내놓아야 하는지와, 그 값이 갈 수 있는 b줄들.
+      const needA = [];
+      const spotsA = [];
+      const needB = new Array(n).fill(need);
+      for (let a = 0; a < n; a++) {
+        let placed = 0;
+        const spots = [];
+        for (let b = 0; b < n; b++) {
+          const mask = state.cands[at(a, b)];
+          if (mask === bit) placed++;
+          else if (mask & bit) spots.push(b);
+        }
+        needA.push(need - placed);
+        spotsA.push(spots);
+      }
+      for (let b = 0; b < n; b++) {
+        for (let a = 0; a < n; a++) if (state.cands[at(a, b)] === bit) needB[b]--;
+      }
+
+      const open = [];
+      for (let a = 0; a < n; a++) if (needA[a] > 0) open.push(a);
+
+      // 고른 줄 집합을 크기 순으로 훑는다. 작은 집합이 사람에게 훨씬 쉬우므로
+      // 먼저 찾은 것을 쓴다.
+      for (let k = 1; k <= CROSS_MAX_LINES; k++) {
+        const chosen = [];
+        const walk = (start) => {
+          if (chosen.length === k) return check();
+          for (let i = start; i < open.length; i++) {
+            chosen.push(open[i]);
+            const found = walk(i + 1);
+            chosen.pop();
+            if (found) return found;
+          }
+          return null;
+        };
+
+        const check = () => {
+          let demand = 0;
+          const union = new Set();
+          for (const a of chosen) {
+            demand += needA[a];
+            for (const b of spotsA[a]) union.add(b);
+          }
+          let capacity = 0;
+          for (const b of union) capacity += needB[b];
+          if (capacity < demand) {
+            state.broken = true;
+            return { line: state.lines[(from === 'row' ? 0 : n) + chosen[0]],
+                     detail: '이 줄들에 그 값을 놓을 자리가 모자랍니다.' };
+          }
+          if (capacity !== demand) return null;
+
+          // 딱 맞으면 고른 줄들이 그 자리를 전부 가져간다. 한 번에 한 b줄씩만
+          // 지우고 알린다 — 힌트 설명이 한 줄을 가리켜야 화면에서 되짚을 수 있다.
+          const picked = new Set(chosen);
+          for (const b of [...union].sort((x, y) => x - y)) {
+            let changed = false;
+            for (let a = 0; a < n; a++) {
+              if (picked.has(a)) continue;
+              const cell = at(a, b);
+              if (state.cands[cell] === bit) continue;
+              changed = restrict(state, cell, ~bit) || changed;
+            }
+            if (!changed) continue;
+
+            const fromLabel = from === 'row' ? '가로' : '세로';
+            const toLabel = from === 'row' ? '세로' : '가로';
+            const lines = chosen.map((a) => a + 1).join('·');
+            const spots = [...union].sort((x, y) => x - y).map((c) => c + 1).join('·');
+            const name = valueName(value);
+            return {
+              line: state.lines[(from === 'row' ? n : 0) + b],
+              detail: `${fromLabel} ${lines}줄의 ${withSubject(name)} 갈 수 있는 자리는 ${toLabel} ${spots}줄 안에만 있습니다.`
+                + ` 그 줄들이 내놓아야 할 ${demand}개가 ${toLabel} ${spots}줄에 남은 자리 수와 정확히 같으니,`
+                + ` 그 자리는 전부 ${fromLabel} ${lines}줄 차지입니다.`,
+            };
+          }
+          return null;
+        };
+
+        const found = walk(0);
+        if (found) return found;
+      }
+    }
+  }
+  return null;
+}
+
 // 앞쪽이 사람 눈에 쉬운 기법이다. 채점은 "끝까지 푸는 데 필요했던 가장 어려운
 // 기법"으로 하므로, 매번 앞에서부터 다시 시도해야 각 단계에서 실제로 필요했던
 // 최소한의 추론이 기록된다.
@@ -327,6 +443,7 @@ const TECHNIQUES = [
   { name: 'hiddenSingle', label: '숨은 단수', run: hiddenSingle },
   { name: 'combinations', label: '조합 따지기', run: combinations },
   { name: 'lineArrangements', label: '배치 좁히기', run: lineArrangements },
+  { name: 'crossLines', label: '가로세로 맞물림', run: crossLines },
 ];
 
 const TECHNIQUE_NAMES = TECHNIQUES.map((t) => t.name);
