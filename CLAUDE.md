@@ -73,10 +73,18 @@ node games/sudoku/logic.test.js # 스도쿠 기법·생성기 테스트
 node games/doppelblock/logic.test.js  # 더블블록 규칙·완전 탐색 테스트
 node games/doppelblock/solver.test.js # 더블블록 논리 기법·힌트 테스트
 node games/doppelblock/generator.test.js # 더블블록 생성기·난이도 테스트
+
+node games/doppelblock/bake.js 8 45 12345 >> /tmp/eight.txt  # 큰 판 미리 굽기
 ```
 
 게임별 테스트는 그 게임 폴더 안에 두고, 새로 만들면 여기에 명령을 추가한다.
 린트·포매터는 아직 없다.
+
+`bake.js`는 배포에 끼지 않는 오프라인 도구다. 더블블록의 큰 판은 무작위로
+뽑아 매겨 보고 버리는 방식으로는 브라우저에서 기다릴 수 없을 만큼 드물어서,
+여기서 미리 구워 `games/doppelblock/puzzles.js`에 붙여 넣는다. 한 판에 수 초가
+걸리므로 씨앗을 달리해 코어 수만큼 동시에 돌리고 결과를 합친다 — **합칠 때
+중복 단서를 걸러낸다.** 프로세스 안에서만 중복을 보기 때문이다.
 
 ## 규칙
 

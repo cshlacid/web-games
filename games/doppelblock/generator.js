@@ -11,6 +11,9 @@ const R = (typeof require !== 'undefined' && typeof module !== 'undefined')
 const S = (typeof require !== 'undefined' && typeof module !== 'undefined')
   ? require('./solver.js')
   : window.DoppelSolver;
+const P = (typeof require !== 'undefined' && typeof module !== 'undefined')
+  ? require('./puzzles.js')
+  : window.DoppelPuzzles;
 
 // 단서를 전부 주는 퍼즐이라 스도쿠처럼 단서를 빼며 조각내는 단계가 없다. 대신
 // 정답을 뽑고 단서를 읽어, 조건에 맞을 때까지 다시 뽑는다. 논리로 끝까지 풀리는
@@ -36,25 +39,26 @@ function levelOf(report) {
 }
 
 /**
- * 난이도마다 나올 수 있는 크기. 무작위 정답을 매겨 본 실측에서 고른 것이고,
- * 두 가지 이유로 빠지는 칸이 있다.
+ * 난이도마다 나올 수 있는 크기. 무작위 정답을 매겨 본 실측에서 고른 것이다.
  *
- * 아예 없는 조합: 4×4는 숫자가 1과 2뿐이라 맞물림까지 갈 판이 안 나오고,
- * 7×7은 반대로 배치 좁히기 없이 끝나는 판이 안 나온다.
+ * 4×4는 숫자가 1과 2뿐이라 맞물림까지 갈 판이 안 나오고, 7×7은 반대로 배치
+ * 좁히기 없이 끝나는 판이 안 나온다. 없는 것을 고르게 할 수는 없다.
  *
- * 있지만 너무 느린 조합: 7×7 어려움은 무작위 판 3000개에 하나꼴이라 한 판
- * 만드는 데 4초가 든다. 만들 수는 있어도 폰에서 기다릴 시간이 아니다.
+ * 8×8이 어려움에 있는 이유는 다르다. 8×8은 논리 깊이로 매기면 보통이다 —
+ * 3만 판을 매겨 봐도 맞물림이 결정타가 된 판이 없었다. 그런데도 어려움에
+ * 두는 것은 64칸에 줄마다 숫자 여섯 개라 손으로 따질 것의 양 자체가 벽이기
+ * 때문이다. 그래서 이 등급만 기준이 둘이고, 도움말에도 그렇게 적어 두었다.
  */
 const SIZES_BY_LEVEL = {
   easy: [4, 5, 6],
   medium: [4, 5, 6, 7],
-  hard: [5, 6],
+  hard: [5, 6, 7, 8],
 };
 
 const LEVELS = {
   easy: { label: '쉬움', note: '배치 좁히기 없이 풀립니다' },
   medium: { label: '보통', note: '배치 좁히기가 필요합니다' },
-  hard: { label: '어려움', note: '가로세로 맞물림까지 필요합니다' },
+  hard: { label: '어려움', note: '맞물림까지 따지거나, 8×8을 상대합니다' },
 };
 
 const LEVEL_NAMES = ['easy', 'medium', 'hard'];
@@ -77,6 +81,37 @@ function mulberry32(seed) {
 }
 
 /**
+ * 미리 구워 둔 목록에서 한 판 꺼낸다. 정답은 담겨 있지 않으므로 솔버로
+ * 되찾는다 — 논리로 풀리는 판만 구웠으니 이것이 성립한다.
+ *
+ * 못 푸는 항목을 만나면 건너뛴다. 기법을 고치다 보면 예전에 굽힌 판이 더는
+ * 안 풀리게 될 수 있는데, 그때 게임이 죽는 것보다 다음 판을 내주는 편이 낫다.
+ * 그런 일이 생겼는지는 테스트가 목록 전체를 풀어 보며 잡는다.
+ */
+function fromBaked(n, level, rng) {
+  const list = P.BAKED[n] || [];
+  const start = Math.floor(rng() * list.length);
+  for (let k = 0; k < list.length; k++) {
+    const [rowClues, colClues] = list[(start + k) % list.length];
+    const result = S.solveLogically(n, rowClues, colClues);
+    if (!result.solved) continue;
+    let hardest = null;
+    for (const name of S.TECHNIQUE_NAMES) if (result.used.has(name)) hardest = name;
+    return {
+      n,
+      level,
+      label: LEVELS[level].label,
+      rowClues: [...rowClues],
+      colClues: [...colClues],
+      solution: result.grid,
+      hardest,
+      baked: true,
+    };
+  }
+  return null;
+}
+
+/**
  * 크기는 난이도가 고른다. 고른 뒤에는 그 크기로만 다시 뽑는다 — 매번 크기를
  * 바꿔 가며 뽑으면 흔한 크기가 거의 항상 이겨서 무작위가 무색해진다.
  */
@@ -88,6 +123,16 @@ function generate(level = 'medium', options = {}) {
   let n = options.n;
   if (n === undefined) n = sizes[Math.floor(rng() * sizes.length)];
   else if (!sizes.includes(n)) throw new Error(`${n}×${n}에는 ${LEVELS[level].label} 난이도가 없습니다`);
+
+  // 목록에 있는 크기는 목록에서만 꺼낸다. 그 자리에서 뽑기에는 너무 드물어서
+  // 구워 둔 것이라, 목록이 비었다고 실시간 생성으로 넘어가면 몇 분이 걸린다.
+  if (P.BAKED[n]) {
+    const made = fromBaked(n, level, rng);
+    if (made) return made;
+    const rest = sizes.filter((size) => !P.BAKED[size]);
+    if (!rest.length) return null;
+    return generate(level, { ...options, rng, n: rest[Math.floor(rng() * rest.length)] });
+  }
 
   const attempts = options.attempts || ATTEMPTS[level];
 
@@ -107,7 +152,7 @@ function generate(level = 'medium', options = {}) {
       colClues,
       solution,
       hardest: report.hardest,
-      arrangementCalls: report.arrangementCalls,
+      baked: false,
     };
     if (made === level) return puzzle;
     // 조건에 못 미쳐도 "힌트만으로 풀린다"는 보장은 지켜진 판이다. 판을 못
@@ -117,7 +162,7 @@ function generate(level = 'medium', options = {}) {
   return fallback;
 }
 
-const Generator = { LEVELS, LEVEL_NAMES, SIZES, SIZES_BY_LEVEL, CHEAP, ATTEMPTS, levelOf, generate, mulberry32 };
+const Generator = { LEVELS, LEVEL_NAMES, SIZES, SIZES_BY_LEVEL, CHEAP, ATTEMPTS, BAKED: P.BAKED, levelOf, generate, mulberry32 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = Generator;
 if (typeof window !== 'undefined') window.DoppelGenerator = Generator;

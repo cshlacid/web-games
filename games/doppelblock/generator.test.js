@@ -34,6 +34,9 @@ check('논리로 못 풀면 등급이 없다', G.levelOf({ solved: false, hardes
 // 7×7은 반대로 배치 좁히기 없이 끝나는 판이 없다.
 check('쉬움에 7×7은 없다', G.SIZES_BY_LEVEL.easy.includes(7), false);
 check('어려움에 4×4는 없다', G.SIZES_BY_LEVEL.hard.includes(4), false);
+// 8×8은 논리 깊이로는 보통이지만 크기 자체가 벽이라 어려움에 둔다.
+check('8×8은 어려움에만 있다',
+  G.LEVEL_NAMES.filter((l) => G.SIZES_BY_LEVEL[l].includes(8)), ['hard']);
 check('고를 수 있는 크기는 난이도별 크기의 합집합', G.SIZES,
   [...new Set(G.LEVEL_NAMES.flatMap((l) => G.SIZES_BY_LEVEL[l]))].sort());
 
@@ -84,7 +87,9 @@ for (const level of G.LEVEL_NAMES) {
       // 7×7은 완전 탐색이 너무 느려 이 대조를 건너뛴다.
       if (n < 7 && R.countSolutions(n, made.rowClues, made.colClues, 2) !== 1) notUnique++;
 
-      if (G.levelOf(report) !== level) offGrade++;
+      // 미리 구워 둔 판은 등급을 논리 깊이로 매기지 않는다. 8×8은 필요한
+      // 논리가 보통과 같은데도 어려움에 두기 때문이다.
+      if (!made.baked && G.levelOf(report) !== level) offGrade++;
     }
 
     check(`${n}×${n} ${level}: 판을 만들어낸다`, missing, 0);
@@ -109,18 +114,59 @@ for (const level of G.LEVEL_NAMES) {
   check('쉬움: 값싼 기법만으로 풀린다', notCheapSolvable, 0);
 }
 
-// 어려움은 맞물림을 빼면 못 풀려야 한다. 그래야 "맞물림까지 필요하다"는 말이
-// 참이 된다.
+// 그 자리에서 만드는 어려움은 맞물림을 빼면 못 풀려야 한다. 그래야 "맞물림까지
+// 필요하다"는 말이 참이 된다. 미리 구워 둔 크기는 여기서 빼는데, 8×8은 논리
+// 깊이가 아니라 크기 때문에 어려움이라 이 조건을 만족하지 않기 때문이다.
+// 구워 둔 목록은 바로 위에서 따로 검사한다.
 {
   const without = S.TECHNIQUE_NAMES.filter((t) => t !== 'crossLines');
   let solvableWithout = 0;
-  for (const n of G.SIZES_BY_LEVEL.hard) {
+  for (const n of G.SIZES_BY_LEVEL.hard.filter((size) => !G.BAKED[size])) {
     for (let i = 0; i < 2; i++) {
       const made = G.generate('hard', { n, seed: i * 6151 + 11 });
       if (S.solveLogically(n, made.rowClues, made.colClues, without).solved) solvableWithout++;
     }
   }
   check('어려움: 맞물림을 빼면 못 푼다', solvableWithout, 0);
+}
+
+// --- 미리 구워 둔 판 ---
+// 여기 담긴 판이 논리로 안 풀리면 "모든 판은 단서만으로 풀린다"는 약속이
+// 조용히 깨진다. 목록이 통째로 검사 대상이라 기법을 고칠 때 바로 걸린다.
+for (const size of Object.keys(G.BAKED).map(Number)) {
+  const list = G.BAKED[size];
+  check(`${size}×${size} 목록이 비어 있지 않다`, list.length > 0, true);
+
+  let badShape = 0;
+  let notLogical = 0;
+  let invalid = 0;
+  let notHard = 0;
+  for (const [rowClues, colClues] of list) {
+    if (rowClues.length !== size || colClues.length !== size) { badShape++; continue; }
+    const result = S.solveLogically(size, rowClues, colClues);
+    if (!result.solved) { notLogical++; continue; }
+    if (R.validate(size, result.grid, rowClues, colClues)) invalid++;
+    // 7×7은 맞물림까지 필요한 판만 구웠다. 그 조건 때문에 구운 것이므로,
+    // 조건이 깨졌으면 실시간으로 뽑아도 되는 판이 섞여 있다는 뜻이다.
+    if (size === 7 && !result.used.has('crossLines')) notHard++;
+  }
+  check(`${size}×${size} 단서 개수가 크기와 맞는다`, badShape, 0);
+  check(`${size}×${size} 목록이 전부 논리로 풀린다`, notLogical, 0);
+  check(`${size}×${size} 되찾은 정답이 단서와 맞는다`, invalid, 0);
+  if (size === 7) check('7×7 목록은 전부 맞물림이 필요하다', notHard, 0);
+
+  const keys = new Set(list.map(([r, c]) => `${r}|${c}`));
+  check(`${size}×${size} 목록에 같은 판이 없다`, keys.size, list.length);
+}
+
+// 구워 둔 크기를 고르면 목록에서 꺼내 오고, 정답까지 딸려 와야 한다.
+for (const size of Object.keys(G.BAKED).map(Number)) {
+  const made = G.generate('hard', { n: size, seed: 4242 });
+  check(`${size}×${size}: 목록에서 꺼내 온다`, Boolean(made && made.baked), true);
+  check(`${size}×${size}: 정답이 규칙을 지킨다`,
+    R.validate(size, made.solution, made.rowClues, made.colClues), null);
+  check(`${size}×${size}: 씨앗이 같으면 같은 판`,
+    G.generate('hard', { n: size, seed: 4242 }).rowClues, made.rowClues);
 }
 
 // --- 재현성 ---
