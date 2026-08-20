@@ -21,7 +21,9 @@ const B = R.BLOCK;
 
 // --- 상수 ---
 check('6×6은 1~4를 쓴다', R.digitCount(6), 4);
+check('7×7은 1~5를 쓴다', R.digitCount(7), 5);
 check('6×6 한 줄의 숫자 합', R.lineTotal(6), 10);
+check('7×7 한 줄의 숫자 합', R.lineTotal(7), 15);
 check('9×9 한 줄의 숫자 합', R.lineTotal(9), 28);
 
 // --- 단서 읽기 ---
@@ -36,6 +38,7 @@ check('검은 칸이 둘이 아니면 null', R.clueOf([1, 2, 3, 4, 5, 6]), null)
 const factorial = (k) => (k <= 1 ? 1 : k * factorial(k - 1));
 const pairs = (k) => (k * (k - 1)) / 2;
 check('6×6 배치 수', R.arrangementsBySize(6).all.length, pairs(6) * factorial(4));
+check('7×7 배치 수', R.arrangementsBySize(7).all.length, pairs(7) * factorial(5));
 check('배치는 모두 검은 칸 2개', R.arrangementsBySize(6).all.every(
   (line) => [...line].filter((v) => v === B).length === 2), true);
 check('단서별로 나뉘어 있다', R.arrangementsForClue(6, 10).every(

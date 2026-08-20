@@ -29,6 +29,7 @@
     helpOpen: document.getElementById('help-open'),
     helpClose: document.getElementById('help-close'),
     helpRange: document.getElementById('help-range'),
+    helpKeys: document.getElementById('help-keys'),
     toggleBgm: document.getElementById('toggle-bgm'),
     toggleSfx: document.getElementById('toggle-sfx'),
   };
@@ -76,6 +77,7 @@
   function buildBoard() {
     el.board.replaceChildren();
     el.board.style.gridTemplateColumns = `repeat(${state.n + 1}, var(--cell))`;
+    el.board.style.setProperty('--cols', state.n + 1);
     cells = [];
     rowClueNodes = [];
     colClueNodes = [];
@@ -621,8 +623,10 @@
     buildDigits();
     buildBoard();
 
-    // 6×6 쉬움은 판당 60ms를 넘길 때가 있다. 화면이 멈춘 것처럼 보이지 않도록
-    // "만드는 중"을 먼저 그리고 다음 프레임에 만든다.
+    // 판을 만드는 데 걸리는 시간이 크기에 따라 크게 튄다. 노트북에서 재 보면
+    // 6×6 쉬움이 판당 60ms를 넘을 때가 있고, 7×7은 논리로 풀리는 판이 1.8%뿐이라
+    // 다시 뽑는 횟수가 늘어 최악이 0.8초에 이른다. 화면이 멈춘 것처럼 보이지
+    // 않도록 "만드는 중"을 먼저 그리고 다음 프레임에 만든다.
     requestAnimationFrame(() => setTimeout(() => {
       const made = G.generate(n, level);
       state.rowClues = made.rowClues;
@@ -638,7 +642,7 @@
       state.hinted.clear();
       el.veil.hidden = true;
       el.timer.textContent = '0:00';
-      el.helpRange.textContent = `1~${R.digitCount(n)}`;
+      setDigitRange(n);
       syncDoneLines();
       save();
       render();
@@ -669,6 +673,14 @@
       button.addEventListener('click', () => newGame(state.n, level));
       el.levels.appendChild(button);
     }
+  }
+
+  // 도움말이 숫자 범위를 두 군데서 말한다. 크기를 바꿀 때 한쪽만 고치면
+  // 없는 키를 누르라고 적혀 있게 된다.
+  function setDigitRange(n) {
+    const text = `1~${R.digitCount(n)}`;
+    el.helpRange.textContent = text;
+    el.helpKeys.textContent = text;
   }
 
   function buildDigits() {
@@ -811,7 +823,7 @@
 
   if (restore()) {
     el.timer.textContent = formatTime(state.elapsed);
-    el.helpRange.textContent = `1~${digitsOf()}`;
+    setDigitRange(state.n);
     render();
   } else {
     newGame(6, 'easy');

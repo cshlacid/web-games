@@ -166,6 +166,29 @@ check('적어 둔 후보와 같은 힌트를 다시 주지 않는다',
   check('완성된 판이 규칙에 맞는다', R.validate(6, board, chainRows, chainCols), null);
 }
 
+// 7×7은 줄이 길어 좁히기 단계가 훨씬 많이 끼어든다. 힌트가 그 끝까지 이어지는지
+// 크기가 커져도 확인해 둔다 — 여기서 끊기면 "모든 판이 단서만으로 풀린다"는
+// 약속이 7×7에서만 조용히 깨진다.
+{
+  const rows = [10, 11, 4, 5, 15, 1, 0];
+  const cols = [10, 11, 0, 0, 12, 0, 4];
+  const board = new Int8Array(49).fill(R.UNKNOWN);
+  const marks = new Uint16Array(49);
+  let guard = 0;
+  while (guard++ < 2000) {
+    const step = S.nextHint(7, rows, cols, board, marks);
+    if (!step) break;
+    if (step.kind === 'narrow') {
+      for (const { cell, mask } of step.cells) marks[cell] = mask;
+      continue;
+    }
+    board[step.cell] = step.value;
+    marks[step.cell] = 0;
+  }
+  check('7×7 판도 힌트만으로 끝까지 채워진다', board.some((v) => v === R.UNKNOWN), false);
+  check('완성된 7×7 판이 규칙에 맞는다', R.validate(7, board, rows, cols), null);
+}
+
 // --- 모순된 판 ---
 const contradictory = S.solveLogically(4, [3, 3, 3, 3], [0, 0, 0, 0]);
 check('모순된 단서는 풀리지 않는다', contradictory.solved, false);
