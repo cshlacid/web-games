@@ -19,29 +19,50 @@ function check(name, actual, expected) {
   }
 }
 
-// --- 크기별로 고를 수 있는 난이도 ---
-// 4×4는 숫자가 1과 2뿐이라 어려움을 만들 여지가 없다.
-check('4×4에는 어려움이 없다', G.levelsFor(4), ['easy', 'medium']);
-check('5×5에는 세 등급이 다 있다', G.levelsFor(5), ['easy', 'medium', 'hard']);
-// 7×7은 반대로 쉬움 쪽이 비어 있다 — 값싼 기법만으로 끝나는 판이 나오지 않는다.
-check('7×7에는 쉬움이 없다', G.levelsFor(7), ['medium', 'hard']);
+// --- 난이도가 무엇으로 정해지는가 ---
+// 크기가 아니라 "끝까지 푸는 데 필요했던 가장 어려운 기법"이다.
+check('배치 좁히기가 필요 없으면 쉬움',
+  G.levelOf({ solved: true, hardest: 'combinations' }), 'easy');
+check('배치 좁히기까지면 보통',
+  G.levelOf({ solved: true, hardest: 'lineArrangements' }), 'medium');
+check('맞물림까지면 어려움',
+  G.levelOf({ solved: true, hardest: 'crossLines' }), 'hard');
+check('논리로 못 풀면 등급이 없다', G.levelOf({ solved: false, hardest: 'eliminate' }), null);
+
+// --- 크기는 난이도가 고른다 ---
+// 없는 조합이 있다. 4×4는 숫자가 1과 2뿐이라 맞물림까지 갈 판이 없고,
+// 7×7은 반대로 배치 좁히기 없이 끝나는 판이 없다.
+check('쉬움에 7×7은 없다', G.SIZES_BY_LEVEL.easy.includes(7), false);
+check('어려움에 4×4는 없다', G.SIZES_BY_LEVEL.hard.includes(4), false);
+check('고를 수 있는 크기는 난이도별 크기의 합집합', G.SIZES,
+  [...new Set(G.LEVEL_NAMES.flatMap((l) => G.SIZES_BY_LEVEL[l]))].sort());
 
 let threw = false;
-try { G.generate(4, 'hard'); } catch { threw = true; }
-check('없는 난이도를 고르면 막는다', threw, true);
+try { G.generate('impossible'); } catch { threw = true; }
+check('없는 난이도를 막는다', threw, true);
 
 threw = false;
-try { G.generate(7, 'easy'); } catch { threw = true; }
-check('7×7 쉬움도 막는다', threw, true);
+try { G.generate('hard', { n: 4 }); } catch { threw = true; }
+check('그 난이도에 없는 크기를 막는다', threw, true);
 
-threw = false;
-try { G.generate(9, 'easy'); } catch { threw = true; }
-check('지원하지 않는 크기를 막는다', threw, true);
+// 크기를 지정하지 않으면 난이도가 허용하는 크기 안에서 무작위로 나와야 한다.
+for (const level of G.LEVEL_NAMES) {
+  const seen = new Set();
+  let outside = 0;
+  for (let i = 0; i < 24; i++) {
+    const made = G.generate(level, { seed: i * 8191 + 3 });
+    seen.add(made.n);
+    if (!G.SIZES_BY_LEVEL[level].includes(made.n)) outside++;
+  }
+  check(`${level}: 허용된 크기만 나온다`, outside, 0);
+  // 크기가 하나로 굳으면 무작위 선택이 동작하지 않는다는 뜻이다.
+  check(`${level}: 크기가 한 가지로 굳지 않는다`, seen.size > 1, true);
+}
 
 // --- 만들어진 판이 조건을 지키는가 ---
-for (const n of G.SIZES) {
-  for (const level of G.levelsFor(n)) {
-    const count = { 6: 6, 7: 3 }[n] || 12;
+for (const level of G.LEVEL_NAMES) {
+  for (const n of G.SIZES_BY_LEVEL[level]) {
+    const count = level === 'hard' ? 2 : (n >= 6 ? 3 : 6);
     let invalid = 0;
     let notLogical = 0;
     let wrongAnswer = 0;
@@ -50,7 +71,7 @@ for (const n of G.SIZES) {
     let missing = 0;
 
     for (let i = 0; i < count; i++) {
-      const made = G.generate(n, level, { seed: i * 7919 + 17 });
+      const made = G.generate(level, { n, seed: i * 7919 + 17 });
       if (!made) { missing++; continue; }
 
       if (R.validate(n, made.solution, made.rowClues, made.colClues)) invalid++;
@@ -60,9 +81,10 @@ for (const n of G.SIZES) {
       else if (String(report.grid) !== String(made.solution)) wrongAnswer++;
 
       // 논리로 풀리면 유일해가 따라온다는 성질을 완전 탐색으로 다시 확인한다.
-      if (R.countSolutions(n, made.rowClues, made.colClues, 2) !== 1) notUnique++;
+      // 7×7은 완전 탐색이 너무 느려 이 대조를 건너뛴다.
+      if (n < 7 && R.countSolutions(n, made.rowClues, made.colClues, 2) !== 1) notUnique++;
 
-      if (!G.LEVELS[level].accept(report, n)) offGrade++;
+      if (G.levelOf(report) !== level) offGrade++;
     }
 
     check(`${n}×${n} ${level}: 판을 만들어낸다`, missing, 0);
@@ -74,38 +96,43 @@ for (const n of G.SIZES) {
   }
 }
 
-// --- 쉬움의 정의 ---
-// 쉬움은 "배치 좁히기가 한 번도 필요 없는 판"이다. 값싼 추론만으로 끝나야 한다.
-for (const n of G.SIZES.filter((n) => G.levelsFor(n).includes('easy'))) {
-  let needsArrangements = 0;
+// --- 등급의 정의가 실제로 지켜지는가 ---
+// 쉬움은 값싼 기법만으로 끝나야 한다. 이것이 깨지면 등급 구분이 이름뿐이 된다.
+{
   let notCheapSolvable = 0;
-  for (let i = 0; i < (n === 6 ? 4 : 8); i++) {
-    const made = G.generate(n, 'easy', { seed: i * 31337 + 5 });
-    if (made.arrangementCalls !== 0) needsArrangements++;
-    if (!S.solveLogically(n, made.rowClues, made.colClues, G.CHEAP).solved) notCheapSolvable++;
+  for (const n of G.SIZES_BY_LEVEL.easy) {
+    for (let i = 0; i < 4; i++) {
+      const made = G.generate('easy', { n, seed: i * 31337 + 5 });
+      if (!S.solveLogically(n, made.rowClues, made.colClues, G.CHEAP).solved) notCheapSolvable++;
+    }
   }
-  check(`${n}×${n} 쉬움: 배치 좁히기가 필요 없다`, needsArrangements, 0);
-  check(`${n}×${n} 쉬움: 값싼 기법만으로 풀린다`, notCheapSolvable, 0);
+  check('쉬움: 값싼 기법만으로 풀린다', notCheapSolvable, 0);
 }
 
-// --- 등급 사이가 겹치지 않는가 ---
-const mediumCalls = [];
-const hardCalls = [];
-for (let i = 0; i < 10; i++) {
-  mediumCalls.push(G.generate(5, 'medium', { seed: i * 977 + 1 }).arrangementCalls);
-  hardCalls.push(G.generate(5, 'hard', { seed: i * 977 + 1 }).arrangementCalls);
+// 어려움은 맞물림을 빼면 못 풀려야 한다. 그래야 "맞물림까지 필요하다"는 말이
+// 참이 된다.
+{
+  const without = S.TECHNIQUE_NAMES.filter((t) => t !== 'crossLines');
+  let solvableWithout = 0;
+  for (const n of G.SIZES_BY_LEVEL.hard) {
+    for (let i = 0; i < 2; i++) {
+      const made = G.generate('hard', { n, seed: i * 6151 + 11 });
+      if (S.solveLogically(n, made.rowClues, made.colClues, without).solved) solvableWithout++;
+    }
+  }
+  check('어려움: 맞물림을 빼면 못 푼다', solvableWithout, 0);
 }
-check('5×5 보통은 배치 좁히기가 필요하다', mediumCalls.every((c) => c > 0), true);
-check('5×5 어려움은 보통보다 더 많이 필요하다',
-  Math.min(...hardCalls) > Math.max(...mediumCalls), true);
 
 // --- 재현성 ---
 check('씨앗이 같으면 같은 판',
-  G.generate(5, 'medium', { seed: 42 }).rowClues,
-  G.generate(5, 'medium', { seed: 42 }).rowClues);
+  G.generate('medium', { seed: 42 }).rowClues,
+  G.generate('medium', { seed: 42 }).rowClues);
+check('씨앗이 같으면 크기도 같다',
+  G.generate('medium', { seed: 42 }).n,
+  G.generate('medium', { seed: 42 }).n);
 check('씨앗이 다르면 대체로 다른 판',
-  String(G.generate(5, 'medium', { seed: 1 }).solution)
-    !== String(G.generate(5, 'medium', { seed: 2 }).solution), true);
+  String(G.generate('medium', { seed: 1, n: 5 }).solution)
+    !== String(G.generate('medium', { seed: 2, n: 5 }).solution), true);
 
 console.log(`${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);

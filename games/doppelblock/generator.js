@@ -16,50 +16,55 @@ const S = (typeof require !== 'undefined' && typeof module !== 'undefined')
 // 정답을 뽑고 단서를 읽어, 조건에 맞을 때까지 다시 뽑는다. 논리로 끝까지 풀리는
 // 판만 통과시키므로 유일해는 따라온다 — 추론에 분기가 없기 때문이다.
 
-const CHEAP = S.TECHNIQUE_NAMES.filter((name) => name !== 'lineArrangements');
+const CHEAP = S.TECHNIQUE_NAMES.filter(
+  (name) => name !== 'lineArrangements' && name !== 'crossLines');
 
-// 크기마다 "배치 좁히기"가 필요한 횟수의 분포가 달라서 경계도 크기별로 잡는다.
-// 실측 중앙값이다: 5×5는 5회, 6×6은 8회, 7×7은 16회.
-//
-// 4×4는 숫자가 1과 2뿐이라 판의 가짓수 자체가 적고, 배치 좁히기가 필요한 판은
-// 전부 정확히 5회로 몰린다. 등급을 셋으로 나눌 여지가 없어서 어려움을 두지
-// 않는다 — 있지도 않은 난이도를 고르게 하고 폴백으로 다른 판을 내주는 것보다
-// 고를 수 없다고 하는 편이 정직하다.
-const MEDIUM_LIMIT = { 4: Infinity, 5: 5, 6: 8, 7: 16 };
+/**
+ * 난이도는 "끝까지 푸는 데 어떤 논리까지 필요했는가"로 가른다. 기법 목록은
+ * 사람 눈에 쉬운 순서로 놓여 있으므로, 그중 가장 뒤엣것이 그 판의 벽이다.
+ *
+ * 예전에는 "배치 좁히기가 몇 번 필요했나"로 셌다. 그 수는 크기에 따라 크게
+ * 달라져서 경계를 크기마다 따로 잡아야 했고, 그래서 크기와 난이도가 서로
+ * 묶여 있었다. 필요한 논리로 가르면 그 경계가 크기와 무관해진다 — 크기를
+ * 무작위로 고를 수 있게 된 것이 이 바꿈의 목적이다.
+ */
+function levelOf(report) {
+  if (!report.solved) return null;
+  if (report.hardest === 'crossLines') return 'hard';
+  if (report.hardest === 'lineArrangements') return 'medium';
+  return 'easy';
+}
 
-// 7×7은 반대쪽이 비어 있다. 무작위 정답 20000판을 매겨 보면 논리로 끝까지
-// 풀리는 판이 1.8%뿐이고, 그중 배치 좁히기가 한 번도 필요 없는 판은 하나도
-// 없었다(최소 1회). 줄이 길수록 단서 하나가 가리는 배치의 비율이 낮아져서,
-// 값싼 기법만으로 끝나는 판이 사실상 생기지 않는다. 그래서 쉬움을 빼고
-// 보통부터 시작한다.
-const LEVELS_BY_SIZE = {
-  4: ['easy', 'medium'],
-  5: ['easy', 'medium', 'hard'],
-  6: ['easy', 'medium', 'hard'],
-  7: ['medium', 'hard'],
+/**
+ * 난이도마다 나올 수 있는 크기. 무작위 정답을 매겨 본 실측에서 고른 것이고,
+ * 두 가지 이유로 빠지는 칸이 있다.
+ *
+ * 아예 없는 조합: 4×4는 숫자가 1과 2뿐이라 맞물림까지 갈 판이 안 나오고,
+ * 7×7은 반대로 배치 좁히기 없이 끝나는 판이 안 나온다.
+ *
+ * 있지만 너무 느린 조합: 7×7 어려움은 무작위 판 3000개에 하나꼴이라 한 판
+ * 만드는 데 4초가 든다. 만들 수는 있어도 폰에서 기다릴 시간이 아니다.
+ */
+const SIZES_BY_LEVEL = {
+  easy: [4, 5, 6],
+  medium: [4, 5, 6, 7],
+  hard: [5, 6],
 };
-
-const levelsFor = (n) => LEVELS_BY_SIZE[n] || [];
 
 const LEVELS = {
-  easy: {
-    label: '쉬움',
-    // 배치 좁히기 없이, 값싼 추론만으로 끝까지 풀리는 판.
-    accept: (report) => report.solved && report.arrangementCalls === 0,
-  },
-  medium: {
-    label: '보통',
-    accept: (report, n) => report.solved
-      && report.arrangementCalls > 0
-      && report.arrangementCalls <= MEDIUM_LIMIT[n],
-  },
-  hard: {
-    label: '어려움',
-    accept: (report, n) => report.solved && report.arrangementCalls > MEDIUM_LIMIT[n],
-  },
+  easy: { label: '쉬움', note: '배치 좁히기 없이 풀립니다' },
+  medium: { label: '보통', note: '배치 좁히기가 필요합니다' },
+  hard: { label: '어려움', note: '가로세로 맞물림까지 필요합니다' },
 };
 
-const SIZES = [4, 5, 6, 7];
+const LEVEL_NAMES = ['easy', 'medium', 'hard'];
+
+const SIZES = [...new Set(LEVEL_NAMES.flatMap((level) => SIZES_BY_LEVEL[level]))].sort();
+
+// 난이도마다 판을 다시 뽑아야 하는 횟수가 자릿수로 다르다. 어려움은 무작위
+// 판 1000개에 하나꼴이라, 쉬움과 같은 횟수를 주면 등급이 어긋난 판을 내주는
+// 일이 심심찮게 생긴다.
+const ATTEMPTS = { easy: 4000, medium: 4000, hard: 60000 };
 
 function mulberry32(seed) {
   let a = seed >>> 0;
@@ -71,41 +76,48 @@ function mulberry32(seed) {
   };
 }
 
-function generate(n = 6, level = 'easy', options = {}) {
-  const config = LEVELS[level];
-  if (!config) throw new Error(`알 수 없는 난이도: ${level}`);
-  if (!SIZES.includes(n)) throw new Error(`지원하지 않는 크기: ${n}`);
-  if (!levelsFor(n).includes(level)) throw new Error(`${n}×${n}에는 ${config.label} 난이도가 없습니다`);
-
+/**
+ * 크기는 난이도가 고른다. 고른 뒤에는 그 크기로만 다시 뽑는다 — 매번 크기를
+ * 바꿔 가며 뽑으면 흔한 크기가 거의 항상 이겨서 무작위가 무색해진다.
+ */
+function generate(level = 'medium', options = {}) {
+  if (!LEVELS[level]) throw new Error(`알 수 없는 난이도: ${level}`);
   const rng = options.rng || (options.seed !== undefined ? mulberry32(options.seed) : Math.random);
-  const attempts = options.attempts || 4000;
+
+  const sizes = SIZES_BY_LEVEL[level];
+  let n = options.n;
+  if (n === undefined) n = sizes[Math.floor(rng() * sizes.length)];
+  else if (!sizes.includes(n)) throw new Error(`${n}×${n}에는 ${LEVELS[level].label} 난이도가 없습니다`);
+
+  const attempts = options.attempts || ATTEMPTS[level];
 
   let fallback = null;
   for (let i = 0; i < attempts; i++) {
     const solution = R.randomSolution(n, rng);
     const { rowClues, colClues } = R.cluesOf(n, solution);
     const report = S.grade(n, rowClues, colClues);
-    if (!report.solved) continue;
+    const made = levelOf(report);
+    if (!made) continue;
 
-    const made = {
+    const puzzle = {
       n,
       level,
-      label: config.label,
+      label: LEVELS[level].label,
       rowClues,
       colClues,
       solution,
-      arrangementCalls: report.arrangementCalls,
       hardest: report.hardest,
+      arrangementCalls: report.arrangementCalls,
     };
-    if (config.accept(report, n)) return made;
+    if (made === level) return puzzle;
     // 조건에 못 미쳐도 "힌트만으로 풀린다"는 보장은 지켜진 판이다. 판을 못
     // 내주는 것보다는 난이도가 조금 어긋난 판을 내주는 편이 낫다.
-    fallback = fallback || made;
+    fallback = fallback || puzzle;
   }
   return fallback;
 }
 
-const Generator = { LEVELS, SIZES, CHEAP, MEDIUM_LIMIT, levelsFor, generate, mulberry32 };
+const Generator = { LEVELS, LEVEL_NAMES, SIZES, SIZES_BY_LEVEL, CHEAP, ATTEMPTS, levelOf, generate, mulberry32 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = Generator;
 if (typeof window !== 'undefined') window.DoppelGenerator = Generator;

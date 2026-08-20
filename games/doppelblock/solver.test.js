@@ -189,6 +189,57 @@ check('적어 둔 후보와 같은 힌트를 다시 주지 않는다',
   check('완성된 7×7 판이 규칙에 맞는다', R.validate(7, board, rows, cols), null);
 }
 
+// --- 가로세로 맞물림 ---
+// 여기까지의 기법은 전부 한 줄만 본다. 아래 두 판은 한 줄만 봐서는 막히고,
+// 가로와 세로를 맞물려 세어야 뚫린다. 이 기법이 실제로 벽을 넘는지 — 그리고
+// 넘고 나서 낸 답이 규칙에 맞는지 — 크기를 달리해 확인한다.
+{
+  const cases = [
+    { n: 5, rows: [0, 5, 0, 5, 1], cols: [0, 0, 2, 3, 0] },
+    { n: 6, rows: [3, 0, 4, 5, 10, 0], cols: [0, 4, 0, 0, 0, 8] },
+  ];
+  const without = S.TECHNIQUE_NAMES.filter((t) => t !== 'crossLines');
+  for (const { n, rows, cols } of cases) {
+    check(`${n}×${n}: 맞물림을 빼면 막힌다`,
+      S.solveLogically(n, rows, cols, without).solved, false);
+    const full = S.solveLogically(n, rows, cols);
+    check(`${n}×${n}: 맞물림을 넣으면 풀린다`, full.solved, true);
+    check(`${n}×${n}: 맞물림이 낸 답이 규칙에 맞다`, R.validate(n, full.grid, rows, cols), null);
+    check(`${n}×${n}: 맞물림이 실제로 쓰였다`, full.used.has('crossLines'), true);
+  }
+}
+
+// 맞물림은 목록의 맨 끝에 있어야 한다. 순서가 곧 난이도 등급이라, 중간에
+// 끼면 그보다 쉬운 기법으로 끝난 판까지 어려움으로 매겨진다.
+check('맞물림이 가장 어려운 기법이다',
+  S.TECHNIQUE_NAMES[S.TECHNIQUE_NAMES.length - 1], 'crossLines');
+
+// 맞물림 단계도 힌트로 나올 수 있어야 한다. 설명 없이 후보만 사라지면
+// 플레이어는 무슨 일이 일어났는지 알 수 없다.
+{
+  const rows = [3, 0, 4, 5, 10, 0];
+  const cols = [0, 4, 0, 0, 0, 8];
+  const board = new Int8Array(36).fill(R.UNKNOWN);
+  const marks = new Uint16Array(36);
+  let crossSeen = null;
+  let guard = 0;
+  while (guard++ < 2000) {
+    const step = S.nextHint(6, rows, cols, board, marks);
+    if (!step) break;
+    if (step.technique === 'crossLines' && !crossSeen) crossSeen = step;
+    if (step.kind === 'narrow') {
+      for (const { cell, mask } of step.cells) marks[cell] = mask;
+      continue;
+    }
+    board[step.cell] = step.value;
+    marks[step.cell] = 0;
+  }
+  check('맞물림이 필요한 판도 힌트만으로 끝난다', board.some((v) => v === R.UNKNOWN), false);
+  check('맞물림 힌트가 실제로 나온다', crossSeen !== null, true);
+  check('맞물림 힌트에 근거가 붙는다',
+    Boolean(crossSeen && crossSeen.detail.includes('줄에 남은 자리 수와 정확히 같으니')), true);
+}
+
 // --- 모순된 판 ---
 const contradictory = S.solveLogically(4, [3, 3, 3, 3], [0, 0, 0, 0]);
 check('모순된 단서는 풀리지 않는다', contradictory.solved, false);
