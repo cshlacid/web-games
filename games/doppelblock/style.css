@@ -18,6 +18,10 @@
   --btn-fg: #f2f5f9;
   --sheet-bg: #ffffff;
   --hint-ring: #c9962f;
+  /* 판이 쓸 수 있는 폭을 칸 크기 계산에서 다시 세야 해서 둘 다 변수로 둔다.
+     한쪽에만 적어 두면 같은 수식을 두 곳에 쓰게 되고, 한쪽만 고치면 어긋난다. */
+  --pad-x: clamp(10px, 4vmin, 28px);
+  --app-max: 440px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -53,13 +57,13 @@ body {
     "Helvetica Neue", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
   display: flex;
   justify-content: center;
-  padding: clamp(10px, 3vmin, 24px) clamp(10px, 4vmin, 28px);
+  padding: clamp(10px, 3vmin, 24px) var(--pad-x);
   overscroll-behavior: none;
   touch-action: manipulation;
 }
 
 .app {
-  width: min(100%, 440px);
+  width: min(100%, var(--app-max));
   display: flex;
   flex-direction: column;
   gap: clamp(8px, 2vmin, 14px);
@@ -148,7 +152,10 @@ h1 {
 .board {
   /* 더블클릭으로 칸을 순환시키므로 그때 글자가 선택되지 않게 막는다. */
   user-select: none;
-  --cell: clamp(34px, min(11vmin, 52px), 52px);
+  /* 화면 폭에 맞춰 줄이는 항이 필요하다. 화면 비율만 보면 7×7(단서 줄까지 여덟
+     칸)이 좁은 폰에서 판 폭을 넘어 옆으로 잘린다. --cols는 buildBoard가 넣는다. */
+  --cell: min(clamp(34px, 11vmin, 52px),
+    calc((min(100vw - 2 * var(--pad-x), var(--app-max)) - (var(--cols) - 1) * 2px) / var(--cols)));
   display: grid;
   gap: 2px;
   width: max-content;

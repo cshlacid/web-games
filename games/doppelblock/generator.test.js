@@ -23,10 +23,16 @@ function check(name, actual, expected) {
 // 4×4는 숫자가 1과 2뿐이라 어려움을 만들 여지가 없다.
 check('4×4에는 어려움이 없다', G.levelsFor(4), ['easy', 'medium']);
 check('5×5에는 세 등급이 다 있다', G.levelsFor(5), ['easy', 'medium', 'hard']);
+// 7×7은 반대로 쉬움 쪽이 비어 있다 — 값싼 기법만으로 끝나는 판이 나오지 않는다.
+check('7×7에는 쉬움이 없다', G.levelsFor(7), ['medium', 'hard']);
 
 let threw = false;
 try { G.generate(4, 'hard'); } catch { threw = true; }
 check('없는 난이도를 고르면 막는다', threw, true);
+
+threw = false;
+try { G.generate(7, 'easy'); } catch { threw = true; }
+check('7×7 쉬움도 막는다', threw, true);
 
 threw = false;
 try { G.generate(9, 'easy'); } catch { threw = true; }
@@ -35,7 +41,7 @@ check('지원하지 않는 크기를 막는다', threw, true);
 // --- 만들어진 판이 조건을 지키는가 ---
 for (const n of G.SIZES) {
   for (const level of G.levelsFor(n)) {
-    const count = n === 6 ? 6 : 12;
+    const count = { 6: 6, 7: 3 }[n] || 12;
     let invalid = 0;
     let notLogical = 0;
     let wrongAnswer = 0;
@@ -70,7 +76,7 @@ for (const n of G.SIZES) {
 
 // --- 쉬움의 정의 ---
 // 쉬움은 "배치 좁히기가 한 번도 필요 없는 판"이다. 값싼 추론만으로 끝나야 한다.
-for (const n of G.SIZES) {
+for (const n of G.SIZES.filter((n) => G.levelsFor(n).includes('easy'))) {
   let needsArrangements = 0;
   let notCheapSolvable = 0;
   for (let i = 0; i < (n === 6 ? 4 : 8); i++) {

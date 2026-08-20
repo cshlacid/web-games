@@ -19,15 +19,25 @@ const S = (typeof require !== 'undefined' && typeof module !== 'undefined')
 const CHEAP = S.TECHNIQUE_NAMES.filter((name) => name !== 'lineArrangements');
 
 // 크기마다 "배치 좁히기"가 필요한 횟수의 분포가 달라서 경계도 크기별로 잡는다.
-// 실측 중앙값이다: 5×5는 5회, 6×6은 8회.
+// 실측 중앙값이다: 5×5는 5회, 6×6은 8회, 7×7은 16회.
 //
 // 4×4는 숫자가 1과 2뿐이라 판의 가짓수 자체가 적고, 배치 좁히기가 필요한 판은
 // 전부 정확히 5회로 몰린다. 등급을 셋으로 나눌 여지가 없어서 어려움을 두지
 // 않는다 — 있지도 않은 난이도를 고르게 하고 폴백으로 다른 판을 내주는 것보다
 // 고를 수 없다고 하는 편이 정직하다.
-const MEDIUM_LIMIT = { 4: Infinity, 5: 5, 6: 8 };
+const MEDIUM_LIMIT = { 4: Infinity, 5: 5, 6: 8, 7: 16 };
 
-const LEVELS_BY_SIZE = { 4: ['easy', 'medium'], 5: ['easy', 'medium', 'hard'], 6: ['easy', 'medium', 'hard'] };
+// 7×7은 반대쪽이 비어 있다. 무작위 정답 20000판을 매겨 보면 논리로 끝까지
+// 풀리는 판이 1.8%뿐이고, 그중 배치 좁히기가 한 번도 필요 없는 판은 하나도
+// 없었다(최소 1회). 줄이 길수록 단서 하나가 가리는 배치의 비율이 낮아져서,
+// 값싼 기법만으로 끝나는 판이 사실상 생기지 않는다. 그래서 쉬움을 빼고
+// 보통부터 시작한다.
+const LEVELS_BY_SIZE = {
+  4: ['easy', 'medium'],
+  5: ['easy', 'medium', 'hard'],
+  6: ['easy', 'medium', 'hard'],
+  7: ['medium', 'hard'],
+};
 
 const levelsFor = (n) => LEVELS_BY_SIZE[n] || [];
 
@@ -49,7 +59,7 @@ const LEVELS = {
   },
 };
 
-const SIZES = [4, 5, 6];
+const SIZES = [4, 5, 6, 7];
 
 function mulberry32(seed) {
   let a = seed >>> 0;
