@@ -408,9 +408,10 @@
   }
 
   /**
-   * 단서를 누르면 그 줄의 빈 칸에 후보를 한꺼번에 적는다. 더블클릭을 칸마다
-   * 반복하는 것과 같고, 후보 계산도 같다 — 가로·세로에 놓인 숫자만 뺀다.
-   * 이미 값이나 검은 칸이 놓인 칸은 건드리지 않는다.
+   * 단서를 누르면 그 줄의 빈 칸에 후보를 한꺼번에 적는다. 두 번 두드리기를
+   * 칸마다 반복하는 것과 같고, 후보 계산도 같다 — 가로·세로에 놓인 숫자만 뺀다.
+   * 값이 놓인 칸도, 이미 연필로 적어 둔 칸도 건드리지 않는다. 손으로 좁혀 둔
+   * 후보를 가로·세로만 본 넓은 후보로 되돌리면 따져 둔 것이 날아간다.
    *
    * 검은 칸 두 개가 아직 정해지지 않은 줄에서는 동작하지 않는다. 그 상태에서
    * 빈 칸에 숫자 후보를 적으면 검은 칸이 될 수도 있는 자리에 "여기는 숫자"라고
@@ -429,9 +430,9 @@
 
     const updates = [];
     for (const cell of cellsInLine) {
-      if (state.values[cell] !== R.UNKNOWN) continue;
+      if (state.values[cell] !== R.UNKNOWN || state.marks[cell]) continue;
       const mask = availableDigits(cell);
-      if (mask !== state.marks[cell]) updates.push([cell, mask]);
+      if (mask) updates.push([cell, mask]);
     }
 
     if (updates.length === 0) { toast('이 줄에 새로 적을 후보가 없어요'); return; }
