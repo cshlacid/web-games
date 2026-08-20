@@ -408,9 +408,10 @@
   }
 
   /**
-   * 단서를 누르면 그 줄의 빈 칸에 후보를 한꺼번에 적는다. 더블클릭을 칸마다
-   * 반복하는 것과 같고, 후보 계산도 같다 — 가로·세로에 놓인 숫자만 뺀다.
-   * 이미 값이나 검은 칸이 놓인 칸은 건드리지 않는다.
+   * 단서를 누르면 그 줄의 빈 칸에 후보를 한꺼번에 적는다. 두 번 두드리기를
+   * 칸마다 반복하는 것과 같고, 후보 계산도 같다 — 가로·세로에 놓인 숫자만 뺀다.
+   * 값이 놓인 칸도, 이미 연필로 적어 둔 칸도 건드리지 않는다. 손으로 좁혀 둔
+   * 후보를 가로·세로만 본 넓은 후보로 되돌리면 따져 둔 것이 날아간다.
    *
    * 검은 칸 두 개가 아직 정해지지 않은 줄에서는 동작하지 않는다. 그 상태에서
    * 빈 칸에 숫자 후보를 적으면 검은 칸이 될 수도 있는 자리에 "여기는 숫자"라고
@@ -429,9 +430,9 @@
 
     const updates = [];
     for (const cell of cellsInLine) {
-      if (state.values[cell] !== R.UNKNOWN) continue;
-      const mask = availableMarks(cell);
-      if (mask !== state.marks[cell]) updates.push([cell, mask]);
+      if (state.values[cell] !== R.UNKNOWN || state.marks[cell]) continue;
+      const mask = availableDigits(cell);
+      if (mask) updates.push([cell, mask]);
     }
 
     if (updates.length === 0) { toast('이 줄에 새로 적을 후보가 없어요'); return; }
@@ -444,24 +445,22 @@
   }
 
   /**
-   * 그 칸의 가로·세로만 보고 아직 가능한 값들. 더블탭과 단서 클릭이 함께 쓴다.
+   * 그 칸의 가로·세로에 아직 안 쓰인 숫자들. 더블탭과 단서 클릭이 함께 쓴다.
    *
-   * 일부러 이 정도만 본다. 그 줄의 가능한 배치까지 따지면 후보가 너무 좁아져서
-   * 사실상 대신 풀어주는 꼴이 된다 — 실제로 그렇게 만들었다가 되돌렸다.
+   * 검은 칸은 일부러 넣지 않는다. 순환의 다음 칸이 검은 칸이라, 후보에까지
+   * 넣으면 같은 말을 두 번 하는 데다 숫자 후보 사이에서 ■만 눈에 띈다.
+   * 검은 칸 후보는 연필 모드에서 손으로 찍거나 힌트가 적어 준다.
+   *
+   * 숫자도 일부러 이 정도만 본다. 그 줄의 가능한 배치까지 따지면 후보가 너무
+   * 좁아져서 사실상 대신 풀어주는 꼴이 된다 — 실제로 그렇게 만들었다가 되돌렸다.
    */
-  function availableMarks(index) {
+  function availableDigits(index) {
     const used = new Set();
-    let blockable = true;
     for (const kind of ['row', 'col']) {
       const line = lineCells(kind, kind === 'row' ? rowOf(index) : colOf(index));
-      let blocks = 0;
-      for (const cell of line) {
-        if (state.values[cell] > 0) used.add(state.values[cell]);
-        else if (state.values[cell] === R.BLOCK) blocks++;
-      }
-      if (blocks >= 2) blockable = false;
+      for (const cell of line) if (state.values[cell] > 0) used.add(state.values[cell]);
     }
-    let mask = blockable ? S.BLOCK_BIT : 0;
+    let mask = 0;
     for (let d = 1; d <= digitsOf(); d++) if (!used.has(d)) mask |= 1 << d;
     return mask;
   }
@@ -497,10 +496,10 @@
       return;
     }
 
-    const mask = availableMarks(index);
-    if (mask === S.BLOCK_BIT) {
-      // 가로·세로에 숫자가 다 찼으면 남는 것은 검은 칸뿐이다. 후보 하나를 연필로
-      // 적게 하는 대신 순환의 다음 칸으로 바로 넘어간다.
+    const mask = availableDigits(index);
+    if (!mask) {
+      // 가로·세로에 숫자가 다 찼으면 그 칸은 숫자가 될 수 없다. 적을 후보가
+      // 없다고 멈추는 대신 순환의 다음 칸인 검은 칸으로 바로 넘어간다.
       snapshot();
       state.values[index] = R.BLOCK;
       state.marks[index] = 0;
@@ -509,7 +508,6 @@
       afterChange();
       return;
     }
-    if (!mask) { toast('이 칸에 놓을 수 있는 값이 없어요'); return; }
 
     snapshot();
     state.marks[index] = mask;
