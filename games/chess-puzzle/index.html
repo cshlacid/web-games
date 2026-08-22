@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>체스 퍼즐</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="game-shell">
+  <header class="game-header">
+    <a class="back" href="../../">← 목록</a>
+    <h1>체스 퍼즐</h1>
+    <label class="sound-control"><input id="sound-toggle" type="checkbox" checked> 소리</label>
+  </header>
+
+  <section class="panel" aria-live="polite">
+    <div class="meta"><span id="count"></span><span id="rating"></span></div>
+    <h2 id="title"></h2>
+    <p id="themes"></p>
+  </section>
+
+  <section class="play-area">
+    <div id="board" class="board" role="grid" aria-label="체스판"></div>
+    <div class="side-panel">
+      <p id="message" class="message">최선의 수를 찾아보세요.</p>
+      <button id="hint" type="button">힌트</button>
+      <button id="next" type="button" hidden>다음 문제</button>
+      <p class="source">퍼즐: Lichess Puzzle Database · CC0</p>
+    </div>
+  </section>
+</main>
+<script src="puzzles.js"></script>
+<script src="logic.js"></script>
+<script src="main.js"></script>
+</body>
+</html>
+
