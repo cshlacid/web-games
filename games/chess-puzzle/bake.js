@@ -20,6 +20,10 @@
 //   export STOCKFISH=/tmp/sf/node_modules/stockfish/index.js
 //   node games/chess-puzzle/bake.js mine 20 12345 /tmp/w1.json   # 코어 수만큼 씨앗을 달리해 동시에
 //   node games/chess-puzzle/bake.js write /tmp/w*.json           # 합쳐서 puzzles.js로
+//
+// mine의 넷째 인자는 두는 깊이다(기본 4). 이 값이 난이도를 가른다 — 얕게 두면
+// 실수가 커서 벌주는 수가 눈에 띄고, 깊게 두면 실수가 미묘해서 벌주는 수도 잘
+// 안 보인다. 어려운 문제가 더 필요하면 7~8로 올려 한 번 더 캔다.
 
 const fs = require('fs');
 const path = require('path');
@@ -260,7 +264,7 @@ function playable(puzzle) {
   return state.status === 'solved';
 }
 
-async function mine(minutes, seed, out) {
+async function mine(minutes, seed, out, playDepth = 4) {
   const sf = await openEngine();
   await sf.setup();
   const rng = mulberry32(seed);
@@ -271,7 +275,7 @@ async function mine(minutes, seed, out) {
 
   while (Date.now() < deadline) {
     const trail = await playGame(sf, {
-      plyLimit: 70, playDepth: 4, openingPlies: 10, blunderRate: 0.3, blunderSpread: 8, rng,
+      plyLimit: 70, playDepth, openingPlies: 10, blunderRate: 0.3, blunderSpread: 8, rng,
     });
     games++;
     for (const puzzle of await minePuzzles(sf, trail, { depth: 12, minEdge: 250, maxBefore: 200, minWin: 200 })) {
@@ -281,9 +285,9 @@ async function mine(minutes, seed, out) {
       found.push(puzzle);
       fs.writeFileSync(out, JSON.stringify(found));
     }
-    if (games % 10 === 0) console.error(`씨앗 ${seed}: ${games}판, ${found.length}개`);
+    if (games % 10 === 0) console.error(`씨앗 ${seed}(깊이 ${playDepth}): ${games}판, ${found.length}개`);
   }
-  console.error(`씨앗 ${seed}: 완료 ${games}판, ${found.length}개`);
+  console.error(`씨앗 ${seed}(깊이 ${playDepth}): 완료 ${games}판, ${found.length}개`);
   sf.quit();
 }
 
@@ -547,12 +551,13 @@ ${body}
 // --- 실행 ---
 
 const [command, ...args] = process.argv.slice(2);
-if (command === 'mine' && args.length === 3) {
-  mine(Number(args[0]), Number(args[1]), args[2]).catch((e) => { console.error(e); process.exit(1); });
+if (command === 'mine' && (args.length === 3 || args.length === 4)) {
+  mine(Number(args[0]), Number(args[1]), args[2], args[3] ? Number(args[3]) : undefined)
+    .catch((e) => { console.error(e); process.exit(1); });
 } else if (command === 'write' && args.length > 0) {
   write(args).catch((e) => { console.error(e); process.exit(1); });
 } else {
-  console.error('사용: node games/chess-puzzle/bake.js mine <분> <씨앗> <출력.json>');
+  console.error('사용: node games/chess-puzzle/bake.js mine <분> <씨앗> <출력.json> [두는깊이]');
   console.error('      node games/chess-puzzle/bake.js write <입력.json...>');
   process.exit(1);
 }
