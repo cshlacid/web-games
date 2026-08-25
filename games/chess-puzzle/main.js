@@ -55,8 +55,59 @@
   // 문제가 있는 난이도로 시작한다.
   const firstFilled = LEVEL_NAMES.find((name) => countOf(name) > 0) || 'easy';
 
+  /**
+   * 문제를 담긴 차례대로 내보내면 늘 같은 순서로 만난다. 그래서 섞는데, 섞는
+   * 방법을 두 가지로 나눈다 — **덩이 차례를 섞고, 덩이 안을 섞는다.** 900개를
+   * 한꺼번에 섞으면 다음 문제가 거의 항상 다른 덩이에 있어서, 문제마다 파일을
+   * 하나씩 받게 된다. 필요할 때 받는다는 구조가 그대로 무너진다.
+   *
+   * 덩이는 주제를 돌아가며 담은 것이라 한 덩이 안에 공통점이 없다. 50개씩
+   * 묶여 나오는 것을 눈으로 알아챌 만한 성질이 없다는 뜻이다.
+   */
+  const mulberry32 = (seed) => {
+    let a = seed >>> 0;
+    return () => {
+      a |= 0; a = (a + 0x6d2b79f5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  };
+
+  const shuffled = (items, rng) => {
+    const out = items.slice();
+    for (let i = out.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [out[i], out[j]] = [out[j], out[i]];
+    }
+    return out;
+  };
+
+  function orderOf(name, seed) {
+    const count = countOf(name);
+    const size = Data.chunkSize;
+    // 난이도마다 씨앗을 달리한다. 같으면 세 난이도가 똑같은 차례로 섞인다.
+    const rng = mulberry32(seed + LEVEL_NAMES.indexOf(name) * 0x9e3779b9);
+    const chunks = [];
+    for (let n = 0; n * size < count; n++) chunks.push(n);
+
+    const out = [];
+    for (const n of shuffled(chunks, rng)) {
+      const inside = [];
+      for (let at = n * size; at < Math.min((n + 1) * size, count); at++) inside.push(at);
+      out.push(...shuffled(inside, rng));
+    }
+    return out;
+  }
+
+  // 섞은 차례는 씨앗 하나로 다시 만들 수 있으므로 씨앗만 저장한다. 매번 새로
+  // 섞으면 "이어서 풀기"가 성립하지 않고 문제 번호도 뜻을 잃는다.
+  let seed = Math.floor(Math.random() * 0x100000000);
+  const orders = {};
+  const orderFor = (name) => (orders[name] || (orders[name] = orderOf(name, seed)));
+
   let level = firstFilled;
-  let index = 0;
+  let index = 0;             // 섞은 차례에서 몇 번째인지 — 문제 번호가 아니다
   let state = null;          // 아직 못 받았거나 받는 중이면 null이다
   let loadToken = 0;         // 받는 사이에 다른 문제로 넘어갔는지 가리는 표
   let selected = null;
@@ -217,17 +268,19 @@
   async function loadPuzzle(next) {
     clearTimeout(replyTimer);
     hideAfter();
-    const total = countOf(level);
+    const order = orderFor(level);
+    const total = order.length;
     index = ((next % total) + total) % total;
+    const at = order[index];
     const token = ++loadToken;
 
-    let puzzle = Data.get(level, index);
+    let puzzle = Data.get(level, at);
     if (!puzzle) {
       clearBoard();
       renderInfo();
       setMessage('문제를 불러오는 중…');
       try {
-        puzzle = await Data.load(level, index);
+        puzzle = await Data.load(level, at);
       } catch {
         if (token !== loadToken) return;
         setMessage('문제를 불러오지 못했습니다. 연결을 확인하고 다시 눌러 보세요.', 'wrong');
@@ -248,12 +301,12 @@
       : '흑 차례입니다. 가장 강한 수를 찾아보세요.');
     // 다음 문제가 다른 덩이에 있으면 지금 받아 둔다. 그래야 "다음 문제"를
     // 눌렀을 때 덩이 경계에서만 기다리는 일이 없다.
-    Data.prefetch(level, (index + 1) % total);
+    Data.prefetch(level, order[(index + 1) % total]);
     save();
   }
 
   function save() {
-    store.set({ version: Data.version, level, index, solved: [...solved] });
+    store.set({ version: Data.version, seed, level, index, solved: [...solved] });
   }
 
   function restore() {
@@ -266,6 +319,9 @@
     if (saved.version === Data.version && Array.isArray(saved.solved)) {
       solved = new Set(saved.solved);
     }
+    // 씨앗까지 되살려야 저장해 둔 번째가 저번과 같은 문제를 가리킨다. 씨앗이
+    // 바뀌면 그 번째는 전혀 다른 문제가 되어, 이어서 푸는 것이 아니게 된다.
+    if (saved.version === Data.version && Number.isInteger(saved.seed)) seed = saved.seed;
     if (LEVEL_NAMES.includes(saved.level) && countOf(saved.level) > 0) setLevel(saved.level);
     return Number.isInteger(saved.index) ? saved.index : 0;
   }

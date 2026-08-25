@@ -45,6 +45,9 @@
     version: index.version,
     levels: index.levels,
     levelNames: Object.keys(index.levels),
+    // 화면이 문제 차례를 섞을 때 덩이 경계를 알아야 한다. 경계를 무시하고 섞으면
+    // 문제마다 다른 파일을 받게 된다.
+    chunkSize,
 
     /** 이미 받아 둔 문제만 돌려준다. 없으면 null — 기다림이 필요하다는 뜻이다. */
     get(level, position) {
