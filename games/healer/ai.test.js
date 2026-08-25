@@ -24,14 +24,18 @@ function check(name, actual, expected) {
 // 적 세 직업이 한 웨이브에 다 있어야 딜러의 우선순위를 끝까지 볼 수 있다.
 // 실제 퀘스트에는 그런 웨이브가 없어서 여기서만 쓰는 판을 만든다.
 const TEST_QUEST = {
-  id: 'test', name: '판단 확인용', desc: '',
+  id: 'test', name: '판단 확인용', desc: '', scene: 'mine', level: 1,
   waves: [['shaman', 'scout', 'orc']],
-  guildReward: { gold: 0, items: [] },
-  dropTable: ['fang'], dropCount: 1,
+  guildReward: { gold: 0, exp: 0 },
+  drops: [], exp: 0,
 };
 
-const battle = (over) => L.createBattle(Object.assign(
-  { quest: TEST_QUEST, party: ['bran', 'lyle', 'mira', 'noa'], skills: ['touch'], seed: 5 }, over));
+const battle = (over) => L.createBattle(Object.assign({
+  quest: TEST_QUEST,
+  party: [{ defId: 'bran', level: 1 }, { defId: 'lyle', level: 1 },
+    { defId: 'mira', level: 1 }, { defId: 'noa', level: 1 }],
+  skills: ['touch'], seed: 5,
+}, over));
 
 const named = (state, name) => state.units.find((u) => u.name === name);
 const enemies = (state) => AI.alive(state, 'enemy');

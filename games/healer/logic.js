@@ -45,16 +45,31 @@ function drainEvents(state) {
 
 // --- 유닛 만들기 -------------------------------------------------------
 
-function makeUnit(def, side, uid, x, y) {
+// 레벨은 수치를 곱하는 것으로만 표현한다. 레벨마다 다른 유닛을 적어 두면 자료가
+// 레벨 수만큼 불어나고, 레벨 하나를 고칠 때마다 다른 레벨과 어긋난다.
+function makeUnit(def, side, uid, x, y, level, override) {
+  const hpMul = side === 'enemy' ? D.LEVEL.enemyHp(level) : D.LEVEL.allyHp(level);
+  const atkMul = side === 'enemy' ? D.LEVEL.enemyAtk(level) : D.LEVEL.allyAtk(level);
+  const hp = Math.round((override && override.hp) || def.hp * hpMul);
+  const mp = Math.round((override && override.mp) != null ? override.mp : def.mp * hpMul);
+
   return {
-    uid, defId: def.id, name: def.name, job: def.job, sprite: def.sprite, side,
+    uid, defId: def.id, name: def.name, job: def.job, sprite: def.sprite, side, level,
     x, y,
-    hp: def.hp, maxHp: def.hp,
-    mp: def.mp, maxMp: def.mp,
-    atk: def.atk, armor: def.armor, range: def.range, speed: def.speed,
+    hp, maxHp: hp,
+    mp, maxMp: mp,
+    atk: def.atk * atkMul,
+    armor: (override && override.armor) || def.armor,
+    healPower: (override && override.heal) || 1,
+    range: def.range, speed: def.speed,
     attackCd: def.attackCd, nextAttackAt: 0,
     threatMul: def.threatMul,
-    skills: (def.skills || []).map((id) => ({ id, readyAt: 0 })),
+    exp: Math.round((def.exp || 0) * (1 + 0.25 * (level - 1))),
+    // 레벨이 낮으면 아직 못 배운 스킬이 있다. 편성 화면이 보여 준 것과 전투에서
+    // 실제로 쓰는 것이 같아야 하므로 같은 규칙으로 거른다.
+    skills: (def.skills || [])
+      .filter((id) => level >= D.UNIT_SKILLS[id].minLevel)
+      .map((id) => ({ id, readyAt: 0 })),
     targetUid: null, tauntUid: null, tauntUntil: 0,
     dead: false,
   };
@@ -64,12 +79,14 @@ function makeUnit(def, side, uid, x, y) {
 // 첫 몇 초 동안 힐러가 최전선에 서 있게 된다.
 const ALLY_LANE = { tank: 32, dealer: 22, healer: 12 };
 
-function placeAllies(state, defs) {
-  const rows = defs.length;
-  defs.forEach((def, i) => {
-    const x = def.id === D.HERO.id ? 7 : ALLY_LANE[def.job];
+function placeAllies(state, members) {
+  const rows = members.length;
+  members.forEach((member, i) => {
+    const def = member.def;
+    const hero = def.id === D.HERO.id;
+    const x = hero ? 7 : ALLY_LANE[def.job];
     const y = rows === 1 ? D.FIELD.h / 2 : 10 + (i * (D.FIELD.h - 20)) / (rows - 1);
-    state.units.push(makeUnit(def, 'ally', def.id === D.HERO.id ? HERO_UID : `a${i}`, x, y));
+    state.units.push(makeUnit(def, 'ally', hero ? HERO_UID : `a${i}`, x, y, member.level, member.stats));
   });
 }
 
@@ -82,7 +99,7 @@ function spawnWave(state, index) {
     const y = wave.length === 1
       ? D.FIELD.h / 2
       : 10 + (i * (D.FIELD.h - 20)) / (wave.length - 1);
-    const unit = makeUnit(def, 'enemy', `e${index}_${i}`, x, y);
+    const unit = makeUnit(def, 'enemy', `e${index}_${i}`, x, y, state.quest.level || 1);
     state.units.push(unit);
     state.threat[unit.uid] = {};
   });
@@ -90,11 +107,15 @@ function spawnWave(state, index) {
     text: `${index + 1}번째 무리 (${state.quest.waves.length} 중)` });
 }
 
+// party는 편성 화면이 고른 동료다: [{ defId, level }]. 주인공의 수치는 성장
+// 상태에서 계산해 넘어온다(progress.stats) — 전투가 레벨·장비 규칙을 다시 알
+// 필요가 없고, 캐릭터 창에 적힌 수치가 곧 전투에서 쓰이는 수치가 된다.
 function createBattle(config) {
-  const quest = typeof config.quest === 'string'
-    ? D.QUESTS.find((q) => q.id === config.quest)
-    : config.quest;
-  const party = (config.party || []).map((id) => D.COMPANIONS[id]).filter(Boolean);
+  const quest = config.quest;
+  const heroStats = config.heroStats || { hp: D.HERO.hp, mp: D.HERO.mp, heal: 1, armor: D.HERO.armor };
+  const party = (config.party || [])
+    .map((entry) => ({ def: D.COMPANIONS[entry.defId], level: entry.level || 1 }))
+    .filter((entry) => entry.def);
   const skills = (config.skills || []).filter((id) => D.PLAYER_SKILLS[id]).slice(0, D.SKILL_MAX);
 
   const state = {
@@ -107,7 +128,10 @@ function createBattle(config) {
     stats: { healed: 0, overheal: 0, damage: 0, casts: 0, deaths: 0 },
   };
 
-  placeAllies(state, [D.HERO, ...party.slice(0, D.PARTY_MAX - 1)]);
+  placeAllies(state, [
+    { def: D.HERO, level: config.heroLevel || 1, stats: heroStats },
+    ...party.slice(0, D.PARTY_MAX - 1),
+  ]);
   spawnWave(state, 0);
   return state;
 }
@@ -155,23 +179,24 @@ function kill(state, unit) {
 
 // 같은 스킬을 다시 걸면 쌓지 않고 새로 고친다. 쌓기로 하면 도트 하나로
 // 무한히 강해지는데, 기획서에 중첩 규칙이 없으므로 약한 쪽을 택했다.
-function addDot(state, source, target, def, kind) {
+function addDot(state, source, target, def, kind, amount) {
   const key = `${def.id}:${target.uid}`;
   const existing = state.dots.find((dot) => dot.key === key);
   const dot = existing || { key, targetUid: target.uid };
   dot.sourceUid = source ? source.uid : null;
   dot.kind = kind;
-  dot.amount = def.tick;
+  dot.amount = amount == null ? def.tick : amount;
   dot.interval = def.interval;
   dot.endsAt = state.t + def.duration;
   dot.nextAt = state.t + def.interval;
   if (!existing) state.dots.push(dot);
 }
 
-function addZone(state, source, def, x, y, kind) {
+function addZone(state, source, def, x, y, kind, amount) {
   state.zones.push({
     id: state.nextZoneId++, sourceUid: source ? source.uid : null, kind,
-    x, y, radius: def.radius, amount: def.tick, interval: def.interval,
+    x, y, radius: def.radius, amount: amount == null ? def.tick : amount,
+    interval: def.interval,
     endsAt: state.t + def.duration, nextAt: state.t + def.interval,
     bornAt: state.t, skillId: def.id,
   });
@@ -220,14 +245,22 @@ function runUnitSkill(state, unit, choice) {
   emit(state, { type: 'cast', uid: unit.uid, name: def.name,
     text: `${unit.name}: ${def.name}` });
 
-  if (def.kind === 'taunt') {
-    target.tauntUid = unit.uid;
-    target.tauntUntil = state.t + def.duration;
-    target.targetUid = unit.uid;
-    // 도발이 풀린 뒤에도 곧바로 다시 놓치지 않도록 위협도 자체를 올려 둔다.
-    const table = state.threat[target.uid] || (state.threat[target.uid] = {});
-    const top = Math.max(0, ...Object.values(table));
-    table[unit.uid] = top + 400;
+  if (def.kind === 'taunt' || def.kind === 'taunt-area') {
+    // 광역 도발은 반경 안의 적을 한꺼번에 끌어온다. 탱커 하나가 여러 적의
+    // 어그로를 다 붙들지 못해 후방이 무너지던 것을 푸는 스킬이라, 대상 하나만
+    // 다르고 나머지 처리는 같다.
+    const pulled = def.kind === 'taunt-area'
+      ? alive(state, AI.opposite(unit.side)).filter((foe) => dist(foe, unit) <= def.radius)
+      : [target];
+    for (const foe of pulled) {
+      foe.tauntUid = unit.uid;
+      foe.tauntUntil = state.t + def.duration;
+      foe.targetUid = unit.uid;
+      // 도발이 풀린 뒤에도 곧바로 다시 놓치지 않도록 위협도 자체를 올려 둔다.
+      const table = state.threat[foe.uid] || (state.threat[foe.uid] = {});
+      const top = Math.max(0, ...Object.values(table));
+      table[unit.uid] = top + 400;
+    }
     return;
   }
   if (def.kind === 'heal') { applyHeal(state, unit, target, def.heal); return; }
@@ -338,16 +371,21 @@ function castSkill(state, skillId, target) {
   emit(state, { type: 'cast', uid: caster.uid, skillId, name: def.name,
     x: spot.x, y: spot.y, radius: def.radius || 0, text: `${def.name}` });
 
+  // 회복량에만 배수가 붙는다. 피해에 붙이지 않는 것은, 힐러의 성장이 딜러
+  // 노릇을 잘하게 만드는 쪽으로 흐르면 이 게임이 아니게 되기 때문이다.
+  const heal = (base) => Math.round(base * caster.healPower);
+
   if (def.mana) caster.mp = Math.min(caster.maxMp, caster.mp + def.mana);
-  else if (def.targeting === 'ally' && def.heal) applyHeal(state, caster, spot.unit, def.heal);
-  else if (def.targeting === 'ally') addDot(state, caster, spot.unit, def, 'heal');
+  else if (def.targeting === 'ally' && def.heal) applyHeal(state, caster, spot.unit, heal(def.heal));
+  else if (def.targeting === 'ally') addDot(state, caster, spot.unit, def, 'heal', heal(def.tick));
   else if (def.targeting === 'enemy') addDot(state, caster, spot.unit, def, 'damage');
   else if (def.targeting === 'area-ally' && def.heal) {
     for (const unit of alive(state, 'ally')) {
-      if (dist(unit, spot) <= def.radius) applyHeal(state, caster, unit, def.heal);
+      if (dist(unit, spot) <= def.radius) applyHeal(state, caster, unit, heal(def.heal));
     }
-  } else if (def.targeting === 'area-ally') addZone(state, caster, def, spot.x, spot.y, 'heal');
-  else if (def.targeting === 'area-enemy') addZone(state, caster, def, spot.x, spot.y, 'damage');
+  } else if (def.targeting === 'area-ally') {
+    addZone(state, caster, def, spot.x, spot.y, 'heal', heal(def.tick));
+  } else if (def.targeting === 'area-enemy') addZone(state, caster, def, spot.x, spot.y, 'damage');
 
   return { ok: true };
 }
@@ -426,8 +464,31 @@ function advance(state, elapsed) {
   }
 }
 
+// 전투가 끝나고 무엇을 얻었는지. 화면 두 곳에서 따로 계산하면 결과 화면에 뜬
+// 숫자와 실제로 오른 경험치가 어긋난다.
+//
+// 실패해도 길드 몫의 절반은 준다. 아무것도 없이 끝나면 어려운 퀘스트를 시도할
+// 이유가 사라진다.
+function rewardOf(state) {
+  const won = state.status === 'won';
+  const kills = state.units
+    .filter((unit) => unit.side === 'enemy' && unit.dead)
+    .reduce((sum, unit) => sum + unit.exp, 0);
+  const guild = Math.round((state.quest.guildReward.exp || 0) * (won ? 1 : 0.5));
+  const healExp = D.LEVEL.healExp(state.stats.healed);
+
+  return {
+    won, kills, guild, healExp,
+    charExp: kills + guild,
+    // 힐러의 직업 경험치는 벤 것보다 살린 것에서 더 나온다. 힐만 하다 전투가
+    // 끝나도 남는 것이 있어야 이 직업을 하는 뜻이 산다.
+    jobExp: Math.round(kills * 0.5) + guild + healExp,
+    gold: won ? state.quest.guildReward.gold : 0,
+  };
+}
+
 const api = {
-  HERO_UID, TICK, WAVE_GAP,
+  HERO_UID, TICK, WAVE_GAP, rewardOf,
   createRng, createBattle, advance, step, drainEvents,
   castSkill, usePotion, applyDamage, applyHeal, addDot, addZone,
   hero, skillSlot, resolveTarget,

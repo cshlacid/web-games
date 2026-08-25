@@ -30,19 +30,64 @@
     </div>
   </header>
 
-  <!-- 1. 퀘스트 선택 -->
-  <section class="screen" id="screen-quest">
-    <ul class="quests" id="quests"></ul>
+  <!-- 메인. 아래쪽 탭으로 퀘스트와 캐릭터를 오간다 -->
+  <section class="screen" id="screen-home">
+    <div class="tab-page" id="tab-quest">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>의뢰 게시판</h2>
+          <button class="mini" id="refresh" type="button">새 의뢰</button>
+        </div>
+        <p class="panel-note">의뢰는 그때그때 들어온다. 적정 레벨을 보고 고른다.</p>
+      </div>
+      <ul class="quests" id="quests"></ul>
+    </div>
+
+    <div class="tab-page" id="tab-character" hidden>
+      <div class="panel">
+        <div class="panel-head">
+          <h2>주인공</h2>
+          <span class="count" id="char-gold">0 골드</span>
+        </div>
+        <ul class="levels" id="char-levels"></ul>
+        <ul class="stats" id="char-stats"></ul>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h2>장비</h2></div>
+        <p class="panel-note">인벤토리의 물건을 눌러 장착한다. 슬롯을 누르면 벗는다.</p>
+        <ul class="slots" id="char-slots"></ul>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h2>인벤토리</h2>
+          <span class="count" id="inv-count">0</span>
+        </div>
+        <ul class="inventory" id="inventory"></ul>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h2>스킬</h2>
+          <span class="count" id="skill-open">0 / 8</span>
+        </div>
+        <p class="panel-note">직업 레벨이 오르면 열린다. 전투에는 이 중 다섯까지 가져간다.</p>
+        <ul class="skill-list" id="char-skills"></ul>
+      </div>
+    </div>
   </section>
 
-  <!-- 2. 편성: 파티와 스킬을 전투 전에 정한다 -->
+  <!-- 편성: 파티·스킬·분배 방식을 전투 전에 정한다 -->
   <section class="screen" id="screen-party" hidden>
+    <div class="panel" id="quest-brief"></div>
+
     <div class="panel">
       <div class="panel-head">
-        <h2>파티</h2>
+        <h2>동료</h2>
         <span class="count" id="party-count">1 / 5</span>
       </div>
-      <p class="panel-note">주인공을 포함해 다섯까지. 직업이 겹쳐도 된다.</p>
+      <p class="panel-note">이번 의뢰에 붙일 수 있는 동료다. 레벨에 따라 들고 오는 스킬이 다르다.</p>
       <ul class="roster" id="roster"></ul>
     </div>
 
@@ -51,14 +96,20 @@
         <h2>스킬 등록</h2>
         <span class="count" id="skill-count">0 / 5</span>
       </div>
-      <p class="panel-note">배운 스킬 중 다섯까지 전투에 가져간다. 전투 중에는 바꿀 수 없다.</p>
+      <p class="panel-note">전투 중에는 바꿀 수 없다.</p>
       <ul class="skill-picks" id="skill-picks"></ul>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>보상 분배</h2></div>
+      <p class="panel-note">진행 중 얻은 것을 나누는 방식. 전투 전에 정해 둔다.</p>
+      <div class="methods" id="methods"></div>
     </div>
 
     <button class="btn primary" id="start" type="button" disabled>전투 시작</button>
   </section>
 
-  <!-- 3. 전투 -->
+  <!-- 전투 -->
   <section class="screen" id="screen-battle" hidden>
     <div class="battle-top">
       <span class="wave" id="wave">1 / 2</span>
@@ -82,36 +133,58 @@
     <div class="skillbar" id="skillbar"></div>
   </section>
 
-  <!-- 4. 결과와 보상 분배 -->
+  <!-- 결과: 경험치·보상 분배·장착 -->
   <section class="screen" id="screen-result" hidden>
     <p class="verdict" id="verdict"></p>
     <p class="verdict-note" id="verdict-note"></p>
 
+    <div class="panel" id="exp-panel">
+      <div class="panel-head"><h2>경험치</h2></div>
+      <ul class="levels" id="exp-gained"></ul>
+      <p class="panel-note" id="exp-note"></p>
+    </div>
+
     <div class="panel" id="guild-panel">
       <div class="panel-head"><h2>길드 확정 보상</h2></div>
-      <p class="panel-note">퀘스트를 완료하면 나누지 않고 그대로 받는다.</p>
+      <p class="panel-note">완료하면 나누지 않고 그대로 받는다.</p>
       <ul class="loot" id="guild-loot"></ul>
     </div>
 
     <div class="panel" id="drop-panel">
-      <div class="panel-head"><h2>진행 중 획득</h2></div>
-      <p class="panel-note">참여자끼리 나눈다. 방식을 바꿔 보아도 주사위 결과는 그대로다.</p>
-      <div class="methods" id="methods"></div>
+      <div class="panel-head">
+        <h2>진행 중 획득</h2>
+        <span class="count" id="method-name"></span>
+      </div>
       <ul class="awards" id="awards"></ul>
+    </div>
+
+    <div class="panel" id="gain-panel">
+      <div class="panel-head"><h2>내 몫</h2></div>
+      <p class="panel-note">장비는 바로 장착할 수 있다. 재료는 길드에 팔아 골드가 된다.</p>
+      <ul class="inventory" id="gained"></ul>
     </div>
 
     <div class="result-actions">
       <button class="btn" id="retry" type="button">다시 도전</button>
-      <button class="btn primary" id="to-quests" type="button">퀘스트 목록</button>
+      <button class="btn primary" id="to-quests" type="button">게시판으로</button>
     </div>
   </section>
+
+  <nav class="tabbar" id="tabbar">
+    <button class="tab" type="button" data-tab="quest" aria-pressed="true">
+      <span class="tab-icon">📜</span><span>퀘스트</span>
+    </button>
+    <button class="tab" type="button" data-tab="character" aria-pressed="false">
+      <span class="tab-icon">✚</span><span>캐릭터</span>
+    </button>
+  </nav>
 
   <div class="sheet" id="help" hidden>
     <p class="sheet-title">힐러만 맡는다</p>
     <ul class="help-list">
       <li><b>직접 조작하는 것은 주인공 힐러의 스킬뿐이다.</b> 동료는 직업에 따라
-        알아서 싸운다 — 탱커는 앞에서 어그로를 잡고, 딜러는 탱커가 잡은 적을
-        먼저 치며, 동료 힐러는 탱커의 체력을 본다.</li>
+        알아서 싸운다 — 탱커는 앞에서 어그로를 잡고(레벨이 높으면 광역 도발도
+        쓴다), 딜러는 탱커가 잡은 적을 먼저 치며, 동료 힐러는 탱커의 체력을 본다.</li>
       <li><b>전투에 가져갈 스킬은 다섯 개까지 전투 전에 등록한다.</b> 전투 중에는
         바꿀 수 없다.</li>
       <li><b>마나는 저절로 차지 않는다.</b> 마나 회복 스킬과 물약뿐이다. 조금
@@ -119,9 +192,11 @@
       <li><b>범위·장판 스킬은 기준점을 고른다.</b> 아래쪽 <b>동료 초상화</b>를
         누르면 그 동료를 기준으로, <b>전투 화면</b>을 누르면 그 위치를 기준으로
         발동한다.</li>
-      <li>개별 대상 스킬은 초상화나 전투 화면의 대상을 직접 누른다. 공격 스킬은
-        적을 누른다 — <b>피해를 주면 어그로가 나에게 올 수 있다.</b></li>
-      <li>주인공이 쓰러지거나 파티가 전멸하면 실패한다.</li>
+      <li><b>레벨이 둘이다.</b> 캐릭터 레벨은 체력과 마나를, 직업 레벨은 회복량과
+        스킬 해금을 올린다. <b>회복시킨 만큼 직업 경험치가 쌓인다</b> — 흘린 힐은
+        빼고 실제로 채운 만큼만이다.</li>
+      <li>주인공이 쓰러지거나 파티가 전멸하면 실패한다. 실패해도 길드 몫의 절반은
+        받는다.</li>
     </ul>
     <div class="sheet-actions">
       <button class="btn" id="help-close" type="button">닫기</button>
@@ -133,6 +208,8 @@
 <script src="data.js"></script>
 <script src="sprites.js"></script>
 <script src="scenes.js"></script>
+<script src="progress.js"></script>
+<script src="quests.js"></script>
 <script src="ai.js"></script>
 <script src="logic.js"></script>
 <script src="loot.js"></script>

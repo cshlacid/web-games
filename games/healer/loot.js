@@ -22,24 +22,16 @@ function createRng(seed) {
   };
 }
 
-// 전리품 뽑기. 전투가 끝난 시점에 한 번만 뽑고, 그 뒤로는 분배 방식을 바꿔도
-// 목록 자체는 그대로다.
-function rollDrops(quest, seed) {
-  const rng = createRng(seed);
-  const table = quest.dropTable;
-  const drops = [];
-  for (let i = 0; i < quest.dropCount; i++) {
-    drops.push(table[Math.floor(rng() * table.length)]);
-  }
-  return drops;
-}
+// 전리품은 퀘스트가 만들어질 때 이미 정해져 있다(quests.js). 여기서는 그것을
+// 누구에게 줄지만 정한다 — 전투를 잘했다고 더 좋은 물건이 나오지는 않는다.
+// 아이템 하나는 { defId, tier } 꼴이다.
 
 // 균등 분배: 참여자 순서대로 한 개씩 돌린다. 시작 위치를 씨앗으로 옮기는 것은,
 // 늘 첫 번째 참여자가 첫 아이템을 가져가면 균등하지 않기 때문이다.
 function even(drops, members, rng) {
   const start = Math.floor(rng() * members.length);
-  return drops.map((itemId, i) => ({
-    itemId,
+  return drops.map((item, i) => ({
+    item,
     toId: members[(start + i) % members.length].id,
     reason: '순서대로',
   }));
@@ -54,9 +46,9 @@ function rollFor(members, rng) {
 }
 
 function dice(drops, members, rng) {
-  return drops.map((itemId) => {
+  return drops.map((item) => {
     const { winner, rolls } = rollFor(members, rng);
-    return { itemId, toId: winner.id, reason: `${winner.roll} 최고`, rolls };
+    return { item, toId: winner.id, reason: `${winner.roll} 최고`, rolls };
   });
 }
 
@@ -67,28 +59,29 @@ function byJob(drops, members, rng) {
   const taken = {};
   members.forEach((m) => { taken[m.id] = 0; });
 
-  return drops.map((itemId) => {
-    const item = D.ITEMS[itemId];
-    const matched = item.job ? members.filter((m) => m.job === item.job) : [];
+  return drops.map((item) => {
+    const def = D.itemDef(item.defId);
+    const job = def && def.job;
+    const matched = job ? members.filter((m) => m.job === job) : [];
 
     // 쓸 직업이 파티에 없거나 직업을 가리지 않는 물건이면 우선권이 생기지 않는다.
     // 그때는 주사위로 넘긴다 — 균등으로 넘기면 순서가 남아 다음 아이템까지 흔든다.
     if (!matched.length) {
       const { winner, rolls } = rollFor(members, rng);
       taken[winner.id]++;
-      return { itemId, toId: winner.id, rolls,
-        reason: item.job ? `${D.JOBS[item.job].name} 없음 · 주사위` : '직업 무관 · 주사위' };
+      return { item, toId: winner.id, rolls,
+        reason: job ? `${D.JOBS[job].name} 없음 · 주사위` : '직업 무관 · 주사위' };
     }
 
     const fewest = Math.min(...matched.map((m) => taken[m.id]));
     const pool = matched.filter((m) => taken[m.id] === fewest);
     if (pool.length === 1) {
       taken[pool[0].id]++;
-      return { itemId, toId: pool[0].id, reason: `${D.JOBS[item.job].name} 우선` };
+      return { item, toId: pool[0].id, reason: `${D.JOBS[job].name} 우선` };
     }
     const { winner, rolls } = rollFor(pool, rng);
     taken[winner.id]++;
-    return { itemId, toId: winner.id, rolls, reason: `${D.JOBS[item.job].name} 우선 · 주사위` };
+    return { item, toId: winner.id, rolls, reason: `${D.JOBS[job].name} 우선 · 주사위` };
   });
 }
 
@@ -105,12 +98,12 @@ function distribute(drops, members, methodId, seed) {
 
   const byMember = {};
   members.forEach((m) => { byMember[m.id] = []; });
-  awards.forEach((award) => { byMember[award.toId].push(award.itemId); });
+  awards.forEach((award) => { byMember[award.toId].push(award.item); });
 
   return { method: method.id, awards, byMember };
 }
 
-const api = { METHODS, rollDrops, distribute, createRng };
+const api = { METHODS, distribute, createRng };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 root.HealerLoot = api;

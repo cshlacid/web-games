@@ -19,11 +19,27 @@ function check(name, actual, expected) {
   }
 }
 
-const PARTY = ['bran', 'lyle', 'mira', 'noa'];
+// 퀘스트는 이제 씨앗에서 만들어진다. 테스트가 특정 퀘스트에 기대면 생성 규칙을
+// 조금 고칠 때마다 테스트가 깨지므로, 여기서 쓸 판을 직접 짠다.
+function quest(over) {
+  return Object.assign({
+    id: 'test', region: 'mine', scene: 'mine', level: 1,
+    name: '시험용 의뢰', desc: '',
+    waves: [['scout', 'scout', 'scout'], ['scout', 'scout', 'scout', 'shaman']],
+    guildReward: { gold: 100, exp: 50 },
+    drops: [{ defId: 'fang', tier: 0 }],
+    exp: 100,
+  }, over);
+}
+
+const PARTY = [
+  { defId: 'bran', level: 1 }, { defId: 'lyle', level: 1 },
+  { defId: 'mira', level: 1 }, { defId: 'noa', level: 1 },
+];
 const SKILLS = ['touch', 'quick', 'regen', 'ripple', 'focus'];
 
 const battle = (over) => L.createBattle(Object.assign(
-  { quest: 'mine', party: PARTY, skills: SKILLS, seed: 3 }, over));
+  { quest: quest(), party: PARTY, skills: SKILLS, seed: 3 }, over));
 
 const unit = (state, name) => state.units.find((u) => u.name === name);
 const run = (state, seconds) => {
@@ -36,15 +52,18 @@ const run = (state, seconds) => {
   const state = battle();
   check('주인공을 포함해 다섯', AI.alive(state, 'ally').length, 5);
   check('주인공은 힐러', L.hero(state).job, 'healer');
-  check('첫 웨이브가 깔린다', AI.alive(state, 'enemy').length, D.QUESTS[0].waves[0].length);
+  check('첫 웨이브가 깔린다', AI.alive(state, 'enemy').length, quest().waves[0].length);
 
   // 기획서 2.2: 직업 중복을 허용한다.
-  const twins = battle({ party: ['bran', 'corin', 'noa', 'dean'] });
+  const twins = battle({ party: [
+    { defId: 'bran', level: 1 }, { defId: 'corin', level: 1 },
+    { defId: 'noa', level: 1 }, { defId: 'dean', level: 1 }] });
   check('같은 직업 둘을 넣을 수 있다',
     AI.alive(twins, 'ally').filter((u) => u.job === 'tank').length, 2);
 
   // 5인을 넘겨 넣어도 다섯에서 잘린다.
-  const crowd = battle({ party: ['bran', 'corin', 'lyle', 'sera', 'mira', 'yuri'] });
+  const crowd = battle({ party: ['bran', 'corin', 'lyle', 'sera', 'mira', 'yuri']
+    .map((defId) => ({ defId, level: 1 })) });
   check('파티는 다섯을 넘지 않는다', AI.alive(crowd, 'ally').length, D.PARTY_MAX);
 
   // 기획서 5.1: 전투에 가져가는 스킬은 다섯까지.
@@ -234,10 +253,122 @@ const run = (state, seconds) => {
   check('동료는 남아 있었다', AI.alive(dead, 'ally').length > 0, true);
 }
 
+// --- 레벨과 성장 --------------------------------------------------------
+{
+  // 적은 의뢰의 적정 레벨을 따라 세진다. 레벨마다 다른 유닛을 적어 두지 않고
+  // 곱해 쓰는 것이 규칙이므로, 실제로 곱해지는지 확인한다.
+  const low = battle({ quest: quest({ level: 1 }) });
+  const high = battle({ quest: quest({ level: 10 }) });
+  const foeOf = (state) => AI.alive(state, 'enemy')[0];
+  check('적정 레벨이 높으면 적이 단단하다', foeOf(high).maxHp > foeOf(low).maxHp, true);
+  check('적정 레벨이 높으면 적이 아프다', foeOf(high).atk > foeOf(low).atk, true);
+  check('적도 레벨을 들고 있다', foeOf(high).level, 10);
+
+  // 동료도 레벨로 세지고, 못 배운 스킬은 들고 오지 않는다.
+  const rookie = battle({ party: [{ defId: 'bran', level: 1 }] });
+  const veteran = battle({ party: [{ defId: 'bran', level: 8 }] });
+  const branOf = (state) => unit(state, '강철의 브란');
+  check('동료도 레벨로 세진다', branOf(veteran).maxHp > branOf(rookie).maxHp, true);
+  check('낮은 레벨은 광역 도발을 못 쓴다',
+    branOf(rookie).skills.map((slot) => slot.id), ['taunt']);
+  // 순서는 data.js에 적힌 그대로다 — 그 순서가 곧 AI의 우선순위다.
+  check('레벨이 오르면 들고 온다',
+    branOf(veteran).skills.map((slot) => slot.id), ['roar', 'taunt']);
+
+  // 주인공의 수치는 성장 상태에서 계산해 넘어온다. 전투가 레벨 규칙을 다시
+  // 알지 못하게 하려는 것이라, 넘긴 값이 그대로 쓰여야 한다.
+  const strong = battle({ heroStats: { hp: 1000, mp: 500, heal: 2, armor: 0.5 } });
+  check('넘긴 체력이 그대로', L.hero(strong).maxHp, 1000);
+  check('넘긴 마나가 그대로', L.hero(strong).maxMp, 500);
+
+  const tank = unit(strong, '강철의 브란');
+  tank.hp = 100;
+  L.castSkill(strong, 'touch', { uid: tank.uid });
+  check('회복력 배수가 힐에 곱해진다', tank.hp, 100 + D.PLAYER_SKILLS.touch.heal * 2);
+
+  // 피해에는 곱해지지 않는다. 힐러의 성장이 딜러 노릇을 잘하게 만드는 쪽으로
+  // 흐르면 이 게임이 아니게 된다.
+  const flame = battle({ skills: ['flame'], heroStats: { hp: 900, mp: 400, heal: 3, armor: 0.9 } });
+  const foe = AI.alive(flame, 'enemy')[0];
+  L.castSkill(flame, 'flame', { uid: foe.uid });
+  check('피해에는 배수가 붙지 않는다',
+    flame.dots.find((dot) => dot.targetUid === foe.uid).amount, D.PLAYER_SKILLS.flame.tick);
+}
+
+// --- 광역 도발 ----------------------------------------------------------
+{
+  const state = battle({ party: [{ defId: 'bran', level: 8 }, { defId: 'mira', level: 1 }] });
+  const bran = unit(state, '강철의 브란');
+  const mira = unit(state, '궁수 미라');
+  const foes = AI.alive(state, 'enemy');
+
+  // 적을 탱커 주위로 모으고 전부 딴 곳을 보게 한다.
+  bran.x = 50; bran.y = 23;
+  foes.forEach((foe, i) => { foe.x = 54 + i * 3; foe.y = 23; foe.targetUid = mira.uid; });
+
+  const choice = AI.chooseSkill(bran, state, foes[0]);
+  check('여럿이 풀리면 광역 도발을 고른다', choice && choice.id, 'roar');
+
+  L.step(state, L.TICK);
+  check('반경 안의 적을 전부 끌어온다',
+    AI.alive(state, 'enemy').every((foe) => foe.targetUid === bran.uid), true);
+
+  // 하나만 풀렸을 때 긴 쿨타임을 쓰면 정작 여럿이 풀렸을 때 쓸 것이 없다.
+  const single = battle({ party: [{ defId: 'bran', level: 8 }, { defId: 'mira', level: 1 }] });
+  const tank2 = unit(single, '강철의 브란');
+  const others = AI.alive(single, 'enemy');
+  tank2.x = 50; tank2.y = 23;
+  others.forEach((foe, i) => { foe.x = 54 + i * 3; foe.y = 23; foe.targetUid = tank2.uid; });
+  others[0].targetUid = unit(single, '궁수 미라').uid;
+  const one = AI.chooseSkill(tank2, single, others[0]);
+  check('하나만 풀리면 단일 도발', one && one.id, 'taunt');
+}
+
+// --- 전투 보상 ----------------------------------------------------------
+{
+  const state = battle();
+  AI.alive(state, 'enemy').forEach((u) => L.applyDamage(state, null, u, 99999));
+  run(state, L.WAVE_GAP + 0.2);
+  AI.alive(state, 'enemy').forEach((u) => L.applyDamage(state, null, u, 99999));
+  run(state, L.WAVE_GAP + 0.2);
+
+  const reward = L.rewardOf(state);
+  check('이겼다', reward.won, true);
+  check('처치 경험치가 들어간다', reward.kills > 0, true);
+  check('길드 몫을 그대로 받는다', reward.guild, quest().guildReward.exp);
+  check('골드는 이겼을 때만', reward.gold, quest().guildReward.gold);
+
+  // 힐로도 직업 경험치가 쌓인다. 흘린 힐은 세지 않는다 — 마나를 아껴 쓸 이유를
+  // 경험치가 무너뜨리면 안 된다.
+  const healer = battle();
+  const tank = unit(healer, '강철의 브란');
+  tank.hp = 100;
+  L.castSkill(healer, 'touch', { uid: tank.uid });
+  const healed = L.rewardOf(healer);
+  check('회복이 직업 경험치가 된다', healed.healExp > 0, true);
+  check('직업 경험치에 회복 몫이 들어 있다',
+    healed.jobExp >= healed.healExp, true);
+
+  const wasted = battle();
+  L.castSkill(wasted, 'touch', { uid: unit(wasted, '강철의 브란').uid });
+  check('흘린 힐은 경험치가 되지 않는다', L.rewardOf(wasted).healExp, 0);
+
+  // 실패해도 길드 몫의 절반은 받는다. 아무것도 없이 끝나면 어려운 의뢰를
+  // 시도할 이유가 사라진다.
+  const lost = battle();
+  AI.alive(lost, 'ally').forEach((u) => L.applyDamage(lost, null, u, 99999));
+  run(lost, 0.1);
+  const failure = L.rewardOf(lost);
+  check('졌다', failure.won, false);
+  check('길드 몫의 절반', failure.guild, Math.round(quest().guildReward.exp * 0.5));
+  check('골드는 없다', failure.gold, 0);
+}
+
 // --- 재현성 -------------------------------------------------------------
 {
   const digest = (seed) => {
-    const state = L.createBattle({ quest: 'outpost', party: PARTY, skills: SKILLS, seed });
+    const state = L.createBattle({ quest: quest({ waves: [['scout', 'scout', 'orc', 'shaman']] }),
+      party: PARTY, skills: SKILLS, seed });
     run(state, 40);
     return state.units.map((u) => `${u.uid}:${Math.round(u.hp)}`).join(',');
   };
@@ -272,8 +403,8 @@ const run = (state, seconds) => {
     if (missing >= 60 && ready('quick')) return void L.castSkill(state, 'quick', { uid: worst.uid });
   }
 
-  function play(questId, seed, withHealer) {
-    const state = L.createBattle({ quest: questId, party: PARTY, skills: SKILLS, seed });
+  function play(waves, seed, withHealer) {
+    const state = L.createBattle({ quest: quest({ waves }), party: PARTY, skills: SKILLS, seed });
     let sinceInput = 0;
     for (let i = 0; i < 240 / L.TICK && state.status === 'fighting'; i++) {
       L.step(state, L.TICK);
@@ -284,17 +415,22 @@ const run = (state, seconds) => {
     return state.status;
   }
 
-  const seeds = [1, 2, 3, 4, 5];
-  const wins = (questId, withHealer) =>
-    seeds.filter((seed) => play(questId, seed, withHealer) === 'won').length;
+  const EASY = [['scout', 'scout', 'scout'], ['scout', 'scout', 'scout', 'shaman']];
+  const MID = [['scout', 'scout', 'scout', 'shaman'], ['orc', 'scout', 'shaman'],
+    ['orc', 'orc', 'shaman']];
+  const HARD = [['orc', 'orc', 'scout', 'scout'], ['hexer', 'shaman', 'orc'], ['chief', 'orc']];
 
-  check('힐러가 놀아도 첫 퀘스트는 넘어간다 (연습용)', wins('mine', false), 5);
+  const seeds = [1, 2, 3, 4, 5];
+  const wins = (waves, withHealer) =>
+    seeds.filter((seed) => play(waves, seed, withHealer) === 'won').length;
+
+  check('힐러가 놀아도 연습용 판은 넘어간다', wins(EASY, false), 5);
   // 실시간 전투에 난수가 섞여 있어 어쩌다 넘어가는 판이 나온다. 확률이 아니라
   // "손을 놓으면 안 된다"는 것이 확인하려는 것이므로 다섯 판 중 하나까지만 봐준다.
-  check('힐러가 놀면 두 번째 퀘스트는 거의 못 깬다', wins('outpost', false) <= 1, true);
-  check('힐러가 놀면 마지막 퀘스트는 못 깬다', wins('camp', false), 0);
-  check('힐이 들어가면 두 번째 퀘스트를 깬다', wins('outpost', true), 5);
-  check('힐이 들어가면 마지막 퀘스트도 깬다', wins('camp', true), 5);
+  check('힐러가 놀면 중간 판은 거의 못 깬다', wins(MID, false) <= 1, true);
+  check('힐러가 놀면 어려운 판은 못 깬다', wins(HARD, false), 0);
+  check('힐이 들어가면 중간 판을 깬다', wins(MID, true), 5);
+  check('힐이 들어가면 어려운 판도 깬다', wins(HARD, true), 5);
 }
 
 console.log(`${passed}개 통과, ${failed}개 실패`);

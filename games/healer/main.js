@@ -1,6 +1,7 @@
 'use strict';
 
-// 화면과 입력. 전투 규칙은 logic.js, 동료 판단은 ai.js, 분배는 loot.js에 있고
+// 화면과 입력. 규칙은 다른 파일에 있다 — 전투는 logic.js, 동료 판단은 ai.js,
+// 성장과 장비는 progress.js, 의뢰 생성은 quests.js, 분배는 loot.js.
 // 여기서는 그리기와 누르기만 한다.
 (function () {
 
@@ -8,6 +9,8 @@ const D = window.HealerData;
 const L = window.HealerLogic;
 const AI = window.HealerAI;
 const Loot = window.HealerLoot;
+const P = window.HealerProgress;
+const Q = window.HealerQuests;
 const Sprites = window.HealerSprites;
 const Scenes = window.HealerScenes;
 const sound = window.HealerSound;
@@ -18,23 +21,37 @@ const el = (tag, cls) => {
   if (cls) node.className = cls;
   return node;
 };
+const text = (tag, cls, value) => {
+  const node = el(tag, cls);
+  node.textContent = value;
+  return node;
+};
 
 const app = {
-  screen: 'quest',
+  screen: 'home',
+  tab: 'quest',
+  progress: P.load(),
+  quests: [],
   quest: null,
+  candidates: [],
   party: [],
-  skills: ['touch', 'quick', 'regen', 'ripple', 'focus'],
+  skills: [],
+  lootMethod: 'even',
   battle: null,
   aiming: null,
   paused: false,
   result: null,
 };
 
+function persist() {
+  P.save(app.progress);
+}
+
 // --- 화면 전환 ---------------------------------------------------------
 
 const SCREENS = {
-  quest: { node: 'screen-quest', name: '퀘스트', note: '길드 게시판', back: null },
-  party: { node: 'screen-party', name: '편성', note: '파티와 스킬을 정한다', back: 'quest' },
+  home: { node: 'screen-home', name: '길드', note: '', back: null, tabs: true },
+  party: { node: 'screen-party', name: '편성', note: '파티와 스킬을 정한다', back: 'home' },
   battle: { node: 'screen-battle', name: '전투', note: '', back: null },
   result: { node: 'screen-result', name: '결과', note: '', back: null },
 };
@@ -46,18 +63,40 @@ function show(name, note) {
   $('step-name').textContent = screen.name;
   $('step-note').textContent = note == null ? screen.note : note;
   $('step-back').hidden = !screen.back;
-  $('step-back').dataset.to = screen.back || '';
+  $('tabbar').hidden = !screen.tabs;
 }
 
 $('step-back').addEventListener('click', () => {
   sound.play('click');
-  const to = $('step-back').dataset.to;
-  if (to === 'quest') openQuests();
+  openHome();
 });
 
-// --- 퀘스트 선택 -------------------------------------------------------
+function openHome(tab) {
+  if (tab) app.tab = tab;
+  $('tab-quest').hidden = app.tab !== 'quest';
+  $('tab-character').hidden = app.tab !== 'character';
+  for (const button of $('tabbar').children) {
+    button.setAttribute('aria-pressed', String(button.dataset.tab === app.tab));
+  }
+  if (app.tab === 'quest') renderQuests();
+  else renderCharacter();
+  show('home', app.tab === 'quest' ? '의뢰 게시판' : `캐릭터 Lv ${app.progress.charLevel}`);
+}
 
-function questSummary(quest) {
+for (const button of $('tabbar').children) {
+  button.addEventListener('click', () => {
+    sound.play('click');
+    openHome(button.dataset.tab);
+  });
+}
+
+// --- 퀘스트 게시판 -----------------------------------------------------
+
+function refreshQuests() {
+  app.quests = Q.generate(app.progress.charLevel, app.progress.questSeed);
+}
+
+function enemyCounts(quest) {
   const counts = {};
   for (const wave of quest.waves) {
     for (const id of wave) counts[id] = (counts[id] || 0) + 1;
@@ -65,60 +104,253 @@ function questSummary(quest) {
   return Object.entries(counts).map(([id, n]) => `${D.ENEMIES[id].name} ×${n}`);
 }
 
-function openQuests() {
+// 적정 레벨과 내 레벨의 차이. 숫자만 보여 주면 그것이 쉬운지 어려운지를 매번
+// 머리로 빼야 한다.
+function difficultyOf(quest) {
+  const gap = quest.level - app.progress.charLevel;
+  if (gap <= -2) return { cls: 'easy', label: '쉬움' };
+  if (gap <= 1) return { cls: 'fair', label: '알맞음' };
+  if (gap <= 3) return { cls: 'hard', label: '벅참' };
+  return { cls: 'deadly', label: '위험' };
+}
+
+function renderQuests() {
+  if (!app.quests.length) refreshQuests();
   const list = $('quests');
   list.textContent = '';
-  D.QUESTS.forEach((quest, i) => {
-    const item = el('li');
+
+  for (const quest of app.quests) {
+    const mood = difficultyOf(quest);
     const button = el('button', 'quest');
     button.type = 'button';
 
     const title = el('div', 'quest-title');
-    const name = el('b');
-    name.textContent = quest.name;
-    const tier = el('span', 'tier');
-    tier.textContent = `${i + 1}단계 · ${quest.waves.length}웨이브`;
-    title.append(name, tier);
+    title.append(text('b', null, quest.name));
+    title.append(text('span', `level ${mood.cls}`, `Lv ${quest.level} · ${mood.label}`));
+    button.append(title);
 
-    const desc = el('p', 'quest-desc');
-    desc.textContent = quest.desc;
+    button.append(text('p', 'quest-desc', quest.desc));
 
     const meta = el('div', 'quest-meta');
-    const place = el('span', 'tag place');
-    place.textContent = Scenes.SCENES[quest.scene].name;
-    meta.append(place);
-    for (const text of questSummary(quest)) {
-      const tag = el('span', 'tag');
-      tag.textContent = text;
-      meta.append(tag);
-    }
-    const gold = el('span', 'tag gold');
-    gold.textContent = `길드 보상 ${quest.guildReward.gold}골드`;
-    meta.append(gold);
+    meta.append(text('span', 'tag place', Scenes.SCENES[quest.scene].name));
+    for (const label of enemyCounts(quest)) meta.append(text('span', 'tag', label));
+    meta.append(text('span', 'tag gold', `${quest.guildReward.gold} 골드 · ${quest.guildReward.exp} exp`));
+    meta.append(text('span', 'tag', `전리품 ${quest.drops.length}`));
+    button.append(meta);
 
-    button.append(title, desc, meta);
     button.addEventListener('click', () => {
       sound.play('click');
       openParty(quest);
     });
+
+    const item = el('li');
     item.append(button);
     list.append(item);
+  }
+}
+
+$('refresh').addEventListener('click', () => {
+  sound.play('click');
+  app.progress.questSeed = (Math.random() * 1e9) | 0;
+  persist();
+  refreshQuests();
+  renderQuests();
+});
+
+// --- 캐릭터 -----------------------------------------------------------
+
+function levelRow(label, level, exp, toNext) {
+  const row = el('li', 'level-row');
+  row.append(text('b', null, label));
+  row.append(text('span', 'lv', `Lv ${level}`));
+  const bar = el('div', 'bar exp');
+  const fill = el('span');
+  fill.style.width = `${toNext ? Math.min(100, (exp / toNext) * 100) : 100}%`;
+  bar.append(fill);
+  row.append(bar);
+  row.append(text('small', null, toNext ? `${exp} / ${toNext}` : '최대'));
+  return row;
+}
+
+const STAT_LABELS = {
+  hp: '최대 체력',
+  mp: '최대 마나',
+  heal: '회복력',
+  armor: '받는 피해',
+};
+
+function statText(key, value) {
+  if (key === 'heal') return `×${value.toFixed(2)}`;
+  if (key === 'armor') return `×${value.toFixed(2)}`;
+  return String(Math.round(value));
+}
+
+function renderCharacter() {
+  const progress = app.progress;
+  const stats = P.stats(progress);
+  const max = progress.charLevel >= D.LEVEL.maxLevel;
+
+  $('char-gold').textContent = `${progress.gold} 골드`;
+
+  const levels = $('char-levels');
+  levels.textContent = '';
+  levels.append(levelRow('캐릭터', progress.charLevel, progress.charExp,
+    max ? 0 : D.LEVEL.charExpTo(progress.charLevel)));
+  levels.append(levelRow('힐러', progress.jobLevel, progress.jobExp,
+    progress.jobLevel >= D.LEVEL.maxLevel ? 0 : D.LEVEL.jobExpTo(progress.jobLevel)));
+
+  const statList = $('char-stats');
+  statList.textContent = '';
+  for (const [key, label] of Object.entries(STAT_LABELS)) {
+    const row = el('li');
+    row.append(text('span', null, label));
+    row.append(text('b', 'stat-value', statText(key, stats[key])));
+    statList.append(row);
+  }
+
+  const slots = $('char-slots');
+  slots.textContent = '';
+  for (const slot of Object.values(D.SLOTS)) {
+    const item = progress.equipped[slot.id];
+    const button = el('button', 'slot-row');
+    button.type = 'button';
+    button.disabled = !item;
+    button.append(text('span', 'slot-name', slot.name));
+    if (item) {
+      button.append(text('span', 'icon', D.GEAR[item.defId].icon));
+      button.append(text('span', 'item-name', D.itemName(item)));
+      button.append(text('span', 'why', statSummary(D.gearStats(item.defId, item.tier))));
+    } else {
+      button.append(text('span', 'item-name empty', '비어 있음'));
+    }
+    button.addEventListener('click', () => {
+      sound.play('click');
+      P.unequip(progress, slot.id);
+      persist();
+      renderCharacter();
+    });
+    const row = el('li');
+    row.append(button);
+    slots.append(row);
+  }
+
+  renderInventory();
+
+  const skills = $('char-skills');
+  skills.textContent = '';
+  const open = new Set(P.unlockedSkills(progress).map((def) => def.id));
+  for (const def of Object.values(D.PLAYER_SKILLS)) {
+    const row = el('li', open.has(def.id) ? 'skill-row' : 'skill-row locked');
+    row.append(text('span', 'icon', open.has(def.id) ? def.icon : '🔒'));
+    const body = el('div', 'pick-body');
+    const name = el('div', 'pick-name');
+    name.append(document.createTextNode(def.name));
+    name.append(text('span', 'job', def.type));
+    body.append(name);
+    body.append(text('div', 'pick-sub', open.has(def.id) ? def.desc : `힐러 Lv ${def.unlock}에 열린다`));
+    row.append(body);
+    skills.append(row);
+  }
+  $('skill-open').textContent = `${open.size} / ${Object.keys(D.PLAYER_SKILLS).length}`;
+}
+
+function statSummary(bonus) {
+  const parts = [];
+  for (const [key, value] of Object.entries(bonus)) {
+    if (key === 'heal') parts.push(`회복 +${Math.round(value * 100)}%`);
+    else if (key === 'armor') parts.push(`피해 ${Math.round(value * 100)}%`);
+    else if (key === 'hp') parts.push(`체력 +${Math.round(value)}`);
+    else if (key === 'mp') parts.push(`마나 +${Math.round(value)}`);
+  }
+  return parts.join(' · ');
+}
+
+// 지금 낀 것과 견준 차이. 이걸 보여 주지 않으면 갈아 끼울지 말지를 매번 머리로
+// 계산해야 하고, 결국 아무도 계산하지 않는다.
+function diffSummary(diff) {
+  const parts = [];
+  for (const [key, value] of Object.entries(diff)) {
+    const sign = value > 0 ? '+' : '';
+    if (key === 'heal') parts.push(`회복 ${sign}${Math.round(value * 100)}%`);
+    else if (key === 'armor') parts.push(`피해 ${sign}${Math.round(value * 100)}%`);
+    else if (key === 'hp') parts.push(`체력 ${sign}${Math.round(value)}`);
+    else if (key === 'mp') parts.push(`마나 ${sign}${Math.round(value)}`);
+  }
+  return parts.length ? parts.join(' · ') : '차이 없음';
+}
+
+function itemButton(item, index, onEquip) {
+  const def = D.GEAR[item.defId];
+  const compare = P.compare(app.progress, item);
+  // 한 수치라도 오르면 좋은 것으로 치면 거의 모든 물건에 표시가 붙는다.
+  // 잃는 것 없이 오르기만 할 때만 표시한다 — 표시가 붙은 줄만 눌러 보면 되게.
+  const changes = Object.entries(compare.diff)
+    .map(([key, value]) => (key === 'armor' ? -value : value));
+  const better = changes.some((v) => v > 0) && !changes.some((v) => v < 0);
+
+  const button = el('button', `item ${better ? 'better' : ''}`);
+  button.type = 'button';
+  button.append(text('span', 'icon', def.icon));
+  const body = el('div', 'pick-body');
+  const name = el('div', 'pick-name');
+  name.append(document.createTextNode(D.itemName(item)));
+  name.append(text('span', 'job', D.SLOTS[def.slot].name));
+  body.append(name);
+  body.append(text('div', 'pick-sub', diffSummary(compare.diff)));
+  button.append(body);
+  button.append(text('span', 'pick-cost', '장착'));
+  button.addEventListener('click', () => onEquip(index));
+  return button;
+}
+
+function renderInventory() {
+  const list = $('inventory');
+  list.textContent = '';
+  $('inv-count').textContent = String(app.progress.inventory.length);
+
+  if (!app.progress.inventory.length) {
+    list.append(text('li', 'empty-note', '아직 없다. 의뢰를 받아 오면 쌓인다.'));
+    return;
+  }
+
+  app.progress.inventory.forEach((item, index) => {
+    const row = el('li');
+    row.append(itemButton(item, index, (i) => {
+      sound.play('click');
+      P.equip(app.progress, i);
+      persist();
+      renderCharacter();
+    }));
+    list.append(row);
   });
-  show('quest');
 }
 
 // --- 편성 --------------------------------------------------------------
 
-function avatar(kind, cls) {
-  const wrap = el('span', cls || 'avatar');
+function avatar(kind) {
+  const wrap = el('span', 'avatar');
   wrap.innerHTML = Sprites.svg(kind);
   return wrap;
 }
 
 function jobTag(job) {
-  const tag = el('span', `job ${job}`);
-  tag.textContent = D.JOBS[job].name;
-  return tag;
+  return text('span', `job ${job}`, D.JOBS[job].name);
+}
+
+function renderBrief() {
+  const quest = app.quest;
+  const brief = $('quest-brief');
+  brief.textContent = '';
+  const head = el('div', 'panel-head');
+  head.append(text('h2', null, quest.name));
+  head.append(text('span', `count level ${difficultyOf(quest).cls}`, `Lv ${quest.level}`));
+  brief.append(head);
+  brief.append(text('p', 'panel-note',
+    `${Scenes.SCENES[quest.scene].name} · ${quest.waves.length}개 무리 · `
+    + `완료 시 ${quest.guildReward.gold} 골드와 ${quest.guildReward.exp} exp`));
+  const meta = el('div', 'quest-meta');
+  for (const label of enemyCounts(quest)) meta.append(text('span', 'tag', label));
+  brief.append(meta);
 }
 
 function renderRoster() {
@@ -126,21 +358,24 @@ function renderRoster() {
   list.textContent = '';
 
   // 주인공은 빼거나 바꿀 수 없으므로 고정된 줄로 먼저 보여 준다.
-  const heroItem = el('li');
   const heroRow = el('div', 'pick locked');
   heroRow.append(avatar('hero'));
   const heroBody = el('div', 'pick-body');
   const heroName = el('div', 'pick-name');
-  heroName.append(document.createTextNode('주인공'), jobTag('healer'));
-  const heroSub = el('div', 'pick-sub');
-  heroSub.textContent = '내가 조작한다. 자동 공격은 하지 않는다.';
-  heroBody.append(heroName, heroSub);
+  heroName.append(document.createTextNode(`주인공 Lv ${app.progress.charLevel}`));
+  heroName.append(jobTag('healer'));
+  heroBody.append(heroName);
+  const stats = P.stats(app.progress);
+  heroBody.append(text('div', 'pick-sub',
+    `체력 ${stats.hp} · 마나 ${stats.mp} · 회복력 ×${stats.heal.toFixed(2)}`));
   heroRow.append(heroBody);
+  const heroItem = el('li');
   heroItem.append(heroRow);
   list.append(heroItem);
 
-  for (const def of Object.values(D.COMPANIONS)) {
-    const picked = app.party.includes(def.id);
+  for (const entry of app.candidates) {
+    const def = D.COMPANIONS[entry.defId];
+    const picked = app.party.some((p) => p.defId === entry.defId);
     const full = app.party.length >= D.PARTY_MAX - 1;
 
     const button = el('button', 'pick');
@@ -151,16 +386,28 @@ function renderRoster() {
 
     const body = el('div', 'pick-body');
     const name = el('div', 'pick-name');
-    name.append(document.createTextNode(def.name), jobTag(def.job));
-    const sub = el('div', 'pick-sub');
-    sub.textContent = `체력 ${def.hp}${def.mp ? ` · 마나 ${def.mp}` : ''} · ${def.note}`;
-    body.append(name, sub);
+    name.append(document.createTextNode(`${def.name} Lv ${entry.level}`));
+    name.append(jobTag(def.job));
+    body.append(name);
+    body.append(text('div', 'pick-sub', def.note));
+
+    // 무엇을 들고 오는지 보여 준다. 같은 동료라도 레벨에 따라 스킬이 다르므로
+    // 이것을 보지 않으면 편성이 이름 고르기가 된다.
+    const skills = el('div', 'skill-chips');
+    for (const id of entry.skills) {
+      const skill = D.UNIT_SKILLS[id];
+      const chip = text('span', 'chip', skill.name);
+      chip.title = skill.desc;
+      skills.append(chip);
+    }
+    if (!entry.skills.length) skills.append(text('span', 'chip dim', '스킬 없음'));
+    body.append(skills);
     button.append(body);
 
     button.addEventListener('click', () => {
       sound.play('click');
-      if (picked) app.party = app.party.filter((id) => id !== def.id);
-      else if (!full) app.party.push(def.id);
+      if (picked) app.party = app.party.filter((p) => p.defId !== entry.defId);
+      else if (!full) app.party.push(entry);
       renderRoster();
       updateStart();
     });
@@ -176,7 +423,7 @@ function renderSkillPicks() {
   const list = $('skill-picks');
   list.textContent = '';
 
-  for (const def of Object.values(D.PLAYER_SKILLS)) {
+  for (const def of P.unlockedSkills(app.progress)) {
     const picked = app.skills.includes(def.id);
     const full = app.skills.length >= D.SKILL_MAX;
 
@@ -184,23 +431,17 @@ function renderSkillPicks() {
     button.type = 'button';
     button.setAttribute('aria-pressed', String(picked));
     button.disabled = !picked && full;
-
-    const icon = el('span', 'icon');
-    icon.textContent = def.icon;
-    button.append(icon);
+    button.append(text('span', 'icon', def.icon));
 
     const body = el('div', 'pick-body');
     const name = el('div', 'pick-name');
-    const type = el('span', 'job');
-    type.textContent = def.type;
-    name.append(document.createTextNode(def.name), type);
-    const sub = el('div', 'pick-sub');
-    sub.textContent = def.desc;
-    body.append(name, sub);
+    name.append(document.createTextNode(def.name));
+    name.append(text('span', 'job', def.type));
+    body.append(name);
+    body.append(text('div', 'pick-sub', def.desc));
     button.append(body);
 
-    const cost = el('span', 'pick-cost');
-    cost.textContent = `${def.mp ? `마나 ${def.mp}` : '마나 없음'}\n쿨 ${def.cd}초`;
+    const cost = text('span', 'pick-cost', `${def.mp ? `마나 ${def.mp}` : '마나 없음'}\n쿨 ${def.cd}초`);
     cost.style.whiteSpace = 'pre-line';
     button.append(cost);
 
@@ -219,14 +460,43 @@ function renderSkillPicks() {
   $('skill-count').textContent = `${app.skills.length} / ${D.SKILL_MAX}`;
 }
 
+// 분배 방식은 전투 전에 정한다. 결과를 보고 고르게 두면 유리한 쪽으로만 고르게 되고,
+// 파티가 미리 합의한다는 이 시스템의 뜻이 사라진다.
+function renderMethods() {
+  const box = $('methods');
+  box.textContent = '';
+  for (const method of Object.values(Loot.METHODS)) {
+    const button = el('button', 'method');
+    button.type = 'button';
+    button.dataset.method = method.id;
+    button.setAttribute('aria-pressed', String(app.lootMethod === method.id));
+    button.append(text('b', null, method.name));
+    button.append(text('small', null, method.desc));
+    button.addEventListener('click', () => {
+      sound.play('click');
+      app.lootMethod = method.id;
+      renderMethods();
+    });
+    box.append(button);
+  }
+}
+
 function updateStart() {
   $('start').disabled = app.skills.length === 0;
 }
 
 function openParty(quest) {
   app.quest = quest;
+  app.candidates = Q.companionsFor(quest, app.progress.questSeed + quest.level);
+  app.party = [];
+  app.skills = P.validSkills(app.progress, app.skills.length
+    ? app.skills
+    : P.unlockedSkills(app.progress).map((def) => def.id));
+
+  renderBrief();
   renderRoster();
   renderSkillPicks();
+  renderMethods();
   updateStart();
   show('party', quest.name);
 }
@@ -240,11 +510,11 @@ $('start').addEventListener('click', () => {
 
 const field = $('field');
 const unitNodes = new Map();
+const zoneNodes = new Map();
 
 // 16칸짜리 그림(테두리 포함 18)이 전장 폭에서 차지할 비율. 여기만 고치면
 // 아홉 그림의 크기가 서로의 비율을 지키며 같이 커지고 작아진다.
 const UNIT_WIDTH = 11;
-const zoneNodes = new Map();
 
 const pctX = (x) => (x / D.FIELD.w) * 100;
 const pctY = (y) => (y / D.FIELD.h) * 100;
@@ -258,9 +528,6 @@ function makeUnitNode(unit) {
   // 발밑에 색 있는 발판을 깔아 그 일을 대신한다 — 그림자 노릇도 같이 한다.
   node.append(el('div', 'mark'));
   node.insertAdjacentHTML('beforeend', Sprites.svg(unit.sprite));
-
-  // 넓게 그린 그림이 화면에서도 넓어야 한다. 폭을 하나로 고정하면 우두머리를
-  // 20칸에 그린 뜻이 사라진다.
   node.style.width = `${(UNIT_WIDTH * Sprites.size(unit.sprite).w) / 18}%`;
 
   const bar = el('div', 'hpbar');
@@ -288,16 +555,14 @@ function syncZones(state) {
   const seen = new Set();
   for (const zone of state.zones) {
     seen.add(zone.id);
-    let node = zoneNodes.get(zone.id);
-    if (!node) {
-      node = el('div', `zone ${zone.kind === 'heal' ? '' : 'damage'}`);
-      node.style.left = `${pctX(zone.x)}%`;
-      node.style.top = `${pctY(zone.y)}%`;
-      node.style.width = `${pctX(zone.radius * 2)}%`;
-      node.style.height = `${pctY(zone.radius * 2)}%`;
-      field.append(node);
-      zoneNodes.set(zone.id, node);
-    }
+    if (zoneNodes.has(zone.id)) continue;
+    const node = el('div', `zone ${zone.kind === 'heal' ? '' : 'damage'}`);
+    node.style.left = `${pctX(zone.x)}%`;
+    node.style.top = `${pctY(zone.y)}%`;
+    node.style.width = `${pctX(zone.radius * 2)}%`;
+    node.style.height = `${pctY(zone.radius * 2)}%`;
+    field.append(node);
+    zoneNodes.set(zone.id, node);
   }
   for (const [id, node] of zoneNodes) {
     if (seen.has(id)) continue;
@@ -306,9 +571,8 @@ function syncZones(state) {
   }
 }
 
-function floatText(unit, text, cls) {
-  const node = el('div', `float ${cls}`);
-  node.textContent = text;
+function floatText(unit, label, cls) {
+  const node = text('div', `float ${cls}`, label);
   node.style.left = `${pctX(unit.x)}%`;
   node.style.top = `${pctY(unit.y) - 6}%`;
   field.append(node);
@@ -334,10 +598,7 @@ function renderPortraits(state) {
     button.dataset.uid = unit.uid;
     if (unit.uid === L.HERO_UID) button.classList.add('is-hero');
     button.append(avatar(unit.sprite));
-
-    const name = el('span', 'pname');
-    name.textContent = unit.name;
-    button.append(name);
+    button.append(text('span', 'pname', unit.name));
 
     const hp = el('div', 'bar');
     hp.append(el('span'));
@@ -372,17 +633,12 @@ function renderSkillbar() {
     button.type = 'button';
     button.dataset.skill = id;
     button.setAttribute('aria-pressed', 'false');
-
-    const glyph = el('span', 'glyph');
-    glyph.textContent = def.icon;
-    const name = el('span', 'sname');
-    name.textContent = def.name;
-    const cost = el('span', 'cost');
-    cost.textContent = def.mp ? `${def.mp}` : '－';
+    button.append(text('span', 'glyph', def.icon));
+    button.append(text('span', 'sname', def.name));
+    button.append(text('span', 'cost', def.mp ? String(def.mp) : '－'));
     const cool = el('div', 'cool');
     cool.style.transform = 'scaleY(0)';
-
-    button.append(glyph, name, cost, cool);
+    button.append(cool);
     button.addEventListener('click', () => onSkill(id));
     bar.append(button);
   }
@@ -391,15 +647,12 @@ function renderSkillbar() {
   const potion = el('button', 'slot');
   potion.type = 'button';
   potion.dataset.potion = '1';
-  const glyph = el('span', 'glyph');
-  glyph.textContent = D.POTION.icon;
-  const name = el('span', 'sname');
-  name.textContent = D.POTION.name;
-  const cost = el('span', 'cost');
-  cost.textContent = `×${D.POTION.count}`;
+  potion.append(text('span', 'glyph', D.POTION.icon));
+  potion.append(text('span', 'sname', D.POTION.name));
+  potion.append(text('span', 'cost', `×${D.POTION.count}`));
   const cool = el('div', 'cool');
   cool.style.transform = 'scaleY(0)';
-  potion.append(glyph, name, cost, cool);
+  potion.append(cool);
   potion.addEventListener('click', onPotion);
   bar.append(potion);
 }
@@ -423,8 +676,7 @@ function syncSkillbar(state) {
     button.setAttribute('aria-pressed', String(app.aiming === def.id));
   }
 
-  const ratio = (hero.mp / hero.maxMp) * 100;
-  $('hero-mp-fill').style.width = `${ratio}%`;
+  $('hero-mp-fill').style.width = `${(hero.mp / hero.maxMp) * 100}%`;
   $('hero-mp-text').textContent = `마나 ${Math.round(hero.mp)} / ${hero.maxMp}`;
 }
 
@@ -481,15 +733,13 @@ function onPotion() {
 }
 
 function onPortrait(uid) {
-  const state = app.battle;
-  if (!state || !app.aiming) { sound.play('click'); return; }
+  if (!app.battle || !app.aiming) { sound.play('click'); return; }
   cast(app.aiming, { uid });
 }
 
 function cast(skillId, target) {
-  const state = app.battle;
   const def = D.PLAYER_SKILLS[skillId];
-  const result = L.castSkill(state, skillId, target);
+  const result = L.castSkill(app.battle, skillId, target);
   if (!result.ok) {
     sound.play('deny');
     note(result.reason);
@@ -523,8 +773,7 @@ field.addEventListener('pointerdown', (event) => {
   }
 
   const side = def.targeting === 'ally' ? 'ally' : 'enemy';
-  const candidates = AI.alive(state, side);
-  const pick = AI.nearest({ x, y }, candidates);
+  const pick = AI.nearest({ x, y }, AI.alive(state, side));
   if (!pick || AI.dist(pick, { x, y }) > SNAP) {
     sound.play('deny');
     note('대상을 정확히 누른다');
@@ -550,16 +799,14 @@ field.addEventListener('pointermove', (event) => {
 
 field.addEventListener('pointerleave', () => { $('aim').hidden = true; });
 
-function note(text) {
-  $('log').textContent = text;
+function note(label) {
+  $('log').textContent = label;
 }
 
 // --- 전투 진행 ---------------------------------------------------------
 
 let raf = 0;
 let lastFrame = 0;
-
-const CAST_SFX = { ripple: 'area', sanctuary: 'zone', pyre: 'zone', flame: 'strike', focus: 'mana' };
 
 function handleEvents(state, events) {
   for (const event of events) {
@@ -573,10 +820,9 @@ function handleEvents(state, events) {
     }
     if (event.type === 'cast') {
       if (event.skillId) {
-        if (event.radius) pulse(event.x, event.y, event.radius,
-          event.skillId === 'pyre' ? 'harm' : '');
+        if (event.radius) pulse(event.x, event.y, event.radius, event.skillId === 'pyre' ? 'harm' : '');
       } else {
-        // 동료가 쓴 스킬은 화면에 글자로만 알린다. 소리까지 겹치면 내 조작음이 묻힌다.
+        // 동료가 쓴 스킬은 글자로만 알린다. 소리까지 겹치면 내 조작음이 묻힌다.
         note(event.text);
       }
       continue;
@@ -593,9 +839,7 @@ function handleEvents(state, events) {
       renderPortraits(state);
       continue;
     }
-    if (event.type === 'end') {
-      sound.play(event.result === 'won' ? 'win' : 'lose');
-    }
+    if (event.type === 'end') sound.play(event.result === 'won' ? 'win' : 'lose');
   }
 }
 
@@ -624,12 +868,14 @@ function startBattle() {
 
   // 배경은 전투당 한 번만 만든다. 씨앗을 퀘스트에 묶어 두어 같은 퀘스트가 늘
   // 같은 모습이 되게 했다 — 다시 도전할 때마다 돌 배치가 바뀌면 다른 곳으로 보인다.
-  $('scene').innerHTML = Scenes.svg(app.quest.scene, app.quest.id.length * 977);
+  $('scene').innerHTML = Scenes.svg(app.quest.scene, app.quest.id.length * 977 + app.quest.level);
 
   app.battle = L.createBattle({
     quest: app.quest,
     party: app.party,
     skills: app.skills,
+    heroStats: P.stats(app.progress),
+    heroLevel: app.progress.charLevel,
     seed: (Math.random() * 1e9) | 0,
   });
   app.lootSeed = (Math.random() * 1e9) | 0;
@@ -639,7 +885,7 @@ function startBattle() {
   renderSkillbar();
   $('wave').textContent = `1 / ${app.quest.waves.length}`;
   note('');
-  show('battle', app.quest.name);
+  show('battle', `${app.quest.name} · Lv ${app.quest.level}`);
 
   L.drainEvents(app.battle);
   lastFrame = 0;
@@ -664,136 +910,144 @@ document.addEventListener('visibilitychange', () => {
   lastFrame = 0;
 });
 
-// --- 결과와 분배 -------------------------------------------------------
+// --- 결과 --------------------------------------------------------------
 
 function partyMembers(state) {
   return state.units.filter((u) => u.side === 'ally').map((u) => ({
-    id: u.uid, name: u.name, job: u.job, sprite: u.sprite,
+    id: u.uid, name: u.name, job: u.job,
   }));
-}
-
-function itemRow(itemId) {
-  const item = D.ITEMS[itemId];
-  const row = el('li');
-  const icon = el('span');
-  icon.textContent = item.icon;
-  const name = el('span');
-  name.textContent = item.name;
-  row.append(icon, name);
-  if (item.job) {
-    const tag = el('span', 'why');
-    tag.textContent = `${D.JOBS[item.job].name}용`;
-    row.append(tag);
-  }
-  return row;
-}
-
-function renderAwards() {
-  const { drops, members, method, seed } = app.result;
-  const result = Loot.distribute(drops, members, method, seed);
-  const list = $('awards');
-  list.textContent = '';
-
-  for (const award of result.awards) {
-    const item = D.ITEMS[award.itemId];
-    const owner = members.find((m) => m.id === award.toId);
-    const row = el('li');
-
-    const icon = el('span');
-    icon.textContent = item.icon;
-    const name = el('span');
-    name.textContent = item.name;
-    const why = el('span', 'why');
-    why.textContent = award.reason;
-    const to = el('span', 'to');
-    to.textContent = owner.name;
-    row.append(icon, name, why, to);
-
-    if (award.rolls) {
-      const rolls = el('span', 'rolls');
-      rolls.textContent = award.rolls.map((r) => `${r.name} ${r.roll}`).join(' · ');
-      row.append(rolls);
-    }
-    list.append(row);
-  }
-
-  for (const button of $('methods').children) {
-    button.setAttribute('aria-pressed', String(button.dataset.method === method));
-  }
-}
-
-function renderMethods() {
-  const box = $('methods');
-  box.textContent = '';
-  for (const method of Object.values(Loot.METHODS)) {
-    const button = el('button', 'method');
-    button.type = 'button';
-    button.dataset.method = method.id;
-    const name = el('b');
-    name.textContent = method.name;
-    const desc = el('small');
-    desc.textContent = method.desc;
-    button.append(name, desc);
-    button.addEventListener('click', () => {
-      sound.play('click');
-      app.result.method = method.id;
-      renderAwards();
-    });
-    box.append(button);
-  }
 }
 
 function openResult(state) {
   const won = state.status === 'won';
   const quest = state.quest;
   const members = partyMembers(state);
+  const reward = L.rewardOf(state);
 
   $('verdict').textContent = won ? '퀘스트 완료' : '퀘스트 실패';
   $('verdict').className = `verdict ${won ? 'won' : 'lost'}`;
 
-  const stats = state.stats;
   const survived = members.filter((m) => !AI.byUid(state, m.id).dead).length;
-  $('verdict-note').textContent = won
-    ? `${Math.round(state.t)}초 · 회복 ${Math.round(stats.healed)} (흘린 힐 ${Math.round(stats.overheal)})`
-      + ` · 스킬 ${stats.casts}회 · 생존 ${survived}/${members.length}`
-    : `${Math.round(state.t)}초까지 버텼다 · 회복 ${Math.round(stats.healed)} · 스킬 ${stats.casts}회`;
+  $('verdict-note').textContent = `${Math.round(state.t)}초 · 회복 ${Math.round(state.stats.healed)}`
+    + ` (흘린 힐 ${Math.round(state.stats.overheal)}) · 스킬 ${state.stats.casts}회`
+    + ` · 생존 ${survived}/${members.length}`;
+
+  // 경험치를 먼저 넣는다. 레벨이 오른 뒤라야 아래에서 계산하는 스탯이 맞다.
+  const before = { char: app.progress.charLevel, job: app.progress.jobLevel };
+  const gained = P.addExp(app.progress, reward.charExp, reward.jobExp);
+  app.progress.gold += reward.gold;
+
+  const expList = $('exp-gained');
+  expList.textContent = '';
+  expList.append(levelRow(`캐릭터 +${reward.charExp}`, app.progress.charLevel, app.progress.charExp,
+    app.progress.charLevel >= D.LEVEL.maxLevel ? 0 : D.LEVEL.charExpTo(app.progress.charLevel)));
+  expList.append(levelRow(`힐러 +${reward.jobExp}`, app.progress.jobLevel, app.progress.jobExp,
+    app.progress.jobLevel >= D.LEVEL.maxLevel ? 0 : D.LEVEL.jobExpTo(app.progress.jobLevel)));
+
+  const lines = [`처치 ${reward.kills} · 길드 ${reward.guild} · 회복 ${reward.healExp}`];
+  if (gained.charLevels) lines.push(`캐릭터 레벨 ${before.char} → ${app.progress.charLevel}`);
+  if (gained.jobLevels) lines.push(`힐러 레벨 ${before.job} → ${app.progress.jobLevel}`);
+  if (gained.unlocked.length) {
+    lines.push(`새 스킬: ${gained.unlocked.map((def) => def.name).join(', ')}`);
+  }
+  $('exp-note').textContent = lines.join(' · ');
 
   $('guild-panel').hidden = !won;
   $('drop-panel').hidden = !won;
+  $('gain-panel').hidden = !won;
+  // 깬 의뢰는 게시판에서 사라진다. 다시 도전을 남겨 두면 같은 의뢰의 보상을
+  // 몇 번이고 받을 수 있다.
+  $('retry').hidden = won;
 
   if (won) {
     const guild = $('guild-loot');
     guild.textContent = '';
     const gold = el('li');
-    const goldIcon = el('span');
-    goldIcon.textContent = '🪙';
-    const goldName = el('span');
-    goldName.textContent = `${quest.guildReward.gold} 골드`;
-    gold.append(goldIcon, goldName);
+    gold.append(text('span', null, '🪙'));
+    gold.append(text('span', null, `${quest.guildReward.gold} 골드`));
     guild.append(gold);
-    for (const itemId of quest.guildReward.items) guild.append(itemRow(itemId));
 
-    app.result = {
-      drops: Loot.rollDrops(quest, app.lootSeed),
-      members,
-      method: app.result ? app.result.method : 'even',
-      seed: app.lootSeed,
-    };
-    renderMethods();
-    renderAwards();
+    const method = Loot.METHODS[app.lootMethod];
+    $('method-name').textContent = method.name;
+    const result = Loot.distribute(quest.drops, members, app.lootMethod, app.lootSeed);
+
+    const awards = $('awards');
+    awards.textContent = '';
+    for (const award of result.awards) {
+      const def = D.itemDef(award.item.defId);
+      const owner = members.find((m) => m.id === award.toId);
+      const row = el('li');
+      row.append(text('span', null, def.icon));
+      row.append(text('span', null, D.itemName(award.item)));
+      row.append(text('span', 'why', award.reason));
+      row.append(text('span', 'to', owner.name));
+      if (award.rolls) {
+        row.append(text('span', 'rolls', award.rolls.map((r) => `${r.name} ${r.roll}`).join(' · ')));
+      }
+      awards.append(row);
+    }
+
+    // 내 몫만 인벤토리로 들어간다. 재료는 그 자리에서 팔린다.
+    let sold = 0;
+    const mine = [];
+    for (const item of result.byMember[L.HERO_UID] || []) {
+      const before2 = app.progress.gold;
+      const added = P.addItem(app.progress, item);
+      if (added.sold) sold += app.progress.gold - before2;
+      else mine.push(item);
+    }
+    renderGained(mine, sold);
+  }
+
+  persist();
+  // 깬 의뢰는 게시판에서 사라지고 새 의뢰가 걸린다.
+  if (won) {
+    app.progress.cleared++;
+    app.progress.questSeed = (Math.random() * 1e9) | 0;
+    persist();
+    refreshQuests();
   }
 
   show('result', quest.name);
 }
 
+function renderGained(items, sold, equipped) {
+  const list = $('gained');
+  list.textContent = '';
+
+  if (sold) list.append(text('li', 'empty-note', `재료를 팔아 ${sold} 골드를 받았다.`));
+  if (!items.length) {
+    if (equipped) list.append(text('li', 'empty-note', '장착했다. 나머지는 인벤토리에 있다.'));
+    else if (!sold) list.append(text('li', 'empty-note', '이번에는 내 몫이 없었다.'));
+    return;
+  }
+
+  for (const item of items) {
+    const index = app.progress.inventory.findIndex((entry) =>
+      entry.defId === item.defId && entry.tier === item.tier);
+    if (index < 0) continue;
+    const row = el('li');
+    row.append(itemButton(item, index, (i) => {
+      sound.play('click');
+      P.equip(app.progress, i);
+      persist();
+      // 장착하면 인벤토리 위치가 바뀐다. 남은 것을 다시 그려야 다음 장착이 맞는다.
+      renderGained(items.filter((entry) => entry !== item), sold, true);
+    }));
+    list.append(row);
+  }
+}
+
 $('retry').addEventListener('click', () => {
   sound.play('click');
+  // 다시 도전할 때는 스킬과 편성을 그대로 쓴다. 매번 다시 고르게 하면
+  // 한 판 더 해 보는 것이 번거로워진다.
   startBattle();
 });
 
 $('to-quests').addEventListener('click', () => {
   sound.play('click');
-  openQuests();
+  openHome('quest');
 });
 
 // --- 소리와 도움말 -----------------------------------------------------
@@ -831,6 +1085,7 @@ $('help-close').addEventListener('click', () => {
 
 document.addEventListener('pointerdown', () => sound.unlock(), { once: true });
 
-openQuests();
+refreshQuests();
+openHome('quest');
 
 })();
