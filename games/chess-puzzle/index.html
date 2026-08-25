@@ -46,6 +46,11 @@
 
   <p class="toast" id="message" role="status" aria-live="polite"></p>
 
+  <div class="after" id="after" hidden>
+    <p class="why" id="why"></p>
+    <button class="btn ghost" id="replay" type="button">이어지는 수순 보기</button>
+  </div>
+
   <div class="pad">
     <button class="tool" id="hint" type="button">
       <span class="tool-icon">?</span><span class="tool-label">힌트</span>
@@ -77,6 +82,10 @@
         <b>메이트가 여럿인 자리에서는 어느 메이트든 정답</b>으로 봅니다.</li>
       <li>정답을 두면 <b>상대가 최선으로 응수</b>하고, 수순이 끝날 때까지
         이어집니다.</li>
+      <li><b>다 풀고 나면 왜 그 수가 이겼는지</b>를 알려 줍니다. 수순을 끝까지
+        둔 자리에서 말을 얼마나 벌었는지, 메이트로 이어지는지를 세어 적은
+        것입니다 — 특히 손해처럼 보이는 수를 두는 문제에서, 두고 나도 무엇을
+        얻었는지 안 보일 때를 위한 것입니다.</li>
       <li><b>힌트</b>는 어떤 말을 움직여야 하는지까지만 알려 줍니다.
         <b>다시</b>는 지금 문제를 처음부터 놓습니다.</li>
       <li>노란 테두리는 <b>직전에 움직인 수</b>, 붉은 테두리는 <b>체크를 받고

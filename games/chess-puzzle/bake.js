@@ -235,6 +235,68 @@ function readMove(puzzle) {
   };
 }
 
+/**
+ * 수순을 끝까지 두면 푸는 쪽이 얻는 것.
+ *
+ * 엔진이 있을 때는 문제가 끝난 *뒤* 이어지는 수순을 두어 보고 쟀다. 엔진이
+ * 없으니 그 수순을 만들 수 없어서, 대신 문제의 수순 자체를 끝까지 두고 시작할
+ * 때와 견준다 — 플레이어가 방금 한 일이 무엇을 벌었는지가 그대로 나온다.
+ */
+function outcomeOf(puzzle) {
+  const start = L.startPuzzle(puzzle);
+  const solver = start.color;
+
+  // 킹은 뺀다. 양쪽에 하나씩 있어 차이에 아무것도 더하지 않는다.
+  const count = (board) => {
+    let mine = 0;
+    let theirs = 0;
+    for (const square of Object.keys(board)) {
+      const piece = board[square];
+      const worth = VALUE[piece.toLowerCase()];
+      if (worth >= 100) continue;
+      if (L.colorOf(piece) === solver) mine += worth;
+      else theirs += worth;
+    }
+    return mine - theirs;
+  };
+
+  let position = start.position;
+  const before = count(position.board);
+  for (let i = 1; i < puzzle.moves.length; i++) {
+    position = L.applyMove(position, puzzle.moves[i]);
+  }
+  return {
+    mate: L.positionStatus(position) === 'checkmate',
+    gain: count(position.board) - before,
+  };
+}
+
+/**
+ * 왜 그 수가 정답이었는지. 다 푼 뒤에만 보여 준다.
+ *
+ * 물질이 안 움직인 자리에서는 판에서 읽을 것이 없다. 그때만 lichess가 붙인
+ * 판정(crushing·advantage·equality)을 쓴다 — 그쪽 엔진이 매긴 것이니 이것도
+ * 지어낸 말이 아니라 자료에 있는 사실이다. themesOf가 덮기 전에 부른다.
+ */
+function whyOf(row, facts) {
+  if (facts.mate) return '체크메이트입니다.';
+  const { mate, gain } = outcomeOf(row);
+  if (mate) return '수순을 다 두면 체크메이트입니다.';
+  if (gain >= 8) return `수순을 다 두면 말을 크게 벌어 둡니다(폰 ${gain}개 값).`;
+  if (gain >= 1) return `수순을 다 두면 폰 ${gain}개 값만큼 앞섭니다.`;
+
+  const verdict = new Set(row.themes);
+  if (gain <= -1) {
+    return verdict.has('crushing')
+      ? '말을 내주고도 판이 결정적으로 기웁니다.'
+      : '말을 내주고도 자리가 좋아집니다.';
+  }
+  if (verdict.has('crushing')) return '잡은 것은 없어도 자리가 결정적으로 좋아집니다.';
+  if (verdict.has('advantage')) return '잡은 것은 없어도 뚜렷하게 유리해집니다.';
+  if (verdict.has('equality')) return '불리하던 판을 다시 팽팽하게 돌려놓습니다.';
+  return '잡은 것은 없어도 자리가 좋아집니다.';
+}
+
 // 대표 주제로 붙일 수 있는 제목·힌트. lichess가 붙인 주제도 판에서 읽어낸
 // 사실이므로, 판을 직접 본 것과 같은 자격으로 쓴다.
 const BY_THEME = {
@@ -405,6 +467,7 @@ function writeChunk(level, n, puzzles) {
       themes: [${p.themes.map(quote).join(', ')}],
       title: ${quote(p.title)},
       hint: ${quote(p.hint)},
+      why: ${quote(p.why)},
     },`).join('\n');
 
   // 화면 쪽 적재기는 script 태그를 꽂고 onload에서 이 표를 읽는다. 등록 함수를
@@ -452,6 +515,7 @@ function build() {
 
     for (const row of picked) {
       const facts = readMove(row);
+      row.why = whyOf(row, facts);     // lichess 원본 주제를 보므로 themes를 덮기 전에
       row.themes = themesOf(row);
       row.title = titleOf(row, facts);
       row.hint = hintOf(row, facts);

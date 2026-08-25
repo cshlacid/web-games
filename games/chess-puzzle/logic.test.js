@@ -209,6 +209,11 @@ const INDEX = global.CHESS_PUZZLE_INDEX;
 const CHUNKS = global.CHESS_PUZZLE_CHUNKS || {};
 const LEVELS = Object.keys(INDEX.levels);
 
+// 한 가지 푸는 방법이 차지해도 되는 몫. 실측하고 정했다 — 지금 자료에서 가장
+// 많은 것이 "폰으로 잡지도 체크도 아닌 두 수"로 4.1%다. 다시 구웠을 때 그 쏠림이
+// 눈에 띄게 나빠지면 걸리도록 6%로 잡는다.
+const METHOD_SHARE_AT = 0.06;
+
 // 목차가 말하는 자리마다 실제 문제가 있는지 본다. 화면은 목차를 믿고 번호를
 // 세므로, 여기가 어긋나면 문제 번호를 넘기다 빈 자리를 만난다.
 const ALL = [];
@@ -243,6 +248,41 @@ const ALL = [];
   check('빠지거나 크기가 어긋난 덩이가 없다', missing, 0);
   check('목차에 버전이 있다', typeof INDEX.version === 'string' && INDEX.version.length > 0, true);
   console.log(`  담긴 문제 ${ALL.length}개 — ${LEVELS.map((l) => `${l} ${counts[l]}`).join(', ')}`);
+
+  // 판이 달라도 푸는 방법이 같으면 같은 문제를 다시 푸는 것과 다르지 않다.
+  // 엔진끼리 둔 판에서 캘 때는 이 쏠림이 심해서 — "비숍으로 퀸을 잡는 한 수"
+  // 하나에 열여섯 개가 몰렸다 — 겹치는 것을 아예 하나만 남겼었다.
+  //
+  // 지금은 그 잣대를 그대로 쓸 수 없다. 이 열쇠는 움직인 말과 잡은 말, 체크·
+  // 포크·메이트 여부만 보는 기계적인 근사라서 가짓수가 몇백 개뿐인데, 문제는
+  // 900개다. 하나만 남기면 900개를 담을 수가 없다. 그래서 "겹치지 않는다"를
+  // **한 방법에 지나치게 몰리지 않는다**로 바꿔 지킨다.
+  const VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 100 };
+  const methods = new Map();
+  for (const { puzzle } of ALL) {
+    const position = L.startPuzzle(puzzle).position;
+    const uci = puzzle.moves[1];
+    const to = uci.slice(2, 4);
+    const piece = position.board[uci.slice(0, 2)];
+    const took = position.board[to];
+    const next = L.applyMove(position, uci);
+    const status = L.positionStatus(next);
+    const targets = L.pseudoMoves(next, to)
+      .map((m) => next.board[m.to])
+      .filter((p) => p && L.colorOf(p) !== L.colorOf(piece) && VALUE[p.toLowerCase()] >= 3);
+    const key = [
+      piece.toLowerCase(), took ? took.toLowerCase() : '-',
+      status === 'check' || status === 'checkmate', status === 'checkmate',
+      targets.length >= 2, Math.ceil((puzzle.moves.length - 1) / 2),
+    ].join('|');
+    if (!methods.has(key)) methods.set(key, []);
+    methods.get(key).push(puzzle.id);
+  }
+  const crowded = [...methods.entries()].sort((a, b) => b[1].length - a[1].length);
+  const share = crowded[0][1].length / ALL.length;
+  check('한 가지 방법에 몰려 있지 않다', share <= METHOD_SHARE_AT, true);
+  console.log(`  푸는 방법 ${methods.size}가지 — 가장 많은 것이 `
+    + `${crowded[0][1].length}개(${(share * 100).toFixed(1)}%, ${crowded[0][0]})`);
 }
 
 for (const { level, puzzle } of ALL) {
@@ -270,6 +310,20 @@ for (const { level, puzzle } of ALL) {
   const [minRating, maxRating] = INDEX.levels[level].rating;
   check(`${label}: 레이팅 ${puzzle.rating}이 ${level} 구간 안에 있다`,
     puzzle.rating >= minRating && puzzle.rating <= maxRating, true);
+
+  // 다 푼 뒤 되짚어 보여 주는 수순. 푸는 데 쓰지 않지만 판 위에서 그대로
+  // 두어 보이므로, 규칙에 어긋나면 그 자리에서 화면이 멈춘다.
+  if (Array.isArray(puzzle.line) && puzzle.line.length) {
+    let after = state.position;
+    let broken = null;
+    for (const move of puzzle.line) {
+      if (!L.isLegal(after, move)) { broken = move; break; }
+      after = L.applyMove(after, move);
+    }
+    check(`${label}: 이어지는 수순이 규칙에 맞는다`, broken, null);
+  }
+  check(`${label}: 왜 이기는지가 적혀 있다`,
+    typeof puzzle.why === 'string' && puzzle.why.length > 0, true);
 
   // 첫 수가 유일한 정답이어야 한다. 다른 수도 똑같이 좋으면, 그것을 둔
   // 플레이어가 오답 판정을 받는다.

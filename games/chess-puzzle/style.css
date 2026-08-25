@@ -285,6 +285,29 @@ h1 {
 .toast[data-kind="solved"] { color: var(--good); }
 .toast[data-kind="hint"] { color: var(--hint); }
 
+/* 다 푼 뒤에만 나오는 줄. 왜 이겼는지 한 줄로 적고, 이어지는 수순을 판 위에서
+   되짚어 볼 수 있게 한다. */
+.after {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card-bg);
+}
+.after[hidden] { display: none; }
+.why { margin: 0; flex: 1; font-size: 13px; line-height: 1.5; }
+.btn.ghost {
+  flex: none;
+  border: 1px solid var(--line);
+  background: none;
+  color: inherit;
+  font-size: 12px;
+  padding: 6px 10px;
+}
+.btn.ghost:disabled { opacity: 0.5; cursor: default; }
+
 .pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
 
 .tool {

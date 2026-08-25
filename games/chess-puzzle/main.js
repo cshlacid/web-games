@@ -20,6 +20,9 @@
     hint: document.getElementById('hint'),
     retry: document.getElementById('retry'),
     next: document.getElementById('next'),
+    after: document.getElementById('after'),
+    why: document.getElementById('why'),
+    replay: document.getElementById('replay'),
     promotion: document.getElementById('promotion'),
     promotionKeys: document.getElementById('promotion-keys'),
     help: document.getElementById('help'),
@@ -61,6 +64,10 @@
   let pending = null;        // 승격 선택을 기다리는 수
   let replyTimer = null;
   let solved = new Set();
+  // 다 푼 뒤 이어지는 수순을 되짚어 보는 중. 여기 있는 동안에는 판이 이 자리를
+  // 보여 주고, 입력은 받지 않는다 — 문제는 이미 끝났으므로 둘 것이 없다.
+  let review = null;
+  let reviewTimer = null;
 
   // --- 그리기 ---
 
@@ -105,11 +112,14 @@
   }
 
   function render() {
-    const board = state ? state.position.board : {};
-    const last = state ? state.lastMove : null;
+    // 되짚어 보는 중이면 그 자리를, 아니면 지금 문제를 그린다. 자료를 아직
+    // 못 받았으면 둘 다 없어서 빈 판이 된다.
+    const shown = review || state;
+    const board = shown ? shown.position.board : {};
+    const last = shown ? shown.lastMove : null;
     // 체크를 받고 있는 쪽의 킹만 표시한다. 어느 쪽이든 지금 위험한 자리다.
-    const checked = state && L.inCheck(state.position)
-      ? L.kingSquare(board, state.position.turn) : null;
+    const checked = shown && L.inCheck(shown.position)
+      ? L.kingSquare(board, shown.position.turn) : null;
 
     for (const [name, button] of squares) {
       const piece = board[name];
@@ -206,6 +216,7 @@
    */
   async function loadPuzzle(next) {
     clearTimeout(replyTimer);
+    hideAfter();
     const total = countOf(level);
     index = ((next % total) + total) % total;
     const token = ++loadToken;
@@ -286,6 +297,7 @@
 
   function onSquare(square) {
     Sound.unlock();
+    if (review) return;               // 되짚어 보는 중에는 둘 것이 없다
     if (pending) return;              // 승격을 고르는 중에는 판을 잠근다
     if (!state || state.status !== 'playing') return;
 
@@ -375,6 +387,54 @@
     Sound.play('solved');
     const mate = L.positionStatus(state.position) === 'checkmate';
     setMessage(mate ? '체크메이트! 문제를 풀었습니다.' : '정답입니다! 문제를 풀었습니다.', 'solved');
+    showAfter();
+  }
+
+  /**
+   * 왜 그 수가 정답이었는지. 한 수짜리 문제는 두고 나도 그 수가 무엇을 얻는지
+   * 화면에 남지 않아서, 다 푼 뒤에만 여기서 알려 준다.
+   */
+  function showAfter() {
+    const puzzle = state.puzzle;
+    el.why.textContent = puzzle.why || '';
+    const hasLine = Array.isArray(puzzle.line) && puzzle.line.length > 0;
+    el.replay.hidden = !hasLine;
+    el.replay.disabled = false;
+    el.replay.textContent = '이어지는 수순 보기';
+    el.after.hidden = !puzzle.why && !hasLine;
+  }
+
+  function hideAfter() {
+    clearTimeout(reviewTimer);
+    review = null;
+    el.after.hidden = true;
+  }
+
+  function startReview() {
+    const line = state.puzzle.line || [];
+    if (!line.length) return;
+    clearTimeout(reviewTimer);
+    review = { position: state.position, lastMove: state.lastMove, at: 0 };
+    el.replay.disabled = true;
+    el.replay.textContent = '두는 중…';
+    render();
+    reviewTimer = setTimeout(stepReview, 500);
+  }
+
+  function stepReview() {
+    const line = state.puzzle.line || [];
+    if (!review || review.at >= line.length) {
+      el.replay.disabled = false;
+      el.replay.textContent = '다시 보기';
+      return;
+    }
+    const uci = line[review.at++];
+    const before = review.position;
+    review.position = L.applyMove(before, uci);
+    review.lastMove = L.moveParts(uci);
+    moveSound(before, review.position, uci.slice(2, 4));
+    render();
+    reviewTimer = setTimeout(stepReview, 850);
   }
 
   // --- 버튼 ---
@@ -395,6 +455,7 @@
     setMessage(`${state.puzzle.hint} 움직일 말을 표시했습니다.`, 'hint');
   });
 
+  el.replay.addEventListener('click', () => { Sound.unlock(); startReview(); });
   el.retry.addEventListener('click', () => { Sound.unlock(); Sound.play('click'); loadPuzzle(index); });
   el.next.addEventListener('click', () => { Sound.unlock(); Sound.play('click'); loadPuzzle(index + 1); });
 
@@ -411,6 +472,14 @@
   window.addEventListener('keydown', (event) => {
     Sound.unlock();
     if (event.key === 'Escape') {
+      if (review) {
+        clearTimeout(reviewTimer);
+        review = null;
+        el.replay.disabled = false;
+        el.replay.textContent = '다시 보기';
+        render();
+        return;
+      }
       if (pending) { pending = null; el.promotion.hidden = true; return; }
       if (!el.help.hidden) { el.help.hidden = true; el.helpOpen.setAttribute('aria-pressed', 'false'); return; }
       clearSelection();
