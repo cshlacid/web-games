@@ -70,8 +70,8 @@ function check(name, actual, expected) {
 
 // --- 배경 --------------------------------------------------------------
 {
-  for (const quest of D.QUESTS) {
-    check(`${quest.name}: 장소가 정해져 있다`, Boolean(Scenes.SCENES[quest.scene]), true);
+  for (const region of Object.values(D.REGIONS)) {
+    check(`${region.name}: 장소가 정해져 있다`, Boolean(Scenes.SCENES[region.scene]), true);
   }
 
   for (const id of Object.keys(Scenes.SCENES)) {

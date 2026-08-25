@@ -71,6 +71,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: clamp(8px, 2vmin, 14px);
+  /* 하단 탭 바가 마지막 카드를 가리지 않게 그만큼 비워 둔다. */
+  padding-bottom: calc(64px + env(safe-area-inset-bottom));
 }
 
 /* 다섯 게임이 같은 헤더 배치를 쓴다. 목록으로 돌아가는 길을 게임마다 다시
@@ -452,3 +454,100 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 @media (prefers-reduced-motion: reduce) {
   .float, .pulse { animation-duration: 0.01ms; }
 }
+
+
+/* --- 하단 메뉴 --- */
+/* 메인 화면에만 나온다. 편성·전투·결과에서는 되돌아갈 곳이 헤더의 뒤로이지
+   탭이 아니다 — 전투 중에 탭이 보이면 누를 수 있는 것처럼 보인다. */
+.tabbar {
+  position: fixed; left: 50%; bottom: 0; transform: translateX(-50%);
+  width: min(100%, var(--app-max));
+  display: flex; gap: 0;
+  background: var(--card-bg);
+  border-top: 1px solid var(--line);
+  padding-bottom: env(safe-area-inset-bottom);
+  z-index: 5;
+}
+
+.tab {
+  flex: 1;
+  border: 0; background: none; color: var(--muted);
+  font-family: inherit; font-size: 12px; font-weight: 700;
+  padding: 9px 4px 10px; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  border-top: 2px solid transparent; margin-top: -1px;
+}
+.tab-icon { font-size: 19px; line-height: 1; }
+.tab[aria-pressed="true"] { color: var(--fg); border-top-color: var(--btn-bg); }
+
+.tab-page { display: flex; flex-direction: column; gap: clamp(8px, 2vmin, 14px); }
+
+.mini {
+  border: 1px solid var(--line); border-radius: 999px;
+  background: none; color: inherit; font-family: inherit;
+  font-size: 12px; font-weight: 700; padding: 3px 11px; cursor: pointer;
+}
+.mini:hover { border-color: var(--btn-bg); }
+
+/* --- 퀘스트 난이도 --- */
+/* 적정 레벨만 적어 두면 그것이 쉬운지 어려운지를 매번 머리로 빼야 한다. */
+.quest-title .level { font-size: 12px; font-weight: 700; }
+.level.easy { color: var(--muted); }
+.level.fair { color: var(--hp); }
+.level.hard { color: var(--hero); }
+.level.deadly { color: var(--harm); }
+
+/* --- 레벨과 경험치 --- */
+.levels, .stats, .slots, .inventory, .skill-list {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; flex-direction: column; gap: 6px;
+}
+
+.level-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.level-row b { flex: none; min-width: 76px; }
+.level-row .lv { flex: none; font-weight: 700; color: var(--muted); }
+.level-row small { flex: none; color: var(--muted); font-size: 11px; min-width: 64px; text-align: right; }
+.bar.exp { flex: 1; height: 8px; }
+.bar.exp span { background: var(--hero); }
+
+.stats li {
+  display: flex; align-items: baseline; justify-content: space-between;
+  font-size: 14px; padding: 4px 0; border-bottom: 1px solid var(--line);
+}
+.stats li:last-child { border-bottom: 0; }
+.stat-value { font-variant-numeric: tabular-nums; }
+
+.slot-row, .item {
+  width: 100%; text-align: left;
+  border: 1px solid var(--line); border-radius: 11px;
+  background: none; color: inherit; font-family: inherit;
+  padding: 8px 12px; cursor: pointer;
+  display: flex; align-items: center; gap: 10px;
+}
+.slot-row:hover, .item:hover { border-color: var(--btn-bg); }
+.slot-row:disabled { cursor: default; opacity: 0.6; }
+.slot-name { flex: none; min-width: 52px; font-size: 12px; font-weight: 700; color: var(--muted); }
+.item-name { flex: 1; min-width: 0; font-weight: 600; font-size: 14px; }
+.item-name.empty { color: var(--muted); font-weight: 400; }
+/* 이름과 수치가 서로 밀면 이름이 한 글자씩 접힌다. 수치 쪽을 좁게 묶어 둔다. */
+.slot-row .why { flex: none; max-width: 46%; text-align: right; line-height: 1.4; }
+
+/* 지금 낀 것보다 나은 물건. 눌러 볼 이유가 있는 줄만 눈에 띄면 된다. */
+.item.better { border-color: var(--hp); }
+.item .pick-cost { color: var(--btn-bg); font-weight: 700; }
+
+.empty-note { color: var(--muted); font-size: 13px; padding: 6px 0; }
+
+.skill-row {
+  display: flex; align-items: center; gap: 10px;
+  border: 1px solid var(--line); border-radius: 11px; padding: 8px 12px;
+}
+.skill-row.locked { opacity: 0.45; }
+
+/* 동료가 무엇을 들고 오는지. 레벨에 따라 다르므로 이름만으로는 고를 수 없다. */
+.skill-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
+.chip {
+  border: 1px solid var(--line); border-radius: 999px;
+  padding: 1px 8px; font-size: 11px; font-weight: 600; color: var(--fg);
+}
+.chip.dim { color: var(--muted); }

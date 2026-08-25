@@ -147,19 +147,26 @@ function healTarget(unit, state, heal) {
 
 // --- 스킬 판단 ---------------------------------------------------------
 
+// **적힌 순서대로 본다.** 조건이 까다로운 스킬(광역 도발, 대치유술)을 앞에 두면
+// 그것이 먼저 걸리고, 조건이 안 맞으면 뒤의 것으로 넘어간다. 순서를 바꾸는 것이
+// 곧 우선순위를 바꾸는 것이라 data.js의 skills 배열이 그 자리다.
 function chooseSkill(unit, state, target) {
   for (const slot of unit.skills) {
     const def = skillReady(unit, state, slot.id);
     if (!def) continue;
 
-    if (def.kind === 'taunt') {
+    if (def.kind === 'taunt' || def.kind === 'taunt-area') {
       // 어그로가 풀렸다는 것은, 내가 아닌 아군을 때리고 있는 적이 있다는 뜻이다.
+      const reach = def.radius || 30;
       const loose = alive(state, opposite(unit.side)).filter((foe) => {
         const t = currentTargetOf(state, foe);
-        return t && t.uid !== unit.uid && dist(unit, foe) <= 30;
+        return t && t.uid !== unit.uid && dist(unit, foe) <= reach;
       });
-      if (loose.length) return { id: def.id, targetUid: nearest(unit, loose).uid };
-      continue;
+      if (!loose.length) continue;
+      // 광역 도발은 쿨타임이 길다. 하나 놓쳤다고 쓰면 정작 여럿이 풀렸을 때
+      // 쓸 것이 없다 — 둘 이상 풀렸을 때만 쓰고, 하나뿐이면 단일 도발에 맡긴다.
+      if (def.kind === 'taunt-area' && loose.length < 2) continue;
+      return { id: def.id, targetUid: nearest(unit, loose).uid };
     }
 
     if (def.kind === 'heal') {
