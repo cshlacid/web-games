@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>힐러</title>
+<meta name="description" content="파티에서 힐러 하나만 맡는다. 나머지는 알아서 싸운다">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>✚</text></svg>">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="app">
+  <header class="head">
+    <div class="title-row">
+      <div class="head-nav">
+        <a class="back" href="../../">← 목록</a>
+        <button class="toggle" id="help-open" type="button" aria-pressed="false">도움말</button>
+      </div>
+      <h1>힐러</h1>
+      <div class="head-actions">
+        <button class="toggle sound" id="toggle-bgm" type="button" aria-pressed="true">BGM</button>
+        <button class="toggle sound" id="toggle-sfx" type="button" aria-pressed="true">효과음</button>
+      </div>
+    </div>
+    <div class="sub-row">
+      <button class="step-back" id="step-back" type="button" hidden>← 뒤로</button>
+      <span class="step" id="step-name">퀘스트</span>
+      <span class="step-note" id="step-note">길드 게시판</span>
+    </div>
+  </header>
+
+  <!-- 1. 퀘스트 선택 -->
+  <section class="screen" id="screen-quest">
+    <ul class="quests" id="quests"></ul>
+  </section>
+
+  <!-- 2. 편성: 파티와 스킬을 전투 전에 정한다 -->
+  <section class="screen" id="screen-party" hidden>
+    <div class="panel">
+      <div class="panel-head">
+        <h2>파티</h2>
+        <span class="count" id="party-count">1 / 5</span>
+      </div>
+      <p class="panel-note">주인공을 포함해 다섯까지. 직업이 겹쳐도 된다.</p>
+      <ul class="roster" id="roster"></ul>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h2>스킬 등록</h2>
+        <span class="count" id="skill-count">0 / 5</span>
+      </div>
+      <p class="panel-note">배운 스킬 중 다섯까지 전투에 가져간다. 전투 중에는 바꿀 수 없다.</p>
+      <ul class="skill-picks" id="skill-picks"></ul>
+    </div>
+
+    <button class="btn primary" id="start" type="button" disabled>전투 시작</button>
+  </section>
+
+  <!-- 3. 전투 -->
+  <section class="screen" id="screen-battle" hidden>
+    <div class="battle-top">
+      <span class="wave" id="wave">1 / 2</span>
+      <p class="log" id="log" role="status" aria-live="polite"></p>
+    </div>
+
+    <div class="field-wrap">
+      <div class="field" id="field">
+        <div class="aim" id="aim" hidden></div>
+      </div>
+      <p class="aim-hint" id="aim-hint" hidden></p>
+    </div>
+
+    <ul class="portraits" id="portraits"></ul>
+
+    <div class="bars">
+      <div class="bar mp"><span id="hero-mp-fill"></span><b id="hero-mp-text">200 / 200</b></div>
+    </div>
+
+    <div class="skillbar" id="skillbar"></div>
+  </section>
+
+  <!-- 4. 결과와 보상 분배 -->
+  <section class="screen" id="screen-result" hidden>
+    <p class="verdict" id="verdict"></p>
+    <p class="verdict-note" id="verdict-note"></p>
+
+    <div class="panel" id="guild-panel">
+      <div class="panel-head"><h2>길드 확정 보상</h2></div>
+      <p class="panel-note">퀘스트를 완료하면 나누지 않고 그대로 받는다.</p>
+      <ul class="loot" id="guild-loot"></ul>
+    </div>
+
+    <div class="panel" id="drop-panel">
+      <div class="panel-head"><h2>진행 중 획득</h2></div>
+      <p class="panel-note">참여자끼리 나눈다. 방식을 바꿔 보아도 주사위 결과는 그대로다.</p>
+      <div class="methods" id="methods"></div>
+      <ul class="awards" id="awards"></ul>
+    </div>
+
+    <div class="result-actions">
+      <button class="btn" id="retry" type="button">다시 도전</button>
+      <button class="btn primary" id="to-quests" type="button">퀘스트 목록</button>
+    </div>
+  </section>
+
+  <div class="sheet" id="help" hidden>
+    <p class="sheet-title">힐러만 맡는다</p>
+    <ul class="help-list">
+      <li><b>직접 조작하는 것은 주인공 힐러의 스킬뿐이다.</b> 동료는 직업에 따라
+        알아서 싸운다 — 탱커는 앞에서 어그로를 잡고, 딜러는 탱커가 잡은 적을
+        먼저 치며, 동료 힐러는 탱커의 체력을 본다.</li>
+      <li><b>전투에 가져갈 스킬은 다섯 개까지 전투 전에 등록한다.</b> 전투 중에는
+        바꿀 수 없다.</li>
+      <li><b>마나는 저절로 차지 않는다.</b> 마나 회복 스킬과 물약뿐이다. 조금
+        깎였다고 큰 힐을 쓰면 남는 힐량이 그대로 사라진다.</li>
+      <li><b>범위·장판 스킬은 기준점을 고른다.</b> 아래쪽 <b>동료 초상화</b>를
+        누르면 그 동료를 기준으로, <b>전투 화면</b>을 누르면 그 위치를 기준으로
+        발동한다.</li>
+      <li>개별 대상 스킬은 초상화나 전투 화면의 대상을 직접 누른다. 공격 스킬은
+        적을 누른다 — <b>피해를 주면 어그로가 나에게 올 수 있다.</b></li>
+      <li>주인공이 쓰러지거나 파티가 전멸하면 실패한다.</li>
+    </ul>
+    <div class="sheet-actions">
+      <button class="btn" id="help-close" type="button">닫기</button>
+    </div>
+  </div>
+</main>
+
+<script src="../../shared/audio.js"></script>
+<script src="data.js"></script>
+<script src="sprites.js"></script>
+<script src="ai.js"></script>
+<script src="logic.js"></script>
+<script src="loot.js"></script>
+<script src="audio.js"></script>
+<script src="main.js"></script>
+</body>
+</html>
