@@ -167,9 +167,13 @@ const ITEMS = {
 
 // 퀘스트. 보상이 둘로 나뉘어 있는 것은 기획서 15장 그대로다 —
 // 길드가 주는 확정 보상과, 진행 중에 얻어서 참여자끼리 나누는 보상은 다른 것이다.
+//
+// scene은 전투 배경(scenes.js)이다. 지금은 퀘스트마다 하나씩이지만 따로 둔 것은
+// 퀘스트가 늘어도 장소는 돌려쓸 수 있어야 하기 때문이다.
 const QUESTS = [
   {
     id: 'mine',
+    scene: 'mine',
     name: '폐광의 고블린',
     desc: '광부들이 갱도에 들어가지 못한다. 고블린 무리를 정리한다.',
     waves: [
@@ -182,6 +186,7 @@ const QUESTS = [
   },
   {
     id: 'outpost',
+    scene: 'outpost',
     name: '무너진 초소',
     desc: '국경 초소가 끊겼다. 남아 있는 것들을 몰아낸다.',
     waves: [
@@ -195,6 +200,7 @@ const QUESTS = [
   },
   {
     id: 'camp',
+    scene: 'camp',
     name: '오크 야영지',
     desc: '우두머리가 무리를 모으고 있다. 흩어지기 전에 친다.',
     waves: [
