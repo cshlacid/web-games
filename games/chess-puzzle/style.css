@@ -1,29 +1,295 @@
-:root { color-scheme: light dark; font-family: system-ui, sans-serif; }
-* { box-sizing: border-box; }
-body { margin: 0; min-width: 320px; background: #121719; color: #edf2ed; }
-button { font: inherit; }
-.game-shell { width: min(100% - 28px, 920px); margin: 0 auto; padding: 20px 0 42px; }
-.game-header { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; min-height: 44px; }
-.game-header h1 { margin: 0; font-size: clamp(1.4rem, 5vw, 2rem); letter-spacing: -0.06em; }
-.back { color: #b9d8bd; text-decoration: none; font-weight: 700; }
-.sound-control { justify-self: end; font-size: 0.9rem; color: #c5d2c6; }
-.panel { margin: 22px auto 16px; text-align: center; }
-.panel h2 { margin: 10px 0 5px; font-size: 1.35rem; }
-.panel p { margin: 0; color: #aab8aa; }
-.meta { display: flex; justify-content: center; gap: 10px; color: #d4b878; font-size: 0.88rem; }
-.play-area { display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: 20px; align-items: start; }
-.board { display: grid; grid-template-columns: repeat(8, 1fr); aspect-ratio: 1; border: 7px solid #6d492d; box-shadow: 0 16px 40px #0008; }
-.square { position: relative; display: grid; place-items: center; border: 0; padding: 0; font-family: 'Segoe UI Symbol', 'Noto Sans Symbols 2', sans-serif; font-size: clamp(1.8rem, 8vw, 4.5rem); cursor: pointer; line-height: 1; text-shadow: 0 2px 2px #0006; }
-.square.light { background: #e7d8b8; color: #fffdf5; }
-.square.dark { background: #8e603d; color: #252019; }
-.square.selected { outline: 5px solid #f0d060; outline-offset: -5px; z-index: 1; }
-.side-panel { min-height: 230px; padding: 18px; border-radius: 14px; background: #1e2923; }
-.message { min-height: 4.6em; margin: 0 0 18px; line-height: 1.5; color: #e4ebe2; }
-.message[data-kind='wrong'] { color: #ffb4a8; }
-.message[data-kind='solved'] { color: #a9e9ad; font-weight: 700; }
-.message[data-kind='hint'] { color: #f3d993; }
-.side-panel button { width: 100%; margin: 0 0 9px; padding: 10px 12px; border: 0; border-radius: 8px; background: #d7a948; color: #1e1707; font-weight: 800; cursor: pointer; }
-.side-panel button:hover { filter: brightness(1.1); }
-.source { margin: 24px 0 0; color: #8fa08f; font-size: 0.72rem; line-height: 1.45; }
-@media (max-width: 660px) { .play-area { grid-template-columns: 1fr; } .side-panel { min-height: 0; } .game-shell { width: min(100% - 20px, 560px); } .square { font-size: clamp(1.7rem, 11vw, 3.7rem); } }
+:root {
+  --bg: #f4f6f9;
+  --fg: #2c3542;
+  --muted: #7b8698;
+  --line: #cdd5e0;
+  --card-bg: #ffffff;
+  --btn-bg: #55637a;
+  --btn-fg: #f2f5f9;
+  --sheet-bg: #ffffff;
+  --key-bg: #dfe5ee;
+  --good: #4f8f45;
+  --bad: #c1503f;
+  --hint: #c9962f;
 
+  /* 판은 나무색을 유지한다. 다른 색으로 바꾸면 체스판으로 안 읽힌다. 대신
+     테마에 따라 밝기만 조금 낮춘다. */
+  --light-square: #e9dbbb;
+  --dark-square: #b08159;
+  --board-edge: #6d492d;
+  --last-move: #d8bb4a;
+
+  /* 판 크기 계산이 이 값들을 다시 읽어야 해서 변수로 둔다. */
+  --pad-x: clamp(10px, 4vmin, 28px);
+  --app-max: 480px;
+  /* 판은 정사각형이라 폭만 보면 세로가 짧은 화면에서 아래가 잘린다. 쓸 수 있는
+     가로와 세로를 함께 보고 작은 쪽을 쓴다. 말 크기도 여기서 나눠 쓰므로,
+     칸에 비해 말이 작아지는 일이 생기지 않는다. */
+  --board: min(100vw - 2 * var(--pad-x), var(--app-max), 70vh);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #171b21;
+    --fg: #dfe5ee;
+    --muted: #8892a3;
+    --line: #333c49;
+    --card-bg: #212832;
+    --btn-bg: #4a5568;
+    --sheet-bg: #212832;
+    --key-bg: #333c49;
+    --good: #6f9e63;
+    --bad: #e0705c;
+    --hint: #d8a13a;
+
+    --light-square: #c2ad8b;
+    --dark-square: #7d5a3d;
+    --board-edge: #4a3220;
+    --last-move: #b8992f;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  display: flex;
+  justify-content: center;
+  padding: clamp(10px, 3vmin, 24px) var(--pad-x);
+  overscroll-behavior: none;
+  touch-action: manipulation;
+}
+
+.app {
+  width: min(100%, var(--app-max));
+  display: flex;
+  flex-direction: column;
+  gap: clamp(8px, 2vmin, 14px);
+}
+
+/* 게임마다 헤더가 제각각이면 게임을 옮겨 다닐 때 목록으로 돌아가는 길을 매번
+   다시 찾게 된다. 네 게임과 같은 배치를 쓴다: 목록은 왼쪽 위, 이름은 가운데.
+   양옆을 1fr로 묶으면 좌우 내용의 폭이 달라도 이름이 화면 한가운데에 온다. */
+.title-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 10px;
+}
+
+.title-row h1 { text-align: center; }
+.title-row .head-nav { justify-self: start; }
+.head-nav { display: flex; align-items: center; gap: 14px; }
+.title-row .head-actions { justify-self: end; }
+.head-actions { display: flex; align-items: center; gap: 8px; }
+
+h1 {
+  margin: 0;
+  font-size: clamp(24px, 6vmin, 34px);
+  letter-spacing: -0.02em;
+}
+
+.back {
+  color: inherit;
+  text-decoration: none;
+  opacity: 0.75;
+  font-size: 14px;
+  font-weight: 600;
+}
+.back:hover { opacity: 1; }
+
+.toggle {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+/* 취소선은 소리 토글에만 준다. 도움말 토글의 꺼짐은 "안 열림"이라 뜻이 다르다. */
+.toggle.sound[aria-pressed="false"] { opacity: 0.38; text-decoration: line-through; }
+
+.sub-row {
+  display: flex;
+  align-items: center;
+  gap: 8px 12px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.sub-row .side { margin-inline-start: auto; color: var(--fg); }
+/* 이미 푼 문제. 다시 눌러 봐도 되는 곳인지 번호만 보고 알 수 있게 한다. */
+.sub-row .count.solved { color: var(--good); }
+.sub-row .count.solved::after { content: ' ✓'; }
+
+.brief { text-align: center; }
+.brief h2 { margin: 0; font-size: 18px; }
+.brief .themes { margin: 3px 0 0; font-size: 12px; color: var(--muted); }
+
+.board-wrap { position: relative; }
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  width: var(--board);
+  margin-inline: auto;
+  aspect-ratio: 1;
+  border: 6px solid var(--board-edge);
+  border-radius: 6px;
+  overflow: hidden;
+  user-select: none;
+}
+
+.square {
+  position: relative;
+  display: grid;
+  place-items: center;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+  line-height: 1;
+}
+.square.light { background: var(--light-square); }
+.square.dark { background: var(--dark-square); }
+
+/* 말은 양쪽 다 속이 찬 글리프를 쓰고 색으로만 가른다. 유니코드의 흰 말은 속이
+   빈 글자라 밝은 칸에서 묻힌다. 반대색 테두리를 둘러 어느 칸에서도 읽히게 한다. */
+.piece {
+  font-family: "Segoe UI Symbol", "Noto Sans Symbols 2", "Apple Symbols", sans-serif;
+  font-size: calc(var(--board) / 8 * 0.8);
+  pointer-events: none;
+}
+.piece.white { color: #fbf7ef; text-shadow: 0 0 1px #1b1611, 0 1px 2px #1b1611b0, 0 0 3px #1b161180; }
+.piece.black { color: #201b16; text-shadow: 0 0 1px #f2ece0, 0 1px 2px #00000060; }
+
+/* 직전 수는 두 칸을 함께 물들인다. 화면을 잠깐 벗어났다 돌아와도 무슨 일이
+   있었는지 판만 보고 알 수 있어야 한다. */
+.square.last::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  box-shadow: inset 0 0 0 3px var(--last-move);
+  pointer-events: none;
+}
+
+.square.selected::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  box-shadow: inset 0 0 0 4px var(--hint);
+  pointer-events: none;
+}
+
+/* 갈 수 있는 빈 칸은 점, 잡을 수 있는 칸은 테두리. 점을 말 위에 겹치면 말이
+   가려져서 무엇을 잡는지 안 보인다. */
+.square.target::before {
+  content: '';
+  position: absolute;
+  width: 28%;
+  height: 28%;
+  border-radius: 50%;
+  background: #1c1c1c44;
+  pointer-events: none;
+}
+.square.capture::before {
+  content: '';
+  position: absolute;
+  inset: 6%;
+  border-radius: 50%;
+  border: 4px solid #1c1c1c44;
+  pointer-events: none;
+}
+
+.square.checked { background: var(--bad); }
+
+.promotion {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+}
+.promotion[hidden] { display: none; }
+.promotion-title { margin: 0; font-weight: 700; }
+.promotion-keys { display: flex; gap: 8px; }
+.promotion-key {
+  width: clamp(48px, 13vw, 64px);
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--light-square);
+  cursor: pointer;
+}
+.promotion-key .piece { font-size: calc(var(--board) / 8 * 0.72); }
+
+.toast {
+  margin: 0;
+  min-height: 3em;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.toast[data-kind="wrong"] { color: var(--bad); }
+.toast[data-kind="solved"] { color: var(--good); }
+.toast[data-kind="hint"] { color: var(--hint); }
+
+.pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+
+.tool {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  cursor: pointer;
+}
+.tool:active { background: var(--key-bg); }
+.tool-icon { font-size: 17px; line-height: 1; }
+.tool-label { font-size: 11px; font-weight: 600; }
+
+.source { margin: 0; text-align: center; font-size: 11px; color: var(--muted); }
+
+.sheet {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--sheet-bg);
+  padding: 14px 16px;
+}
+.sheet[hidden] { display: none; }
+.sheet-title { margin: 0 0 8px; font-weight: 700; }
+.help-list { margin: 0; padding-inline-start: 18px; font-size: 13px; line-height: 1.7; }
+.help-list li { margin-bottom: 6px; }
+.sheet-actions { display: flex; justify-content: flex-end; margin-top: 10px; }
+
+.btn {
+  border: 0;
+  border-radius: 8px;
+  padding: 8px 16px;
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  font-family: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
