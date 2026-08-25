@@ -140,6 +140,10 @@ h1 {
 .board {
   display: grid;
   grid-template-columns: repeat(8, 1fr);
+  /* 행도 못박아야 한다. 없으면 행 높이가 내용을 따라가서, 말이 하나도 없는
+     가로줄만 납작해진다. 시작 위치에서는 어느 줄에나 말이 있어 드러나지 않고,
+     3번 문제를 다 푼 뒤처럼 한 줄이 통째로 비어야 나타난다. */
+  grid-template-rows: repeat(8, 1fr);
   width: var(--board);
   margin-inline: auto;
   aspect-ratio: 1;
