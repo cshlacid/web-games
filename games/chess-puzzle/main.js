@@ -9,6 +9,7 @@
 
   const el = {
     board: document.getElementById('board'),
+    levels: document.getElementById('levels'),
     count: document.getElementById('count'),
     rating: document.getElementById('rating'),
     side: document.getElementById('side'),
@@ -40,8 +41,20 @@
     },
   };
 
-  const puzzles = window.CHESS_PUZZLES;
+  const LEVELS = { easy: '쉬움', medium: '보통', hard: '어려움' };
+  const LEVEL_NAMES = Object.keys(LEVELS);
 
+  // 난이도별로 나눠 담는다. 고른 난이도의 문제만 돌아가며 나온다.
+  const byLevel = {};
+  for (const name of LEVEL_NAMES) {
+    byLevel[name] = window.CHESS_PUZZLES.filter((p) => p.level === name);
+  }
+  // 등급이 비어 있으면 고를 수는 있는데 아무것도 안 나온다. 그럴 바에는
+  // 문제가 있는 난이도로 시작한다.
+  const firstFilled = LEVEL_NAMES.find((name) => byLevel[name].length > 0) || 'easy';
+
+  let level = firstFilled;
+  let puzzles = byLevel[level];
   let index = 0;
   let state = null;
   let selected = null;
@@ -124,7 +137,9 @@
     // 것인지 다음 문제가 푼 것인지 읽는 사람이 알 수 없다.
     el.count.textContent = `문제 ${index + 1} / ${puzzles.length}`;
     el.count.classList.toggle('solved', solved.has(puzzle.id));
-    el.rating.textContent = `난이도 ${puzzle.rating}`;
+    // 레이팅은 원래 자료에 있던 문제에만 붙어 있다. 만들어 낸 문제에 없는
+    // 숫자를 지어내는 대신, 있을 때만 보여 준다.
+    el.rating.textContent = puzzle.rating ? `레이팅 ${puzzle.rating}` : '';
     el.side.textContent = state.color === L.WHITE ? '내가 백' : '내가 흑';
     el.title.textContent = puzzle.title;
     el.themes.textContent = puzzle.themes.join(' · ');
@@ -136,6 +151,33 @@
   }
 
   // --- 문제 넘나들기 ---
+
+  function buildLevels() {
+    el.levels.replaceChildren();
+    for (const name of LEVEL_NAMES) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'pick';
+      button.textContent = LEVELS[name];
+      button.dataset.level = name;
+      button.disabled = byLevel[name].length === 0;
+      button.setAttribute('aria-pressed', String(name === level));
+      button.addEventListener('click', () => {
+        if (name === level) return;
+        Sound.unlock();
+        Sound.play('click');
+        setLevel(name);
+        loadPuzzle(0);
+      });
+      el.levels.appendChild(button);
+    }
+  }
+
+  function setLevel(name) {
+    level = name;
+    puzzles = byLevel[name];
+    buildLevels();
+  }
 
   function loadPuzzle(next) {
     clearTimeout(replyTimer);
@@ -154,16 +196,19 @@
   }
 
   function save() {
-    store.set({ index, solved: [...solved] });
+    store.set({ level, index, solved: [...solved] });
   }
 
   function restore() {
     const saved = store.get(null);
     if (!saved) return 0;
     if (Array.isArray(saved.solved)) {
-      const ids = new Set(puzzles.map((p) => p.id));
+      // 푼 기록은 난이도와 무관하게 문제 하나하나에 붙는다. 없어진 문제의
+      // 기록은 버린다 — 자료를 다시 만들면 아이디가 바뀐다.
+      const ids = new Set(window.CHESS_PUZZLES.map((p) => p.id));
       solved = new Set(saved.solved.filter((id) => ids.has(id)));
     }
+    if (LEVEL_NAMES.includes(saved.level) && byLevel[saved.level].length > 0) setLevel(saved.level);
     return Number.isInteger(saved.index) ? saved.index : 0;
   }
 
@@ -337,5 +382,6 @@
   bindSoundToggle(el.toggleBgm, 'bgm', (on) => Sound.setBgm(on));
   bindSoundToggle(el.toggleSfx, 'sfx', (on) => Sound.setSfx(on));
 
+  buildLevels();
   loadPuzzle(restore());
 })();

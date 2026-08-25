@@ -191,8 +191,27 @@ const uciOf = (position, from) => L.legalMoves(position, from).map(L.moveToUci).
 }
 
 // --- 담겨 있는 퍼즐 ---
-// 정답 수순이 규칙에 맞고 끝까지 이어지는지. 데이터를 손으로 넣는 이상 여기서
-// 걸리지 않으면 화면에서 풀 수 없는 문제가 조용히 섞인다.
+// 대부분이 만들어 낸 자료다. 여기서 걸리지 않으면 화면에서 풀 수 없는 문제가
+// 조용히 섞이므로, 담긴 것을 하나도 빼지 않고 전부 풀어 본다.
+const LEVELS = ['easy', 'medium', 'hard'];
+{
+  const counts = {};
+  const ids = new Set();
+  let duplicated = 0;
+  let badLevel = 0;
+  for (const puzzle of global.CHESS_PUZZLES) {
+    if (ids.has(puzzle.id)) duplicated++;
+    ids.add(puzzle.id);
+    if (!LEVELS.includes(puzzle.level)) badLevel++;
+    else counts[puzzle.level] = (counts[puzzle.level] || 0) + 1;
+  }
+  check('문제 아이디가 겹치지 않는다', duplicated, 0);
+  check('모든 문제에 난이도가 있다', badLevel, 0);
+  // 비어 있는 난이도가 있으면 골라도 아무것도 안 나온다.
+  for (const level of LEVELS) check(`${level}: 문제가 있다`, (counts[level] || 0) > 0, true);
+  console.log(`  담긴 문제 ${global.CHESS_PUZZLES.length}개 — ${LEVELS.map((l) => `${l} ${counts[l] || 0}`).join(', ')}`);
+}
+
 for (const puzzle of global.CHESS_PUZZLES) {
   const label = `${puzzle.id}(${puzzle.title})`;
   check(`${label}: 수순이 짝수가 아니다`, puzzle.moves.length % 2, 0);
@@ -212,7 +231,25 @@ for (const puzzle of global.CHESS_PUZZLES) {
   check(`${label}: 정답 수순이 규칙에 맞는다`, illegal, null);
   check(`${label}: 끝까지 풀린다`, state.status, 'solved');
   check(`${label}: 힌트가 있다`, typeof puzzle.hint === 'string' && puzzle.hint.length > 0, true);
-  check(`${label}: 난이도가 있다`, Number.isFinite(puzzle.rating), true);
+  check(`${label}: 제목과 주제가 있다`,
+    Boolean(puzzle.title) && Array.isArray(puzzle.themes) && puzzle.themes.length > 0, true);
+  // 레이팅은 원래 자료에 있던 문제에만 있다. 있다면 숫자여야 한다.
+  check(`${label}: 레이팅이 있다면 숫자다`,
+    puzzle.rating === undefined || Number.isFinite(puzzle.rating), true);
+
+  // 첫 수가 유일한 정답이어야 한다. 다른 수도 똑같이 좋으면, 그것을 둔
+  // 플레이어가 오답 판정을 받는다.
+  const first = L.startPuzzle(puzzle);
+  const answer = puzzle.moves[1];
+  const otherMates = L.legalMoves(first.position)
+    .map(L.moveToUci)
+    .filter((m) => m !== answer)
+    .filter((m) => L.positionStatus(L.applyMove(first.position, m)) === 'checkmate');
+  // 메이트가 여럿이면 규칙상 다 정답으로 받아 주므로 문제는 아니다. 다만
+  // 한 수 메이트 문제에서는 그 사실을 알고 있어야 한다.
+  check(`${label}: 다른 메이트가 있으면 그것도 정답으로 받는다`,
+    otherMates.length === 0 || L.attemptMove(first, otherMates[0].slice(0, 2), otherMates[0].slice(2, 4)).correct,
+    true);
 }
 
 console.log(`${passed}개 통과, ${failed}개 실패`);

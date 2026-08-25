@@ -63,7 +63,8 @@ GitHub Pages가 `main` 브랜치의 루트를 그대로 서빙한다. 여기서 
 
 ## 명령
 
-패키지 매니저도 빌드 도구도 없다. 설치 단계가 없다.
+**사이트에는 패키지 매니저도 빌드 도구도 없다.** 받아서 열면 그대로 돈다.
+예외는 아래 `bake.js` 둘뿐인데, 배포에 끼지 않는 오프라인 도구다.
 
 ```bash
 python3 -m http.server 8000   # 로컬 확인 (http://localhost:8000)
@@ -76,16 +77,28 @@ node games/doppelblock/solver.test.js # 더블블록 논리 기법·힌트 테�
 node games/doppelblock/generator.test.js # 더블블록 생성기·난이도 테스트
 
 node games/doppelblock/bake.js 8 45 12345 >> /tmp/eight.txt  # 큰 판 미리 굽기
+
+npm i stockfish --prefix /tmp/sf                          # 체스 퍼즐 굽기(1회)
+export STOCKFISH=/tmp/sf/node_modules/stockfish/index.js
+node games/chess-puzzle/bake.js mine 20 12345 /tmp/w1.json  # 코어마다 씨앗을 달리해
+node games/chess-puzzle/bake.js write /tmp/w*.json          # 합쳐서 puzzles.js로
 ```
 
 게임별 테스트는 그 게임 폴더 안에 두고, 새로 만들면 여기에 명령을 추가한다.
 린트·포매터는 아직 없다.
 
-`bake.js`는 배포에 끼지 않는 오프라인 도구다. 더블블록의 큰 판은 무작위로
-뽑아 매겨 보고 버리는 방식으로는 브라우저에서 기다릴 수 없을 만큼 드물어서,
-여기서 미리 구워 `games/doppelblock/puzzles.js`에 붙여 넣는다. 한 판에 수 초가
-걸리므로 씨앗을 달리해 코어 수만큼 동시에 돌리고 결과를 합친다 — **합칠 때
-중복 단서를 걸러낸다.** 프로세스 안에서만 중복을 보기 때문이다.
+`bake.js` 둘은 배포에 끼지 않는 오프라인 도구다. 게임 안에서 만들기에는 너무
+드물거나 무거운 자료를 미리 만들어 `puzzles.js`에 넣는다. 둘 다 씨앗을 달리해
+코어 수만큼 동시에 돌리고 결과를 합치는 식이라, **합칠 때 중복을 다시 걸러낸다** —
+프로세스 안에서만 중복을 보기 때문이다.
+
+더블블록은 무작위로 뽑아 매겨 보고 버리는데, 8×8은 논리로 풀리는 판이 0.04%뿐이라
+한 판에 18초가 든다. 체스는 엔진끼리 두게 하고 실수가 나온 자리를 캔다.
+
+**체스 쪽만 Stockfish가 필요하다.** 저장소에 `package.json`을 두지 않으려고
+`--prefix`로 밖에 설치하고 경로를 환경변수로 넘긴다 — 사이트는 여전히 설치
+단계가 없어야 하고, GPL 엔진을 저장소에 들이지도 않는다. 만들어진 퍼즐 자료는
+판에 대한 사실이라 그 라이선스가 따라붙지 않는다.
 
 ## 규칙
 
