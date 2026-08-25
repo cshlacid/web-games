@@ -70,6 +70,7 @@ GitHub Pages가 `main` 브랜치의 루트를 그대로 서빙한다. 여기서 
 python3 -m http.server 8000   # 로컬 확인 (http://localhost:8000)
 node games/2048/logic.test.js   # 2048 규칙 테스트
 node games/chess-puzzle/logic.test.js # 체스 퍼즐 수순 테스트
+node games/chess-puzzle/data.test.js  # 체스 퍼즐 덩이 적재 테스트
 node games/kkodle/logic.test.js # 꼬들 자모 처리·판정 테스트
 node games/sudoku/logic.test.js # 스도쿠 기법·생성기 테스트
 node games/doppelblock/logic.test.js  # 더블블록 규칙·완전 탐색 테스트
@@ -77,28 +78,39 @@ node games/doppelblock/solver.test.js # 더블블록 논리 기법·힌트 테�
 node games/doppelblock/generator.test.js # 더블블록 생성기·난이도 테스트
 
 node games/doppelblock/bake.js 8 45 12345 >> /tmp/eight.txt  # 큰 판 미리 굽기
-
-npm i stockfish --prefix /tmp/sf                          # 체스 퍼즐 굽기(1회)
-export STOCKFISH=/tmp/sf/node_modules/stockfish/index.js
-node games/chess-puzzle/bake.js mine 20 12345 /tmp/w1.json  # 코어마다 씨앗을 달리해
-node games/chess-puzzle/bake.js write /tmp/w*.json          # 합쳐서 puzzles.js로
+node games/chess-puzzle/bake.js pick                        # 체스 퍼즐 900개 굽기
 ```
 
 게임별 테스트는 그 게임 폴더 안에 두고, 새로 만들면 여기에 명령을 추가한다.
 린트·포매터는 아직 없다.
 
 `bake.js` 둘은 배포에 끼지 않는 오프라인 도구다. 게임 안에서 만들기에는 너무
-드물거나 무거운 자료를 미리 만들어 `puzzles.js`에 넣는다. 둘 다 씨앗을 달리해
-코어 수만큼 동시에 돌리고 결과를 합치는 식이라, **합칠 때 중복을 다시 걸러낸다** —
-프로세스 안에서만 중복을 보기 때문이다.
+드물거나 무거운 자료를 미리 만들어 둔다. **하는 일은 서로 다르다.**
 
-더블블록은 무작위로 뽑아 매겨 보고 버리는데, 8×8은 논리로 풀리는 판이 0.04%뿐이라
-한 판에 18초가 든다. 체스는 엔진끼리 두게 하고 실수가 나온 자리를 캔다.
+더블블록은 판을 **만든다**. 무작위로 뽑아 매겨 보고 버리는데, 8×8은 논리로
+풀리는 판이 0.04%뿐이라 한 판에 18초가 든다. 씨앗을 달리해 코어 수만큼 동시에
+돌리고 결과를 합치므로 **합칠 때 중복을 다시 걸러낸다** — 프로세스 안에서만
+중복을 보기 때문이다.
 
-**체스 쪽만 Stockfish가 필요하다.** 저장소에 `package.json`을 두지 않으려고
-`--prefix`로 밖에 설치하고 경로를 환경변수로 넘긴다 — 사이트는 여전히 설치
-단계가 없어야 하고, GPL 엔진을 저장소에 들이지도 않는다. 만들어진 퍼즐 자료는
-판에 대한 사실이라 그 라이선스가 따라붙지 않는다.
+체스는 판을 **고른다**. Lichess Puzzle Database(CC0)를 훑어 조건에 맞는 것을
+추린다. 전에는 여기서도 엔진끼리 두게 하고 실수가 난 자리를 캤는데, 그건
+lichess를 받아 올 수 없던 동안의 대체재였다. 자료가 생긴 지금은 쓸 이유가
+없어서 지웠고 — 사람이 실제로 둔 판이고, 사람 수천 명이 매긴 난이도(레이팅)와
+검증된 수순이 붙어 있다 — **Stockfish 의존도 그와 함께 사라졌다.** 저장소에
+`package.json`도 GPL 엔진도 없어야 한다는 제약이 이제 그냥 지켜진다.
+
+고를 때 거는 조건은 셋이다. 품질 지표(찬반·시행 횟수·레이팅 편차)로 한 번
+좁히고, 레이팅 구간으로 난이도를 가르고, **대표 주제별로 칸을 나눠 돌아가며
+뽑는다.** 마지막 것이 없으면 900개가 메이트와 포크로 채워진다 — 자료에서 그
+둘이 압도적으로 많다. 담기 전에 `logic.js`로 직접 풀어 보는 것은 lichess가
+검증한 수순이라도 우리 엔진이 못 따라가면 화면에서도 못 풀기 때문이다.
+
+**자료 파일(`lichess_db_puzzle.csv.zst`, 610만 줄 304MB)은 굽는 데만 쓴다.**
+<https://database.lichess.org/lichess_db_puzzle.csv.zst> 에서 받아 게임 폴더에
+둔다. pzstd로 묶여 있어 압축 프레임 앞마다 건너뛰기 프레임이 끼는데, node의
+zstd 스트림은 거기서 멈춘다 — `bake.js`가 프레임을 직접 끊어 푸는 이유다.
+**이 파일을 저장소에 둘지는 아직 정하지 않았다.** 지금은 커밋돼 있지만, Pages가
+루트를 그대로 서빙하므로 사이트에 304MB가 얹혀 있는 상태이기도 하다.
 
 ## 규칙
 
@@ -107,6 +119,16 @@ node games/chess-puzzle/bake.js write /tmp/w*.json          # 합쳐서 puzzles.
   위해서다. 로직이 DOM을 만지는 순간 이 테스트가 불가능해진다.
 - 로직 모듈 끝의 `module.exports` / `window.X` 이중 노출은 그 테스트를 위한
   통로다. 빌드 도구 없이 node와 브라우저 양쪽에서 쓰려면 이 방법이 필요하다.
+- **체스 퍼즐 자료만 한 번에 다 받지 않는다.** 900개 300KB를 통째로 받으면 첫
+  문제 하나를 보려고 899개를 기다리게 되므로, 목차(`puzzles/index.js`)만 미리
+  받고 나머지는 그 문제가 나올 때 덩이 단위로 받는다. **`fetch`가 아니라
+  `script` 태그를 꽂는다** — `file://`로 열어도 돌아가야 하는데 fetch는 거기서
+  CORS에 막힌다. 덩이 파일이 콜백 없이 자기 자신을 전역 표에 등록하는 것도
+  같은 이유로 골랐다. node에서 `require` 한 번이면 같은 자료가 모여 테스트가
+  브라우저 없이 돈다.
+- 그래서 **화면은 전체 문제 목록을 볼 수 없다.** 푼 기록에서 없어진 아이디를
+  걸러 내던 것을 목차의 `version` 비교로 바꾼 이유가 이것이다. 전체를 훑어야
+  하는 기능을 새로 넣으려면 먼저 이 구조를 다시 봐야 한다.
 - **소리는 음원 파일이 아니라 Web Audio로 합성하고, 그림은 인라인 SVG로 직접
   그린다.** 저장소에 바이너리 애셋을 들이지 않고, 빌드 없이 정적 파일만 배포하는
   구조를 유지하기 위해서다. 라이선스를 따질 일이 없어지는 것도 이 선택의 이유다.

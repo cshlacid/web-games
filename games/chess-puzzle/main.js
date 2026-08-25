@@ -4,6 +4,7 @@
 // 최상위에 같은 이름을 선언하면 다른 파일과 충돌하므로 IIFE로 가둔다.
 (function () {
   const L = window.ChessPuzzleLogic;
+  const Data = window.ChessPuzzleData;
   const Sound = window.ChessSound;
   const SAVE_KEY = 'web-games.chess-puzzle.progress';
 
@@ -44,19 +45,17 @@
   const LEVELS = { easy: '쉬움', medium: '보통', hard: '어려움' };
   const LEVEL_NAMES = Object.keys(LEVELS);
 
-  // 난이도별로 나눠 담는다. 고른 난이도의 문제만 돌아가며 나온다.
-  const byLevel = {};
-  for (const name of LEVEL_NAMES) {
-    byLevel[name] = window.CHESS_PUZZLES.filter((p) => p.level === name);
-  }
+  // 문제는 난이도별로 나뉘어 있고, 몇 개인지는 목차가 알려 준다. 실제 자료는
+  // 그 문제가 나올 때 data.js가 받아 온다.
+  const countOf = (name) => Data.levels[name].count;
   // 등급이 비어 있으면 고를 수는 있는데 아무것도 안 나온다. 그럴 바에는
   // 문제가 있는 난이도로 시작한다.
-  const firstFilled = LEVEL_NAMES.find((name) => byLevel[name].length > 0) || 'easy';
+  const firstFilled = LEVEL_NAMES.find((name) => countOf(name) > 0) || 'easy';
 
   let level = firstFilled;
-  let puzzles = byLevel[level];
   let index = 0;
-  let state = null;
+  let state = null;          // 아직 못 받았거나 받는 중이면 null이다
+  let loadToken = 0;         // 받는 사이에 다른 문제로 넘어갔는지 가리는 표
   let selected = null;
   let targets = new Map();   // 도착 칸 → 그 칸으로 가는 합법 수들
   let pending = null;        // 승격 선택을 기다리는 수
@@ -74,7 +73,9 @@
   function buildBoard() {
     el.board.replaceChildren();
     squares.clear();
-    const flipped = state.color === L.BLACK;
+    // 아직 문제가 없으면 백 시점으로 세운다. 빈 판이라도 자리를 잡아 두어야
+    // 자료가 도착했을 때 화면이 덜컥 밀리지 않는다.
+    const flipped = state ? state.color === L.BLACK : false;
 
     for (let row = 0; row < 8; row++) {
       for (let column = 0; column < 8; column++) {
@@ -104,10 +105,11 @@
   }
 
   function render() {
-    const board = state.position.board;
-    const last = state.lastMove;
+    const board = state ? state.position.board : {};
+    const last = state ? state.lastMove : null;
     // 체크를 받고 있는 쪽의 킹만 표시한다. 어느 쪽이든 지금 위험한 자리다.
-    const checked = L.inCheck(state.position) ? L.kingSquare(board, state.position.turn) : null;
+    const checked = state && L.inCheck(state.position)
+      ? L.kingSquare(board, state.position.turn) : null;
 
     for (const [name, button] of squares) {
       const piece = board[name];
@@ -132,14 +134,22 @@
   }
 
   function renderInfo() {
-    const puzzle = state.puzzle;
     // 푼 표시는 문제 번호 옆에 둔다. "다음 문제" 버튼에 달면 지금 문제가 푼
     // 것인지 다음 문제가 푼 것인지 읽는 사람이 알 수 없다.
-    el.count.textContent = `문제 ${index + 1} / ${puzzles.length}`;
+    el.count.textContent = `문제 ${index + 1} / ${countOf(level)}`;
+
+    if (!state) {
+      el.count.classList.remove('solved');
+      el.rating.textContent = '';
+      el.side.textContent = '';
+      el.title.textContent = '';
+      el.themes.textContent = '';
+      return;
+    }
+
+    const puzzle = state.puzzle;
     el.count.classList.toggle('solved', solved.has(puzzle.id));
-    // 레이팅은 원래 자료에 있던 문제에만 붙어 있다. 만들어 낸 문제에 없는
-    // 숫자를 지어내는 대신, 있을 때만 보여 준다.
-    el.rating.textContent = puzzle.rating ? `레이팅 ${puzzle.rating}` : '';
+    el.rating.textContent = `레이팅 ${puzzle.rating}`;
     el.side.textContent = state.color === L.WHITE ? '내가 백' : '내가 흑';
     el.title.textContent = puzzle.title;
     el.themes.textContent = puzzle.themes.join(' · ');
@@ -160,7 +170,7 @@
       button.className = 'pick';
       button.textContent = LEVELS[name];
       button.dataset.level = name;
-      button.disabled = byLevel[name].length === 0;
+      button.disabled = countOf(name) === 0;
       button.setAttribute('aria-pressed', String(name === level));
       button.addEventListener('click', () => {
         if (name === level) return;
@@ -175,14 +185,47 @@
 
   function setLevel(name) {
     level = name;
-    puzzles = byLevel[name];
     buildLevels();
   }
 
-  function loadPuzzle(next) {
+  /** 판을 비우고 문제 하나를 세울 준비를 한다. 자료를 기다리는 동안의 모습이기도 하다. */
+  function clearBoard() {
+    state = null;
+    selected = null;
+    targets = new Map();
+    pending = null;
+    el.promotion.hidden = true;
+    buildBoard();
+    render();
+  }
+
+  /**
+   * 문제 자료는 여기서 처음 필요해진다. 이미 받아 둔 덩이면 기다림 없이 그대로
+   * 이어지고, 아니면 받는 동안 판을 비워 둔다 — 앞 문제를 남겨 두면 다음 문제로
+   * 넘어간 줄 알고 이미 푼 자리에 수를 두게 된다.
+   */
+  async function loadPuzzle(next) {
     clearTimeout(replyTimer);
-    index = ((next % puzzles.length) + puzzles.length) % puzzles.length;
-    state = L.startPuzzle(puzzles[index]);
+    const total = countOf(level);
+    index = ((next % total) + total) % total;
+    const token = ++loadToken;
+
+    let puzzle = Data.get(level, index);
+    if (!puzzle) {
+      clearBoard();
+      renderInfo();
+      setMessage('문제를 불러오는 중…');
+      try {
+        puzzle = await Data.load(level, index);
+      } catch {
+        if (token !== loadToken) return;
+        setMessage('문제를 불러오지 못했습니다. 연결을 확인하고 다시 눌러 보세요.', 'wrong');
+        return;
+      }
+      if (token !== loadToken) return;   // 기다리는 사이 다른 문제로 넘어갔다
+    }
+
+    state = L.startPuzzle(puzzle);
     selected = null;
     targets = new Map();
     pending = null;
@@ -192,23 +235,27 @@
     render();
     setMessage(state.color === L.WHITE ? '백 차례입니다. 가장 강한 수를 찾아보세요.'
       : '흑 차례입니다. 가장 강한 수를 찾아보세요.');
+    // 다음 문제가 다른 덩이에 있으면 지금 받아 둔다. 그래야 "다음 문제"를
+    // 눌렀을 때 덩이 경계에서만 기다리는 일이 없다.
+    Data.prefetch(level, (index + 1) % total);
     save();
   }
 
   function save() {
-    store.set({ level, index, solved: [...solved] });
+    store.set({ version: Data.version, level, index, solved: [...solved] });
   }
 
   function restore() {
     const saved = store.get(null);
     if (!saved) return 0;
-    if (Array.isArray(saved.solved)) {
-      // 푼 기록은 난이도와 무관하게 문제 하나하나에 붙는다. 없어진 문제의
-      // 기록은 버린다 — 자료를 다시 만들면 아이디가 바뀐다.
-      const ids = new Set(window.CHESS_PUZZLES.map((p) => p.id));
-      solved = new Set(saved.solved.filter((id) => ids.has(id)));
+    // 푼 기록은 문제 하나하나에 붙는데, 자료를 다시 구우면 아이디가 통째로
+    // 바뀐다. 전에는 없어진 아이디를 걸러 냈지만 이제는 그럴 수 없다 — 덩이를
+    // 다 받아 보기 전에는 어떤 아이디가 있는지 모른다. 대신 목차의 version이
+    // 다르면 기록 전체를 버린다.
+    if (saved.version === Data.version && Array.isArray(saved.solved)) {
+      solved = new Set(saved.solved);
     }
-    if (LEVEL_NAMES.includes(saved.level) && byLevel[saved.level].length > 0) setLevel(saved.level);
+    if (LEVEL_NAMES.includes(saved.level) && countOf(saved.level) > 0) setLevel(saved.level);
     return Number.isInteger(saved.index) ? saved.index : 0;
   }
 
@@ -240,7 +287,7 @@
   function onSquare(square) {
     Sound.unlock();
     if (pending) return;              // 승격을 고르는 중에는 판을 잠근다
-    if (state.status !== 'playing') return;
+    if (!state || state.status !== 'playing') return;
 
     if (selected && targets.has(square)) {
       const moves = targets.get(square);
@@ -339,7 +386,7 @@
 
   el.hint.addEventListener('click', () => {
     Sound.unlock();
-    if (state.status !== 'playing') return;
+    if (!state || state.status !== 'playing') return;
     const move = L.expectedMove(state);
     if (!move) return;
     // 도착 칸까지 알려 주면 문제가 사라진다. 어떤 말을 볼지까지만 짚는다.

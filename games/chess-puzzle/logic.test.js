@@ -1,9 +1,20 @@
 'use strict';
 
 // 실행: node games/chess-puzzle/logic.test.js
+const fs = require('fs');
+const path = require('path');
 const L = require('./logic.js');
+
 global.window = global;
-require('./puzzles.js');
+
+// 화면은 덩이를 script 태그로 하나씩 받아 가지만, 여기서는 전부 풀어 봐야
+// 하므로 다 읽는다. 덩이 파일이 콜백 없이 자기 자신을 표에 등록하는 구조라
+// require만으로도 브라우저와 같은 자료가 모인다.
+const PUZZLE_DIR = path.join(__dirname, 'puzzles');
+require(path.join(PUZZLE_DIR, 'index.js'));
+for (const file of fs.readdirSync(PUZZLE_DIR).sort()) {
+  if (file !== 'index.js' && file.endsWith('.js')) require(path.join(PUZZLE_DIR, file));
+}
 
 let passed = 0;
 let failed = 0;
@@ -191,28 +202,50 @@ const uciOf = (position, from) => L.legalMoves(position, from).map(L.moveToUci).
 }
 
 // --- 담겨 있는 퍼즐 ---
-// 대부분이 만들어 낸 자료다. 여기서 걸리지 않으면 화면에서 풀 수 없는 문제가
-// 조용히 섞이므로, 담긴 것을 하나도 빼지 않고 전부 풀어 본다.
-const LEVELS = ['easy', 'medium', 'hard'];
+// Lichess Puzzle Database에서 고른 자료다. 저쪽에서 이미 검증된 수순이지만
+// 우리 엔진이 못 따라가면 화면에서도 못 푸므로, 담긴 것을 하나도 빼지 않고
+// 전부 풀어 본다.
+const INDEX = global.CHESS_PUZZLE_INDEX;
+const CHUNKS = global.CHESS_PUZZLE_CHUNKS || {};
+const LEVELS = Object.keys(INDEX.levels);
+
+// 목차가 말하는 자리마다 실제 문제가 있는지 본다. 화면은 목차를 믿고 번호를
+// 세므로, 여기가 어긋나면 문제 번호를 넘기다 빈 자리를 만난다.
+const ALL = [];
 {
-  const counts = {};
   const ids = new Set();
   let duplicated = 0;
-  let badLevel = 0;
-  for (const puzzle of global.CHESS_PUZZLES) {
-    if (ids.has(puzzle.id)) duplicated++;
-    ids.add(puzzle.id);
-    if (!LEVELS.includes(puzzle.level)) badLevel++;
-    else counts[puzzle.level] = (counts[puzzle.level] || 0) + 1;
+  let missing = 0;
+  const counts = {};
+
+  for (const level of LEVELS) {
+    const count = INDEX.levels[level].count;
+    counts[level] = 0;
+    for (let n = 0; n * INDEX.chunkSize < count; n++) {
+      const name = `${level}-${String(n).padStart(2, '0')}`;
+      const chunk = CHUNKS[name];
+      if (!chunk) { missing++; continue; }
+      const expected = Math.min(INDEX.chunkSize, count - n * INDEX.chunkSize);
+      if (chunk.length !== expected) missing++;
+      for (const puzzle of chunk) {
+        if (ids.has(puzzle.id)) duplicated++;
+        ids.add(puzzle.id);
+        counts[level]++;
+        ALL.push({ level, puzzle });
+      }
+    }
+    check(`${level}: 목차의 개수만큼 담겨 있다`, counts[level], count);
+    // 비어 있는 난이도가 있으면 골라도 아무것도 안 나온다.
+    check(`${level}: 문제가 있다`, count > 0, true);
   }
+
   check('문제 아이디가 겹치지 않는다', duplicated, 0);
-  check('모든 문제에 난이도가 있다', badLevel, 0);
-  // 비어 있는 난이도가 있으면 골라도 아무것도 안 나온다.
-  for (const level of LEVELS) check(`${level}: 문제가 있다`, (counts[level] || 0) > 0, true);
-  console.log(`  담긴 문제 ${global.CHESS_PUZZLES.length}개 — ${LEVELS.map((l) => `${l} ${counts[l] || 0}`).join(', ')}`);
+  check('빠지거나 크기가 어긋난 덩이가 없다', missing, 0);
+  check('목차에 버전이 있다', typeof INDEX.version === 'string' && INDEX.version.length > 0, true);
+  console.log(`  담긴 문제 ${ALL.length}개 — ${LEVELS.map((l) => `${l} ${counts[l]}`).join(', ')}`);
 }
 
-for (const puzzle of global.CHESS_PUZZLES) {
+for (const { level, puzzle } of ALL) {
   const label = `${puzzle.id}(${puzzle.title})`;
   check(`${label}: 수순이 짝수가 아니다`, puzzle.moves.length % 2, 0);
 
@@ -233,9 +266,10 @@ for (const puzzle of global.CHESS_PUZZLES) {
   check(`${label}: 힌트가 있다`, typeof puzzle.hint === 'string' && puzzle.hint.length > 0, true);
   check(`${label}: 제목과 주제가 있다`,
     Boolean(puzzle.title) && Array.isArray(puzzle.themes) && puzzle.themes.length > 0, true);
-  // 레이팅은 원래 자료에 있던 문제에만 있다. 있다면 숫자여야 한다.
-  check(`${label}: 레이팅이 있다면 숫자다`,
-    puzzle.rating === undefined || Number.isFinite(puzzle.rating), true);
+  // 난이도를 레이팅으로 가르므로, 담긴 덩이와 레이팅이 어긋나면 잘못 담긴 것이다.
+  const [minRating, maxRating] = INDEX.levels[level].rating;
+  check(`${label}: 레이팅 ${puzzle.rating}이 ${level} 구간 안에 있다`,
+    puzzle.rating >= minRating && puzzle.rating <= maxRating, true);
 
   // 첫 수가 유일한 정답이어야 한다. 다른 수도 똑같이 좋으면, 그것을 둔
   // 플레이어가 오답 판정을 받는다.

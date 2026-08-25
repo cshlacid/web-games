@@ -1,300 +1,212 @@
 'use strict';
 
-// 퍼즐을 캐서 puzzles.js를 굽는 오프라인 도구. 배포되는 사이트에는 끼지 않는다.
+// Lichess Puzzle Database(CC0)에서 문제를 골라 puzzles/ 아래에 굽는 오프라인
+// 도구. 배포되는 사이트에는 끼지 않는다.
 //
-// 왜 만들었나: lichess 퍼즐 데이터베이스(CC0)를 받아 올 수 있으면 그걸 쓰는
-// 것이 낫다. 하지만 이 환경에서는 lichess가 막혀 있어 네 문제를 손으로 옮긴
-// 것이 전부였다. 그래서 직접 만든다.
+// 전에는 여기서 엔진끼리 두게 하고 실수가 난 자리를 캤다. 그건 lichess를 받아
+// 올 수 없던 동안의 대체재였고, 자료가 생긴 지금은 쓸 이유가 없다 — 사람이 실제로
+// 둔 판이고, 사람이 매긴 난이도(레이팅)와 검증된 수순이 붙어 있다. Stockfish
+// 의존도 그와 함께 사라졌다.
 //
-// 어떻게 만드나: 엔진끼리 두게 하고, 실수가 나온 자리를 골라낸다. lichess가
-// 사람의 대국에서 하는 일과 같고, 다른 점은 실수를 사람이 아니라 낮은 깊이로
-// 두는 엔진이 낸다는 것뿐이다. 조건은 둘이다 — 실수 직전에는 팽팽했을 것,
-// 실수 뒤에는 한 수만이 결정적일 것. 둘 다여야 "찾아낼 것이 있는" 문제가 된다.
+// 자료 파일은 저장소에 없다. 받아서 이 폴더에 두고 돌린다:
+//   https://database.lichess.org/lichess_db_puzzle.csv.zst
+//   node games/chess-puzzle/bake.js pick
 //
-// 엔진을 둘 쓴다. Stockfish는 자리를 만들고 값을 매기고, 저장소의 logic.js는
-// 그 결과를 규칙으로 다시 검증한다 — 메이트는 완전 탐색으로 증명하고, 정답이
-// 유일한지도 여기서 본다. 엔진 말만 믿으면 화면에서 못 푸는 판이 섞인다.
-//
-// 실행 (Stockfish는 저장소 밖에 설치한다 — 저장소에는 패키지 매니저를 두지 않는다):
-//   npm i stockfish --prefix /tmp/sf
-//   export STOCKFISH=/tmp/sf/node_modules/stockfish/index.js
-//   node games/chess-puzzle/bake.js mine 20 12345 /tmp/w1.json   # 코어 수만큼 씨앗을 달리해 동시에
-//   node games/chess-puzzle/bake.js write /tmp/w*.json           # 합쳐서 puzzles.js로
+// 610만 개를 전부 훑는데 1분이 채 안 걸리므로 표본을 뜨지 않고 다 본다.
 
 const fs = require('fs');
 const path = require('path');
+const zlib = require('zlib');
 const L = require('./logic.js');
 
-const ENGINE = process.env.STOCKFISH;
-const OUT = path.join(__dirname, 'puzzles.js');
+const SOURCE = path.join(__dirname, 'lichess_db_puzzle.csv.zst');
+const OUT_DIR = path.join(__dirname, 'puzzles');
 
-// --- Stockfish 창구 ---
+// 난이도당 개수와 한 덩이의 크기. 화면은 덩이 단위로 받아 가므로, 이 값이
+// 첫 화면에서 내려받는 양을 정한다.
+const PER_LEVEL = 300;
+const CHUNK_SIZE = 50;
 
-function openEngine() {
-  if (!ENGINE) throw new Error('STOCKFISH 환경변수에 엔진 경로를 주세요 (위 주석 참고)');
-  const initEngine = require(ENGINE);
-  return new Promise((resolve, reject) => {
-    const engine = initEngine('lite-single', (err) => { if (err) reject(err); });
-    const waiters = [];
-    let buffer = [];
-    engine.listener = (line) => {
-      buffer.push(line);
-      for (let i = waiters.length - 1; i >= 0; i--) {
-        if (waiters[i].re.test(line)) { waiters[i].resolve(line); waiters.splice(i, 1); }
-      }
-    };
-    const send = (cmd) => engine.sendCommand(cmd);
-    const until = (re, ms = 120000) => new Promise((res, rej) => {
-      const waiter = { re, resolve: res };
-      waiters.push(waiter);
-      setTimeout(() => {
-        const i = waiters.indexOf(waiter);
-        if (i >= 0) { waiters.splice(i, 1); rej(new Error('시간 초과: ' + re)); }
-      }, ms);
-    });
-
-    const api = {
-      async setup() {
-        send('uci');
-        await until(/^uciok/);
-        send('setoption name Threads value 1');
-        send('setoption name Hash value 128');
-        send('ucinewgame');
-        send('isready');
-        await until(/^readyok/);
-      },
-      /** 한 자리를 분석해 상위 수와 점수를 돌려준다. */
-      async analyse(fen, depth, multipv = 2) {
-        send(`setoption name MultiPV value ${multipv}`);
-        send('isready');
-        await until(/^readyok/);
-        buffer = [];
-        send(`position fen ${fen}`);
-        send(`go depth ${depth}`);
-        const done = await until(/^bestmove/);
-
-        // 마지막으로 끝낸 깊이의 info만 본다. 앞선 깊이의 것이 섞이면 순위가 뒤집힌다.
-        const byRank = new Map();
-        for (const info of buffer) {
-          if (!/^info .*\bmultipv \d+/.test(info) || !/\bpv\b/.test(info)) continue;
-          const depthAt = Number((info.match(/\bdepth (\d+)/) || [])[1]);
-          const rank = Number((info.match(/\bmultipv (\d+)/) || [])[1]);
-          const cp = info.match(/\bscore cp (-?\d+)/);
-          const mate = info.match(/\bscore mate (-?\d+)/);
-          const pv = (info.match(/\bpv (.+)$/) || [])[1];
-          if (!rank || !pv) continue;
-          const prev = byRank.get(rank);
-          if (prev && prev.depth > depthAt) continue;
-          byRank.set(rank, {
-            depth: depthAt,
-            cp: cp ? Number(cp[1]) : null,
-            mate: mate ? Number(mate[1]) : null,
-            pv: pv.split(' '),
-          });
-        }
-        return {
-          best: done.split(' ')[1],
-          lines: [...byRank.entries()].sort((a, b) => a[0] - b[0]).map(([, v]) => v),
-        };
-      },
-      quit() { try { send('quit'); } catch { /* 무시 */ } },
-    };
-
-    // sendCommand가 생겨야 말이 통한다.
-    const boot = setInterval(() => {
-      if (typeof engine.sendCommand === 'function') { clearInterval(boot); resolve(api); }
-    }, 30);
-    setTimeout(() => { clearInterval(boot); reject(new Error('엔진이 뜨지 않음')); }, 60000);
-  });
-}
-
-// 메이트를 하나의 점수로 눕힌다. 수가 짧을수록 높다 — 같은 수로 메이트하는 수가
-// 둘이면 차이가 0이 되어, 아래의 "한 수만 이긴다" 검사가 그대로 걸러 준다.
-const cpOf = (line) => (line.mate !== null
-  ? (line.mate > 0 ? 100000 - line.mate * 100 : -100000 - line.mate * 100)
-  : line.cp);
-
-const mulberry32 = (seed) => {
-  let a = seed >>> 0;
-  return () => {
-    a |= 0; a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-};
-
-// --- 우리 엔진으로 메이트를 증명한다 ---
-
-/** 지금 두는 쪽이 n수 안에 강제로 메이트할 수 있는가. 완전 탐색이라 증명이 된다. */
-function canForceMate(position, n) {
-  if (n <= 0) return false;
-  for (const move of L.legalMoves(position)) {
-    const next = L.applyMove(position, L.moveToUci(move));
-    if (L.positionStatus(next) === 'checkmate') return true;
-    if (n === 1) continue;
-    const replies = L.legalMoves(next);
-    if (replies.length === 0) continue; // 스테일메이트는 메이트가 아니다
-    if (replies.every((r) => canForceMate(L.applyMove(next, L.moveToUci(r)), n - 1))) return true;
-  }
-  return false;
-}
-
-/** n수 메이트를 만드는 첫 수들. 하나뿐이어야 정답이 갈린다. */
-function mateMoves(position, n) {
-  const found = [];
-  for (const move of L.legalMoves(position)) {
-    const uci = L.moveToUci(move);
-    const next = L.applyMove(position, uci);
-    if (L.positionStatus(next) === 'checkmate') { found.push(uci); continue; }
-    if (n === 1) continue;
-    const replies = L.legalMoves(next);
-    if (replies.length === 0) continue;
-    if (replies.every((r) => canForceMate(L.applyMove(next, L.moveToUci(r)), n - 1))) found.push(uci);
-  }
-  return found;
-}
-
-// --- 캐기 ---
-
-/** 엔진끼리 한 판. 최선수만 두면 실수가 없고, 실수가 없으면 퍼즐도 없다. */
-async function playGame(sf, { plyLimit, playDepth, openingPlies, blunderRate, blunderSpread, rng }) {
-  let position = L.parseFen('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');
-  const trail = [];
-
-  for (let ply = 0; ply < plyLimit; ply++) {
-    const status = L.positionStatus(position);
-    if (status === 'checkmate' || status === 'stalemate') break;
-    const fen = L.toFen(position);
-
-    // 흔들 때는 넓게 본다. 차선수 정도로는 판이 안 기울어서, 결정적인 자리가
-    // 나와도 그것을 벌줄 수 있는 수가 여럿이 된다 — 그러면 정답이 유일하지 않다.
-    const wobble = ply < openingPlies || rng() < blunderRate;
-    const { lines } = await sf.analyse(fen, playDepth, wobble ? blunderSpread : 1);
-    if (!lines.length) break;
-    const uci = (wobble ? lines[Math.floor(rng() * lines.length)] : lines[0]).pv[0];
-    if (!uci || !L.isLegal(position, uci)) break;
-
-    trail.push({ fen, uci });
-    position = L.applyMove(position, uci);
-  }
-  return trail;
-}
-
-/** 한 판을 훑어 퍼즐이 될 자리를 찾는다. */
-async function minePuzzles(sf, trail, { depth, minEdge, maxBefore, minWin }) {
-  const cache = new Map();
-  const evalAt = async (fen, multipv) => {
-    const key = `${fen}|${multipv}`;
-    if (!cache.has(key)) cache.set(key, await sf.analyse(fen, depth, multipv));
-    return cache.get(key);
-  };
-
-  const out = [];
-  for (let i = 0; i < trail.length - 1; i++) {
-    const before = trail[i];     // 실수를 두기 직전
-    const after = trail[i + 1];  // 실수를 둔 뒤, 푸는 쪽 차례
-
-    const beforeEval = await evalAt(before.fen, 1);
-    if (!beforeEval.lines.length) continue;
-    // 이미 한쪽이 크게 유리했다면 "실수를 벌준다"는 이야기가 성립하지 않는다.
-    if (Math.abs(cpOf(beforeEval.lines[0])) > maxBefore) continue;
-
-    const position = L.parseFen(after.fen);
-    if (L.legalMoves(position).length < 2) continue; // 외길수는 문제가 아니다
-
-    const solved = await evalAt(after.fen, 3);
-    if (solved.lines.length < 2) continue;
-    const bestCp = cpOf(solved.lines[0]);
-    const secondCp = cpOf(solved.lines[1]);
-    const isMate = solved.lines[0].mate !== null && solved.lines[0].mate > 0;
-    if (!isMate && bestCp < minWin) continue;
-    if (bestCp - secondCp < minEdge) continue;
-
-    const answer = solved.lines[0].pv[0];
-    if (!answer || !L.isLegal(position, answer)) continue;
-
-    let solution;
-    let mateIn = null;
-    if (isMate && solved.lines[0].mate === 2) {
-      // 두 수 메이트만 수순을 끝까지 담는다. 우리 엔진이 증명할 수 있는 깊이다.
-      const winners = mateMoves(position, 2);
-      if (winners.length !== 1 || winners[0] !== answer) continue;
-      const reply = solved.lines[0].pv[1];
-      const afterAnswer = L.applyMove(position, answer);
-      if (!reply || !L.isLegal(afterAnswer, reply)) continue;
-      const afterReply = L.applyMove(afterAnswer, reply);
-      const finish = L.legalMoves(afterReply).map(L.moveToUci)
-        .find((m) => L.positionStatus(L.applyMove(afterReply, m)) === 'checkmate');
-      if (!finish) continue;
-      mateIn = 2;
-      solution = [answer, reply, finish];
-    } else {
-      // 나머지는 한 수짜리로 둔다. 수순을 길게 가져가면 상대의 응수가 유일하지
-      // 않은 구간이 생겨, 플레이어가 다른 좋은 수를 두고도 오답 판정을 받는다.
-      solution = [answer];
-      if (isMate) mateIn = solved.lines[0].mate;
-    }
-
-    out.push({
-      fen: before.fen,
-      moves: [before.uci, ...solution],
-      mateIn,
-      edge: bestCp - secondCp,
-    });
-  }
-  return out;
-}
-
-/** 담기 전에 저장소 규칙으로 한 번 더 푼다. 여기서 걸리면 화면에서도 못 푼다. */
-function playable(puzzle) {
-  let state = L.startPuzzle(puzzle);
-  for (let i = 1; i < puzzle.moves.length; i++) {
-    if (state.status === 'replying') state = L.playReply(state);
-    if (state.status !== 'playing') return false;
-    const move = puzzle.moves[i];
-    const result = L.attemptMove(state, move.slice(0, 2), move.slice(2, 4), move[4]);
-    if (!result.correct) return false;
-    state = result.state;
-  }
-  return state.status === 'solved';
-}
-
-async function mine(minutes, seed, out) {
-  const sf = await openEngine();
-  await sf.setup();
-  const rng = mulberry32(seed);
-  const found = [];
-  const seen = new Set();
-  const deadline = Date.now() + minutes * 60000;
-  let games = 0;
-
-  while (Date.now() < deadline) {
-    const trail = await playGame(sf, {
-      plyLimit: 70, playDepth: 4, openingPlies: 10, blunderRate: 0.3, blunderSpread: 8, rng,
-    });
-    games++;
-    for (const puzzle of await minePuzzles(sf, trail, { depth: 12, minEdge: 250, maxBefore: 200, minWin: 200 })) {
-      const key = `${puzzle.fen}|${puzzle.moves.join(' ')}`;
-      if (seen.has(key) || !playable(puzzle)) continue;
-      seen.add(key);
-      found.push(puzzle);
-      fs.writeFileSync(out, JSON.stringify(found));
-    }
-    if (games % 10 === 0) console.error(`씨앗 ${seed}: ${games}판, ${found.length}개`);
-  }
-  console.error(`씨앗 ${seed}: 완료 ${games}판, ${found.length}개`);
-  sf.quit();
-}
-
-// --- 난이도 매기기 ---
-
-const VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 100 };
-const DEPTHS = [4, 6, 8, 10];
+// --- 자료 읽기 ---
 
 /**
- * 정답 수가 판에서 무엇을 하는지. 제목과 주제는 여기서 읽은 사실로만 만든다 —
- * 그럴듯한 이름을 지어내면 판과 어긋난 설명이 붙는다.
+ * pzstd로 묶인 파일이라 건너뛰기 프레임(0x184D2A50)이 압축 프레임 앞마다 끼어
+ * 있고, node의 zstd 스트림은 그걸 만나면 멈춘다. 그래서 프레임을 직접 끊어
+ * 하나씩 푼다. 프레임 경계가 줄 한가운데일 수 있어 남는 조각을 이어 붙인다.
+ */
+function* rows(file) {
+  const fd = fs.openSync(file, 'r');
+  try {
+    const size = fs.statSync(file).size;
+    const header = Buffer.alloc(12);
+    let offset = 0;
+    let rest = '';
+    let first = true;
+
+    while (offset < size) {
+      fs.readSync(fd, header, 0, 12, offset);
+      if (header.readUInt32LE(0) !== 0x184d2a50) {
+        throw new Error(`${offset}바이트에서 예상치 못한 프레임을 만났다`);
+      }
+      const length = header.readUInt32LE(8);
+      const frame = Buffer.alloc(length);
+      fs.readSync(fd, frame, 0, length, offset + 12);
+      offset += 12 + length;
+
+      const lines = (rest + zlib.zstdDecompressSync(frame).toString('utf8')).split('\n');
+      rest = lines.pop();
+      for (const line of lines) {
+        if (first) { first = false; continue; }  // 머리글
+        if (line) yield line;
+      }
+    }
+    if (rest) yield rest;
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+/** PuzzleId,FEN,Moves,Rating,RatingDeviation,Popularity,NbPlays,Themes,GameUrl,OpeningTags,DailyDate */
+function parseRow(line) {
+  const c = line.split(',');
+  if (c.length < 8) return null;
+  return {
+    id: c[0],
+    fen: c[1],
+    moves: c[2].split(' '),
+    rating: Number(c[3]),
+    deviation: Number(c[4]),
+    popularity: Number(c[5]),
+    plays: Number(c[6]),
+    themes: c[7] ? c[7].split(' ') : [],
+  };
+}
+
+// --- 고르는 기준 ---
+
+/**
+ * 난이도는 lichess 레이팅으로 가른다. 사람 수천 명이 풀어서 매겨진 값이라
+ * 판에서 읽어낸 어떤 지표보다 "사람이 느끼는 어려움"에 가깝다.
+ *
+ * 구간 사이를 띄운 이유: 경계에 붙은 문제는 옆 등급과 사실상 구분되지 않는데,
+ * 그걸 담으면 "쉬움"의 끝과 "보통"의 시작이 같은 난이도가 된다.
+ *
+ * 수순 길이도 함께 막는다. 레이팅이 낮아도 열 수짜리 수순은 화면에서 지친다.
+ */
+const LEVELS = [
+  { name: 'easy', min: 600, max: 1199, maxMoves: 4 },
+  { name: 'medium', min: 1400, max: 1899, maxMoves: 6 },
+  { name: 'hard', min: 2000, max: 2600, maxMoves: 8 },
+];
+
+/**
+ * 자료의 품질 지표. 셋 다 넘긴 것이 130만 개라 이 정도로 좁혀도 고를 것은 남는다.
+ * - popularity: 푼 사람들이 문제에 준 찬반. 낮은 것은 억지스러운 문제다.
+ * - plays: 적게 풀린 문제는 레이팅이 아직 자리를 못 잡았다.
+ * - deviation: 레이팅이 얼마나 흔들리는지. 난이도로 가를 것이라 직접 걸린다.
+ */
+const passesQuality = (row) => row.popularity >= 90 && row.plays >= 1000 && row.deviation <= 80;
+
+/**
+ * 주제 하나를 골라 그 문제의 대표로 삼는다. 좁은 것부터 본다 — smotheredMate는
+ * 언제나 mate이기도 하므로, 순서를 뒤집으면 모든 메이트가 한 칸에 쌓인다.
+ *
+ * 이 대표 주제로 칸을 나눠 돌아가며 뽑는다. 그냥 인기순으로만 뽑으면 300개가
+ * 메이트와 포크로 채워진다 — 자료에서 그 둘이 압도적으로 많기 때문이다.
+ */
+const PRIMARY = [
+  'smotheredMate', 'backRankMate', 'doubleCheck', 'discoveredCheck', 'discoveredAttack',
+  'skewer', 'pin', 'fork', 'deflection', 'attraction', 'clearance', 'interference',
+  'intermezzo', 'capturingDefender', 'xRayAttack', 'trappedPiece', 'zugzwang',
+  'enPassant', 'underPromotion', 'promotion', 'advancedPawn', 'sacrifice',
+  'mateIn1', 'mateIn2', 'mateIn3', 'quietMove', 'defensiveMove', 'hangingPiece',
+  'attackingF2F7', 'exposedKing', 'kingsideAttack', 'queensideAttack',
+  'pawnEndgame', 'rookEndgame', 'mate',
+];
+
+function primaryOf(row) {
+  const set = new Set(row.themes);
+  return PRIMARY.find((theme) => set.has(theme)) || '기타';
+}
+
+// --- 주제와 설명 ---
+
+// 화면에 그대로 나가는 이름이라, 판을 보고 확인할 수 있는 것만 옮긴다. 여기
+// 없는 주제는 버린다 — 뜻이 애매한 이름을 지어 붙이면 판과 어긋난 설명이 된다.
+const THEME_KO = {
+  smotheredMate: '질식 메이트',
+  backRankMate: '백 랭크 메이트',
+  doubleCheck: '더블 체크',
+  discoveredCheck: '발견 체크',
+  discoveredAttack: '발견 공격',
+  skewer: '스큐어',
+  pin: '핀',
+  fork: '포크',
+  deflection: '수비 이탈',
+  attraction: '유인',
+  clearance: '길 비우기',
+  interference: '차단',
+  intermezzo: '중간 수',
+  capturingDefender: '수비 말 잡기',
+  xRayAttack: '엑스레이 공격',
+  trappedPiece: '갇힌 말',
+  zugzwang: '추크츠방',
+  enPassant: '앙파상',
+  castling: '캐슬링',
+  underPromotion: '낮은 승격',
+  promotion: '승격',
+  advancedPawn: '전진한 폰',
+  sacrifice: '희생',
+  mateIn1: '한 수 메이트',
+  mateIn2: '두 수 메이트',
+  mateIn3: '세 수 메이트',
+  mateIn4: '긴 메이트',
+  mateIn5: '긴 메이트',
+  mate: '메이트',
+  quietMove: '조용한 수',
+  defensiveMove: '수비수',
+  hangingPiece: '지켜지지 않은 말',
+  attackingF2F7: '약한 칸 공격',
+  exposedKing: '드러난 킹',
+  kingsideAttack: '킹사이드 공격',
+  queensideAttack: '퀸사이드 공격',
+  pawnEndgame: '폰 종반',
+  rookEndgame: '룩 종반',
+  bishopEndgame: '비숍 종반',
+  knightEndgame: '나이트 종반',
+  queenEndgame: '퀸 종반',
+  opening: '오프닝',
+  middlegame: '중반',
+  endgame: '종반',
+};
+
+// 좁은 것을 앞에 둔다. 세 개까지만 보여 주므로 순서가 곧 무엇이 잘리는지다.
+// 판 단계(오프닝·중반·종반)는 전술이 아니라 배경이라 맨 뒤에 둔다.
+const THEME_ORDER = [...PRIMARY, 'mateIn4', 'mateIn5', 'castling',
+  'bishopEndgame', 'knightEndgame', 'queenEndgame', 'opening', 'middlegame', 'endgame'];
+
+function themesOf(row) {
+  const set = new Set(row.themes);
+  const out = [];
+  for (const theme of THEME_ORDER) {
+    if (!set.has(theme) || !THEME_KO[theme]) continue;
+    const name = THEME_KO[theme];
+    if (!out.includes(name)) out.push(name);   // mateIn4와 mateIn5가 같은 이름을 쓴다
+    if (out.length === 3) break;
+  }
+  return out.length ? out : ['전술'];
+}
+
+const VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 100 };
+
+// 말 이름과 조사. 받침이 없는 이름은 나이트뿐이다.
+const PIECE = { p: '폰', n: '나이트', b: '비숍', r: '룩', q: '퀸', k: '킹' };
+const subject = (kind) => PIECE[kind] + (kind === 'n' ? '가' : '이');
+const object = (kind) => PIECE[kind] + (kind === 'n' ? '를' : '을');
+
+/**
+ * 정답 수가 판에서 무엇을 하는지 읽는다. 제목과 힌트는 여기서 읽은 사실과
+ * lichess가 붙인 주제로만 만든다 — 그럴듯한 이름을 지어내면 판과 어긋난다.
  */
 function readMove(puzzle) {
   const position = L.startPuzzle(puzzle).position;
@@ -305,9 +217,8 @@ function readMove(puzzle) {
   const next = L.applyMove(position, uci);
   const status = L.positionStatus(next);
 
-  // 옮긴 자리에서 이 말이 노리는 적의 큰 말들. 둘 이상이면 포크다.
   const targets = L.pseudoMoves(next, to)
-    .map((m) => next.board[m.to])
+    .map((move) => next.board[move.to])
     .filter((p) => p && L.colorOf(p) !== L.colorOf(piece) && VALUE[p.toLowerCase()] >= 3);
 
   return {
@@ -318,71 +229,43 @@ function readMove(puzzle) {
     mate: status === 'checkmate',
     promotion: Boolean(uci[4]),
     fork: targets.length >= 2,
-    solverMoves: Math.ceil((puzzle.moves.length - 1) / 2),
     // 잡은 것보다 비싼 말을 잡히는 자리에 놓는 수는 눈으로는 손해로 보인다.
     sacrifice: L.attacksSquare(next.board, to, next.turn)
       && VALUE[piece.toLowerCase()] > (captured ? VALUE[captured.toLowerCase()] : 0),
   };
 }
 
-/**
- * 난이도 점수. 하나로만 가르면 어느 쪽이든 어긋난다 — 수순이 짧아도 조용한
- * 수는 안 보이고, 수순이 길어도 외길이면 쉽다. 그래서 여러 가지를 섞는다.
- *
- * 무게가 가장 큰 항은 "몇 수 앞을 봐야 보이는가"다. 깊이 4에서 이미 최선수로
- * 꼽히는 수는 눈에 띄고, 깊이 10까지 가야 나오는 수는 잘 안 보인다. 사람이
- * 느끼는 어려움에 가장 가까워서 실측해 보고 넣었다.
- *
- * "비슷해 보이는 수의 개수"를 쓰려다 뺐다. 캐는 조건이 차선수와 250cp 이상
- * 벌어질 것을 요구하므로 그 값은 언제나 0이 되어 아무것도 가르지 못한다.
- */
-function score(puzzle, facts) {
-  let value = 0;
-  value += (facts.solverMoves - 1) * 40;                   // 수순이 길수록
-  value += Math.max(0, (puzzle.foundDepth || 4) - 4) * 6;  // 깊이 봐야 보일수록
-  if (!facts.capture && !facts.check) value += 25;         // 잡지도 체크도 아닌 조용한 수
-  if (facts.sacrifice) value += 30;                        // 손해처럼 보이는 수
-  value += (1 - Math.min(puzzle.edge, 800) / 800) * 15;    // 차선수와 벌어진 폭이 좁을수록
-  if (puzzle.mateIn === 1) value -= 20;                    // 한 수 메이트는 가장 눈에 띈다
-  return Math.round(value);
-}
-
-/**
- * 점수를 세 단계로 가르는 경계.
- *
- * 삼분위로 자르려다 말았다. 점수가 0~19에 절반 넘게 뭉쳐 있어 삼분위를 그대로
- * 쓰면 경계가 9와 11이 되고, 1점 차이로 난이도가 갈린다. 대신 분포에서 실제로
- * 벌어지는 자리를 골랐다 — 실측 217개 기준으로 107/64/50으로 나뉜다.
- * 다시 구울 때는 write가 찍어 주는 분포를 보고 고친다.
- */
-const LEVEL_AT = { easy: 10, medium: 35 };
-const levelOf = (value) => (value < LEVEL_AT.easy ? 'easy' : value < LEVEL_AT.medium ? 'medium' : 'hard');
-
-// 말 이름과 조사. 제목이 열두 가지뿐이면 이백 개에 붙였을 때 같은 말만
-// 되풀이된다. 움직이는 말을 넣으면 사실을 더 담으면서 종류도 늘어난다.
-// 받침이 없는 이름은 나이트뿐이다.
-const PIECE = { p: '폰', n: '나이트', b: '비숍', r: '룩', q: '퀸', k: '킹' };
-const subject = (kind) => PIECE[kind] + (kind === 'n' ? '가' : '이');
-const object = (kind) => PIECE[kind] + (kind === 'n' ? '를' : '을');
-
-function themesOf(puzzle, facts) {
-  const out = [];
-  if (facts.sacrifice) out.push('희생');
-  if (puzzle.mateIn === 1) out.push('한 수 메이트');
-  else if (puzzle.mateIn) out.push('메이트');
-  if (facts.fork) out.push('포크');
-  if (facts.promotion) out.push('승격');
-  if (facts.capture >= 5) out.push('큰 말 잡기');
-  else if (facts.capture) out.push('잡기');
-  if (!facts.capture && !facts.check) out.push('조용한 수');
-  else if (facts.check && !facts.mate) out.push('체크');
-  if (facts.solverMoves > 1) out.push('긴 수순');
-  return out.length ? out : ['전술'];
-}
+// 대표 주제로 붙일 수 있는 제목·힌트. lichess가 붙인 주제도 판에서 읽어낸
+// 사실이므로, 판을 직접 본 것과 같은 자격으로 쓴다.
+const BY_THEME = {
+  smotheredMate: ['빠져나갈 곳이 없다', '킹의 도망 칸을 자기 말이 막고 있습니다.'],
+  backRankMate: ['맨 끝 줄', '킹이 폰 뒤에 갇혀 있습니다.'],
+  doubleCheck: ['두 곳에서 동시에', '두 말이 함께 체크를 겁니다. 막을 수 없습니다.'],
+  discoveredCheck: ['비켜서면 체크', '한 말이 비켜서면 뒤의 말이 체크를 겁니다.'],
+  discoveredAttack: ['열린 길', '한 말이 비켜서면 뒤의 말이 노리는 것이 드러납니다.'],
+  skewer: ['앞의 말을 밀어낸다', '값진 말을 먼저 겨누면 뒤의 말이 남습니다.'],
+  pin: ['묶인 말', '움직이면 뒤가 드러나는 말이 있습니다.'],
+  deflection: ['수비를 떼어낸다', '무언가를 지키고 있는 말을 다른 곳으로 부르세요.'],
+  attraction: ['불러들인다', '상대 말을 원하는 칸으로 끌어내 보세요.'],
+  clearance: ['길을 비운다', '내 말이 내 길을 막고 있습니다.'],
+  interference: ['사이를 끊는다', '지키는 말과 지켜지는 말 사이를 막아 보세요.'],
+  intermezzo: ['그전에 한 수', '되잡기 전에 먼저 끼워 넣을 수가 있습니다.'],
+  capturingDefender: ['지키는 말을 잡는다', '무언가를 지키고 있는 말부터 없애 보세요.'],
+  xRayAttack: ['말을 꿰뚫어', '내 말 너머까지 이어지는 줄을 보세요.'],
+  trappedPiece: ['갈 곳이 없다', '도망갈 칸이 없는 말이 있습니다.'],
+  zugzwang: ['둘 수가 없다', '상대는 무엇을 두든 나빠집니다.'],
+  enPassant: ['지나쳐 잡는다', '방금 두 칸 나온 폰을 앙파상으로 잡을 수 있습니다.'],
+  underPromotion: ['퀸이 아니다', '퀸 말고 다른 말로 승격해 보세요.'],
+  advancedPawn: ['끝줄이 가깝다', '깊이 들어간 폰을 보세요.'],
+  quietMove: ['조용한 한 수', '잡지도 체크하지도 않는 수입니다.'],
+  defensiveMove: ['먼저 막는다', '공격보다 지키는 수가 필요한 자리입니다.'],
+  hangingPiece: ['그냥 놓여 있다', '아무도 지키지 않는 말이 있습니다.'],
+};
 
 function titleOf(puzzle, facts) {
-  if (puzzle.mateIn === 1) return `${subject(facts.kind)} 끝낸다`;
-  if (puzzle.mateIn) return '메이트로 가는 길';
+  if (puzzle.primary === 'mateIn1') return `${subject(facts.kind)} 끝낸다`;
+  if (BY_THEME[puzzle.primary]) return BY_THEME[puzzle.primary][0];
+  if (puzzle.primary.startsWith('mateIn') || puzzle.primary === 'mate') return '메이트로 가는 길';
   if (facts.sacrifice) return `${object(facts.kind)} 내준다`;
   if (facts.fork) return `${subject(facts.kind)} 둘을 노린다`;
   if (facts.promotion) return '끝까지 간 폰';
@@ -393,9 +276,12 @@ function titleOf(puzzle, facts) {
 }
 
 function hintOf(puzzle, facts) {
-  if (puzzle.mateIn === 1) return '한 번에 끝낼 수 있습니다.';
+  if (puzzle.primary === 'mateIn1') return '한 번에 끝낼 수 있습니다.';
+  if (BY_THEME[puzzle.primary]) return BY_THEME[puzzle.primary][1];
+  if (puzzle.primary.startsWith('mateIn') || puzzle.primary === 'mate') {
+    return '피할 곳을 좁혀 가면 메이트가 보입니다.';
+  }
   if (facts.sacrifice) return '손해처럼 보이는 수를 한 번 따져 보세요.';
-  if (puzzle.mateIn) return '피할 곳을 좁혀 가면 메이트가 보입니다.';
   if (facts.fork) return '한 수로 두 개를 동시에 노릴 수 있습니다.';
   if (facts.promotion) return '폰이 끝 줄에 닿습니다.';
   if (facts.capture) return '지켜지지 않은 말이 있습니다.';
@@ -403,123 +289,201 @@ function hintOf(puzzle, facts) {
   return '잡지도 체크하지도 않는 수입니다.';
 }
 
-// 원래 담겨 있던 네 문제. 사람이 둔 대국에서 나온 것이고 lichess 레이팅이
-// 붙어 있어, 점수 대신 그 레이팅으로 난이도를 준다.
-const SEEDED = [
-  { id: '00sO1', level: 'easy', rating: 998,
-    fen: '1k1r4/pp3pp1/2p1p3/4b3/P3n1P1/8/KPP2PN1/3rBR1R b - - 2 31',
-    moves: ['b8c7', 'e1a5', 'b7b6', 'f1d1'],
-    themes: ['발견 공격', '전술'], title: '열린 길',
-    hint: '상대의 킹과 뒤에 놓인 말을 함께 노리세요.' },
-  { id: '00sHx', level: 'medium', rating: 1760,
-    fen: 'q3k1nr/1pp1nQpp/3p4/1P2p3/4P3/B1PP1b2/B5PP/5K2 b k - 0 17',
-    moves: ['e8d7', 'a2e6', 'd7d8', 'f7f8'],
-    themes: ['메이트', '중반'], title: '대각선 위의 메이트',
-    hint: '흑 킹이 옮긴 뒤, 긴 대각선을 다시 보세요.' },
-  { id: '00sJb', level: 'medium', rating: 2235,
-    fen: 'Q1b2r1k/p2np2p/5bp1/q7/5P2/4B3/PPP3PP/2KR1B1R w - - 1 17',
-    moves: ['d1d7', 'a5e1', 'd7d1', 'e1e3', 'c1b1', 'e3b6'],
-    themes: ['포크', '긴 수순'], title: '침입한 퀸',
-    hint: '열린 d파일의 룩을 먼저 활용하세요.' },
-  { id: '00sJ9', level: 'hard', rating: 2671,
-    fen: 'r3r1k1/p4ppp/2p2n2/1p6/3P1qb1/2NQR3/PPB2PP1/R1B3K1 w - - 5 18',
-    moves: ['e3g3', 'e8e1', 'g1h2', 'e1c1', 'a1c1', 'f4h6', 'h2g1', 'h6c1'],
-    themes: ['유인', '포크', '희생'], title: '백 랭크의 유인',
-    hint: '먼저 상대의 수비를 한 칸으로 몰아넣으세요.' },
-];
+// --- 담기 전 검증 ---
 
-async function write(files) {
-  const raw = [];
-  for (const file of files) raw.push(...JSON.parse(fs.readFileSync(file, 'utf8')));
+/**
+ * 저장소의 규칙 엔진으로 직접 풀어 본다. lichess가 검증한 수순이라도 우리
+ * 엔진이 못 따라가면 화면에서도 못 푼다 — 캐슬링·앙파상·승격이 그런 자리다.
+ */
+function playable(puzzle) {
+  if (puzzle.moves.length < 2 || puzzle.moves.length % 2 !== 0) return false;
+  let state;
+  try {
+    state = L.startPuzzle(puzzle);
+  } catch {
+    return false;
+  }
+  let guard = 0;
+  while (state.status !== 'solved' && guard++ < 40) {
+    if (state.status === 'replying') { state = L.playReply(state); continue; }
+    const move = L.expectedMove(state);
+    if (!move || !L.isLegal(state.position, move)) return false;
+    const result = L.attemptMove(state, move.slice(0, 2), move.slice(2, 4), move[4]);
+    if (!result.correct) return false;
+    state = result.state;
+  }
+  return state.status === 'solved';
+}
 
-  // 워커들은 서로를 못 보므로 합칠 때 중복을 다시 걸러야 한다.
-  const seen = new Set();
-  const unique = raw.filter((puzzle) => {
-    const key = `${puzzle.fen}|${puzzle.moves.join(' ')}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return playable(puzzle);
-  });
+// --- 고르기 ---
 
-  // 얕은 깊이로도 보이는 수인지 잰다. 난이도 점수의 가장 큰 항이라 여기서 채운다.
-  const sf = await openEngine();
-  await sf.setup();
-  for (const puzzle of unique) {
-    const solverFen = L.toFen(L.applyMove(L.parseFen(puzzle.fen), puzzle.moves[0]));
-    puzzle.foundDepth = DEPTHS[DEPTHS.length - 1] + 2;
-    for (const depth of DEPTHS) {
-      const { best } = await sf.analyse(solverFen, depth, 1);
-      if (best === puzzle.moves[1]) { puzzle.foundDepth = depth; break; }
+/**
+ * 대표 주제별로 상위 몇 개만 들고 훑는다. 610만 줄을 다 담아 두면 메모리가
+ * 감당이 안 되고, 어차피 주제마다 필요한 것은 열 개 남짓이다.
+ */
+const KEEP_PER_THEME = 60;
+
+/** 잘 검증된 것이 앞이다. 많이 풀린 문제일수록 레이팅과 주제가 믿을 만하다. */
+const better = (a, b) => b.plays - a.plays || (a.id < b.id ? -1 : 1);
+
+function collect() {
+  const buckets = new Map();   // `${level} ${primary}` → 후보 배열
+  let scanned = 0;
+  let qualified = 0;
+
+  for (const line of rows(SOURCE)) {
+    scanned++;
+    const row = parseRow(line);
+    if (!row || !passesQuality(row)) continue;
+
+    const level = LEVELS.find((l) => row.rating >= l.min && row.rating <= l.max
+      && row.moves.length <= l.maxMoves && row.moves.length >= 2);
+    if (!level) continue;
+    qualified++;
+
+    row.primary = primaryOf(row);
+    const key = `${level.name} ${row.primary}`;
+    let bucket = buckets.get(key);
+    if (!bucket) { bucket = []; buckets.set(key, bucket); }
+
+    // 정렬된 상태를 유지하며 꼬리를 잘라 낸다. 전부 모았다가 정렬하는 것보다
+    // 메모리가 훨씬 덜 든다.
+    if (bucket.length === KEEP_PER_THEME && better(row, bucket[bucket.length - 1]) > 0) continue;
+    bucket.push(row);
+    bucket.sort(better);
+    if (bucket.length > KEEP_PER_THEME) bucket.pop();
+  }
+
+  return { buckets, scanned, qualified };
+}
+
+/** 주제 칸을 돌아가며 하나씩 뽑는다. 한 주제가 목록을 뒤덮지 않게 하는 장치다. */
+function pickLevel(buckets, level) {
+  const names = PRIMARY.concat('기타').filter((theme) => buckets.has(`${level} ${theme}`));
+  const cursors = new Map(names.map((theme) => [theme, 0]));
+  const picked = [];
+  const rejected = [];
+
+  let moved = true;
+  while (picked.length < PER_LEVEL && moved) {
+    moved = false;
+    for (const theme of names) {
+      if (picked.length >= PER_LEVEL) break;
+      const bucket = buckets.get(`${level} ${theme}`);
+      let at = cursors.get(theme);
+      // 그 주제에서 실제로 풀리는 것이 나올 때까지 내려간다.
+      while (at < bucket.length && !playable(bucket[at])) { rejected.push(bucket[at]); at++; }
+      if (at >= bucket.length) { cursors.set(theme, at); continue; }
+      picked.push(bucket[at]);
+      cursors.set(theme, at + 1);
+      moved = true;
     }
   }
-  sf.quit();
+  return { picked, rejected };
+}
 
-  const made = unique.map((puzzle, i) => {
-    const facts = readMove(puzzle);
-    const value = score(puzzle, facts);
-    return {
-      id: `g${i.toString(36)}`,
-      level: levelOf(value),
-      fen: puzzle.fen,
-      moves: puzzle.moves,
-      themes: themesOf(puzzle, facts),
-      title: titleOf(puzzle, facts),
-      hint: hintOf(puzzle, facts),
-      value,
-    };
-  });
+// --- 쓰기 ---
 
-  const all = [...SEEDED, ...made];
-  const counts = {};
-  for (const puzzle of all) counts[puzzle.level] = (counts[puzzle.level] || 0) + 1;
-  const values = made.map((p) => p.value).sort((a, b) => a - b);
-  console.error(`캐낸 것 ${raw.length}개 → 쓸 만한 ${made.length}개 + 원래 ${SEEDED.length}개`);
-  if (values.length) {
-    const q = (f) => values[Math.floor(values.length * f)];
-    console.error(`점수: 최소 ${values[0]}, 1/3 ${q(1 / 3)}, 중앙 ${q(0.5)}, 2/3 ${q(2 / 3)}, 최대 ${values[values.length - 1]}`);
-  }
-  console.error('난이도별:', JSON.stringify(counts));
+const quote = (text) => `'${String(text).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
 
-  const body = all.map((p) => `    {
-      id: '${p.id}',
-      level: '${p.level}',
-      fen: '${p.fen}',
-      moves: [${p.moves.map((m) => `'${m}'`).join(', ')}],${p.rating ? `\n      rating: ${p.rating},` : ''}
-      themes: [${p.themes.map((t) => `'${t}'`).join(', ')}],
-      title: '${p.title}',
-      hint: '${p.hint}',
-    },`).join('\n');
+const chunkNameOf = (level, n) => `${level}-${String(n).padStart(2, '0')}`;
 
-  fs.writeFileSync(OUT, `'use strict';
+const WRAP = (body) => `'use strict';
 
 (function (root) {
-
-  // 문제 자료. 앞의 넷은 Lichess Puzzle Database(CC0)에서 골랐고, 나머지는
-  // bake.js가 만들었다 — 엔진끼리 둔 판에서 "한 수만 이기는" 자리를 캐낸 것이다.
-  //
-  // level은 캘 때 매긴 점수로 갈랐다. 몇 수 앞을 봐야 보이는지, 수순이 얼마나
-  // 긴지, 잡지도 체크하지도 않는 수인지, 손해처럼 보이는 수인지를 섞는다.
-  // 원래 있던 넷은 사람이 둔 판이라 lichess 레이팅을 그대로 썼다.
-  //
-  // 제목과 주제는 판에서 읽어낸 사실로만 붙인다 — 그럴듯한 이름을 지어내면
-  // 판과 어긋난 설명이 달린다.
-  root.CHESS_PUZZLES = [
 ${body}
-  ];
 })(typeof window !== 'undefined' ? window : globalThis);
-`);
-  console.error(`${OUT} 에 ${all.length}개 썼다`);
+`;
+
+function writeChunk(level, n, puzzles) {
+  const name = chunkNameOf(level, n);
+  const body = puzzles.map((p) => `    {
+      id: ${quote(p.id)},
+      fen: ${quote(p.fen)},
+      moves: [${p.moves.map(quote).join(', ')}],
+      rating: ${p.rating},
+      themes: [${p.themes.map(quote).join(', ')}],
+      title: ${quote(p.title)},
+      hint: ${quote(p.hint)},
+    },`).join('\n');
+
+  // 화면 쪽 적재기는 script 태그를 꽂고 onload에서 이 표를 읽는다. 등록 함수를
+  // 부르지 않는 이유는, 이러면 node에서도 require 한 번으로 같은 자료를 볼 수
+  // 있어 테스트가 브라우저 없이 돈다는 것이다.
+  fs.writeFileSync(path.join(OUT_DIR, `${name}.js`), WRAP(`  const chunks = root.CHESS_PUZZLE_CHUNKS || (root.CHESS_PUZZLE_CHUNKS = {});
+  chunks[${quote(name)}] = [
+${body}
+  ];`));
+}
+
+function writeIndex(counts) {
+  const levels = LEVELS.map((l) => `      ${l.name}: { count: ${counts[l.name]}, rating: [${l.min}, ${l.max}] },`).join('\n');
+
+  // version은 자료가 바뀐 것을 화면에 알리는 표시다. 다시 구우면 아이디 목록이
+  // 통째로 달라지는데, 화면은 덩이를 다 받아 보기 전에는 그것을 알 수 없다 —
+  // 저장된 진행 기록을 언제 버려야 하는지 이 값으로 판단한다.
+  fs.writeFileSync(path.join(OUT_DIR, 'index.js'), WRAP(`  // bake.js가 만든다. 직접 고치지 않는다.
+  root.CHESS_PUZZLE_INDEX = {
+    version: ${quote(new Date().toISOString().slice(0, 10))},
+    chunkSize: ${CHUNK_SIZE},
+    levels: {
+${levels}
+    },
+  };`));
+}
+
+function build() {
+  if (!fs.existsSync(SOURCE)) {
+    throw new Error(`${SOURCE} 가 없다. 위 주석의 주소에서 받아 이 폴더에 둔다.`);
+  }
+  fs.mkdirSync(OUT_DIR, { recursive: true });
+  for (const file of fs.readdirSync(OUT_DIR)) {
+    if (file.endsWith('.js')) fs.unlinkSync(path.join(OUT_DIR, file));
+  }
+
+  const started = Date.now();
+  const { buckets, scanned, qualified } = collect();
+  console.error(`훑은 줄 ${scanned}개 → 기준을 넘긴 ${qualified}개 (${((Date.now() - started) / 1000).toFixed(1)}초)`);
+
+  const counts = {};
+  for (const level of LEVELS) {
+    const { picked, rejected } = pickLevel(buckets, level.name);
+    counts[level.name] = picked.length;
+
+    for (const row of picked) {
+      const facts = readMove(row);
+      row.themes = themesOf(row);
+      row.title = titleOf(row, facts);
+      row.hint = hintOf(row, facts);
+    }
+
+    for (let n = 0; n * CHUNK_SIZE < picked.length; n++) {
+      writeChunk(level.name, n, picked.slice(n * CHUNK_SIZE, (n + 1) * CHUNK_SIZE));
+    }
+
+    const themes = new Set(picked.map((p) => p.primary));
+    const ratings = picked.map((p) => p.rating).sort((a, b) => a - b);
+    console.error(`${level.name}: ${picked.length}개, 주제 ${themes.size}가지, `
+      + `레이팅 ${ratings[0]}~${ratings[ratings.length - 1]}, `
+      + `우리 엔진이 못 푼 것 ${rejected.length}개`);
+  }
+
+  writeIndex(counts);
+  const files = fs.readdirSync(OUT_DIR);
+  const bytes = files.reduce((sum, f) => sum + fs.statSync(path.join(OUT_DIR, f)).size, 0);
+  console.error(`${OUT_DIR} 에 ${files.length}개 파일, 합계 ${(bytes / 1024).toFixed(0)}KB`);
 }
 
 // --- 실행 ---
 
-const [command, ...args] = process.argv.slice(2);
-if (command === 'mine' && args.length === 3) {
-  mine(Number(args[0]), Number(args[1]), args[2]).catch((e) => { console.error(e); process.exit(1); });
-} else if (command === 'write' && args.length > 0) {
-  write(args).catch((e) => { console.error(e); process.exit(1); });
+if (process.argv[2] === 'pick') {
+  try {
+    build();
+  } catch (error) {
+    console.error(error.message);
+    process.exit(1);
+  }
 } else {
-  console.error('사용: node games/chess-puzzle/bake.js mine <분> <씨앗> <출력.json>');
-  console.error('      node games/chess-puzzle/bake.js write <입력.json...>');
+  console.error('사용: node games/chess-puzzle/bake.js pick');
   process.exit(1);
 }
