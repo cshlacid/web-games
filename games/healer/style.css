@@ -15,8 +15,6 @@
   --mp: #4d74b8;
   --heal: #4f9a63;
   --harm: #c1503f;
-  --field-far: #dbe3ee;
-  --field-near: #cbd6e6;
   --zone-heal: #4f9a63;
   --zone-harm: #c1503f;
   --sel: #d9e4f2;
@@ -43,8 +41,6 @@
     --mp: #6b93d8;
     --heal: #6fb883;
     --harm: #dd7a68;
-    --field-far: #222933;
-    --field-near: #2b333f;
     --sel: #35435a;
   }
 }
@@ -154,6 +150,7 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
   padding: 2px 9px; color: var(--muted);
 }
 .tag.gold { color: var(--hero); border-color: currentColor; }
+.tag.place { color: var(--fg); border-color: var(--btn-bg); font-weight: 600; }
 
 /* --- 편성 --- */
 .panel {
@@ -215,47 +212,69 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
   position: relative;
   aspect-ratio: 100 / 46;
   border: 1px solid var(--line); border-radius: 14px;
-  background: linear-gradient(180deg, var(--field-far), var(--field-near));
+  background: #1d1a24;
   overflow: hidden;
   touch-action: none;
 }
+
+/* 배경은 퀘스트 장소에 따라 scenes.js가 만들어 넣는다. 밝은 테마에서도 배경은
+   그대로 어둡다 — 던전 안이 페이지 설정에 따라 밝아질 이유가 없다. */
+.scene-layer { position: absolute; inset: 0; }
+.scene { display: block; width: 100%; height: 100%; }
 .field.aiming { cursor: crosshair; }
 .field.aiming::after {
   content: ""; position: absolute; inset: 0;
-  border: 2px dashed var(--btn-bg); border-radius: 13px; opacity: 0.5;
+  border: 2px dashed #f0e2a8; border-radius: 13px; opacity: 0.75;
   pointer-events: none;
 }
 
 .unit {
   position: absolute;
-  width: 9.5%;
+  /* 폭은 그림마다 다르므로 main.js가 정한다. */
   transform: translate(-50%, -72%);
   display: flex; flex-direction: column; align-items: center; gap: 2px;
   pointer-events: none;
 }
 .unit.pickable { pointer-events: auto; cursor: pointer; }
-.unit.dead { opacity: 0.22; filter: grayscale(1); }
+/* 쓰러진 유닛은 눕힌다. 흐리게만 두었더니 도트 그림이 회색 덩어리로 뭉개져
+   무엇이 쓰러진 것인지 알 수 없었다. 눕히면 형태는 남고 상태는 분명해진다. */
+.unit.dead { opacity: 0.32; }
+.unit.dead .mark { opacity: 0.25; }
+.unit.dead .hpbar { display: none; }
+/* 발끝을 축으로 넘어뜨린다. 가운데를 축으로 돌리면 쓰러진 유닛이 바닥에서
+   떠올라 공중에 눕는다. */
+.unit.dead .sprite { transform-origin: 50% 100%; }
+.unit.ally.dead .sprite { transform: rotate(-80deg); }
+.unit.enemy.dead .sprite { transform: scaleX(-1) rotate(-80deg); }
 
 .sprite { width: 100%; height: auto; display: block; }
-.sprite .fill { fill: currentColor; }
-.sprite .line { stroke: currentColor; fill: none; }
 
+/* 도트 그림은 제 색을 갖는다. color는 이제 그림이 아니라 발판과 강조 테두리에만
+   쓰인다 — 편을 가르는 일을 그것들이 대신한다. */
 .unit.ally { color: var(--ally); }
 .unit.ally.is-hero { color: var(--hero); }
 .unit.enemy { color: var(--enemy); }
 /* 적은 왼쪽을 보고 서야 아군과 마주 본다. */
 .unit.enemy .sprite { transform: scaleX(-1); }
 
+.unit .mark {
+  position: absolute; bottom: 4%; left: 50%;
+  width: 70%; height: 12%;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: color-mix(in srgb, currentColor 55%, transparent);
+  box-shadow: 0 0 6px 2px rgba(0, 0, 0, 0.45);
+}
+
 .unit .hpbar {
   width: 118%; height: 4px; border-radius: 2px;
-  background: rgba(0, 0, 0, 0.22); overflow: hidden;
+  background: rgba(0, 0, 0, 0.55); overflow: hidden;
 }
 .unit .hpbar span { display: block; height: 100%; background: var(--hp); }
 .unit.low .hpbar span { background: var(--hp-low); }
-.unit .tag-name {
-  font-size: 9px; font-weight: 700; color: var(--muted);
-  white-space: nowrap;
-}
+/* 유닛 이름표는 없다. 아홉 그림이 실루엣만으로 갈리도록 그렸고, 아군의 이름은
+   아래 초상화 줄에 있다. 뭉쳐 싸울 때 이름표가 서로 겹쳐 읽히지도 않으면서
+   화면만 덮었다 — 그림을 구분되게 그린 것이 이름표를 없애기 위해서였다. */
 .unit.targeted .sprite { filter: drop-shadow(0 0 3px currentColor); }
 
 /* 조준 중에 고를 수 있는 대상. 테두리가 아니라 그림자를 쓰는 것은 유닛이
@@ -275,8 +294,8 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .aim {
   position: absolute; border-radius: 50%;
   transform: translate(-50%, -50%);
-  border: 2px dashed var(--btn-bg);
-  background: color-mix(in srgb, var(--btn-bg) 10%, transparent);
+  border: 2px dashed #f0e2a8;
+  background: rgba(240, 226, 168, 0.12);
   pointer-events: none;
 }
 

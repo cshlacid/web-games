@@ -9,6 +9,7 @@ const L = window.HealerLogic;
 const AI = window.HealerAI;
 const Loot = window.HealerLoot;
 const Sprites = window.HealerSprites;
+const Scenes = window.HealerScenes;
 const sound = window.HealerSound;
 
 const $ = (id) => document.getElementById(id);
@@ -83,6 +84,9 @@ function openQuests() {
     desc.textContent = quest.desc;
 
     const meta = el('div', 'quest-meta');
+    const place = el('span', 'tag place');
+    place.textContent = Scenes.SCENES[quest.scene].name;
+    meta.append(place);
     for (const text of questSummary(quest)) {
       const tag = el('span', 'tag');
       tag.textContent = text;
@@ -236,6 +240,10 @@ $('start').addEventListener('click', () => {
 
 const field = $('field');
 const unitNodes = new Map();
+
+// 16칸짜리 그림(테두리 포함 18)이 전장 폭에서 차지할 비율. 여기만 고치면
+// 아홉 그림의 크기가 서로의 비율을 지키며 같이 커지고 작아진다.
+const UNIT_WIDTH = 11;
 const zoneNodes = new Map();
 
 const pctX = (x) => (x / D.FIELD.w) * 100;
@@ -245,15 +253,19 @@ function makeUnitNode(unit) {
   const node = el('div', `unit ${unit.side}`);
   if (unit.uid === L.HERO_UID) node.classList.add('is-hero');
   node.dataset.uid = unit.uid;
-  node.innerHTML = Sprites.svg(unit.sprite);
+
+  // 도트 그림이 제 색을 가지므로 파랑·빨강으로 물들여 편을 가를 수 없다.
+  // 발밑에 색 있는 발판을 깔아 그 일을 대신한다 — 그림자 노릇도 같이 한다.
+  node.append(el('div', 'mark'));
+  node.insertAdjacentHTML('beforeend', Sprites.svg(unit.sprite));
+
+  // 넓게 그린 그림이 화면에서도 넓어야 한다. 폭을 하나로 고정하면 우두머리를
+  // 20칸에 그린 뜻이 사라진다.
+  node.style.width = `${(UNIT_WIDTH * Sprites.size(unit.sprite).w) / 18}%`;
 
   const bar = el('div', 'hpbar');
   bar.append(el('span'));
   node.append(bar);
-
-  const tag = el('div', 'tag-name');
-  tag.textContent = unit.name;
-  node.append(tag);
 
   field.append(node);
   unitNodes.set(unit.uid, node);
@@ -609,6 +621,10 @@ function startBattle() {
   field.querySelectorAll('.unit, .zone, .float, .pulse').forEach((node) => node.remove());
   unitNodes.clear();
   zoneNodes.clear();
+
+  // 배경은 전투당 한 번만 만든다. 씨앗을 퀘스트에 묶어 두어 같은 퀘스트가 늘
+  // 같은 모습이 되게 했다 — 다시 도전할 때마다 돌 배치가 바뀌면 다른 곳으로 보인다.
+  $('scene').innerHTML = Scenes.svg(app.quest.scene, app.quest.id.length * 977);
 
   app.battle = L.createBattle({
     quest: app.quest,

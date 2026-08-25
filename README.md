@@ -40,6 +40,7 @@ node games/chess-puzzle/data.test.js
 node games/healer/logic.test.js
 node games/healer/ai.test.js
 node games/healer/loot.test.js
+node games/healer/art.test.js
 ```
 
 ## 구조
