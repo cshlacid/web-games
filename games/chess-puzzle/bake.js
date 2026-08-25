@@ -348,6 +348,20 @@ function score(puzzle, facts) {
 }
 
 /**
+ * 그 문제를 "어떻게 푸는가". 좌표가 아니라 방법으로 묶는다 — 같은 수를 다른
+ * 판에서 두는 것은 다른 문제지만, 다른 판에서 같은 방법을 되풀이하는 것은
+ * 같은 문제다.
+ *
+ * 엔진끼리 둔 판에서 캐면 이 쏠림이 심하다. 222개를 매겨 보니 "비숍으로 퀸을
+ * 잡는 한 수"에만 16개가 몰려 있었다. 판은 전부 달라서 판으로는 걸러지지
+ * 않는다 — 실제로 시작 FEN·플레이어가 보는 판·말 배치 어느 기준으로도 겹치는
+ * 것이 하나도 없었다.
+ */
+function methodOf(facts) {
+  return [facts.kind, facts.tookKind || '-', facts.check, facts.mate, facts.fork, facts.solverMoves].join('|');
+}
+
+/**
  * 점수를 세 단계로 가르는 경계.
  *
  * 삼분위로 자르려다 말았다. 점수가 0~19에 절반 넘게 뭉쳐 있어 삼분위를 그대로
@@ -454,10 +468,27 @@ async function write(files) {
   }
   sf.quit();
 
-  const made = unique.map((puzzle, i) => {
+  const scored = unique.map((puzzle) => {
     const facts = readMove(puzzle);
     const value = score(puzzle, facts);
-    return {
+    return { puzzle, facts, value, method: methodOf(facts) };
+  });
+
+  // 방법이 같으면 하나만 남긴다. 무리 안에서는 점수가 가장 높은 것을 고른다 —
+  // 어느 것을 골라도 방법은 같으니, 가장 눈에 안 띄는 판이 문제로서 낫다.
+  const best = new Map();
+  for (const item of scored) {
+    const kept = best.get(item.method);
+    if (!kept || item.value > kept.value) best.set(item.method, item);
+  }
+
+  // 원래 있던 넷은 사람이 둔 판이라 무조건 남기고, 방법이 겹치는 만들어 낸
+  // 문제를 대신 버린다.
+  for (const puzzle of SEEDED) best.delete(methodOf(readMove(puzzle)));
+
+  const made = [...best.values()]
+    .sort((a, b) => a.value - b.value)
+    .map(({ puzzle, facts, value }, i) => ({
       id: `g${i.toString(36)}`,
       level: levelOf(value),
       fen: puzzle.fen,
@@ -466,14 +497,13 @@ async function write(files) {
       title: titleOf(puzzle, facts),
       hint: hintOf(puzzle, facts),
       value,
-    };
-  });
+    }));
 
   const all = [...SEEDED, ...made];
   const counts = {};
   for (const puzzle of all) counts[puzzle.level] = (counts[puzzle.level] || 0) + 1;
   const values = made.map((p) => p.value).sort((a, b) => a - b);
-  console.error(`캐낸 것 ${raw.length}개 → 쓸 만한 ${made.length}개 + 원래 ${SEEDED.length}개`);
+  console.error(`캐낸 것 ${raw.length}개 → 풀리는 ${unique.length}개 → 방법이 겹치지 않는 ${made.length}개 + 원래 ${SEEDED.length}개`);
   if (values.length) {
     const q = (f) => values[Math.floor(values.length * f)];
     console.error(`점수: 최소 ${values[0]}, 1/3 ${q(1 / 3)}, 중앙 ${q(0.5)}, 2/3 ${q(2 / 3)}, 최대 ${values[values.length - 1]}`);
@@ -500,6 +530,9 @@ async function write(files) {
   // level은 캘 때 매긴 점수로 갈랐다. 몇 수 앞을 봐야 보이는지, 수순이 얼마나
   // 긴지, 잡지도 체크하지도 않는 수인지, 손해처럼 보이는 수인지를 섞는다.
   // 원래 있던 넷은 사람이 둔 판이라 lichess 레이팅을 그대로 썼다.
+  //
+  // 푸는 방법이 겹치는 것은 하나만 남겼다. 판은 전부 다르지만, 다른 판에서
+  // 같은 방법을 되풀이하면 같은 문제를 다시 푸는 것과 다르지 않다.
   //
   // 제목과 주제는 판에서 읽어낸 사실로만 붙인다 — 그럴듯한 이름을 지어내면
   // 판과 어긋난 설명이 달린다.
