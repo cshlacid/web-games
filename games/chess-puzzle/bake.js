@@ -234,8 +234,9 @@ async function minePuzzles(sf, trail, { depth, minEdge, maxBefore, minWin }) {
       mateIn = 2;
       solution = [answer, reply, finish];
     } else {
-      // 나머지는 한 수짜리로 둔다. 수순을 길게 가져가면 상대의 응수가 유일하지
-      // 않은 구간이 생겨, 플레이어가 다른 좋은 수를 두고도 오답 판정을 받는다.
+      // 여기서는 첫 수만 담는다. 수순을 늘리는 것은 굽는 단계(extend)가 한다 —
+      // 늘리려면 이어지는 자리마다 "이 수만 이긴다"를 다시 확인해야 하는데,
+      // 그 기준을 바꿀 때마다 다시 캐야 한다면 손이 너무 많이 간다.
       solution = [answer];
       if (isMate) mateIn = solved.lines[0].mate;
     }
@@ -366,13 +367,53 @@ function methodOf(facts) {
 }
 
 /**
- * 점수를 세 단계로 가르는 경계.
+ * 수순을 늘린다. 푸는 쪽이 두는 수를 최대 maxMoves개까지.
  *
- * 삼분위로 자르려다 말았다. 점수가 0~19에 절반 넘게 뭉쳐 있어 삼분위를 그대로
- * 쓰면 경계가 9와 11이 되고, 1점 차이로 난이도가 갈린다. 대신 분포에서 실제로
- * 벌어지는 자리를 골랐다 — 실측 217개 기준으로 107/64/50으로 나뉜다.
- * 다시 구울 때는 write가 찍어 주는 분포를 보고 고친다.
+ * 처음에는 한 수로 끊었다. 길게 가져가면 상대의 응수가 유일하지 않은 구간이
+ * 생기고, 플레이어가 다른 좋은 수를 두고도 오답 판정을 받기 때문이다.
+ *
+ * 그 걱정은 푸는 쪽의 수마다 첫 수와 같은 잣대를 다시 대면 사라진다 — 차선수와
+ * 크게 벌어질 때만 다음 수를 붙이고, 아니면 거기서 끊는다. 상대의 응수가
+ * 여럿이어도 상관없다. 우리가 하나를 정해 두면 그 다음 자리는 하나로 정해지고,
+ * 플레이어가 고르는 것은 자기 수뿐이기 때문이다.
+ *
+ * 결과적으로 강제 수순만 길어진다. 한 수 두면 상대가 받아칠 수밖에 없고 또
+ * 한 수가 유일한, 그런 자리만 남는다 — 좋은 다수 수순 문제가 원래 그렇다.
  */
+async function extend(sf, puzzle, { depth, minEdge, maxMoves }) {
+  // 메이트 문제는 늘리지 않는다. 두 수 메이트는 이미 끝까지 있고, 더 긴 메이트는
+  // 여기 잣대로는 못 늘린다 — 메이트 점수는 한 수 차이가 100뿐이라, 늦게 메이트하는
+  // 수가 있으면 "크게 벌어질 것"을 만족하지 못하고 바로 끊긴다.
+  if (puzzle.mateIn) return puzzle.moves;
+
+  const moves = [...puzzle.moves];
+  let position = L.parseFen(puzzle.fen);
+  for (const move of moves) position = L.applyMove(position, move);
+
+  while (Math.ceil((moves.length - 1) / 2) < maxMoves) {
+    if (L.positionStatus(position) === 'checkmate') break;
+    if (!L.legalMoves(position).length) break;
+
+    // 상대의 응수. 최선으로 받게 한다.
+    const reply = (await sf.analyse(L.toFen(position), depth, 1)).best;
+    if (!reply || !L.isLegal(position, reply)) break;
+    const afterReply = L.applyMove(position, reply);
+    if (L.positionStatus(afterReply) === 'checkmate') break;
+    if (L.legalMoves(afterReply).length < 2) break;   // 외길수는 문제가 아니다
+
+    // 푸는 쪽의 다음 수. 첫 수와 같은 잣대를 댄다.
+    const next = await sf.analyse(L.toFen(afterReply), depth, 3);
+    if (next.lines.length < 2) break;
+    if (cpOf(next.lines[0]) - cpOf(next.lines[1]) < minEdge) break;
+    const answer = next.lines[0].pv[0];
+    if (!answer || !L.isLegal(afterReply, answer)) break;
+
+    moves.push(reply, answer);
+    position = L.applyMove(afterReply, answer);
+  }
+  return moves;
+}
+
 /**
  * 정답을 둔 뒤 이어지는 수순.
  *
@@ -442,6 +483,16 @@ function whyOf(puzzle, facts) {
   return '잡은 것은 없어도 자리가 결정적으로 좋아집니다.';
 }
 
+/**
+ * 점수를 세 단계로 가르는 경계.
+ *
+ * 삼분위로 자르려다 말았다. 점수가 한쪽에 뭉쳐 있어 삼분위를 그대로 쓰면 경계가
+ * 1점 차이로 붙어 버린다. 대신 분포에서 실제로 벌어지는 자리를 골랐다.
+ *
+ * 수순을 늘리기 전(전부 한 수짜리)에는 10/35로 107/64/50이 나왔다. 수순이
+ * 길어지면서 점수가 위로 밀려, 같은 경계로는 어려움이 절반을 넘는다. 다시
+ * 구울 때는 write가 찍어 주는 분포를 보고 고친다.
+ */
 const LEVEL_AT = { easy: 10, medium: 35 };
 const levelOf = (value) => (value < LEVEL_AT.easy ? 'easy' : value < LEVEL_AT.medium ? 'medium' : 'hard');
 
@@ -538,6 +589,9 @@ async function write(files) {
       const { best } = await sf.analyse(solverFen, depth, 1);
       if (best === puzzle.moves[1]) { puzzle.foundDepth = depth; break; }
     }
+    // 수순을 먼저 늘리고, 그 끝에서 이어지는 수순을 뽑는다. 순서가 바뀌면
+    // 늘어난 만큼을 두 번 보여 주게 된다.
+    puzzle.moves = await extend(sf, puzzle, { depth: 12, minEdge: 250, maxMoves: 3 });
     puzzle.line = await continuation(sf, puzzle);
   }
   // 손으로 고른 넷에도 같은 설명을 붙인다. 수순이 길어 스스로 설명되는 편이지만,
@@ -553,6 +607,23 @@ async function write(files) {
     const value = score(puzzle, facts);
     return { puzzle, facts, value, method: methodOf(facts) };
   });
+
+  // 점수의 무게와 등급 경계를 다시 잡으려면 입력값이 있어야 하는데, 캐고 굽는
+  // 데만 십수 분이 걸려 그때마다 다시 돌릴 수가 없다. BAKE_DUMP를 주면 그
+  // 값들을 남겨, 굽지 않고도 무게를 바꿔 가며 배분을 볼 수 있다.
+  if (process.env.BAKE_DUMP) {
+    fs.writeFileSync(process.env.BAKE_DUMP, JSON.stringify(scored.map(({ puzzle, facts, value }) => ({
+      value,
+      solverMoves: facts.solverMoves,
+      foundDepth: puzzle.foundDepth,
+      edge: puzzle.edge,
+      sacrifice: facts.sacrifice,
+      quiet: !facts.capture && !facts.check,
+      mateIn: puzzle.mateIn,
+      method: methodOf(facts),
+    }))));
+    console.error(`${process.env.BAKE_DUMP} 에 점수 입력값을 남겼다`);
+  }
 
   // 방법이 같으면 하나만 남긴다. 무리 안에서는 점수가 가장 높은 것을 고른다 —
   // 어느 것을 골라도 방법은 같으니, 가장 눈에 안 띄는 판이 문제로서 낫다.
