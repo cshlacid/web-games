@@ -127,6 +127,26 @@ h1 {
   color: var(--muted);
 }
 .sub-row .side { margin-inline-start: auto; color: var(--fg); }
+.sub-row .rating:empty { display: none; }
+
+/* 난이도 고르개. 다른 게임의 것과 같은 모양을 쓴다. */
+.picker { display: flex; gap: 4px; }
+.pick {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 9px;
+  cursor: pointer;
+}
+.pick[aria-pressed="true"] {
+  background: var(--btn-bg);
+  border-color: var(--btn-bg);
+  color: var(--btn-fg);
+}
 /* 이미 푼 문제. 다시 눌러 봐도 되는 곳인지 번호만 보고 알 수 있게 한다. */
 .sub-row .count.solved { color: var(--good); }
 .sub-row .count.solved::after { content: ' ✓'; }
