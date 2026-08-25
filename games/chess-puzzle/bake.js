@@ -20,6 +20,10 @@
 //   export STOCKFISH=/tmp/sf/node_modules/stockfish/index.js
 //   node games/chess-puzzle/bake.js mine 20 12345 /tmp/w1.json   # 코어 수만큼 씨앗을 달리해 동시에
 //   node games/chess-puzzle/bake.js write /tmp/w*.json           # 합쳐서 puzzles.js로
+//
+// mine의 넷째 인자는 두는 깊이다(기본 4). 이 값이 난이도를 가른다 — 얕게 두면
+// 실수가 커서 벌주는 수가 눈에 띄고, 깊게 두면 실수가 미묘해서 벌주는 수도 잘
+// 안 보인다. 어려운 문제가 더 필요하면 7~8로 올려 한 번 더 캔다.
 
 const fs = require('fs');
 const path = require('path');
@@ -230,8 +234,9 @@ async function minePuzzles(sf, trail, { depth, minEdge, maxBefore, minWin }) {
       mateIn = 2;
       solution = [answer, reply, finish];
     } else {
-      // 나머지는 한 수짜리로 둔다. 수순을 길게 가져가면 상대의 응수가 유일하지
-      // 않은 구간이 생겨, 플레이어가 다른 좋은 수를 두고도 오답 판정을 받는다.
+      // 여기서는 첫 수만 담는다. 수순을 늘리는 것은 굽는 단계(extend)가 한다 —
+      // 늘리려면 이어지는 자리마다 "이 수만 이긴다"를 다시 확인해야 하는데,
+      // 그 기준을 바꿀 때마다 다시 캐야 한다면 손이 너무 많이 간다.
       solution = [answer];
       if (isMate) mateIn = solved.lines[0].mate;
     }
@@ -260,7 +265,7 @@ function playable(puzzle) {
   return state.status === 'solved';
 }
 
-async function mine(minutes, seed, out) {
+async function mine(minutes, seed, out, playDepth = 4) {
   const sf = await openEngine();
   await sf.setup();
   const rng = mulberry32(seed);
@@ -271,7 +276,7 @@ async function mine(minutes, seed, out) {
 
   while (Date.now() < deadline) {
     const trail = await playGame(sf, {
-      plyLimit: 70, playDepth: 4, openingPlies: 10, blunderRate: 0.3, blunderSpread: 8, rng,
+      plyLimit: 70, playDepth, openingPlies: 10, blunderRate: 0.3, blunderSpread: 8, rng,
     });
     games++;
     for (const puzzle of await minePuzzles(sf, trail, { depth: 12, minEdge: 250, maxBefore: 200, minWin: 200 })) {
@@ -281,9 +286,9 @@ async function mine(minutes, seed, out) {
       found.push(puzzle);
       fs.writeFileSync(out, JSON.stringify(found));
     }
-    if (games % 10 === 0) console.error(`씨앗 ${seed}: ${games}판, ${found.length}개`);
+    if (games % 10 === 0) console.error(`씨앗 ${seed}(깊이 ${playDepth}): ${games}판, ${found.length}개`);
   }
-  console.error(`씨앗 ${seed}: 완료 ${games}판, ${found.length}개`);
+  console.error(`씨앗 ${seed}(깊이 ${playDepth}): 완료 ${games}판, ${found.length}개`);
   sf.quit();
 }
 
@@ -348,12 +353,145 @@ function score(puzzle, facts) {
 }
 
 /**
+ * 그 문제를 "어떻게 푸는가". 좌표가 아니라 방법으로 묶는다 — 같은 수를 다른
+ * 판에서 두는 것은 다른 문제지만, 다른 판에서 같은 방법을 되풀이하는 것은
+ * 같은 문제다.
+ *
+ * 엔진끼리 둔 판에서 캐면 이 쏠림이 심하다. 222개를 매겨 보니 "비숍으로 퀸을
+ * 잡는 한 수"에만 16개가 몰려 있었다. 판은 전부 달라서 판으로는 걸러지지
+ * 않는다 — 실제로 시작 FEN·플레이어가 보는 판·말 배치 어느 기준으로도 겹치는
+ * 것이 하나도 없었다.
+ */
+function methodOf(facts) {
+  return [facts.kind, facts.tookKind || '-', facts.check, facts.mate, facts.fork, facts.solverMoves].join('|');
+}
+
+/**
+ * 수순을 늘린다. 푸는 쪽이 두는 수를 최대 maxMoves개까지.
+ *
+ * 처음에는 한 수로 끊었다. 길게 가져가면 상대의 응수가 유일하지 않은 구간이
+ * 생기고, 플레이어가 다른 좋은 수를 두고도 오답 판정을 받기 때문이다.
+ *
+ * 그 걱정은 푸는 쪽의 수마다 첫 수와 같은 잣대를 다시 대면 사라진다 — 차선수와
+ * 크게 벌어질 때만 다음 수를 붙이고, 아니면 거기서 끊는다. 상대의 응수가
+ * 여럿이어도 상관없다. 우리가 하나를 정해 두면 그 다음 자리는 하나로 정해지고,
+ * 플레이어가 고르는 것은 자기 수뿐이기 때문이다.
+ *
+ * 결과적으로 강제 수순만 길어진다. 한 수 두면 상대가 받아칠 수밖에 없고 또
+ * 한 수가 유일한, 그런 자리만 남는다 — 좋은 다수 수순 문제가 원래 그렇다.
+ */
+async function extend(sf, puzzle, { depth, minEdge, maxMoves }) {
+  // 메이트 문제는 늘리지 않는다. 두 수 메이트는 이미 끝까지 있고, 더 긴 메이트는
+  // 여기 잣대로는 못 늘린다 — 메이트 점수는 한 수 차이가 100뿐이라, 늦게 메이트하는
+  // 수가 있으면 "크게 벌어질 것"을 만족하지 못하고 바로 끊긴다.
+  if (puzzle.mateIn) return puzzle.moves;
+
+  const moves = [...puzzle.moves];
+  let position = L.parseFen(puzzle.fen);
+  for (const move of moves) position = L.applyMove(position, move);
+
+  while (Math.ceil((moves.length - 1) / 2) < maxMoves) {
+    if (L.positionStatus(position) === 'checkmate') break;
+    if (!L.legalMoves(position).length) break;
+
+    // 상대의 응수. 최선으로 받게 한다.
+    const reply = (await sf.analyse(L.toFen(position), depth, 1)).best;
+    if (!reply || !L.isLegal(position, reply)) break;
+    const afterReply = L.applyMove(position, reply);
+    if (L.positionStatus(afterReply) === 'checkmate') break;
+    if (L.legalMoves(afterReply).length < 2) break;   // 외길수는 문제가 아니다
+
+    // 푸는 쪽의 다음 수. 첫 수와 같은 잣대를 댄다.
+    const next = await sf.analyse(L.toFen(afterReply), depth, 3);
+    if (next.lines.length < 2) break;
+    if (cpOf(next.lines[0]) - cpOf(next.lines[1]) < minEdge) break;
+    const answer = next.lines[0].pv[0];
+    if (!answer || !L.isLegal(afterReply, answer)) break;
+
+    moves.push(reply, answer);
+    position = L.applyMove(afterReply, answer);
+  }
+  return moves;
+}
+
+/**
+ * 정답을 둔 뒤 이어지는 수순.
+ *
+ * 문제는 대부분 한 수짜리라, 두고 나면 "정답입니다"만 뜨고 그 수가 무엇을
+ * 얻는지는 화면에 남지 않는다. 희생 문제가 특히 그렇다 — 손해로 보이는 수를
+ * 두고 정답 판정만 받으니 왜 이기는지 알 수 없다.
+ *
+ * 그래서 이 수순은 푸는 데 쓰지 않는다. 다 푼 뒤에 판 위에서 되짚어 보여
+ * 주기만 한다. 플레이어가 따라 둘 것이 아니므로, 상대의 응수가 유일하지 않아도
+ * 상관없다 — 수순을 한 수로 끊어 둔 이유가 여기서는 걸리지 않는다.
+ */
+async function continuation(sf, puzzle, plies = 6) {
+  let position = L.parseFen(puzzle.fen);
+  for (const move of puzzle.moves) position = L.applyMove(position, move);
+  if (L.positionStatus(position) === 'checkmate') return [];
+
+  const { lines } = await sf.analyse(L.toFen(position), 14, 1);
+  if (!lines.length) return [];
+
+  // 엔진이 주는 PV는 끝이 잘려 있거나 어긋날 수 있다. 우리 규칙으로 한 수씩
+  // 짚어 보고, 어긋나는 자리에서 끊는다.
+  const out = [];
+  for (const move of lines[0].pv.slice(0, plies)) {
+    if (!L.isLegal(position, move)) break;
+    position = L.applyMove(position, move);
+    out.push(move);
+    if (L.positionStatus(position) === 'checkmate') break;
+  }
+  return out;
+}
+
+/** 그 수순을 끝까지 두면 푸는 쪽이 얻는 것. 설명은 이 사실로만 쓴다. */
+function outcomeOf(puzzle) {
+  let position = L.parseFen(puzzle.fen);
+  for (const move of puzzle.moves) position = L.applyMove(position, move);
+  const solver = L.other(position.turn);
+
+  const count = (board) => {
+    let mine = 0;
+    let theirs = 0;
+    for (const square of Object.keys(board)) {
+      const piece = board[square];
+      const worth = VALUE[piece.toLowerCase()];
+      if (worth >= 100) continue;
+      if (L.colorOf(piece) === solver) mine += worth;
+      else theirs += worth;
+    }
+    return mine - theirs;
+  };
+
+  const before = count(position.board);
+  for (const move of puzzle.line || []) position = L.applyMove(position, move);
+  return {
+    mate: L.positionStatus(position) === 'checkmate',
+    gain: count(position.board) - before,
+  };
+}
+
+function whyOf(puzzle, facts) {
+  if (facts.mate) return '체크메이트입니다.';
+  const { mate, gain } = outcomeOf(puzzle);
+  if (mate) return '이대로 두면 몇 수 안에 메이트입니다.';
+  if (gain >= 8) return `이대로 두면 말을 크게 벌어 둡니다(폰 ${gain}개 값).`;
+  if (gain >= 3) return `이대로 두면 폰 ${gain}개 값만큼 앞섭니다.`;
+  if (gain >= 1) return `이대로 두면 폰 ${gain}개 값만큼 앞섭니다.`;
+  // 이득이 눈에 안 잡히면 자리가 좋아진 것이다. 없는 이유를 지어내지 않는다.
+  return '잡은 것은 없어도 자리가 결정적으로 좋아집니다.';
+}
+
+/**
  * 점수를 세 단계로 가르는 경계.
  *
- * 삼분위로 자르려다 말았다. 점수가 0~19에 절반 넘게 뭉쳐 있어 삼분위를 그대로
- * 쓰면 경계가 9와 11이 되고, 1점 차이로 난이도가 갈린다. 대신 분포에서 실제로
- * 벌어지는 자리를 골랐다 — 실측 217개 기준으로 107/64/50으로 나뉜다.
- * 다시 구울 때는 write가 찍어 주는 분포를 보고 고친다.
+ * 삼분위로 자르려다 말았다. 점수가 한쪽에 뭉쳐 있어 삼분위를 그대로 쓰면 경계가
+ * 1점 차이로 붙어 버린다. 대신 분포에서 실제로 벌어지는 자리를 골랐다.
+ *
+ * 수순을 늘리기 전(전부 한 수짜리)에는 10/35로 107/64/50이 나왔다. 수순이
+ * 길어지면서 점수가 위로 밀려, 같은 경계로는 어려움이 절반을 넘는다. 다시
+ * 구울 때는 write가 찍어 주는 분포를 보고 고친다.
  */
 const LEVEL_AT = { easy: 10, medium: 35 };
 const levelOf = (value) => (value < LEVEL_AT.easy ? 'easy' : value < LEVEL_AT.medium ? 'medium' : 'hard');
@@ -441,23 +579,67 @@ async function write(files) {
     return playable(puzzle);
   });
 
-  // 얕은 깊이로도 보이는 수인지 잰다. 난이도 점수의 가장 큰 항이라 여기서 채운다.
   const sf = await openEngine();
   await sf.setup();
   for (const puzzle of unique) {
+    // 얕은 깊이로도 보이는 수인지 잰다. 난이도 점수의 가장 큰 항이다.
     const solverFen = L.toFen(L.applyMove(L.parseFen(puzzle.fen), puzzle.moves[0]));
     puzzle.foundDepth = DEPTHS[DEPTHS.length - 1] + 2;
     for (const depth of DEPTHS) {
       const { best } = await sf.analyse(solverFen, depth, 1);
       if (best === puzzle.moves[1]) { puzzle.foundDepth = depth; break; }
     }
+    // 수순을 먼저 늘리고, 그 끝에서 이어지는 수순을 뽑는다. 순서가 바뀌면
+    // 늘어난 만큼을 두 번 보여 주게 된다.
+    puzzle.moves = await extend(sf, puzzle, { depth: 12, minEdge: 250, maxMoves: 3 });
+    puzzle.line = await continuation(sf, puzzle);
+  }
+  // 손으로 고른 넷에도 같은 설명을 붙인다. 수순이 길어 스스로 설명되는 편이지만,
+  // 어떤 문제는 되짚어 보여 주고 어떤 문제는 안 보여 주면 그게 더 이상하다.
+  for (const puzzle of SEEDED) {
+    puzzle.line = await continuation(sf, puzzle);
+    puzzle.why = whyOf(puzzle, readMove(puzzle));
   }
   sf.quit();
 
-  const made = unique.map((puzzle, i) => {
+  const scored = unique.map((puzzle) => {
     const facts = readMove(puzzle);
     const value = score(puzzle, facts);
-    return {
+    return { puzzle, facts, value, method: methodOf(facts) };
+  });
+
+  // 점수의 무게와 등급 경계를 다시 잡으려면 입력값이 있어야 하는데, 캐고 굽는
+  // 데만 십수 분이 걸려 그때마다 다시 돌릴 수가 없다. BAKE_DUMP를 주면 그
+  // 값들을 남겨, 굽지 않고도 무게를 바꿔 가며 배분을 볼 수 있다.
+  if (process.env.BAKE_DUMP) {
+    fs.writeFileSync(process.env.BAKE_DUMP, JSON.stringify(scored.map(({ puzzle, facts, value }) => ({
+      value,
+      solverMoves: facts.solverMoves,
+      foundDepth: puzzle.foundDepth,
+      edge: puzzle.edge,
+      sacrifice: facts.sacrifice,
+      quiet: !facts.capture && !facts.check,
+      mateIn: puzzle.mateIn,
+      method: methodOf(facts),
+    }))));
+    console.error(`${process.env.BAKE_DUMP} 에 점수 입력값을 남겼다`);
+  }
+
+  // 방법이 같으면 하나만 남긴다. 무리 안에서는 점수가 가장 높은 것을 고른다 —
+  // 어느 것을 골라도 방법은 같으니, 가장 눈에 안 띄는 판이 문제로서 낫다.
+  const best = new Map();
+  for (const item of scored) {
+    const kept = best.get(item.method);
+    if (!kept || item.value > kept.value) best.set(item.method, item);
+  }
+
+  // 원래 있던 넷은 사람이 둔 판이라 무조건 남기고, 방법이 겹치는 만들어 낸
+  // 문제를 대신 버린다.
+  for (const puzzle of SEEDED) best.delete(methodOf(readMove(puzzle)));
+
+  const made = [...best.values()]
+    .sort((a, b) => a.value - b.value)
+    .map(({ puzzle, facts, value }, i) => ({
       id: `g${i.toString(36)}`,
       level: levelOf(value),
       fen: puzzle.fen,
@@ -465,15 +647,16 @@ async function write(files) {
       themes: themesOf(puzzle, facts),
       title: titleOf(puzzle, facts),
       hint: hintOf(puzzle, facts),
+      line: puzzle.line || [],
+      why: whyOf(puzzle, facts),
       value,
-    };
-  });
+    }));
 
   const all = [...SEEDED, ...made];
   const counts = {};
   for (const puzzle of all) counts[puzzle.level] = (counts[puzzle.level] || 0) + 1;
   const values = made.map((p) => p.value).sort((a, b) => a - b);
-  console.error(`캐낸 것 ${raw.length}개 → 쓸 만한 ${made.length}개 + 원래 ${SEEDED.length}개`);
+  console.error(`캐낸 것 ${raw.length}개 → 풀리는 ${unique.length}개 → 방법이 겹치지 않는 ${made.length}개 + 원래 ${SEEDED.length}개`);
   if (values.length) {
     const q = (f) => values[Math.floor(values.length * f)];
     console.error(`점수: 최소 ${values[0]}, 1/3 ${q(1 / 3)}, 중앙 ${q(0.5)}, 2/3 ${q(2 / 3)}, 최대 ${values[values.length - 1]}`);
@@ -487,7 +670,7 @@ async function write(files) {
       moves: [${p.moves.map((m) => `'${m}'`).join(', ')}],${p.rating ? `\n      rating: ${p.rating},` : ''}
       themes: [${p.themes.map((t) => `'${t}'`).join(', ')}],
       title: '${p.title}',
-      hint: '${p.hint}',
+      hint: '${p.hint}',${p.line && p.line.length ? `\n      line: [${p.line.map((m) => `'${m}'`).join(', ')}],` : ''}${p.why ? `\n      why: '${p.why}',` : ''}
     },`).join('\n');
 
   fs.writeFileSync(OUT, `'use strict';
@@ -500,6 +683,9 @@ async function write(files) {
   // level은 캘 때 매긴 점수로 갈랐다. 몇 수 앞을 봐야 보이는지, 수순이 얼마나
   // 긴지, 잡지도 체크하지도 않는 수인지, 손해처럼 보이는 수인지를 섞는다.
   // 원래 있던 넷은 사람이 둔 판이라 lichess 레이팅을 그대로 썼다.
+  //
+  // 푸는 방법이 겹치는 것은 하나만 남겼다. 판은 전부 다르지만, 다른 판에서
+  // 같은 방법을 되풀이하면 같은 문제를 다시 푸는 것과 다르지 않다.
   //
   // 제목과 주제는 판에서 읽어낸 사실로만 붙인다 — 그럴듯한 이름을 지어내면
   // 판과 어긋난 설명이 달린다.
@@ -514,12 +700,13 @@ ${body}
 // --- 실행 ---
 
 const [command, ...args] = process.argv.slice(2);
-if (command === 'mine' && args.length === 3) {
-  mine(Number(args[0]), Number(args[1]), args[2]).catch((e) => { console.error(e); process.exit(1); });
+if (command === 'mine' && (args.length === 3 || args.length === 4)) {
+  mine(Number(args[0]), Number(args[1]), args[2], args[3] ? Number(args[3]) : undefined)
+    .catch((e) => { console.error(e); process.exit(1); });
 } else if (command === 'write' && args.length > 0) {
   write(args).catch((e) => { console.error(e); process.exit(1); });
 } else {
-  console.error('사용: node games/chess-puzzle/bake.js mine <분> <씨앗> <출력.json>');
+  console.error('사용: node games/chess-puzzle/bake.js mine <분> <씨앗> <출력.json> [두는깊이]');
   console.error('      node games/chess-puzzle/bake.js write <입력.json...>');
   process.exit(1);
 }

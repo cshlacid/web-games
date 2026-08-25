@@ -206,6 +206,40 @@ const LEVELS = ['easy', 'medium', 'hard'];
     else counts[puzzle.level] = (counts[puzzle.level] || 0) + 1;
   }
   check('문제 아이디가 겹치지 않는다', duplicated, 0);
+
+  // 판이 달라도 푸는 방법이 같으면 같은 문제를 다시 푸는 것과 다르지 않다.
+  // 엔진끼리 둔 판에서 캐면 이 쏠림이 심해서 — "비숍으로 퀸을 잡는 한 수"
+  // 하나에 열여섯 개가 몰렸다 — bake.js가 하나만 남긴다. 그 성질을 여기서 지킨다.
+  //
+  // 손으로 고른 넷(레이팅이 붙은 것)은 뺀다. 이 열쇠는 움직인 말과 잡은 말,
+  // 체크·포크·메이트 여부만 보는 기계적인 근사라서 발견 공격과 메이트 그물을
+  // 구분하지 못한다 — 실제로 '열린 길'과 '대각선 위의 메이트'가 같은 열쇠로
+  // 묶인다. 사람이 고른 판까지 이 잣대로 버릴 이유는 없다.
+  const VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 100 };
+  const methods = new Map();
+  for (const puzzle of global.CHESS_PUZZLES.filter((p) => p.rating === undefined)) {
+    const position = L.startPuzzle(puzzle).position;
+    const uci = puzzle.moves[1];
+    const to = uci.slice(2, 4);
+    const piece = position.board[uci.slice(0, 2)];
+    const took = position.board[to];
+    const next = L.applyMove(position, uci);
+    const status = L.positionStatus(next);
+    const targets = L.pseudoMoves(next, to)
+      .map((m) => next.board[m.to])
+      .filter((p) => p && L.colorOf(p) !== L.colorOf(piece) && VALUE[p.toLowerCase()] >= 3);
+    const key = [
+      piece.toLowerCase(), took ? took.toLowerCase() : '-',
+      status === 'check' || status === 'checkmate', status === 'checkmate',
+      targets.length >= 2, Math.ceil((puzzle.moves.length - 1) / 2),
+    ].join('|');
+    if (!methods.has(key)) methods.set(key, []);
+    methods.get(key).push(puzzle.id);
+  }
+  const repeated = [...methods.entries()].filter(([, ids]) => ids.length > 1);
+  check('만들어 낸 문제끼리 푸는 방법이 겹치지 않는다',
+    repeated.map(([k, ids]) => `${k}: ${ids.join(',')}`), []);
+  console.log(`  푸는 방법 ${methods.size}가지`);
   check('모든 문제에 난이도가 있다', badLevel, 0);
   // 비어 있는 난이도가 있으면 골라도 아무것도 안 나온다.
   for (const level of LEVELS) check(`${level}: 문제가 있다`, (counts[level] || 0) > 0, true);
@@ -236,6 +270,20 @@ for (const puzzle of global.CHESS_PUZZLES) {
   // 레이팅은 원래 자료에 있던 문제에만 있다. 있다면 숫자여야 한다.
   check(`${label}: 레이팅이 있다면 숫자다`,
     puzzle.rating === undefined || Number.isFinite(puzzle.rating), true);
+
+  // 다 푼 뒤 되짚어 보여 주는 수순. 푸는 데 쓰지 않지만 판 위에서 그대로
+  // 두어 보이므로, 규칙에 어긋나면 그 자리에서 화면이 멈춘다.
+  if (Array.isArray(puzzle.line) && puzzle.line.length) {
+    let after = state.position;
+    let broken = null;
+    for (const move of puzzle.line) {
+      if (!L.isLegal(after, move)) { broken = move; break; }
+      after = L.applyMove(after, move);
+    }
+    check(`${label}: 이어지는 수순이 규칙에 맞는다`, broken, null);
+  }
+  check(`${label}: 왜 이기는지가 적혀 있다`,
+    typeof puzzle.why === 'string' && puzzle.why.length > 0, true);
 
   // 첫 수가 유일한 정답이어야 한다. 다른 수도 똑같이 좋으면, 그것을 둔
   // 플레이어가 오답 판정을 받는다.
