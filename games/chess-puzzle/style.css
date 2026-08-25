@@ -162,15 +162,26 @@ h1 {
 .square.light { background: var(--light-square); }
 .square.dark { background: var(--dark-square); }
 
-/* 말은 양쪽 다 속이 찬 글리프를 쓰고 색으로만 가른다. 유니코드의 흰 말은 속이
-   빈 글자라 밝은 칸에서 묻힌다. 반대색 테두리를 둘러 어느 칸에서도 읽히게 한다. */
+/* 말은 pieces.js가 그리는 SVG다. 채우기와 테두리를 반대색으로 두면 밝은 칸에서도
+   어두운 칸에서도 윤곽이 살아, 흑백을 한눈에 가를 수 있다. */
 .piece {
-  font-family: "Segoe UI Symbol", "Noto Sans Symbols 2", "Apple Symbols", sans-serif;
-  font-size: calc(var(--board) / 8 * 0.8);
+  display: block;
+  width: 88%;
   pointer-events: none;
+  filter: drop-shadow(0 1px 1px #00000038);
 }
-.piece.white { color: #fbf7ef; text-shadow: 0 0 1px #1b1611, 0 1px 2px #1b1611b0, 0 0 3px #1b161180; }
-.piece.black { color: #201b16; text-shadow: 0 0 1px #f2ece0, 0 1px 2px #00000060; }
+.piece svg { display: block; width: 100%; height: auto; }
+.piece svg * {
+  fill: var(--piece-fill);
+  stroke: var(--piece-stroke);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+/* 속을 비우고 선만 그리는 도형. 인라인 fill="none"은 위 규칙에 덮어써지므로
+   클래스로 되돌려야 한다 — 처음엔 그걸 몰라 비숍의 트인 자리가 칠해져 나왔다. */
+.piece svg .line { fill: none; stroke: var(--piece-stroke); }
+.piece.white { --piece-fill: #f7f2e7; --piece-stroke: #23201a; }
+.piece.black { --piece-fill: #2a251d; --piece-stroke: #e9e1d2; }
 
 /* 직전 수는 두 칸을 함께 물들인다. 화면을 잠깐 벗어났다 돌아와도 무슨 일이
    있었는지 판만 보고 알 수 있어야 한다. */
@@ -235,7 +246,7 @@ h1 {
   background: var(--light-square);
   cursor: pointer;
 }
-.promotion-key .piece { font-size: calc(var(--board) / 8 * 0.72); }
+.promotion-key .piece { width: 80%; }
 
 .toast {
   margin: 0;
