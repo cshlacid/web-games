@@ -27,10 +27,7 @@
     toggleSfx: document.getElementById('toggle-sfx'),
   };
 
-  // 말은 양쪽 다 속이 찬 글리프를 쓰고 색으로만 가른다. 유니코드의 흰 말
-  // (♔♕♖)은 속이 빈 글자라, 칸 색에 따라 안이 비쳐 보이거나 아예 묻힌다.
-  // 같은 모양을 칠하고 반대색 테두리를 두르는 편이 어느 칸에서도 읽힌다.
-  const GLYPHS = { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' };
+  const Pieces = window.ChessPieces;
   const PROMOTION_ORDER = ['q', 'r', 'b', 'n'];
   const PROMOTION_NAMES = { q: '퀸', r: '룩', b: '비숍', n: '나이트' };
 
@@ -109,12 +106,13 @@
       if (targets.has(name)) classes.push(piece ? 'capture' : 'target');
       button.className = classes.join(' ');
 
-      button.replaceChildren();
-      if (piece) {
-        const glyph = document.createElement('span');
-        glyph.className = `piece ${L.colorOf(piece) === L.WHITE ? 'white' : 'black'}`;
-        glyph.textContent = GLYPHS[piece.toLowerCase()];
-        button.appendChild(glyph);
+      // 같은 말이 같은 칸에 그대로 있으면 다시 그리지 않는다. 매 수마다 64칸의
+      // SVG를 새로 파싱하면 판이 눈에 띄게 느려진다.
+      if (button.dataset.piece !== (piece || '')) {
+        button.dataset.piece = piece || '';
+        button.innerHTML = piece
+          ? `<span class="piece ${L.colorOf(piece) === L.WHITE ? 'white' : 'black'}">${Pieces.svg(piece.toLowerCase())}</span>`
+          : '';
       }
       button.setAttribute('aria-label', describe(name, piece));
     }
@@ -224,7 +222,7 @@
       button.className = 'promotion-key';
       button.dataset.promotion = kind;
       const color = state.color === L.WHITE ? 'white' : 'black';
-      button.innerHTML = `<span class="piece ${color}">${GLYPHS[kind]}</span>`;
+      button.innerHTML = `<span class="piece ${color}">${Pieces.svg(kind)}</span>`;
       button.setAttribute('aria-label', PROMOTION_NAMES[kind]);
       button.addEventListener('click', () => {
         const move = pending;
