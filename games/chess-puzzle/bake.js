@@ -373,6 +373,75 @@ function methodOf(facts) {
  * 벌어지는 자리를 골랐다 — 실측 217개 기준으로 107/64/50으로 나뉜다.
  * 다시 구울 때는 write가 찍어 주는 분포를 보고 고친다.
  */
+/**
+ * 정답을 둔 뒤 이어지는 수순.
+ *
+ * 문제는 대부분 한 수짜리라, 두고 나면 "정답입니다"만 뜨고 그 수가 무엇을
+ * 얻는지는 화면에 남지 않는다. 희생 문제가 특히 그렇다 — 손해로 보이는 수를
+ * 두고 정답 판정만 받으니 왜 이기는지 알 수 없다.
+ *
+ * 그래서 이 수순은 푸는 데 쓰지 않는다. 다 푼 뒤에 판 위에서 되짚어 보여
+ * 주기만 한다. 플레이어가 따라 둘 것이 아니므로, 상대의 응수가 유일하지 않아도
+ * 상관없다 — 수순을 한 수로 끊어 둔 이유가 여기서는 걸리지 않는다.
+ */
+async function continuation(sf, puzzle, plies = 6) {
+  let position = L.parseFen(puzzle.fen);
+  for (const move of puzzle.moves) position = L.applyMove(position, move);
+  if (L.positionStatus(position) === 'checkmate') return [];
+
+  const { lines } = await sf.analyse(L.toFen(position), 14, 1);
+  if (!lines.length) return [];
+
+  // 엔진이 주는 PV는 끝이 잘려 있거나 어긋날 수 있다. 우리 규칙으로 한 수씩
+  // 짚어 보고, 어긋나는 자리에서 끊는다.
+  const out = [];
+  for (const move of lines[0].pv.slice(0, plies)) {
+    if (!L.isLegal(position, move)) break;
+    position = L.applyMove(position, move);
+    out.push(move);
+    if (L.positionStatus(position) === 'checkmate') break;
+  }
+  return out;
+}
+
+/** 그 수순을 끝까지 두면 푸는 쪽이 얻는 것. 설명은 이 사실로만 쓴다. */
+function outcomeOf(puzzle) {
+  let position = L.parseFen(puzzle.fen);
+  for (const move of puzzle.moves) position = L.applyMove(position, move);
+  const solver = L.other(position.turn);
+
+  const count = (board) => {
+    let mine = 0;
+    let theirs = 0;
+    for (const square of Object.keys(board)) {
+      const piece = board[square];
+      const worth = VALUE[piece.toLowerCase()];
+      if (worth >= 100) continue;
+      if (L.colorOf(piece) === solver) mine += worth;
+      else theirs += worth;
+    }
+    return mine - theirs;
+  };
+
+  const before = count(position.board);
+  for (const move of puzzle.line || []) position = L.applyMove(position, move);
+  return {
+    mate: L.positionStatus(position) === 'checkmate',
+    gain: count(position.board) - before,
+  };
+}
+
+function whyOf(puzzle, facts) {
+  if (facts.mate) return '체크메이트입니다.';
+  const { mate, gain } = outcomeOf(puzzle);
+  if (mate) return '이대로 두면 몇 수 안에 메이트입니다.';
+  if (gain >= 8) return `이대로 두면 말을 크게 벌어 둡니다(폰 ${gain}개 값).`;
+  if (gain >= 3) return `이대로 두면 폰 ${gain}개 값만큼 앞섭니다.`;
+  if (gain >= 1) return `이대로 두면 폰 ${gain}개 값만큼 앞섭니다.`;
+  // 이득이 눈에 안 잡히면 자리가 좋아진 것이다. 없는 이유를 지어내지 않는다.
+  return '잡은 것은 없어도 자리가 결정적으로 좋아집니다.';
+}
+
 const LEVEL_AT = { easy: 10, medium: 35 };
 const levelOf = (value) => (value < LEVEL_AT.easy ? 'easy' : value < LEVEL_AT.medium ? 'medium' : 'hard');
 
@@ -459,16 +528,23 @@ async function write(files) {
     return playable(puzzle);
   });
 
-  // 얕은 깊이로도 보이는 수인지 잰다. 난이도 점수의 가장 큰 항이라 여기서 채운다.
   const sf = await openEngine();
   await sf.setup();
   for (const puzzle of unique) {
+    // 얕은 깊이로도 보이는 수인지 잰다. 난이도 점수의 가장 큰 항이다.
     const solverFen = L.toFen(L.applyMove(L.parseFen(puzzle.fen), puzzle.moves[0]));
     puzzle.foundDepth = DEPTHS[DEPTHS.length - 1] + 2;
     for (const depth of DEPTHS) {
       const { best } = await sf.analyse(solverFen, depth, 1);
       if (best === puzzle.moves[1]) { puzzle.foundDepth = depth; break; }
     }
+    puzzle.line = await continuation(sf, puzzle);
+  }
+  // 손으로 고른 넷에도 같은 설명을 붙인다. 수순이 길어 스스로 설명되는 편이지만,
+  // 어떤 문제는 되짚어 보여 주고 어떤 문제는 안 보여 주면 그게 더 이상하다.
+  for (const puzzle of SEEDED) {
+    puzzle.line = await continuation(sf, puzzle);
+    puzzle.why = whyOf(puzzle, readMove(puzzle));
   }
   sf.quit();
 
@@ -500,6 +576,8 @@ async function write(files) {
       themes: themesOf(puzzle, facts),
       title: titleOf(puzzle, facts),
       hint: hintOf(puzzle, facts),
+      line: puzzle.line || [],
+      why: whyOf(puzzle, facts),
       value,
     }));
 
@@ -521,7 +599,7 @@ async function write(files) {
       moves: [${p.moves.map((m) => `'${m}'`).join(', ')}],${p.rating ? `\n      rating: ${p.rating},` : ''}
       themes: [${p.themes.map((t) => `'${t}'`).join(', ')}],
       title: '${p.title}',
-      hint: '${p.hint}',
+      hint: '${p.hint}',${p.line && p.line.length ? `\n      line: [${p.line.map((m) => `'${m}'`).join(', ')}],` : ''}${p.why ? `\n      why: '${p.why}',` : ''}
     },`).join('\n');
 
   fs.writeFileSync(OUT, `'use strict';

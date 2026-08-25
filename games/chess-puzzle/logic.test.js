@@ -271,6 +271,20 @@ for (const puzzle of global.CHESS_PUZZLES) {
   check(`${label}: 레이팅이 있다면 숫자다`,
     puzzle.rating === undefined || Number.isFinite(puzzle.rating), true);
 
+  // 다 푼 뒤 되짚어 보여 주는 수순. 푸는 데 쓰지 않지만 판 위에서 그대로
+  // 두어 보이므로, 규칙에 어긋나면 그 자리에서 화면이 멈춘다.
+  if (Array.isArray(puzzle.line) && puzzle.line.length) {
+    let after = state.position;
+    let broken = null;
+    for (const move of puzzle.line) {
+      if (!L.isLegal(after, move)) { broken = move; break; }
+      after = L.applyMove(after, move);
+    }
+    check(`${label}: 이어지는 수순이 규칙에 맞는다`, broken, null);
+  }
+  check(`${label}: 왜 이기는지가 적혀 있다`,
+    typeof puzzle.why === 'string' && puzzle.why.length > 0, true);
+
   // 첫 수가 유일한 정답이어야 한다. 다른 수도 똑같이 좋으면, 그것을 둔
   // 플레이어가 오답 판정을 받는다.
   const first = L.startPuzzle(puzzle);
