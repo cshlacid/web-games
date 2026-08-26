@@ -69,8 +69,10 @@ function makeUnit(def, side, uid, x, y, level, override, bonus, potions, name) {
     armor: Math.max(0.35, ((override && override.armor) || def.armor) + (gear.armor || 0)),
     healPower: stats.heal + (gear.heal || 0),
     spellPower: stats.spell,
-    // 회피는 능력치에서만 온다. 장비에 붙이면 회피만 쌓는 것이 최선이 된다.
+    // 회피·치명타는 능력치에서만 온다. 장비에 붙이면 그것만 쌓는 것이 최선이 된다.
     dodge: stats.dodge,
+    crit: stats.crit,
+    critDamage: stats.critDamage,
     // 직업에 따라 자동으로 들고 들어간다. 마나를 다 쓴 사제가 남은 전투 내내
     // 서 있는 것을 막는 것이 이것의 목적이다.
     potions: Object.assign({}, potions),
@@ -177,8 +179,33 @@ function addThreat(state, source, target, amount) {
   table[source.uid] = (table[source.uid] || 0) + amount * source.threatMul;
 }
 
+// 치명타. 확률은 때리는 쪽의 민첩이, 추가 피해는 그쪽의 힘이 정한다.
+//
+// **막는 쪽의 회피가 두 번 끼어든다**: 터진 치명타를 그냥 맞는 것으로 무르고
+// (critAvoid), 그래도 터지면 추가 피해를 깎는다(critCut). 회피가 상한일 때
+// 추가 피해가 절반이 되도록 잡았다.
+//
+// 회복에는 막는 쪽이 없다 — 아군에게 가는 것이라 피할 이유가 없다. 그때는
+// defender 없이 부르면 시전자의 확률과 배수가 그대로 걸린다.
+function rollCrit(state, source, defender) {
+  if (!source || !(source.crit > 0)) return 1;
+
+  let chance = source.crit;
+  if (defender) chance *= Math.max(0, 1 - defender.dodge * D.ATTR.critAvoid);
+  if (state.rng() >= chance) return 1;
+
+  let bonus = source.critDamage - 1;
+  if (defender) {
+    const cut = Math.min(D.ATTR.critCut, (defender.dodge / D.ATTR.dodgeCap) * D.ATTR.critCut);
+    bonus *= 1 - cut;
+  }
+  return 1 + bonus;
+}
+
 // 회피는 때리는 것에만 걸린다. 장판과 도트까지 피할 수 있으면 민첩 하나로
 // 모든 것을 무르는 능력치가 되고, 어디에 장판을 깔지 고르는 뜻도 사라진다.
+// 다만 **치명타는 무엇으로 맞든 회피가 끼어든다** — 그쪽은 피하는 것이 아니라
+// 급소를 내주지 않는 것이라 장판이든 도트든 같이 걸린다.
 function applyDamage(state, source, target, raw, dodgeable) {
   if (target.dead) return 0;
 
@@ -187,24 +214,28 @@ function applyDamage(state, source, target, raw, dodgeable) {
     return 0;
   }
 
-  const amount = Math.max(1, Math.round(raw * target.armor));
+  const crit = rollCrit(state, source, target);
+  const amount = Math.max(1, Math.round(raw * crit * target.armor));
   target.hp = Math.max(0, target.hp - amount);
   addThreat(state, source, target, amount);
   state.stats.damage += source && source.side === 'ally' ? amount : 0;
-  emit(state, { type: 'damage', uid: target.uid, amount });
+  emit(state, { type: 'damage', uid: target.uid, amount, crit: crit > 1 });
   if (target.hp === 0) kill(state, target);
   return amount;
 }
 
 function applyHeal(state, source, target, raw) {
   if (target.dead) return 0;
-  const amount = Math.min(raw, target.maxHp - target.hp);
+  // 회복도 터진다. 다만 받는 쪽이 아군이라 회피가 끼어들지 않는다.
+  const crit = rollCrit(state, source, null);
+  const healed = Math.round(raw * crit);
+  const amount = Math.min(healed, target.maxHp - target.hp);
   target.hp += amount;
   if (source && source.uid === HERO_UID) {
     state.stats.healed += amount;
-    state.stats.overheal += raw - amount;
+    state.stats.overheal += healed - amount;
   }
-  emit(state, { type: 'heal', uid: target.uid, amount, over: raw - amount });
+  emit(state, { type: 'heal', uid: target.uid, amount, over: healed - amount, crit: crit > 1 });
   return amount;
 }
 
@@ -553,7 +584,7 @@ function rewardOf(state) {
 const api = {
   HERO_UID, TICK, WAVE_GAP, rewardOf,
   createRng, createBattle, advance, step, drainEvents,
-  castSkill, usePotion, drink, magicPowerOf, applyDamage, applyHeal, addDot, addZone,
+  castSkill, usePotion, drink, magicPowerOf, rollCrit, applyDamage, applyHeal, addDot, addZone,
   hero, skillSlot, resolveTarget,
 };
 

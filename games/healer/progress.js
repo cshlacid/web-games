@@ -117,6 +117,8 @@ function stats(progress) {
     mp: Math.round(derived.mp + (bonus.mp || 0)),
     heal: derived.heal + (bonus.heal || 0),
     dodge: derived.dodge,
+    crit: derived.crit,
+    critDamage: derived.critDamage,
     // 방어 계수가 0 아래로 내려가면 피해가 회복이 된다. 장비를 아무리 겹쳐도
     // 넘지 못하는 바닥을 둔다.
     armor: Math.max(0.35, D.HERO.armor + (bonus.armor || 0)),

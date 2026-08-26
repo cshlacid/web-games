@@ -69,6 +69,19 @@ const everyDef = () => [D.HERO, ...Object.values(D.COMPANIONS), ...Object.values
   check('주문 피해는 회복량보다 덜 오른다',
     at({ int: 40 }).spell < at({ int: 40 }).heal, true);
 
+  // 민첩 → 치명타 확률, 힘 → 치명타 피해
+  check('민첩이 치명타 확률을 정한다', at({}).crit, 10 * D.ATTR.critPerAgi);
+  check('민첩이 오르면 치명타도 잦아진다', at({ agi: 40 }).crit > at({}).crit, true);
+  check('치명타 확률에는 상한이 있다', at({ agi: 100000 }).crit, D.ATTR.critCap);
+  check('힘이 치명타 피해를 정한다',
+    at({}).critDamage, D.ATTR.critBase + 20 * D.ATTR.critDamagePerStr);
+  check('힘이 오르면 더 세게 터진다', at({ str: 60 }).critDamage > at({}).critDamage, true);
+  check('치명타 피해에도 상한이 있다', at({ str: 100000 }).critDamage, D.ATTR.critDamageCap);
+  // 공격 방식과 무관하게 힘이 정한다 — 시전자는 자주 터뜨려도 세게 때리지 못한다.
+  check('시전자도 치명타 피해는 힘이 정한다',
+    D.derive({ id: 'z', name: 'z', atk: 10, attrs: base, attackType: 'magic' },
+      Object.assign({}, base, { int: 999 })).critDamage, at({}).critDamage);
+
   // 민첩 → 회피
   check('민첩이 회피를 정한다', at({}).dodge, 10 * D.ATTR.dodgePerAgi);
   check('민첩이 오르면 회피도', at({ agi: 40 }).dodge > at({}).dodge, true);

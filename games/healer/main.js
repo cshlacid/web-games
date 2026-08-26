@@ -187,13 +187,15 @@ const STAT_LABELS = {
   hp: '최대 체력',
   mp: '최대 마나',
   heal: '회복력',
+  crit: '치명타 확률',
+  critDamage: '치명타 피해',
   dodge: '회피',
   armor: '받는 피해',
 };
 
 function statText(key, value) {
-  if (key === 'heal' || key === 'armor') return `×${value.toFixed(2)}`;
-  if (key === 'dodge') return `${(value * 100).toFixed(1)}%`;
+  if (key === 'heal' || key === 'armor' || key === 'critDamage') return `×${value.toFixed(2)}`;
+  if (key === 'dodge' || key === 'crit') return `${(value * 100).toFixed(1)}%`;
   return String(Math.round(value));
 }
 
@@ -1019,7 +1021,10 @@ function handleEvents(state, events) {
       const unit = AI.byUid(state, event.uid);
       if (unit && event.amount > 0) {
         const heal = event.type === 'heal';
-        floatText(unit, `${heal ? '+' : '−'}${event.amount}`, heal ? 'heal' : 'harm');
+        // 치명타는 느낌표와 큰 글자로 가른다. 색만 다르게 하면 피해·회복과
+        // 헷갈리고, 숫자만 크게 하면 그냥 많이 맞은 것으로 보인다.
+        const kind = `${heal ? 'heal' : 'harm'}${event.crit ? ' crit' : ''}`;
+        floatText(unit, `${heal ? '+' : '−'}${event.amount}${event.crit ? '!' : ''}`, kind);
       }
       continue;
     }

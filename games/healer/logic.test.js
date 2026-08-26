@@ -140,6 +140,9 @@ const run = (state, seconds) => {
   const tank = unit(state, '강철의 브란');
   tank.hp = 200;
   const def = D.PLAYER_SKILLS.regen;
+  // 여기서 보려는 것은 도트가 몇 번 째깍이는가다. 치명타가 터지면 회복량이
+  // 달라져 아래 세는 방법이 그 째깍임을 놓친다.
+  L.hero(state).crit = 0;
 
   L.castSkill(state, 'regen', { uid: tank.uid });
   check('도트는 즉시 회복시키지 않는다', tank.hp, 200);
@@ -311,6 +314,84 @@ const run = (state, seconds) => {
   check('지능이 마법 피해도 올린다', dot.amount > D.PLAYER_SKILLS.flame.tick, true);
   check('회복량보다는 덜 오른다',
     dot.amount / D.PLAYER_SKILLS.flame.tick < power, true);
+}
+
+// --- 치명타 ------------------------------------------------------------
+{
+  // 난수를 직접 넣어 확률을 확정한다. 굴려서 확인하면 "가끔 터진다"까지만 알 수
+  // 있고, 회피가 몇 번 어떻게 끼어드는지는 볼 수 없다.
+  const state = battle();
+  const source = { crit: 0.5, critDamage: 2, side: 'ally' };
+  const rolls = [];
+  state.rng = () => rolls.shift();
+
+  const soft = { dodge: 0 };
+  const nimble = { dodge: D.ATTR.dodgeCap };
+
+  rolls.push(0.9);
+  check('확률을 넘기면 그냥 맞는다', L.rollCrit(state, source, soft), 1);
+
+  rolls.push(0.1);
+  check('확률 안이면 터진다', L.rollCrit(state, source, soft), 2);
+
+  // 회피는 두 번 끼어든다. 먼저 터진 치명타를 무른다.
+  rolls.push(0.4);
+  check('회피가 있으면 같은 값에도 안 터진다', L.rollCrit(state, source, nimble), 1);
+
+  // 그래도 터지면 추가 피해를 깎는다. 회피가 상한이면 절반이다.
+  rolls.push(0.1);
+  check('터져도 추가 피해가 깎인다', L.rollCrit(state, source, nimble), 1.5);
+
+  // 회복에는 막는 쪽이 없다 — 아군에게 가는 것이라 피할 이유가 없다.
+  rolls.push(0.4);
+  check('회복은 회피가 끼어들지 않는다', L.rollCrit(state, source, null), 2);
+
+  check('때리는 쪽이 없으면 터지지 않는다', L.rollCrit(state, null, soft), 1);
+  check('치명타가 없는 쪽도 터지지 않는다',
+    L.rollCrit(state, { crit: 0, critDamage: 3 }, soft), 1);
+}
+
+// --- 치명타가 실제 피해와 회복에 반영되는가 -----------------------------
+{
+  // 반드시 터지게 해 두고 값을 본다.
+  const state = battle();
+  const foe = AI.alive(state, 'enemy')[0];
+  const dealer = unit(state, '검사 라일');
+  dealer.crit = 1;
+  dealer.critDamage = 2;
+  foe.dodge = 0;
+  foe.armor = 1;
+
+  const before = foe.hp;
+  L.applyDamage(state, dealer, foe, 100);
+  check('치명타면 피해가 배수만큼', before - foe.hp, 200);
+
+  const events = L.drainEvents(state);
+  check('화면에 치명타라고 알린다',
+    events.some((event) => event.type === 'damage' && event.crit), true);
+
+  // 회복도 터진다.
+  const healer = L.hero(state);
+  healer.crit = 1;
+  healer.critDamage = 2;
+  const tank = unit(state, '강철의 브란');
+  tank.hp = 100;
+  L.castSkill(state, 'touch', { uid: tank.uid });
+  check('회복도 배수만큼 터진다', tank.hp, 100 + D.PLAYER_SKILLS.touch.heal * 2);
+
+  // 도트와 장판도 터진다 — 피할 수는 없지만 급소는 내줄 수 있다.
+  const dot = battle({ skills: ['flame', 'touch', 'quick', 'regen', 'focus'] });
+  const target = AI.alive(dot, 'enemy').find((u) => u.job === 'tank')
+    || AI.alive(dot, 'enemy')[0];
+  target.dodge = 0;
+  target.armor = 1;
+  L.hero(dot).crit = 1;
+  L.hero(dot).critDamage = 2;
+  L.castSkill(dot, 'flame', { uid: target.uid });
+  const hpBefore = target.hp;
+  run(dot, D.PLAYER_SKILLS.flame.interval + 0.05);
+  const ticked = hpBefore - target.hp;
+  check('도트도 터진다', ticked >= D.PLAYER_SKILLS.flame.tick * 2, true);
 }
 
 // --- 광역 도발 ----------------------------------------------------------
