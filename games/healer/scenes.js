@@ -17,9 +17,13 @@ const D = node ? require('./data.js') : root.HealerData;
 const W = D.FIELD.w;
 const H = D.FIELD.h;
 
-// 벽과 바닥의 경계. 유닛은 y 5~41에 서므로 벽을 이보다 낮게 두면 뒤쪽 유닛이
-// 바닥이 아니라 벽에 서 있는 것처럼 보인다.
+// 벽과 바닥의 경계. 유닛은 FIELD.top~bottom에 서므로 벽을 그보다 낮게 두면
+// 뒤쪽 유닛이 바닥이 아니라 벽에 서 있는 것처럼 보인다.
 const HORIZON = 13;
+
+// 바닥 위의 자리를 비율로 찍는다. 전장 높이를 늘렸을 때 레일과 모닥불이 제
+// 위치를 지키게 하려는 것이다 — 숫자로 박아 두면 높이를 고칠 때마다 어긋난다.
+const floorY = (t) => HORIZON + t * (H - HORIZON);
 
 function createRng(seed) {
   let a = (seed >>> 0) || 1;
@@ -108,7 +112,7 @@ const SCENES = {
       grain(out, HORIZON + 2, H, 46, ['#3d3025', '#553f2d', '#5d4b36'], rng);
 
       // 광차 레일. 가로로 깔린 선 두 줄이 바닥을 바닥으로 읽히게 한다.
-      for (const y of [30, 34.2]) {
+      for (const y of [floorY(0.52), floorY(0.64)]) {
         for (let x = 0; x < W; x += 5) out.push(box(x, y - 1.2, 3.4, 1.1, '#4e3d2c'));
         out.push(box(0, y, W, 0.9, '#7a6a55'));
       }
@@ -153,9 +157,10 @@ const SCENES = {
 
       // 잔해 더미. 바닥보다 어두워야 떨어져 있는 것으로 보인다.
       for (const x of [12, 47, 88]) {
-        out.push(box(x, 30, 6, 3, '#4f4c46'));
-        out.push(box(x + 1.5, 27.5, 3.5, 2.6, '#5c5851'));
-        out.push(box(x + 5, 28.6, 2.4, 1.8, '#464340'));
+        const y = floorY(0.52);
+        out.push(box(x, y, 6, 3, '#4f4c46'));
+        out.push(box(x + 1.5, y - 2.5, 3.5, 2.6, '#5c5851'));
+        out.push(box(x + 5, y - 1.4, 2.4, 1.8, '#464340'));
       }
     },
   },
@@ -191,13 +196,14 @@ const SCENES = {
       grain(out, HORIZON + 4, H, 40, ['#262d1f', '#39442d', '#414d34'], rng);
 
       // 모닥불. 화면에서 가장 밝은 점이라 시선이 여기로 먼저 간다.
-      glow(out, 72, 32, 22, 'gw');
-      out.push(box(67, 33, 10, 2, '#4a3524'));
-      out.push(box(69, 31, 6, 2.4, '#e07b32'));
-      out.push(box(70, 28.6, 4, 2.6, '#f0a83e'));
-      out.push(box(71, 26.8, 2, 2, '#f8dc74'));
-      glow(out, 30.6, 18, 12, 'gw');
-      torch(out, 30, 20);
+      const fire = floorY(0.58);
+      glow(out, 72, fire, 22, 'gw');
+      out.push(box(67, fire + 1, 10, 2, '#4a3524'));
+      out.push(box(69, fire - 1, 6, 2.4, '#e07b32'));
+      out.push(box(70, fire - 3.4, 4, 2.6, '#f0a83e'));
+      out.push(box(71, fire - 5.2, 2, 2, '#f8dc74'));
+      glow(out, 30.6, floorY(0.15), 12, 'gw');
+      torch(out, 30, floorY(0.2));
     },
   },
 };
@@ -218,7 +224,7 @@ function svg(sceneId, seed) {
     + ` shape-rendering="crispEdges" aria-hidden="true">${defs}${out.join('')}</svg>`;
 }
 
-const api = { SCENES, svg, HORIZON };
+const api = { SCENES, svg, HORIZON, floorY };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 root.HealerScenes = api;

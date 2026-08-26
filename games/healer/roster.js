@@ -29,8 +29,8 @@ const pick = (rng, list) => list[(rng() * list.length) | 0];
 
 // 이름이 겹치면 두 동료가 한 사람처럼 보인다. 몇 번 다시 뽑고 그래도 겹치면
 // 뒤에 번호를 붙인다 — 못 만드는 것보다 낫다.
-function makeName(rng, taken, job) {
-  const titles = D.NAMES.title[job] || D.NAMES.title.dealer;
+function makeName(rng, taken, spec) {
+  const titles = D.NAMES.title[spec] || D.NAMES.title.warrior;
   const draw = () => `${pick(rng, titles)} ${pick(rng, D.NAMES.given)}`;
   for (let i = 0; i < 20; i++) {
     const name = draw();
@@ -46,7 +46,7 @@ function makeMember(rng, taken, level, defId) {
   const def = defId ? D.COMPANIONS[defId] : pick(rng, Object.values(D.COMPANIONS));
   return {
     // 이름이 곧 신원이다. 저장본에서 돌아와도 이 이름으로 같은 동료가 이어진다.
-    name: makeName(rng, taken, def.job),
+    name: makeName(rng, taken, def.spec),
     defId: def.id,
     level: Math.max(1, level),
     exp: 0,
@@ -72,12 +72,13 @@ function create(seed) {
 }
 
 const jobOf = (member) => D.COMPANIONS[member.defId].job;
+const specOf = (member) => D.COMPANIONS[member.defId].spec;
 const defOf = (member) => D.COMPANIONS[member.defId];
 
 // 레벨에 맞춰 실제로 들고 나가는 스킬. 편성 화면이 보여 주는 것과 전투가
-// 쓰는 것이 같아야 하므로 규칙을 한 곳에 둔다.
+// 쓰는 것이 같아야 하므로 규칙을 한 곳에 둔다 — data.js의 skillsFor 하나다.
 function skillsOf(member) {
-  return defOf(member).skills.filter((id) => member.level >= D.UNIT_SKILLS[id].minLevel);
+  return D.skillsFor(specOf(member), member.level);
 }
 
 // --- 성장 ---------------------------------------------------------------
@@ -198,7 +199,7 @@ function adopt(saved) {
 
 const api = {
   START_SIZE, MAX_SIZE, JOIN_CHANCE,
-  create, adopt, makeMember, jobOf, defOf, skillsOf,
+  create, adopt, makeMember, jobOf, specOf, defOf, skillsOf,
   gainExp, awardExp, offerGear, gearOf, bonusOf, potionsOf, toParty, maybeJoin,
 };
 

@@ -48,15 +48,19 @@ const SEEDS = [1, 5, 77, 4242, 20260825];
   }
   check('이름이 겹치지 않는다', dupes, []);
 
-  // 이름과 직업이 어긋나면 편성 화면에서 이름을 못 믿게 된다.
+  // 이름과 계열이 어긋나면 편성 화면에서 이름을 못 믿게 된다. 역할(딜러)이
+  // 아니라 계열(궁수·마법사)로 나누는 것은, 한 통에 두면 "궁수 유리"가 전사의
+  // 스킬을 들고 나오기 때문이다.
   const wrong = [];
   for (const seed of SEEDS) {
     for (const member of R.create(seed)) {
-      const titles = D.NAMES.title[R.jobOf(member)];
-      if (!titles.some((title) => member.name.startsWith(title))) wrong.push(member.name);
+      const titles = D.NAMES.title[R.specOf(member)];
+      if (!titles || !titles.some((title) => member.name.startsWith(title))) wrong.push(member.name);
     }
   }
-  check('이름이 직업에 맞는다', wrong, []);
+  check('이름이 계열에 맞는다', wrong, []);
+  check('계열마다 이름 조각이 있다',
+    Object.values(D.COMPANIONS).every((def) => Array.isArray(D.NAMES.title[def.spec])), true);
 }
 
 // --- 성장 ---------------------------------------------------------------

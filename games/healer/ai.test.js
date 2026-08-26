@@ -107,10 +107,12 @@ function gather(state) {
   gather(state);
   const tank = named(state, '강철의 브란');
 
-  // 모든 적이 탱커를 보고 있으면 도발할 이유가 없다.
+  // 모든 적이 탱커를 보고 있으면 도발할 이유가 없다. 때리는 스킬은 나가도 된다 —
+  // 여기서 보려는 것은 도발을 고르지 않는다는 것이다.
   enemies(state).forEach((u) => { u.targetUid = tank.uid; });
+  const idle = AI.chooseSkill(tank, state, enemies(state)[0]);
   check('어그로가 붙어 있으면 도발하지 않는다',
-    AI.chooseSkill(tank, state, enemies(state)[0]), null);
+    idle && D.UNIT_SKILLS[idle.id].kind.startsWith('taunt'), false);
 
   // 하나라도 다른 아군을 때리기 시작하면 도발로 회수한다.
   const loose = enemyOf(state, 'dealer');
@@ -229,7 +231,8 @@ function gather(state) {
 
   // 같은 논리를 쓴다는 것은 같은 수단을 갖는다는 뜻이기도 하다. 도발이 이쪽에만
   // 있으면 적 힐러는 아무에게도 보호받지 못한다.
-  check('적 탱커도 도발을 들고 온다', orc.skills.map((slot) => slot.id), ['taunt']);
+  check('적 탱커도 도발을 들고 온다',
+    orc.skills.some((slot) => slot.id === 'taunt'), true);
   const pull = AI.chooseSkill(orc, state, lyle);
   check('제 힐러를 치는 쪽에게 도발한다', pull && pull.targetUid, lyle.uid);
 

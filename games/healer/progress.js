@@ -115,6 +115,8 @@ function stats(progress) {
     attrs: own,
     hp: Math.round(derived.hp + (bonus.hp || 0)),
     mp: Math.round(derived.mp + (bonus.mp || 0)),
+    // 주인공도 마나가 떨어지면 기본 공격을 하므로 공격력이 화면에 있어야 한다.
+    atk: derived.atk * (1 + (bonus.atk || 0)),
     heal: derived.heal + (bonus.heal || 0),
     dodge: derived.dodge,
     crit: derived.crit,
