@@ -115,6 +115,80 @@ function check(name, actual, expected) {
   check('활은 선으로만 긋는다', Sprites.shape(bow).includes('fill="none"'), true);
 }
 
+// --- 상자 밖으로 나가지 않는다 ------------------------------------------
+//
+// 그려 낸 SVG는 `viewBox` 밖을 잘라 낸다. 도형 하나가 상자를 넘으면 그만큼이
+// 조용히 사라지는데, 실제로 오크 우두머리의 머리와 마법사의 모자 끝이 그렇게
+// 잘려 있었다. 좌표를 손으로 적는 한 다시 일어나므로 여기서 본다.
+{
+  // 곡선은 조종점이 아니라 실제로 지나가는 자리를 봐야 한다. 조종점까지 상자
+  // 안에 넣으라고 하면 궁수의 활처럼 크게 휜 것이 헛되이 걸린다.
+  function quadExtremes(a, c, b) {
+    const out = [a, b];
+    const denom = a - 2 * c + b;
+    if (Math.abs(denom) > 1e-9) {
+      const t = (a - c) / denom;
+      if (t > 0 && t < 1) {
+        out.push((1 - t) * (1 - t) * a + 2 * (1 - t) * t * c + t * t * b);
+      }
+    }
+    return out;
+  }
+
+  // `M x y`, `L x y`, `Q cx cy x y`, `Z`만 쓴다.
+  function pathBox(d) {
+    const tokens = d.match(/[MLQZ]|-?\d*\.?\d+/g) || [];
+    const xs = [];
+    const ys = [];
+    let i = 0;
+    let cx = 0;
+    let cy = 0;
+    while (i < tokens.length) {
+      const cmd = tokens[i++];
+      const num = () => Number(tokens[i++]);
+      if (cmd === 'M' || cmd === 'L') {
+        cx = num(); cy = num();
+        xs.push(cx); ys.push(cy);
+      } else if (cmd === 'Q') {
+        const qx = num();
+        const qy = num();
+        const ex = num();
+        const ey = num();
+        xs.push(...quadExtremes(cx, qx, ex));
+        ys.push(...quadExtremes(cy, qy, ey));
+        cx = ex; cy = ey;
+      }
+    }
+    return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
+  }
+
+  function partBox(part) {
+    if (part.e) {
+      const [x, y, rx, ry] = part.e;
+      return [x - rx, y - ry, x + rx, y + ry];
+    }
+    if (part.r) {
+      const [x, y, w, h] = part.r;
+      return [x, y, x + w, y + h];
+    }
+    return pathBox(part.p || part.arc);
+  }
+
+  const clipped = [];
+  for (const [kind, sprite] of Object.entries(Sprites.SPRITES)) {
+    for (const part of sprite.parts) {
+      // 선은 좌표를 가운데 두고 양옆으로 반씩 번진다.
+      const half = part.arc ? part.width / 2 : (part.o === 0 ? 0 : Sprites.STROKE / 2);
+      const [x0, y0, x1, y1] = partBox(part);
+      if (x0 - half < -1 || y0 - half < -1
+        || x1 + half > sprite.w + 1 || y1 + half > sprite.h + 1) {
+        clipped.push(`${kind} [${x0 - half}, ${y0 - half}, ${x1 + half}, ${y1 + half}]`);
+      }
+    }
+  }
+  check('모든 도형이 상자 안에 있다', clipped, []);
+}
+
 // --- 스킬도 눈으로 갈린다 -----------------------------------------------
 //
 // 아이콘이 "어떤 스킬인가"를, 색이 "무엇을 하는가"를 알린다. 둘 중 하나만으로는

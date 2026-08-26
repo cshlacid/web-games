@@ -485,12 +485,19 @@ function cast(state, skillId, target) {
 // 다음 무리가 있으면 그 자리에 적이 솟는 것이 아니라, 걸어가서 만나는 것으로
 // 보여야 한다. 배경이 흘러가고 아군은 대열을 다시 짠다.
 {
-  const state = battle();
+  const state = battle({ skills: ['touch', 'sanctuary'] });
+  // 장판을 하나 깔아 둔 채로 무리를 정리한다. 장판은 유닛 좌표계에 있고 이동
+  // 중에는 그 좌표가 그대로라, 배경만 흘러가면 장판이 파티를 따라오는 것으로
+  // 보인다 — 시체를 치우는 것과 같은 이유로 두고 온다.
+  cast(state, 'sanctuary', { uid: unit(state, '강철의 브란').uid });
+  check('장판이 깔렸다', state.zones.length > 0, true);
+
   AI.alive(state, 'enemy').forEach((u) => L.applyDamage(state, null, u, 99999));
   // 대열이 흐트러진 상태에서 시작해야 다시 짜는 것이 보인다.
   AI.alive(state, 'ally').forEach((u) => { u.x = 80; });
   run(state, 0.2);
   check('무리를 정리하면 이동이 시작된다', state.marching, true);
+  check('깔아 둔 장판은 두고 온다', state.zones, []);
 
   const scrolled = state.scroll;
   run(state, 1);

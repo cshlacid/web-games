@@ -637,6 +637,12 @@ function checkEnd(state) {
     if (!state.nextWaveAt) {
       state.nextWaveAt = state.t + WAVE_GAP;
       state.marching = true;
+      // **깔아 둔 장판은 그 자리에 두고 온다.** 장판은 유닛 좌표계에 있고 이동
+      // 중에는 그 좌표가 그대로라, 배경만 흘러가면 장판이 파티를 따라오는
+      // 것으로 보인다. 시체를 치우는 것과 같은 이유다. 남겨 두면 걸어가는 동안
+      // 회복 장판이 공짜로 도는 문제도 함께 있다. 도트는 몸에 붙은 것이라
+      // 따라가는 것이 맞으므로 건드리지 않는다.
+      state.zones = [];
       emit(state, { type: 'march', text: '다음 무리를 찾아 나선다' });
     } else if (state.t >= state.nextWaveAt) {
       state.nextWaveAt = 0;
