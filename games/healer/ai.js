@@ -229,11 +229,46 @@ function chooseMove(unit, state, target) {
   return dist(unit, target) > want ? standoff(unit, target, want) : null;
 }
 
+// --- 물약 --------------------------------------------------------------
+
+// 마나를 다 쓴 사제가 남은 전투 내내 서 있는 것을 막는다. 물약은 수가 적으므로
+// 아무 때나 마시면 정작 필요할 때 없다.
+//
+// 체력이 먼저다. 마나가 없어 못 싸우는 것보다 죽는 것이 급하다.
+const POTION_HP = 0.35;   // 이 아래로 내려가면 체력 물약
+const POTION_MP = 1.15;   // 가장 싼 스킬도 못 쓸 지경(비용의 이만큼)이면 마나 물약
+
+function cheapestSkillCost(unit) {
+  let cheapest = Infinity;
+  for (const slot of unit.skills) {
+    const def = D.UNIT_SKILLS[slot.id];
+    if (def && def.mp > 0) cheapest = Math.min(cheapest, def.mp);
+  }
+  return cheapest;
+}
+
+function choosePotion(unit, state) {
+  if (!unit.potions || state.t < unit.potionReadyAt) return null;
+
+  if (unit.potions.health > 0 && unit.hp / unit.maxHp <= POTION_HP) return 'health';
+
+  if (unit.potions.mana > 0) {
+    const cost = cheapestSkillCost(unit);
+    // 쓸 스킬이 없으면 마나를 채울 이유도 없다.
+    if (cost !== Infinity && unit.mp < cost * POTION_MP) return 'mana';
+  }
+  return null;
+}
+
 function decide(unit, state) {
   const target = chooseTarget(unit, state);
-  const skill = chooseSkill(unit, state, target);
+  const potion = choosePotion(unit, state);
+  // 물약을 마시는 턴에는 스킬을 쓰지 않는다. 마시자마자 그 마나로 스킬을 쓰면
+  // 물약이 사실상 스킬 하나를 공짜로 얹어 주는 것이 된다.
+  const skill = potion ? null : chooseSkill(unit, state, target);
   return {
     targetUid: target ? target.uid : null,
+    potion,
     skill,
     move: chooseMove(unit, state, target),
     attack: target && dist(unit, target) <= unit.range ? target.uid : null,
@@ -242,7 +277,8 @@ function decide(unit, state) {
 
 const api = {
   dist, alive, byUid, opposite, nearest, frontTank,
-  chooseTarget, healTarget, chooseSkill, chooseMove, decide,
+  chooseTarget, healTarget, chooseSkill, choosePotion, chooseMove, decide,
+  POTION_HP, POTION_MP,
   EFFICIENT, EMERGENCY,
 };
 

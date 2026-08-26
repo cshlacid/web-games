@@ -551,3 +551,23 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
   padding: 1px 8px; font-size: 11px; font-weight: 600; color: var(--fg);
 }
 .chip.dim { color: var(--muted); }
+
+
+/* --- 초상화의 마나 --- */
+/* 동료도 마나를 쓴다. 사제가 왜 가만히 있는지가 화면에 없으면 고장 난 것처럼
+   보이므로 체력 아래에 얇게 한 줄 더 둔다. */
+.bar.thin { height: 4px; margin-top: 2px; }
+.portrait .bar.mp span { background: var(--mp); }
+
+/* --- 편성 화면의 칩 --- */
+.chip.gear { border-color: var(--hero); color: var(--hero); }
+
+/* --- 아이템 줄 --- */
+/* 옵션 줄과 차이 줄이 같은 색이면 무엇이 지금 붙어 있고 무엇이 달라지는지
+   구분되지 않는다. */
+.pick-sub.diff { color: var(--btn-bg); font-weight: 600; }
+.item .pick-cost { white-space: nowrap; }
+.item:disabled { opacity: 0.45; cursor: default; }
+
+/* --- 레벨이 오른 줄 --- */
+.stat-value.up { color: var(--hp); }

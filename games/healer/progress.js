@@ -11,9 +11,13 @@
 
 const node = typeof module !== 'undefined' && module.exports;
 const D = node ? require('./data.js') : root.HealerData;
+const Items = node ? require('./items.js') : root.HealerItems;
+const Roster = node ? require('./roster.js') : root.HealerRoster;
 
 const STORAGE_KEY = 'web-games.healer.progress';
-const VERSION = 1;
+// 판이 바뀌면 저장본을 통째로 버린다. 어중간하게 읽으면 더 이상한 상태가 된다.
+// 2에서 바뀐 것: 아이템에 uid와 무작위 옵션, 동료 명부, 물약 보유량.
+const VERSION = 2;
 
 function create() {
   return {
@@ -25,7 +29,12 @@ function create() {
     // 인덱스를 가리키면 아이템 하나가 빠질 때마다 장착이 엉뚱한 것으로 바뀐다.
     equipped: { weapon: null, armor: null, trinket: null },
     inventory: [],
+    // 주인공이 들고 갈 물약. 동료는 직업에 따라 자동으로 들고 가지만(roster.js),
+    // 주인공 것은 사서 채운다.
+    potions: { mana: 3, health: 1 },
+    roster: Roster.create(),
     questSeed: (Math.random() * 1e9) | 0,
+    shopSeed: (Math.random() * 1e9) | 0,
     cleared: 0,
   };
 }
@@ -77,13 +86,11 @@ function stats(progress) {
     armor: D.HERO.armor,
   };
 
-  for (const item of equippedItems(progress)) {
-    const bonus = D.gearStats(item.defId, item.tier);
-    base.hp += bonus.hp || 0;
-    base.mp += bonus.mp || 0;
-    base.heal += bonus.heal || 0;
-    base.armor += bonus.armor || 0;
-  }
+  const bonus = Items.sum(equippedItems(progress));
+  base.hp += bonus.hp || 0;
+  base.mp += bonus.mp || 0;
+  base.heal += bonus.heal || 0;
+  base.armor += bonus.armor || 0;
 
   // 방어 계수가 0 아래로 내려가면 피해가 회복이 된다. 장비를 아무리 겹쳐도
   // 넘지 못하는 바닥을 둔다.
@@ -103,14 +110,22 @@ function addItem(progress, item) {
   if (D.MATERIALS[item.defId]) {
     // 재료는 들고 다닐 이유가 없다. 바로 팔아 골드로 바꾼다 — 팔기 화면을
     // 따로 만들지 않기 위한 선택이고, 그 사실을 결과 화면에 적는다.
-    progress.gold += D.MATERIALS[item.defId].gold * (1 + (item.tier || 0));
-    return { sold: true };
+    const gold = Items.price(item);
+    progress.gold += gold;
+    return { sold: true, gold };
   }
-  progress.inventory.push({ defId: item.defId, tier: item.tier });
-  return { sold: false };
+  progress.inventory.push(item);
+  return { sold: false, gold: 0 };
 }
 
-function equip(progress, index) {
+// 인벤토리 항목은 uid로 찾는다. 자리 번호로 찾으면 하나 장착할 때마다 뒤의
+// 번호가 밀려서, 결과 화면처럼 목록을 들고 있는 곳이 엉뚱한 것을 집는다.
+function findItem(progress, itemUid) {
+  return progress.inventory.findIndex((item) => item.uid === itemUid);
+}
+
+function equip(progress, itemUid) {
+  const index = findItem(progress, itemUid);
   const item = progress.inventory[index];
   const def = item && D.GEAR[item.defId];
   if (!def) return { ok: false, reason: '장착할 수 없는 물건' };
@@ -120,6 +135,45 @@ function equip(progress, index) {
   progress.inventory.splice(index, 1);
   if (previous) progress.inventory.push(previous);
   return { ok: true, slot: def.slot, previous };
+}
+
+// --- 상점 ---------------------------------------------------------------
+
+function spend(progress, cost) {
+  if (progress.gold < cost) return { ok: false, reason: '골드가 모자란다' };
+  progress.gold -= cost;
+  return { ok: true, cost };
+}
+
+function buyGear(progress, item) {
+  const paid = spend(progress, Items.price(item));
+  if (!paid.ok) return paid;
+  progress.inventory.push(item);
+  return { ok: true, cost: paid.cost };
+}
+
+function buyPotion(progress, potionId) {
+  const potion = D.POTIONS[potionId];
+  if (!potion) return { ok: false, reason: '모르는 물약' };
+  if ((progress.potions[potionId] || 0) >= D.POTION_MAX) {
+    return { ok: false, reason: `${D.POTION_MAX}개까지만 들고 간다` };
+  }
+  const paid = spend(progress, potion.price);
+  if (!paid.ok) return paid;
+  progress.potions[potionId] = (progress.potions[potionId] || 0) + 1;
+  return { ok: true, cost: paid.cost };
+}
+
+// 장착 중인 것은 팔 수 없다. 팔리면 다음 전투에 빈손으로 나가는데, 그것을
+// 되돌릴 방법이 없다.
+function sell(progress, itemUid) {
+  const index = findItem(progress, itemUid);
+  const item = progress.inventory[index];
+  if (!item) return { ok: false, reason: '없는 물건' };
+  const gold = Items.sellPrice(item);
+  progress.inventory.splice(index, 1);
+  progress.gold += gold;
+  return { ok: true, gold };
 }
 
 function unequip(progress, slot) {
@@ -135,15 +189,13 @@ function unequip(progress, slot) {
 function compare(progress, item) {
   const def = D.GEAR[item.defId];
   if (!def) return null;
-  const now = progress.equipped[def.slot];
-  const next = D.gearStats(item.defId, item.tier);
-  const prev = now ? D.gearStats(now.defId, now.tier) : {};
-  const diff = {};
-  for (const key of ['hp', 'mp', 'heal', 'armor']) {
-    const delta = (next[key] || 0) - (prev[key] || 0);
-    if (Math.abs(delta) > 0.0001) diff[key] = delta;
-  }
-  return { slot: def.slot, current: now, diff };
+  const current = progress.equipped[def.slot];
+  return {
+    slot: def.slot,
+    current,
+    diff: Items.diff(item, current),
+    upgrade: Items.isUpgrade(item, current),
+  };
 }
 
 // --- 스킬 ---------------------------------------------------------------
@@ -180,16 +232,30 @@ function load() {
   if (!saved || saved.version !== VERSION) return fresh;
 
   const progress = Object.assign(fresh, saved);
-  progress.equipped = Object.assign({ weapon: null, armor: null, trinket: null }, saved.equipped);
-  for (const slot of Object.keys(progress.equipped)) {
-    const item = progress.equipped[slot];
-    if (!item || !D.GEAR[item.defId] || D.GEAR[item.defId].slot !== slot) progress.equipped[slot] = null;
+
+  // 아이템은 uid를 다시 붙여 받는다. 저장본의 uid를 그대로 믿으면 겹칠 수 있고,
+  // 겹치면 하나를 장착할 때 다른 하나가 사라진다.
+  progress.equipped = { weapon: null, armor: null, trinket: null };
+  for (const [slot, item] of Object.entries(saved.equipped || {})) {
+    const adopted = Items.adopt(item);
+    if (adopted && D.GEAR[adopted.defId] && D.GEAR[adopted.defId].slot === slot) {
+      progress.equipped[slot] = adopted;
+    }
   }
   progress.inventory = (Array.isArray(saved.inventory) ? saved.inventory : [])
-    .filter((item) => item && D.GEAR[item.defId])
-    .map((item) => ({ defId: item.defId, tier: Math.max(0, Math.min(D.TIERS.length - 1, item.tier | 0)) }));
+    .map((item) => Items.adopt(item))
+    .filter((item) => item && D.GEAR[item.defId]);
+
+  progress.potions = {};
+  for (const id of Object.keys(D.POTIONS)) {
+    const saved2 = (saved.potions || {})[id];
+    progress.potions[id] = Math.max(0, Math.min(D.POTION_MAX, saved2 | 0));
+  }
+
+  progress.roster = Roster.adopt(saved.roster);
   progress.charLevel = Math.max(1, Math.min(D.LEVEL.maxLevel, progress.charLevel | 0));
   progress.jobLevel = Math.max(1, Math.min(D.LEVEL.maxLevel, progress.jobLevel | 0));
+  progress.gold = Math.max(0, progress.gold | 0);
   return progress;
 }
 
@@ -199,9 +265,10 @@ function reset() {
 }
 
 const api = {
-  STORAGE_KEY, create, load, save, reset,
+  STORAGE_KEY, VERSION, create, load, save, reset,
   addExp, gainLevels, stats, equippedItems,
-  addItem, equip, unequip, compare,
+  addItem, findItem, equip, unequip, compare,
+  spend, buyGear, buyPotion, sell,
   unlockedSkills, validSkills,
 };
 

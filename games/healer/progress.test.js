@@ -5,6 +5,8 @@
 // 두면 저장본이 깨졌을 때 진행이 통째로 날아가는 것을 알 방법이 없다.
 const D = require('./data.js');
 const P = require('./progress.js');
+const Items = require('./items.js');
+const Roster = require('./roster.js');
 
 let passed = 0;
 let failed = 0;
@@ -20,13 +22,15 @@ function check(name, actual, expected) {
   }
 }
 
-const gear = (defId, tier) => ({ defId, tier: tier || 0 });
+const gear = (defId, tier) => Items.make(defId, tier || 0, 3);
 
 // --- 시작 상태 ----------------------------------------------------------
 {
   const progress = P.create();
   check('레벨 1에서 시작', [progress.charLevel, progress.jobLevel], [1, 1]);
   check('빈손으로 시작', [progress.inventory.length, progress.gold], [0, 0]);
+  check('명부를 들고 시작', progress.roster.length, Roster.START_SIZE);
+  check('물약을 조금 들고 시작', progress.potions.mana > 0, true);
   check('처음 열린 스킬은 둘', P.unlockedSkills(progress).map((def) => def.id), ['touch', 'quick']);
 
   const stats = P.stats(progress);
@@ -98,13 +102,14 @@ const gear = (defId, tier) => ({ defId, tier: tier || 0 });
   check('장비는 인벤토리로', progress.inventory.length, 1);
 
   const before = P.stats(progress);
-  check('장착된다', P.equip(progress, 0).ok, true);
+  check('장착된다', P.equip(progress, progress.inventory[0].uid).ok, true);
   check('장착하면 인벤토리에서 빠진다', progress.inventory.length, 0);
   check('수치가 오른다', P.stats(progress).heal > before.heal, true);
 
   // 같은 슬롯에 다른 것을 끼면 원래 것이 인벤토리로 돌아온다. 사라지면 안 된다.
-  P.addItem(progress, gear('rod', 0));
-  P.equip(progress, 0);
+  const rod = gear('rod', 0);
+  P.addItem(progress, rod);
+  P.equip(progress, rod.uid);
   check('갈아 끼우면 쓰던 것이 인벤토리로', progress.inventory.length, 1);
   check('새 것이 장착되어 있다', progress.equipped.weapon.defId, 'rod');
 
@@ -116,15 +121,16 @@ const gear = (defId, tier) => ({ defId, tier: tier || 0 });
 // --- 견주기 -------------------------------------------------------------
 {
   const progress = P.create();
-  P.addItem(progress, gear('staff', 0));
-  P.equip(progress, 0);
+  const staff = gear('staff', 0);
+  P.addItem(progress, staff);
+  P.equip(progress, staff.uid);
 
   // 빈 슬롯과 견주면 통째로 이득이고, 낀 것과 견주면 차이만 보여야 한다.
   const better = P.compare(progress, gear('staff', 3));
   check('등급이 높으면 이득이다', better.diff.heal > 0, true);
   check('어느 슬롯인지 알려 준다', better.slot, 'weapon');
 
-  const same = P.compare(progress, gear('staff', 0));
+  const same = P.compare(progress, staff);
   check('같은 것이면 차이가 없다', Object.keys(same.diff).length, 0);
 
   const empty = P.compare(P.create(), gear('robe', 0));
@@ -136,8 +142,9 @@ const gear = (defId, tier) => ({ defId, tier: tier || 0 });
   // 장비를 겹쳐 끼우면 계수가 0 아래로 내려가 피해가 회복이 될 수 있다.
   const progress = P.create();
   for (const defId of ['mail', 'shield', 'band']) {
-    P.addItem(progress, gear(defId, D.TIERS.length - 1));
-    P.equip(progress, 0);
+    const item = gear(defId, D.TIERS.length - 1);
+    P.addItem(progress, item);
+    P.equip(progress, item.uid);
   }
   check('받는 피해에 바닥이 있다', P.stats(progress).armor >= 0.35, true);
 }
@@ -162,6 +169,7 @@ const gear = (defId, tier) => ({ defId, tier: tier || 0 });
   saved.gold = 500;
   saved.inventory = [gear('staff', 1), { defId: '없는물건', tier: 0 }, null];
   saved.equipped.weapon = gear('robe', 0);   // 슬롯이 맞지 않는 장착
+  saved.potions = { mana: 99, health: -3 };  // 범위를 벗어난 값
   check('저장된다', P.save(saved), true);
 
   const loaded = P.load();
@@ -169,6 +177,12 @@ const gear = (defId, tier) => ({ defId, tier: tier || 0 });
   check('골드가 남는다', loaded.gold, 500);
   check('모르는 물건은 버린다', loaded.inventory.length, 1);
   check('슬롯이 안 맞는 장착은 비운다', loaded.equipped.weapon, null);
+  check('물약 수는 범위 안으로 자른다', [loaded.potions.mana, loaded.potions.health], [D.POTION_MAX, 0]);
+  check('명부도 살아 돌아온다', loaded.roster.length, Roster.START_SIZE);
+  // uid를 저장본 그대로 믿으면 겹칠 수 있고, 겹치면 하나를 장착할 때 다른
+  // 하나가 사라진다.
+  check('아이템 uid를 다시 붙인다',
+    new Set(loaded.inventory.map((item) => item.uid)).size, loaded.inventory.length);
 
   // 판이 바뀌면 저장본을 통째로 버린다. 어중간하게 읽으면 더 이상한 상태가 된다.
   global.localStorage.setItem('x', JSON.stringify({ version: 999, charLevel: 20 }));
@@ -177,6 +191,35 @@ const gear = (defId, tier) => ({ defId, tier: tier || 0 });
   global.localStorage.setItem('x', '깨진 저장본');
   check('깨진 저장본도 새로 시작', P.load().charLevel, 1);
   delete global.localStorage;
+}
+
+// --- 상점 --------------------------------------------------------------
+{
+  const progress = P.create();
+  progress.gold = 1000;
+  const item = gear('staff', 2);
+
+  check('골드가 모자라면 못 산다', P.buyGear(P.create(), item).ok, false);
+  const bought = P.buyGear(progress, item);
+  check('사면 인벤토리로', [bought.ok, progress.inventory.length], [true, 1]);
+  check('골드가 준다', progress.gold, 1000 - Items.price(item));
+
+  // 사서 되파는 것이 이득이면 골드가 뜻을 잃는다.
+  const goldBefore = progress.gold;
+  const sold = P.sell(progress, item.uid);
+  check('팔면 골드가 는다', sold.ok, true);
+  check('산 값보다 싸게 팔린다', sold.gold < Items.price(item), true);
+  check('되팔아도 본전이 안 된다', progress.gold < goldBefore + Items.price(item), true);
+  check('없는 물건은 못 판다', P.sell(progress, '없는uid').ok, false);
+
+  const potions = P.create();
+  potions.gold = 10000;
+  potions.potions.mana = D.POTION_MAX;
+  check('가득 차면 더 못 산다', P.buyPotion(potions, 'mana').ok, false);
+  check('모르는 물약은 못 산다', P.buyPotion(potions, '엘릭서').ok, false);
+  potions.potions.health = 0;
+  check('빈 쪽은 살 수 있다', P.buyPotion(potions, 'health').ok, true);
+  check('한 개씩 는다', potions.potions.health, 1);
 }
 
 console.log(`${passed}개 통과, ${failed}개 실패`);

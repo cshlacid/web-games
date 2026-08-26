@@ -4,6 +4,7 @@
 // 기획서 16장의 세 분배 방식. 경매는 후순위로 미뤄 둔 기능이라 여기 없다.
 const D = require('./data.js');
 const Loot = require('./loot.js');
+const Items = require('./items.js');
 
 let passed = 0;
 let failed = 0;
@@ -31,15 +32,15 @@ const counts = (result) => MEMBERS.map((m) => result.byMember[m.id].length);
 const jobOf = (id) => MEMBERS.find((m) => m.id === id).job;
 
 // 전리품 하나는 { defId, tier } 꼴이다. 등급이 붙는 것은 장비뿐이다.
-const gear = (defId, tier) => ({ defId, tier: tier || 0 });
-const names = (list) => list.map((item) => D.itemName(item));
+const gear = (defId, tier) => Items.make(defId, tier || 0, 1);
+const names = (list) => list.map((item) => Items.name(item));
 
 // --- 전리품은 퀘스트가 들고 온다 ----------------------------------------
 {
   const Q = require('./quests.js');
   const quest = Q.generate(6, 99)[0];
   check('의뢰에 전리품이 붙어 있다', quest.drops.length > 0, true);
-  check('전부 아는 물건이다', quest.drops.every((item) => Boolean(D.itemDef(item.defId))), true);
+  check('전부 아는 물건이다', quest.drops.every((item) => Boolean(Items.def(item))), true);
   check('같은 씨앗이면 같은 전리품', names(Q.generate(6, 99)[0].drops), names(quest.drops));
 }
 
@@ -142,10 +143,10 @@ const names = (list) => list.map((item) => D.itemName(item));
 
 // --- 이름 표시 ----------------------------------------------------------
 {
-  check('장비 이름에는 등급이 붙는다', D.itemName(gear('shield', 2)), '튼튼한 참나무 방패');
-  check('재료 이름에는 등급이 붙지 않는다', D.itemName(gear('fang', 2)), '고블린 이빨');
+  check('장비 이름에는 등급이 붙는다', Items.name(gear('shield', 2)), '튼튼한 참나무 방패');
+  check('재료 이름에는 등급이 붙지 않는다', Items.name(gear('fang', 2)), '고블린 이빨');
   check('등급이 오르면 수치도 오른다',
-    D.gearStats('shield', 2).hp > D.gearStats('shield', 0).hp, true);
+    Items.stats(gear('shield', 2)).hp > Items.stats(gear('shield', 0)).hp, true);
 }
 
 console.log(`${passed}개 통과, ${failed}개 실패`);

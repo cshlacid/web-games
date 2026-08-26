@@ -47,20 +47,29 @@ function drainEvents(state) {
 
 // 레벨은 수치를 곱하는 것으로만 표현한다. 레벨마다 다른 유닛을 적어 두면 자료가
 // 레벨 수만큼 불어나고, 레벨 하나를 고칠 때마다 다른 레벨과 어긋난다.
-function makeUnit(def, side, uid, x, y, level, override) {
+// override는 주인공처럼 수치가 밖에서 정해지는 경우, bonus는 동료의 장비 몫이다.
+// 둘을 나눈 것은 동료의 기본 수치는 레벨로 곱해야 하고 장비는 그 위에 더해야
+// 하기 때문이다 — 장비까지 레벨로 곱하면 높은 레벨에서 장비가 전부를 결정한다.
+function makeUnit(def, side, uid, x, y, level, override, bonus, potions, name) {
   const hpMul = side === 'enemy' ? D.LEVEL.enemyHp(level) : D.LEVEL.allyHp(level);
   const atkMul = side === 'enemy' ? D.LEVEL.enemyAtk(level) : D.LEVEL.allyAtk(level);
-  const hp = Math.round((override && override.hp) || def.hp * hpMul);
-  const mp = Math.round((override && override.mp) != null ? override.mp : def.mp * hpMul);
+  const gear = bonus || {};
+  const hp = Math.round(((override && override.hp) || def.hp * hpMul) + (gear.hp || 0));
+  const baseMp = (override && override.mp) != null ? override.mp : def.mp * hpMul;
+  const mp = Math.round(baseMp + (gear.mp || 0));
 
   return {
-    uid, defId: def.id, name: def.name, job: def.job, sprite: def.sprite, side, level,
+    uid, defId: def.id, name: name || def.name, job: def.job, sprite: def.sprite, side, level,
     x, y,
     hp, maxHp: hp,
     mp, maxMp: mp,
-    atk: def.atk * atkMul,
-    armor: (override && override.armor) || def.armor,
-    healPower: (override && override.heal) || 1,
+    atk: def.atk * atkMul * (1 + (gear.atk || 0)),
+    armor: Math.max(0.35, ((override && override.armor) || def.armor) + (gear.armor || 0)),
+    healPower: ((override && override.heal) || 1) + (gear.heal || 0),
+    // 직업에 따라 자동으로 들고 들어간다. 마나를 다 쓴 사제가 남은 전투 내내
+    // 서 있는 것을 막는 것이 이것의 목적이다.
+    potions: Object.assign({}, potions),
+    potionReadyAt: 0,
     range: def.range, speed: def.speed,
     attackCd: def.attackCd, nextAttackAt: 0,
     threatMul: def.threatMul,
@@ -86,7 +95,8 @@ function placeAllies(state, members) {
     const hero = def.id === D.HERO.id;
     const x = hero ? 7 : ALLY_LANE[def.job];
     const y = rows === 1 ? D.FIELD.h / 2 : 10 + (i * (D.FIELD.h - 20)) / (rows - 1);
-    state.units.push(makeUnit(def, 'ally', hero ? HERO_UID : `a${i}`, x, y, member.level, member.stats));
+    state.units.push(makeUnit(def, 'ally', hero ? HERO_UID : `a${i}`, x, y,
+      member.level, member.stats, member.bonus, member.potions, member.name));
   });
 }
 
@@ -99,7 +109,10 @@ function spawnWave(state, index) {
     const y = wave.length === 1
       ? D.FIELD.h / 2
       : 10 + (i * (D.FIELD.h - 20)) / (wave.length - 1);
-    const unit = makeUnit(def, 'enemy', `e${index}_${i}`, x, y, state.quest.level || 1);
+    // 적도 직업에 따라 물약을 들고 온다. 아군만 마나를 되찾을 수 있으면
+    // 뒤 웨이브의 주술사가 그냥 서 있는 상대가 된다.
+    const unit = makeUnit(def, 'enemy', `e${index}_${i}`, x, y, state.quest.level || 1,
+      null, null, D.JOB_POTIONS[def.job]);
     state.units.push(unit);
     state.threat[unit.uid] = {};
   });
@@ -114,7 +127,13 @@ function createBattle(config) {
   const quest = config.quest;
   const heroStats = config.heroStats || { hp: D.HERO.hp, mp: D.HERO.mp, heal: 1, armor: D.HERO.armor };
   const party = (config.party || [])
-    .map((entry) => ({ def: D.COMPANIONS[entry.defId], level: entry.level || 1 }))
+    .map((entry) => ({
+      def: D.COMPANIONS[entry.defId],
+      level: entry.level || 1,
+      bonus: entry.bonus,
+      potions: entry.potions || D.JOB_POTIONS[(D.COMPANIONS[entry.defId] || {}).job],
+      name: entry.name,
+    }))
     .filter((entry) => entry.def);
   const skills = (config.skills || []).filter((id) => D.PLAYER_SKILLS[id]).slice(0, D.SKILL_MAX);
 
@@ -123,7 +142,9 @@ function createBattle(config) {
     t: 0, waveIndex: -1, nextWaveAt: 0,
     units: [], zones: [], dots: [], threat: {},
     skills: skills.map((id) => ({ id, readyAt: 0 })),
-    potions: D.POTION.count, potionReadyAt: 0,
+    // 주인공이 들고 온 물약. 상점에서 사서 채운 것이 그대로 들어온다.
+    potions: Object.assign({ mana: 0, health: 0 }, config.potions),
+    potionReadyAt: 0,
     status: 'fighting', events: [], nextZoneId: 1,
     stats: { healed: 0, overheal: 0, damage: 0, casts: 0, deaths: 0 },
   };
@@ -390,18 +411,37 @@ function castSkill(state, skillId, target) {
   return { ok: true };
 }
 
-function usePotion(state) {
-  if (state.status !== 'fighting') return { ok: false, reason: '전투가 끝났다' };
-  if (state.potions <= 0) return { ok: false, reason: '물약이 없다' };
-  if (state.t < state.potionReadyAt) return { ok: false, reason: '쿨타임' };
-  const caster = hero(state);
-  if (caster.dead) return { ok: false, reason: '쓰러졌다' };
+// 물약은 마시는 순간 회복된다. 마나 물약과 체력 물약이 쿨타임을 함께 쓰는 것은,
+// 둘을 번갈아 마시는 것이 최선이 되면 물약 관리가 아니라 손가락 싸움이 되기 때문이다.
+function drink(state, unit, potionId) {
+  const potion = D.POTIONS[potionId];
+  const carried = unit === hero(state) ? state.potions : unit.potions;
+  if (!potion || !carried || carried[potionId] <= 0) return { ok: false, reason: '물약이 없다' };
 
-  state.potions--;
-  state.potionReadyAt = state.t + D.POTION.cd;
-  caster.mp = Math.min(caster.maxMp, caster.mp + D.POTION.mana);
-  emit(state, { type: 'potion', uid: caster.uid, text: `${D.POTION.name}` });
-  return { ok: true };
+  const readyAt = unit === hero(state) ? state.potionReadyAt : unit.potionReadyAt;
+  if (state.t < readyAt) return { ok: false, reason: '쿨타임' };
+  if (unit.dead) return { ok: false, reason: '쓰러졌다' };
+
+  carried[potionId]--;
+  if (unit === hero(state)) state.potionReadyAt = state.t + potion.cd;
+  else unit.potionReadyAt = state.t + potion.cd;
+
+  const before = unit[potion.restore];
+  const cap = potion.restore === 'hp' ? unit.maxHp : unit.maxMp;
+  unit[potion.restore] = Math.min(cap, before + cap * potion.ratio);
+  const gained = unit[potion.restore] - before;
+
+  emit(state, { type: 'potion', uid: unit.uid, potionId, amount: gained,
+    text: `${unit.name}: ${potion.name}` });
+  if (potion.restore === 'hp' && gained > 0) {
+    emit(state, { type: 'heal', uid: unit.uid, amount: Math.round(gained), over: 0 });
+  }
+  return { ok: true, amount: gained };
+}
+
+function usePotion(state, potionId) {
+  if (state.status !== 'fighting') return { ok: false, reason: '전투가 끝났다' };
+  return drink(state, hero(state), potionId || 'mana');
 }
 
 // --- 진행 --------------------------------------------------------------
@@ -435,7 +475,8 @@ function step(state, dt) {
     if (unit.dead || unit.uid === HERO_UID) continue;
     const decision = AI.decide(unit, state);
     unit.targetUid = decision.targetUid;
-    if (decision.skill) runUnitSkill(state, unit, decision.skill);
+    if (decision.potion) drink(state, unit, decision.potion);
+    else if (decision.skill) runUnitSkill(state, unit, decision.skill);
     else if (decision.move) moveToward(unit, decision.move, dt);
 
     if (decision.attack && state.t >= unit.nextAttackAt && isFinite(unit.attackCd)) {
@@ -490,7 +531,7 @@ function rewardOf(state) {
 const api = {
   HERO_UID, TICK, WAVE_GAP, rewardOf,
   createRng, createBattle, advance, step, drainEvents,
-  castSkill, usePotion, applyDamage, applyHeal, addDot, addZone,
+  castSkill, usePotion, drink, applyDamage, applyHeal, addDot, addZone,
   hero, skillSlot, resolveTarget,
 };
 
