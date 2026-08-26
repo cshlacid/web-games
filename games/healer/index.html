@@ -60,10 +60,17 @@
       </div>
 
       <div class="panel">
+        <div class="panel-head"><h2>물약</h2></div>
+        <p class="panel-note">전투에 들고 간다. 상점에서 사서 채운다. 동료는 직업에 맞는 물약을 알아서 챙긴다.</p>
+        <ul class="stats" id="char-potions"></ul>
+      </div>
+
+      <div class="panel">
         <div class="panel-head">
           <h2>인벤토리</h2>
           <span class="count" id="inv-count">0</span>
         </div>
+        <p class="panel-note">누르면 장착한다. 팔 때는 오른쪽 값을 누른다.</p>
         <ul class="inventory" id="inventory"></ul>
       </div>
 
@@ -74,6 +81,36 @@
         </div>
         <p class="panel-note">직업 레벨이 오르면 열린다. 전투에는 이 중 다섯까지 가져간다.</p>
         <ul class="skill-list" id="char-skills"></ul>
+      </div>
+    </div>
+
+    <div class="tab-page" id="tab-shop" hidden>
+      <div class="panel">
+        <div class="panel-head">
+          <h2>상점</h2>
+          <span class="count" id="shop-gold">0 골드</span>
+        </div>
+        <p class="panel-note">진열대는 의뢰를 깨면 바뀐다. 그 전에 바꾸려면 값을 낸다.</p>
+        <button class="mini" id="shop-refresh" type="button">진열대 바꾸기</button>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h2>물약</h2></div>
+        <ul class="inventory" id="shop-potions"></ul>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h2>장비</h2></div>
+        <ul class="inventory" id="shop-gear"></ul>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h2>팔기</h2>
+          <span class="count" id="sell-count">0</span>
+        </div>
+        <p class="panel-note">장착 중인 것은 팔 수 없다. 벗은 다음에 판다.</p>
+        <ul class="inventory" id="shop-sell"></ul>
       </div>
     </div>
   </section>
@@ -158,6 +195,12 @@
       <ul class="awards" id="awards"></ul>
     </div>
 
+    <div class="panel" id="roster-panel">
+      <div class="panel-head"><h2>동료</h2></div>
+      <p class="panel-note">데려간 동료는 함께 얻고, 남은 동료는 다른 파티에서 경험을 쌓는다.</p>
+      <ul class="stats" id="roster-report"></ul>
+    </div>
+
     <div class="panel" id="gain-panel">
       <div class="panel-head"><h2>내 몫</h2></div>
       <p class="panel-note">장비는 바로 장착할 수 있다. 재료는 길드에 팔아 골드가 된다.</p>
@@ -177,6 +220,9 @@
     <button class="tab" type="button" data-tab="character" aria-pressed="false">
       <span class="tab-icon">✚</span><span>캐릭터</span>
     </button>
+    <button class="tab" type="button" data-tab="shop" aria-pressed="false">
+      <span class="tab-icon">🛒</span><span>상점</span>
+    </button>
   </nav>
 
   <div class="sheet" id="help" hidden>
@@ -188,7 +234,12 @@
       <li><b>전투에 가져갈 스킬은 다섯 개까지 전투 전에 등록한다.</b> 전투 중에는
         바꿀 수 없다.</li>
       <li><b>마나는 저절로 차지 않는다.</b> 마나 회복 스킬과 물약뿐이다. 조금
-        깎였다고 큰 힐을 쓰면 남는 힐량이 그대로 사라진다.</li>
+        깎였다고 큰 힐을 쓰면 남는 힐량이 그대로 사라진다. <b>동료도 마나를
+        쓰고 물약을 마신다</b> — 탱커는 체력 물약, 마나를 쓰는 직업은 마나 물약을
+        직업에 따라 알아서 챙겨 온다.</li>
+      <li><b>동료는 명부에 남아 함께 자란다.</b> 같은 이름이면 같은 동료이고,
+        데려가지 않은 동료도 다른 파티에서 경험을 쌓는다. 분배로 동료에게 간
+        장비는 그 동료가 계속 쓴다.</li>
       <li><b>범위·장판 스킬은 기준점을 고른다.</b> 아래쪽 <b>동료 초상화</b>를
         누르면 그 동료를 기준으로, <b>전투 화면</b>을 누르면 그 위치를 기준으로
         발동한다.</li>
@@ -208,7 +259,10 @@
 <script src="data.js"></script>
 <script src="sprites.js"></script>
 <script src="scenes.js"></script>
+<script src="items.js"></script>
+<script src="roster.js"></script>
 <script src="progress.js"></script>
+<script src="shop.js"></script>
 <script src="quests.js"></script>
 <script src="ai.js"></script>
 <script src="logic.js"></script>

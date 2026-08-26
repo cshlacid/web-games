@@ -170,6 +170,58 @@ function gather(state) {
     (heroState.threat[target.uid] || {})[L.HERO_UID] > 0, true);
 }
 
+// --- 물약 (마나를 다 쓴 동료가 서 있지 않게) ----------------------------
+{
+  const state = battle();
+  gather(state);
+  const healer = named(state, '사제 노아');
+  const tank = named(state, '강철의 브란');
+
+  check('멀쩡하면 안 마신다', AI.choosePotion(healer, state), null);
+
+  // 체력이 먼저다. 마나가 없어 못 싸우는 것보다 죽는 것이 급하다.
+  healer.hp = healer.maxHp * (AI.POTION_HP - 0.05);
+  healer.mp = 0;
+  check('둘 다 급하면 체력부터', AI.choosePotion(healer, state), 'health');
+
+  healer.hp = healer.maxHp;
+  check('마나가 없으면 마나 물약', AI.choosePotion(healer, state), 'mana');
+
+  // 가장 싼 스킬을 쓸 만큼 남아 있으면 아직 마시지 않는다. 물약은 수가 적어
+  // 아무 때나 마시면 정작 필요할 때 없다.
+  healer.mp = D.UNIT_SKILLS.mend.mp * 2;
+  check('쓸 만큼 있으면 아낀다', AI.choosePotion(healer, state), null);
+
+  healer.mp = 0;
+  healer.potions = { mana: 0, health: 0 };
+  check('없으면 못 마신다', AI.choosePotion(healer, state), null);
+
+  // 쿨타임이 도는 동안에는 마시지 않는다.
+  healer.potions = { mana: 2, health: 1 };
+  healer.potionReadyAt = state.t + 5;
+  check('쿨타임 중에는 안 마신다', AI.choosePotion(healer, state), null);
+
+  // 물약을 마시는 턴에는 스킬을 쓰지 않는다. 마시자마자 그 마나로 스킬을 쓰면
+  // 물약이 사실상 스킬 하나를 공짜로 얹어 주는 것이 된다.
+  tank.hp = tank.maxHp * 0.2;
+  tank.potionReadyAt = 0;
+  const decision = AI.decide(tank, state);
+  check('물약을 고르면', decision.potion, 'health');
+  check('그 턴에는 스킬을 쓰지 않는다', decision.skill, null);
+  check('때리는 것은 막지 않는다', decision.attack !== undefined, true);
+
+  // 실제로 마셔지는지. 회복량은 최대치의 비율이다.
+  const drinker = battle();
+  const bran = named(drinker, '강철의 브란');
+  bran.hp = 100;
+  const before = bran.hp;
+  check('마신다', L.drink(drinker, bran, 'health').ok, true);
+  check('최대 체력의 비율만큼 찬다',
+    Math.round(bran.hp - before), Math.round(bran.maxHp * D.POTIONS.health.ratio));
+  check('물약이 준다', bran.potions.health, D.JOB_POTIONS.tank.health - 1);
+  check('연달아 못 마신다', L.drink(drinker, bran, 'health').ok, false);
+}
+
 // --- 이동 --------------------------------------------------------------
 {
   const state = battle();

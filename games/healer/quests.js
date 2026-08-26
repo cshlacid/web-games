@@ -125,34 +125,29 @@ function generate(playerLevel, seed) {
 
 // --- 동료 후보 ----------------------------------------------------------
 
-// 퀘스트마다 붙일 수 있는 동료가 다르다. 여덟이 늘 다 나오면 한 번 정한 편성을
-// 계속 쓰게 되고, 편성 화면이 처음 한 번만 의미를 갖는다.
+// 명부에서 이번 의뢰에 붙일 수 있는 동료를 고른다. 명부 전원을 늘 보여 주면
+// 목록이 길어지기만 하고, 한 번 정한 넷을 계속 쓰게 된다.
 //
-// 탱커와 힐러가 하나씩은 반드시 있어야 한다. 없는 목록이 나오면 그 퀘스트는
-// 편성을 고민하는 것이 아니라 그냥 못 깨는 퀘스트가 된다.
-function companionsFor(quest, seed) {
-  const rng = createRng(seed ^ 0x9e3779b9);
-  const roster = Object.values(D.COMPANIONS);
-  const byJob = (job) => roster.filter((def) => def.job === job);
+// **탱커와 힐러는 반드시 하나씩 넣는다.** 없는 목록은 편성을 고민할 의뢰가
+// 아니라 그냥 못 깨는 의뢰다.
+function companionsFor(quest, roster, seed) {
+  const rng = createRng((seed ^ 0x9e3779b9) >>> 0);
+  const byJob = (job) => roster.filter((member) => D.COMPANIONS[member.defId].job === job);
 
-  const chosen = [pick(rng, byJob('tank')), pick(rng, byJob('healer'))];
-  const rest = roster.filter((def) => !chosen.includes(def));
+  const chosen = [];
+  for (const job of ['tank', 'healer']) {
+    const pool = byJob(job);
+    if (pool.length) chosen.push(pick(rng, pool));
+  }
+
+  const rest = roster.filter((member) => !chosen.includes(member));
   while (chosen.length < COMPANION_COUNT && rest.length) {
     chosen.push(rest.splice((rng() * rest.length) | 0, 1)[0]);
   }
 
-  return chosen.map((def) => {
-    // 레벨이 흔들려야 "이번 브란은 함성을 못 쓴다" 같은 것이 생긴다.
-    const level = Math.max(1, quest.level + range(rng, -1, 1));
-    return {
-      defId: def.id,
-      level,
-      skills: def.skills.filter((id) => level >= D.UNIT_SKILLS[id].minLevel),
-    };
-  }).sort((a, b) => {
-    const order = { tank: 0, dealer: 1, healer: 2 };
-    return order[D.COMPANIONS[a.defId].job] - order[D.COMPANIONS[b.defId].job];
-  });
+  const order = { tank: 0, dealer: 1, healer: 2 };
+  return chosen.sort((a, b) =>
+    order[D.COMPANIONS[a.defId].job] - order[D.COMPANIONS[b.defId].job]);
 }
 
 const api = { generate, companionsFor, makeQuest, createRng, QUEST_COUNT, COMPANION_COUNT };

@@ -10,6 +10,7 @@
 
 const node = typeof module !== 'undefined' && module.exports;
 const D = node ? require('./data.js') : root.HealerData;
+const Items = node ? require('./items.js') : root.HealerItems;
 
 function createRng(seed) {
   let a = (seed >>> 0) || 1;
@@ -60,7 +61,7 @@ function byJob(drops, members, rng) {
   members.forEach((m) => { taken[m.id] = 0; });
 
   return drops.map((item) => {
-    const def = D.itemDef(item.defId);
+    const def = Items.def(item);
     const job = def && def.job;
     const matched = job ? members.filter((m) => m.job === job) : [];
 

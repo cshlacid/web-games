@@ -6,6 +6,8 @@
 const D = require('./data.js');
 const Q = require('./quests.js');
 const L = require('./logic.js');
+const R = require('./roster.js');
+const Items = require('./items.js');
 
 let passed = 0;
 let failed = 0;
@@ -64,7 +66,7 @@ function everyQuest(fn) {
   check('아는 장소에서 싸운다',
     everyQuest((q) => (D.REGIONS[q.region] && q.scene ? null : '모르는 지역')), []);
   check('전리품이 붙어 있다',
-    everyQuest((q) => (q.drops.length && q.drops.every((i) => D.itemDef(i.defId)) ? null : '전리품')), []);
+    everyQuest((q) => (q.drops.length && q.drops.every((i) => Items.def(i)) ? null : '전리품')), []);
   check('보상이 0보다 크다',
     everyQuest((q) => (q.guildReward.gold > 0 && q.guildReward.exp > 0 ? null : '보상 없음')), []);
 
@@ -99,19 +101,21 @@ function everyQuest(fn) {
 // --- 동료 후보 ----------------------------------------------------------
 {
   const quest = Q.generate(6, 31)[0];
-  const list = Q.companionsFor(quest, 31);
+  const roster = R.create(31);
+  const list = Q.companionsFor(quest, roster, 31);
 
-  check('정해진 수만큼 나온다', list.length, Q.COMPANION_COUNT);
+  check('명부만큼 나온다', list.length, Math.min(Q.COMPANION_COUNT, roster.length));
   check('같은 씨앗이면 같은 후보',
-    Q.companionsFor(quest, 31).map((c) => c.defId), list.map((c) => c.defId));
-  check('겹치지 않는다', new Set(list.map((c) => c.defId)).size, list.length);
+    Q.companionsFor(quest, roster, 31).map((c) => c.name), list.map((c) => c.name));
+  check('같은 동료가 두 번 나오지 않는다', new Set(list.map((c) => c.name)).size, list.length);
+  check('명부에 있는 동료만 나온다', list.every((c) => roster.includes(c)), true);
 
   // 탱커와 힐러가 없으면 편성을 고민하는 것이 아니라 그냥 못 깨는 의뢰가 된다.
   const bad = [];
   for (const seed of SEEDS) {
     for (const level of LEVELS) {
       for (const q of Q.generate(level, seed)) {
-        const jobs = Q.companionsFor(q, seed).map((c) => D.COMPANIONS[c.defId].job);
+        const jobs = Q.companionsFor(q, R.create(seed), seed).map((c) => D.COMPANIONS[c.defId].job);
         if (!jobs.includes('tank')) bad.push(`Lv${level}/${seed}: 탱커 없음`);
         if (!jobs.includes('healer')) bad.push(`Lv${level}/${seed}: 힐러 없음`);
       }
@@ -123,22 +127,20 @@ function everyQuest(fn) {
   const mute = [];
   for (const seed of SEEDS) {
     for (const q of Q.generate(1, seed)) {
-      for (const entry of Q.companionsFor(q, seed)) {
-        if (!entry.skills.length) mute.push(D.COMPANIONS[entry.defId].name);
+      for (const entry of Q.companionsFor(q, R.create(seed), seed)) {
+        if (!R.skillsOf(entry).length) mute.push(D.COMPANIONS[entry.defId].name);
       }
     }
   }
   check('레벨 1에서도 스킬이 하나는 있다', [...new Set(mute)], []);
 
   // 레벨이 높으면 더 들고 온다 — 광역 도발이 그 예다.
-  const low = Q.companionsFor(Q.generate(1, 5)[0], 5);
-  const high = Q.companionsFor(Q.generate(12, 5)[0], 5);
-  const roars = (list2) => list2.some((c) => c.skills.includes('roar'));
-  check('낮은 레벨 탱커는 광역 도발을 못 쓴다', roars(low), false);
-  check('레벨이 오르면 광역 도발을 들고 온다', roars(high), true);
-
-  check('동료 레벨은 의뢰 레벨 근처',
-    list.every((c) => Math.abs(c.level - quest.level) <= 1), true);
+  // 레벨은 명부가 들고 있다. 낮은 동료는 광역 도발을 못 쓰고, 자라면 쓴다.
+  const rookies = R.create(5);
+  const veterans = R.create(5).map((m) => Object.assign({}, m, { level: 12 }));
+  const roars = (members) => members.some((m) => R.skillsOf(m).includes('roar'));
+  check('낮은 레벨 탱커는 광역 도발을 못 쓴다', roars(rookies), false);
+  check('레벨이 오르면 광역 도발을 들고 온다', roars(veterans), true);
 }
 
 // --- 만들어진 의뢰가 실제로 굴러가는가 ----------------------------------
@@ -149,7 +151,7 @@ function everyQuest(fn) {
   for (const seed of [3, 88, 12345]) {
     for (const level of [1, 8, 20]) {
       for (const quest of Q.generate(level, seed)) {
-        const party = Q.companionsFor(quest, seed).slice(0, 4);
+        const party = Q.companionsFor(quest, R.create(seed), seed).slice(0, 4).map(R.toParty);
         const state = L.createBattle({
           quest, party, skills: ['touch', 'quick'],
           heroStats: { hp: 900, mp: 400, heal: 1.5, armor: 0.8 }, heroLevel: level, seed,

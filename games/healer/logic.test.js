@@ -39,7 +39,8 @@ const PARTY = [
 const SKILLS = ['touch', 'quick', 'regen', 'ripple', 'focus'];
 
 const battle = (over) => L.createBattle(Object.assign(
-  { quest: quest(), party: PARTY, skills: SKILLS, seed: 3 }, over));
+  { quest: quest(), party: PARTY, skills: SKILLS, seed: 3,
+    potions: { mana: 3, health: 2 } }, over));
 
 const unit = (state, name) => state.units.find((u) => u.name === name);
 const run = (state, seconds) => {
@@ -185,20 +186,29 @@ const run = (state, seconds) => {
   check('마나 회복 스킬로 찬다', hero.mp, 40 + D.PLAYER_SKILLS.focus.mana);
 
   hero.mp = 10;
-  check('물약으로도 찬다', L.usePotion(state).ok, true);
-  check('물약만큼 찬다', hero.mp, 10 + D.POTION.mana);
-  check('물약이 하나 준다', state.potions, D.POTION.count - 1);
-  check('물약도 쿨타임이 있다', L.usePotion(state).ok, false);
+  check('마나 물약으로도 찬다', L.usePotion(state, 'mana').ok, true);
+  check('최대 마나의 비율만큼 찬다', hero.mp, 10 + hero.maxMp * D.POTIONS.mana.ratio);
+  check('물약이 하나 준다', state.potions.mana, 2);
+  check('물약도 쿨타임이 있다', L.usePotion(state, 'mana').ok, false);
 
   const empty = battle();
-  empty.potions = 0;
-  check('물약이 없으면 못 쓴다', L.usePotion(empty).ok, false);
+  empty.potions.mana = 0;
+  check('물약이 없으면 못 쓴다', L.usePotion(empty, 'mana').ok, false);
 
   // 최대치를 넘겨 채워지지 않아야 물약을 아껴 쓸 이유가 생긴다.
   const full = battle();
   L.hero(full).mp = L.hero(full).maxMp - 5;
-  L.usePotion(full);
+  L.usePotion(full, 'mana');
   check('최대치를 넘지 않는다', L.hero(full).mp, L.hero(full).maxMp);
+
+  // 체력 물약은 같은 쿨타임을 쓴다. 번갈아 마시는 것이 최선이 되면 물약
+  // 관리가 아니라 손가락 싸움이 된다.
+  const both = battle();
+  L.hero(both).hp = 100;
+  L.hero(both).mp = 10;
+  check('체력 물약도 있다', L.usePotion(both, 'health').ok, true);
+  check('체력이 찬다', L.hero(both).hp > 100, true);
+  check('쿨타임은 둘이 함께 쓴다', L.usePotion(both, 'mana').ok, false);
 }
 
 // --- 어그로와 피해 -----------------------------------------------------
@@ -379,14 +389,21 @@ const run = (state, seconds) => {
 // --- 난이도 확인 --------------------------------------------------------
 //
 // 힐러가 게임의 전부이므로, "가만히 둬도 이긴다"면 이 게임은 성립하지 않는다.
-// 조작 없이 굴린 결과와 단순한 자동 힐러를 붙인 결과를 함께 본다.
+// 고정한 판이 아니라 **실제로 생성되는 의뢰**로 잰다 — 자료를 손볼 때마다 고정
+// 판만 맞춰 두면 게시판에 실제로 걸리는 의뢰가 어떤지는 아무도 모르게 된다.
 {
+  const Q = require('./quests.js');
+  const R = require('./roster.js');
+
   function autoHeal(state) {
     const hero = L.hero(state);
     if (hero.dead) return;
+    const has = (id) => state.skills.some((slot) => slot.id === id);
     const ready = (id) => { const slot = L.skillSlot(state, id); return slot && state.t >= slot.readyAt; };
-    if (hero.mp < 45 && ready('focus')) return void L.castSkill(state, 'focus', {});
-    if (hero.mp < 30 && state.potions > 0 && state.t >= state.potionReadyAt) return void L.usePotion(state);
+    if (has('focus') && hero.mp < 50 && ready('focus')) return void L.castSkill(state, 'focus', {});
+    if (hero.mp < 30 && state.potions.mana > 0 && state.t >= state.potionReadyAt) {
+      return void L.usePotion(state, 'mana');
+    }
 
     const hurt = AI.alive(state, 'ally').filter((u) => u.hp < u.maxHp)
       .sort((a, b) => (b.maxHp - b.hp) - (a.maxHp - a.hp));
@@ -395,18 +412,50 @@ const run = (state, seconds) => {
     const missing = worst.maxHp - worst.hp;
     const clustered = hurt.filter((u) => AI.dist(u, worst) <= D.PLAYER_SKILLS.ripple.radius
       && u.maxHp - u.hp >= D.PLAYER_SKILLS.ripple.heal);
-    if (clustered.length >= 2 && ready('ripple') && hero.mp >= D.PLAYER_SKILLS.ripple.mp) {
+    if (has('ripple') && clustered.length >= 2 && ready('ripple') && hero.mp >= D.PLAYER_SKILLS.ripple.mp) {
       return void L.castSkill(state, 'ripple', { uid: worst.uid });
     }
-    if (missing >= 200 && ready('regen')) return void L.castSkill(state, 'regen', { uid: worst.uid });
+    if (has('regen') && missing >= 200 && ready('regen')) return void L.castSkill(state, 'regen', { uid: worst.uid });
     if (missing >= 115 && ready('touch')) return void L.castSkill(state, 'touch', { uid: worst.uid });
     if (missing >= 60 && ready('quick')) return void L.castSkill(state, 'quick', { uid: worst.uid });
   }
 
-  function play(waves, seed, withHealer) {
-    const state = L.createBattle({ quest: quest({ waves }), party: PARTY, skills: SKILLS, seed });
+  // 게시판에서 사람이 고를 법한 의뢰: 내 레벨에 가장 가까운 것과, 확실히 벅찬 것.
+  function questAt(playerLevel, seed, wanted) {
+    const quests = Q.generate(playerLevel, seed);
+    return quests.slice().sort((a, b) =>
+      Math.abs(a.level - wanted) - Math.abs(b.level - wanted))[0];
+  }
+
+  function play(playerLevel, seed, wanted, withHealer) {
+    const quest = questAt(playerLevel, seed, wanted);
+    const roster = R.create(seed);
+    const candidates = Q.companionsFor(quest, roster, seed);
+    // 탱커 하나, 힐러 하나, 나머지는 딜러 — 사람이 짤 법한 편성.
+    const party = [];
+    for (const job of ['tank', 'healer', 'dealer', 'dealer']) {
+      const found = candidates.find((m) => R.jobOf(m) === job && !party.includes(m));
+      if (found) party.push(found);
+    }
+    for (const member of party) member.level = quest.level;
+
+    const state = L.createBattle({
+      quest,
+      party: party.map(R.toParty),
+      skills: ['touch', 'quick', 'regen', 'ripple', 'focus'],
+      heroStats: {
+        hp: D.LEVEL.heroHp(playerLevel),
+        mp: D.LEVEL.heroMp(playerLevel, playerLevel),
+        heal: D.LEVEL.heroHeal(playerLevel),
+        armor: D.HERO.armor,
+      },
+      heroLevel: playerLevel,
+      potions: { mana: 3, health: 1 },
+      seed,
+    });
+
     let sinceInput = 0;
-    for (let i = 0; i < 240 / L.TICK && state.status === 'fighting'; i++) {
+    for (let i = 0; i < 300 / L.TICK && state.status === 'fighting'; i++) {
       L.step(state, L.TICK);
       sinceInput += L.TICK;
       if (withHealer && sinceInput >= 0.2) { sinceInput = 0; autoHeal(state); }
@@ -415,22 +464,29 @@ const run = (state, seconds) => {
     return state.status;
   }
 
-  const EASY = [['scout', 'scout', 'scout'], ['scout', 'scout', 'scout', 'shaman']];
-  const MID = [['scout', 'scout', 'scout', 'shaman'], ['orc', 'scout', 'shaman'],
-    ['orc', 'orc', 'shaman']];
-  const HARD = [['orc', 'orc', 'scout', 'scout'], ['hexer', 'shaman', 'orc'], ['chief', 'orc']];
+  const seeds = [11, 22, 33, 44, 55];
+  const wins = (playerLevel, wanted, withHealer) =>
+    seeds.filter((seed) => play(playerLevel, seed, wanted, withHealer) === 'won').length;
 
-  const seeds = [1, 2, 3, 4, 5];
-  const wins = (waves, withHealer) =>
-    seeds.filter((seed) => play(waves, seed, withHealer) === 'won').length;
+  // 적정 레벨이 내 레벨과 같은 의뢰는 힐이 들어가면 넘어간다.
+  check('알맞은 의뢰는 힐이 들어가면 깬다', wins(6, 6, true) >= 4, true);
 
-  check('힐러가 놀아도 연습용 판은 넘어간다', wins(EASY, false), 5);
-  // 실시간 전투에 난수가 섞여 있어 어쩌다 넘어가는 판이 나온다. 확률이 아니라
-  // "손을 놓으면 안 된다"는 것이 확인하려는 것이므로 다섯 판 중 하나까지만 봐준다.
-  check('힐러가 놀면 중간 판은 거의 못 깬다', wins(MID, false) <= 1, true);
-  check('힐러가 놀면 어려운 판은 못 깬다', wins(HARD, false), 0);
-  check('힐이 들어가면 중간 판을 깬다', wins(MID, true), 5);
-  check('힐이 들어가면 어려운 판도 깬다', wins(HARD, true), 5);
+  // 벅찬 의뢰(적정 레벨 +3)는 손을 놓으면 넘어가지 못한다. 실시간 전투에 난수가
+  // 섞여 있어 어쩌다 넘어가는 판이 나오므로 다섯 판 중 하나까지만 봐준다.
+  check('벅찬 의뢰는 손을 놓으면 거의 못 깬다', wins(6, 9, false) <= 1, true);
+
+  // 힐이 들어가도 반은 진다. 그래서 "벅참"이다 — 여기서 다섯 판을 다 이기면
+  // 게시판의 난이도 표시가 거짓말이 된다. 위 자동 힐러는 사람보다 서투르므로
+  // 실제로는 이보다 잘 나온다.
+  const hardWins = wins(6, 9, true);
+  check('벅찬 의뢰는 힐이 들어가도 만만치 않다', hardWins >= 2 && hardWins <= 4, true);
+
+  // 어느 레벨에서든 힐이 들어간 쪽이 더 많이 이겨야 한다. 이 게임에서 플레이어가
+  // 하는 일이 그것뿐이다.
+  for (const level of [3, 8, 14]) {
+    check(`Lv${level}: 힐이 들어간 쪽이 더 이긴다`,
+      wins(level, level + 2, true) > wins(level, level + 2, false), true);
+  }
 }
 
 console.log(`${passed}개 통과, ${failed}개 실패`);
