@@ -2,8 +2,12 @@
 
 // 동료와 적의 판단. 기획서 10~14장의 직업별 행동 우선순위가 여기 다 들어 있다.
 //
+// **아군과 적이 같은 함수를 쓴다.** 편마다 다른 규칙을 두었더니 한쪽만 고치고
+// 다른 쪽을 잊는 일이 반복됐고, 무엇보다 적이 아군과 다르게 움직이면 전투를
+// 보면서 규칙을 배울 수가 없다. 여기서 편은 `opposite(side)`로만 나타난다.
+//
 // **판단만 하고 상태를 바꾸지 않는다.** 실행(피해·회복·이동 적용)은 logic.js가 한다.
-// 이렇게 나눠 두면 "탱커가 어그로를 놓쳤을 때 도발을 고르는가" 같은 것을 전투를
+// 이렇게 나눠 두면 "힐러가 노려질 때 탱커가 도발을 고르는가" 같은 것을 전투를
 // 굴리지 않고 상태 하나만 만들어서 확인할 수 있고, logic.js와 순환 참조도 없다.
 (function (root) {
 
@@ -21,6 +25,10 @@ const byUid = (state, uid) => state.units.find((u) => u.uid === uid) || null;
 const opposite = (side) => (side === 'ally' ? 'enemy' : 'ally');
 const missing = (u) => u.maxHp - u.hp;
 
+// 딜러는 근접이냐 원거리냐로 하는 일이 갈린다. 그 구분을 data.js가 사거리에서
+// 뽑아 주므로 여기서는 직업 대신 이것을 본다.
+const roleOf = (unit) => D.roleOf(unit);
+
 function nearest(unit, list) {
   let best = null;
   let bestD = Infinity;
@@ -31,6 +39,56 @@ function nearest(unit, list) {
   return best;
 }
 
+// 우선순위 표에서 앞설수록 작은 값. 표에 없는 역할은 맨 뒤로 보낸다.
+function rankOf(order, unit) {
+  const i = order.indexOf(roleOf(unit));
+  return i < 0 ? order.length : i;
+}
+
+// 표에서 앞선 쪽, 같으면 가까운 쪽. 가까운 쪽을 섞는 것은 뒤에 선 적을 향해
+// 대열을 가로지르지 않게 하려는 것이다.
+function bestBy(unit, list, order) {
+  let best = null;
+  for (const other of list) {
+    if (!best) { best = other; continue; }
+    const rank = rankOf(order, other) - rankOf(order, best);
+    if (rank < 0 || (rank === 0 && dist(unit, other) < dist(unit, best))) best = other;
+  }
+  return best;
+}
+
+const mates = (unit, state) => alive(state, unit.side).filter((u) => u.uid !== unit.uid);
+const foesOf = (unit, state) => alive(state, opposite(unit.side));
+
+// 이 편의 탱커. 여럿이면 앞에 선 쪽을 기준으로 본다 — 후열이 붙는 자리이자
+// 어그로를 보는 자리라 최전선이어야 나머지 규칙이 뜻대로 굴러간다.
+function frontTank(state, side) {
+  const tanks = alive(state, side).filter((u) => u.job === 'tank');
+  if (!tanks.length) return null;
+  const forward = side === 'ally' ? 1 : -1;
+  return tanks.reduce((a, b) => ((b.x - a.x) * forward > 0 ? b : a));
+}
+
+// unit을 지금 노리고 있는 반대편. 어그로 판단의 근거라 logic.js가 매 틱 갱신한
+// targetUid를 그대로 쓴다 — 위협도 표 없이 "누가 누구를 보고 있는가"만 본다.
+function attackersOf(state, unit) {
+  return alive(state, opposite(unit.side)).filter((foe) => foe.targetUid === unit.uid);
+}
+
+// 우리 편에서 지금 구해야 할 사람과 그를 치고 있는 적. PULL_ORDER 순으로
+// 힐러 → 원거리 딜러 → 근접 딜러를 보고, 처음 걸리는 쪽을 돌려준다.
+// 탱커는 표에 없다 — 탱커가 맞는 것은 구할 일이 아니라 제 할 일이다.
+function endangered(unit, state) {
+  const ranked = mates(unit, state)
+    .filter((mate) => rankOf(D.PULL_ORDER, mate) < D.PULL_ORDER.length)
+    .sort((a, b) => rankOf(D.PULL_ORDER, a) - rankOf(D.PULL_ORDER, b));
+  for (const mate of ranked) {
+    const foes = attackersOf(state, mate);
+    if (foes.length) return { mate, foes };
+  }
+  return null;
+}
+
 function skillReady(unit, state, id) {
   const slot = unit.skills.find((s) => s.id === id);
   if (!slot || state.t < slot.readyAt) return null;
@@ -39,84 +97,45 @@ function skillReady(unit, state, id) {
   return def;
 }
 
-// 이 편의 탱커. 여럿이면 앞에 선 쪽을 기준으로 본다 — 어그로를 보는 쪽이
-// 최전선이어야 딜러의 우선순위가 뜻대로 굴러간다.
-function frontTank(state, side) {
-  const tanks = alive(state, side).filter((u) => u.job === 'tank');
-  if (!tanks.length) return null;
-  const forward = side === 'ally' ? 1 : -1;
-  return tanks.reduce((a, b) => ((b.x - a.x) * forward > 0 ? b : a));
-}
-
-// 적이 지금 누구를 때리고 있는지. 어그로 판단의 근거라 logic.js가 매 틱 갱신한 값을 쓴다.
-function currentTargetOf(state, unit) {
-  return unit.targetUid ? byUid(state, unit.targetUid) : null;
-}
-
 // --- 대상 고르기 -------------------------------------------------------
 
-// 딜러: 탱커가 어그로를 잡고 있는 적을 우선 공격한다. 그런 적이 없으면
-// 적 힐러 → 적 딜러 → 적 탱커 순이다. (기획서 12장)
-const DEALER_ORDER = { healer: 0, dealer: 1, tank: 2 };
-
-function dealerTarget(unit, state) {
-  const foes = alive(state, opposite(unit.side));
-  if (!foes.length) return null;
-
-  const tank = frontTank(state, unit.side);
-  if (tank) {
-    const held = foes.filter((foe) => foe.targetUid === tank.uid);
-    if (held.length) return nearest(unit, held);
-  }
-
-  // 우선순위가 같으면 가까운 쪽. 뒤에 있는 적을 향해 대열을 가로지르지 않게 한다.
-  let best = null;
-  for (const foe of foes) {
-    if (!best) { best = foe; continue; }
-    const rank = DEALER_ORDER[foe.job] - DEALER_ORDER[best.job];
-    if (rank < 0 || (rank === 0 && dist(unit, foe) < dist(unit, best))) best = foe;
-  }
-  return best;
-}
-
-// 탱커: 최전선의 적을 잡는다. 자기를 때리는 적이 있으면 그쪽을 먼저 본다 —
-// 맞고 있는 적을 두고 다른 적을 쫓아가면 최전선이 무너진다.
+// 탱커: 후열을 노리는 적을 떼어 내는 것이 최우선이다. 아무도 안 노려지고 있으면
+// 나를 때리는 적을, 그것도 없으면 가까운 적을 본다.
 function tankTarget(unit, state) {
-  const foes = alive(state, opposite(unit.side));
+  const foes = foesOf(unit, state);
   if (!foes.length) return null;
+  const danger = endangered(unit, state);
+  if (danger) return nearest(unit, danger.foes);
   const onMe = foes.filter((foe) => foe.targetUid === unit.uid);
   return nearest(unit, onMe.length ? onMe : foes);
 }
 
-// 힐러: 때릴 대상은 가까운 적이면 된다. 힐 대상 판단은 healTarget이 따로 한다.
-function healerTarget(unit, state) {
-  return nearest(unit, alive(state, opposite(unit.side)));
-}
-
-// 적: 어그로 표를 따른다. 도발이 걸려 있으면 그것이 이긴다.
-function enemyTarget(unit, state) {
-  const foes = alive(state, opposite(unit.side));
+// 딜러: 우리 힐러를 치고 있는 적이 먼저다. 없으면 적 힐러 → 원거리 → 근접 →
+// 탱커 순(ATTACK_ORDER). 탱커가 맨 뒤인 것은 제일 단단한 쪽이기 때문이다.
+function dealerTarget(unit, state) {
+  const foes = foesOf(unit, state);
   if (!foes.length) return null;
 
-  const forced = unit.tauntUid && state.t < unit.tauntUntil ? byUid(state, unit.tauntUid) : null;
-  if (forced && !forced.dead) return forced;
-
-  const table = state.threat[unit.uid] || {};
-  let best = null;
-  let bestValue = 0;
-  for (const foe of foes) {
-    const value = table[foe.uid] || 0;
-    if (value > bestValue) { bestValue = value; best = foe; }
+  const onHealer = [];
+  for (const mate of alive(state, unit.side)) {
+    if (roleOf(mate) !== 'healer') continue;
+    for (const foe of attackersOf(state, mate)) onHealer.push(foe);
   }
-  // 아직 아무도 위협을 쌓지 않은 전투 시작 직후에는 가까운 쪽으로 달려든다.
-  return best || nearest(unit, foes);
+  if (onHealer.length) return nearest(unit, onHealer);
+
+  return bestBy(unit, foes, D.ATTACK_ORDER);
 }
 
 function chooseTarget(unit, state) {
-  if (unit.side === 'enemy') return enemyTarget(unit, state);
-  if (unit.job === 'tank') return tankTarget(unit, state);
-  if (unit.job === 'dealer') return dealerTarget(unit, state);
-  return healerTarget(unit, state);
+  // 도발은 다른 모든 판단을 이긴다. 아군이든 적이든 같다.
+  const forced = unit.tauntUid && state.t < unit.tauntUntil ? byUid(state, unit.tauntUid) : null;
+  if (forced && !forced.dead) return forced;
+
+  const role = roleOf(unit);
+  if (role === 'tank') return tankTarget(unit, state);
+  // 힐러가 때릴 상대는 가까운 적이면 된다. 힐 대상은 healTarget이 따로 고른다.
+  if (role === 'healer') return nearest(unit, foesOf(unit, state));
+  return dealerTarget(unit, state);
 }
 
 // --- 힐 판단 -----------------------------------------------------------
@@ -128,14 +147,16 @@ function chooseTarget(unit, state) {
 const EFFICIENT = 0.85;  // 힐량의 이만큼은 깎여 있어야 쓴다
 const EMERGENCY = 0.35;  // 효율을 따질 상황이 아닌 체력 비율
 
+// 탱커가 최우선이고, 탱커에게 여유가 있으면 힐러 → 근접 → 원거리 순(HEAL_ORDER).
+// "여유가 있다"를 따로 재지 않는 것은, 효율·위급 조건에 걸리지 않는 것이 곧
+// 여유가 있다는 뜻이기 때문이다 — 조건 하나로 순서와 여유를 같이 본다.
 function healTarget(unit, state, heal) {
   const friends = alive(state, unit.side).filter((u) => missing(u) > 0);
   if (!friends.length) return null;
 
-  // 탱커 최우선. 같은 조건이면 더 많이 깎인 쪽.
   const ordered = friends.slice().sort((a, b) => {
-    if ((a.job === 'tank') !== (b.job === 'tank')) return a.job === 'tank' ? -1 : 1;
-    return missing(b) - missing(a);
+    const rank = rankOf(D.HEAL_ORDER, a) - rankOf(D.HEAL_ORDER, b);
+    return rank || (missing(b) - missing(a));
   });
 
   const efficient = ordered.find((u) => missing(u) >= heal * EFFICIENT);
@@ -147,6 +168,9 @@ function healTarget(unit, state, heal) {
 
 // --- 스킬 판단 ---------------------------------------------------------
 
+// 사거리는 스킬마다 다르다. 적어 두지 않은 스킬은 유닛의 사거리를 따른다.
+const rangeOf = (def, unit) => (def.range == null ? unit.range : def.range);
+
 // **적힌 순서대로 본다.** 조건이 까다로운 스킬(광역 도발, 대치유술)을 앞에 두면
 // 그것이 먼저 걸리고, 조건이 안 맞으면 뒤의 것으로 넘어간다. 순서를 바꾸는 것이
 // 곧 우선순위를 바꾸는 것이라 data.js의 skills 배열이 그 자리다.
@@ -154,39 +178,57 @@ function chooseSkill(unit, state, target) {
   for (const slot of unit.skills) {
     const def = skillReady(unit, state, slot.id);
     if (!def) continue;
+    const reach = rangeOf(def, unit);
 
     if (def.kind === 'taunt' || def.kind === 'taunt-area') {
-      // 어그로가 풀렸다는 것은, 내가 아닌 아군을 때리고 있는 적이 있다는 뜻이다.
-      const reach = def.radius || 30;
-      const loose = alive(state, opposite(unit.side)).filter((foe) => {
-        const t = currentTargetOf(state, foe);
-        return t && t.uid !== unit.uid && dist(unit, foe) <= reach;
-      });
-      if (!loose.length) continue;
-      // 광역 도발은 쿨타임이 길다. 하나 놓쳤다고 쓰면 정작 여럿이 풀렸을 때
-      // 쓸 것이 없다 — 둘 이상 풀렸을 때만 쓰고, 하나뿐이면 단일 도발에 맡긴다.
-      if (def.kind === 'taunt-area' && loose.length < 2) continue;
-      return { id: def.id, targetUid: nearest(unit, loose).uid };
+      if (def.kind === 'taunt-area') {
+        // 광역 도발은 쿨타임이 길다. 하나 놓쳤다고 쓰면 정작 여럿이 풀렸을 때
+        // 쓸 것이 없다 — 둘 이상 풀렸을 때만 쓰고, 하나뿐이면 단일 도발에 맡긴다.
+        const loose = foesOf(unit, state).filter((foe) => {
+          const t = foe.targetUid ? byUid(state, foe.targetUid) : null;
+          return t && t.uid !== unit.uid && dist(unit, foe) <= def.radius;
+        });
+        if (loose.length < 2) continue;
+        return { id: def.id, targetUid: nearest(unit, loose).uid };
+      }
+      // 단일 도발은 가장 급한 아군(PULL_ORDER)을 치는 적에게 쓴다.
+      const danger = endangered(unit, state);
+      if (!danger) continue;
+      const inReach = danger.foes.filter((foe) => dist(unit, foe) <= reach);
+      if (!inReach.length) continue;
+      return { id: def.id, targetUid: nearest(unit, inReach).uid };
     }
 
     if (def.kind === 'heal') {
       const hurt = healTarget(unit, state, def.heal);
-      if (hurt && dist(unit, hurt) <= unit.range + 6) return { id: def.id, targetUid: hurt.uid };
+      if (hurt && dist(unit, hurt) <= reach) return { id: def.id, targetUid: hurt.uid };
       continue;
     }
 
     if (def.kind === 'damage' || def.kind === 'dot') {
-      if (target && dist(unit, target) <= unit.range) return { id: def.id, targetUid: target.uid };
+      if (target && dist(unit, target) <= reach) return { id: def.id, targetUid: target.uid };
       continue;
     }
 
     if (def.kind === 'damage-area') {
       // 여럿이 겹쳐 있을 때만 쓴다. 하나에게 쓰면 쿨타임만 버리는 셈이다.
-      if (!target || dist(unit, target) > unit.range) continue;
-      const hit = alive(state, opposite(unit.side)).filter((foe) => dist(foe, target) <= def.radius);
+      if (!target || dist(unit, target) > reach) continue;
+      const hit = foesOf(unit, state).filter((foe) => dist(foe, target) <= def.radius);
       if (hit.length >= 2) return { id: def.id, targetUid: target.uid };
       continue;
     }
+  }
+  return null;
+}
+
+// 지금 사거리 안에 들어가야 하는 회복 대상. 쿨타임과 마나는 보지 않는다 —
+// 쿨타임이 도는 동안 자리를 잡아 두어야 돌아오자마자 힐이 나간다.
+function healReach(unit, state) {
+  for (const slot of unit.skills) {
+    const def = D.UNIT_SKILLS[slot.id];
+    if (!def || def.kind !== 'heal') continue;
+    const hurt = healTarget(unit, state, def.heal);
+    if (hurt) return { unit: hurt, range: rangeOf(def, unit) };
   }
   return null;
 }
@@ -202,25 +244,56 @@ function standoff(unit, target, range) {
   return { x: target.x + (dx / d) * range, y: target.y + (dy / d) * range };
 }
 
-const RETREAT = { ranged: 14, healer: 17 };
+const STICK = 16;    // 후열이 탱커 뒤에서 유지하는 거리
+const SPREAD = 10;   // 붙어 있는 동안 허용하는 세로 편차
+const RETREAT = 18;  // 붙을 곳이 아무도 없을 때 적과 벌리려는 거리
 
+// 붙는 자리는 탱커의 **뒤**다. 지금 선 방향으로 붙게 했더니 다섯이 한 덩어리로
+// 뭉쳐 화면에서 누가 누구인지 보이지 않았고, 후열이 탱커를 지나쳐 적 쪽에 서기도
+// 했다.
+//
+// 세로는 지금 선 높이를 지키되 탱커에게서 SPREAD 안으로 묶는다. 그대로 두었더니
+// 처음 선 줄에서 영영 내려오지 않아, 맨 위 줄에서 시작한 주인공이 전투가 아래로
+// 옮겨 간 뒤에도 혼자 위에 남았다. 아주 묶어 버리면 다섯이 한 줄로 선다.
+function behind(unit, anchor, gap) {
+  const forward = unit.side === 'ally' ? 1 : -1;
+  const offset = Math.max(-SPREAD, Math.min(SPREAD, unit.y - anchor.y));
+  return { x: anchor.x - forward * gap, y: anchor.y + offset };
+}
+
+// 후열이 붙을 자리. 탱커가 없으면 근접 딜러, 그것도 없으면 없다.
+function anchorOf(unit, state) {
+  const tank = frontTank(state, unit.side);
+  if (tank && tank.uid !== unit.uid) return tank;
+  return nearest(unit, mates(unit, state).filter((u) => roleOf(u) === 'melee'));
+}
+
+// **후열은 맞아도 도망가지 않는다.** 도망가면 어그로를 끌 탱커에게서 멀어지고,
+// 결국 탱커가 닿지 못하는 곳에서 혼자 맞는다. 탱커 곁에 붙어 있어야 탱커가
+// 그 적을 도발 사거리 안에 둔다. 붙을 탱커도 근접 딜러도 없을 때에만 물러선다.
 function chooseMove(unit, state, target) {
   if (!unit.speed) return null;
+  const role = roleOf(unit);
 
-  // 뒤에서 싸우는 직업은 붙는 것보다 떨어지는 것이 먼저다. 붙으면 어그로가
-  // 풀렸을 때 곧바로 맞기 시작한다.
-  const back = unit.job === 'healer' ? RETREAT.healer : (unit.range > 20 ? RETREAT.ranged : 0);
-  if (back) {
-    const foe = nearest(unit, alive(state, opposite(unit.side)));
-    if (foe && dist(unit, foe) < back) return standoff(unit, foe, back + 4);
-  }
-
-  if (unit.job === 'healer') {
-    // 힐러는 적이 아니라 아군을 따라다닌다. 탱커가 사거리 밖으로 나가면 힐이 끊긴다.
-    const anchor = frontTank(state, unit.side) || nearest(unit, alive(state, unit.side));
-    if (anchor && anchor.uid !== unit.uid && dist(unit, anchor) > unit.range * 0.8) {
-      return standoff(unit, anchor, unit.range * 0.7);
+  if (role === 'healer' || role === 'ranged') {
+    // 힐이 안 닿으면 붙어 있는 뜻이 없다. 회복 대상이 먼저다.
+    const need = healReach(unit, state);
+    if (need && dist(unit, need.unit) > need.range) {
+      return standoff(unit, need.unit, need.range * 0.8);
     }
+
+    const anchor = anchorOf(unit, state);
+    if (anchor) {
+      // 제자리 근처에서는 움직이지 않는다. 조금씩이라도 계속 걸으면 캐스팅이
+      // 매번 취소되어 후열이 아무 스킬도 못 쓴다.
+      const spot = behind(unit, anchor, STICK);
+      return dist(unit, spot) > STICK * 0.4 ? spot : null;
+    }
+
+    // 앞에 아무도 없다. 이제야 물러서되, 공격과 힐은 계속한다 — 도망은
+    // 이동일 뿐이고 logic.js는 사거리만 맞으면 때린다.
+    const foe = nearest(unit, foesOf(unit, state));
+    if (foe && dist(unit, foe) < RETREAT) return standoff(unit, foe, RETREAT + 4);
     return null;
   }
 
@@ -276,9 +349,10 @@ function decide(unit, state) {
 }
 
 const api = {
-  dist, alive, byUid, opposite, nearest, frontTank,
+  dist, alive, byUid, opposite, nearest, roleOf, rankOf, frontTank, anchorOf, behind,
+  attackersOf, endangered, healReach,
   chooseTarget, healTarget, chooseSkill, choosePotion, chooseMove, decide,
-  POTION_HP, POTION_MP,
+  POTION_HP, POTION_MP, STICK, RETREAT, SPREAD,
   EFFICIENT, EMERGENCY,
 };
 
