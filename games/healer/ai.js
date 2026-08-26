@@ -175,6 +175,23 @@ function healTarget(unit, state, heal) {
 const POTION_HP = 0.35;   // 이 아래로 내려가면 체력 물약
 const POTION_MP = 1.15;   // 가장 싼 스킬도 못 쓸 지경(비용의 이만큼)이면 마나 물약
 
+const isTaunt = (def) => def.kind === 'taunt' || def.kind === 'taunt-area';
+
+// **도발에 쓸 마나는 남겨 둔다.** 탱커가 때리는 스킬로 마나를 다 쓰고 나면,
+// 정작 적이 힐러에게 붙었을 때 끌어올 수단이 없다 — 위협도 표를 없앤 뒤로
+// 어그로를 움직이는 것은 도발뿐이라 그 순간이 그대로 후열이 무너지는 순간이 된다.
+//
+// 들고 있는 도발을 한 번씩 쓸 만큼 남긴다. 도발이 없는 유닛에게는 0이라
+// 직업을 가르는 분기가 필요 없다.
+function tauntReserve(unit) {
+  let reserve = 0;
+  for (const slot of unit.skills) {
+    const def = D.UNIT_SKILLS[slot.id];
+    if (def && isTaunt(def)) reserve += def.mp;
+  }
+  return reserve;
+}
+
 function cheapestSkillCost(unit) {
   let cheapest = Infinity;
   for (const slot of unit.skills) {
@@ -206,12 +223,17 @@ const rangeOf = (def, unit) => (def.range == null ? unit.range : def.range);
 // 그것이 먼저 걸리고, 조건이 안 맞으면 뒤의 것으로 넘어간다. 순서를 바꾸는 것이
 // 곧 우선순위를 바꾸는 것이라 data.js의 skills 배열이 그 자리다.
 function chooseSkill(unit, state, target) {
+  const reserve = tauntReserve(unit);
+
   for (const slot of unit.skills) {
     const def = skillReady(unit, state, slot.id);
     if (!def) continue;
+    // 도발 몫을 헐어 가며 때리지 않는다. 마나를 되찾는 스킬은 예외다 —
+    // 그것을 막으면 마나가 바닥난 탱커가 영영 도발을 못 하게 된다.
+    if (!isTaunt(def) && def.kind !== 'mana' && unit.mp - def.mp < reserve) continue;
     const reach = rangeOf(def, unit);
 
-    if (def.kind === 'taunt' || def.kind === 'taunt-area') {
+    if (isTaunt(def)) {
       if (def.kind === 'taunt-area') {
         // 광역 도발은 쿨타임이 길다. 하나 놓쳤다고 쓰면 정작 여럿이 풀렸을 때
         // 쓸 것이 없다 — 둘 이상 풀렸을 때만 쓰고, 하나뿐이면 단일 도발에 맡긴다.
@@ -318,6 +340,15 @@ function behind(unit, anchor, gap) {
   return { x: anchor.x - forward * gap, y: anchor.y + offset };
 }
 
+// 앞줄을 앞질러 가지 않게 가로 위치를 자른다. 세로는 그대로 둔다 — 앞뒤만
+// 지키면 되고, 세로까지 묶으면 대열이 한 줄이 된다.
+function holdBehind(unit, anchor, spot) {
+  const forward = unit.side === 'ally' ? 1 : -1;
+  const limit = anchor.x - forward * 2;
+  const x = forward > 0 ? Math.min(spot.x, limit) : Math.max(spot.x, limit);
+  return { x, y: spot.y };
+}
+
 // 후열이 붙을 자리. 탱커가 없으면 근접 딜러, 그것도 없으면 없다.
 function anchorOf(unit, state) {
   const tank = frontTank(state, unit.side);
@@ -340,6 +371,14 @@ function chooseMove(unit, state, target) {
     }
 
     const anchor = anchorOf(unit, state);
+
+    // **회복시킬 사람이 없으면 사거리 안까지 나가 때린다.** 뒤에 서서 아무것도
+    // 안 하는 힐러는 화면에서 고장 난 것으로 보인다. 다만 **탱커보다 앞으로는
+    // 나가지 않는다** — 앞질러 나가면 어그로를 끌 사람이 뒤에 남는다.
+    if (role === 'healer' && !need && target && dist(unit, target) > unit.range) {
+      const spot = standoff(unit, target, unit.range * 0.9);
+      return anchor ? holdBehind(unit, anchor, spot) : spot;
+    }
     if (anchor) {
       // 제자리 근처에서는 움직이지 않는다. 조금씩이라도 계속 걸으면 캐스팅이
       // 매번 취소되어 후열이 아무 스킬도 못 쓴다.
@@ -376,6 +415,7 @@ function decide(unit, state) {
 
 const api = {
   dist, alive, byUid, opposite, nearest, roleOf, rankOf, frontTank, anchorOf, behind,
+  tauntReserve,
   attackersOf, endangered, healReach,
   chooseTarget, healTarget, chooseSkill, choosePotion, chooseMove, decide,
   POTION_HP, POTION_MP, STICK, RETREAT, SPREAD,

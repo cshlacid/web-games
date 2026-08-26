@@ -370,5 +370,77 @@ function gather(state) {
   check('연달아 못 마신다', L.drink(drinker, bran, 'health').ok, false);
 }
 
+// --- 탱커는 도발에 쓸 마나를 남긴다 -------------------------------------
+//
+// 때리는 스킬로 마나를 다 쓰고 나면, 정작 적이 힐러에게 붙었을 때 끌어올 수단이
+// 없다. 위협도 표를 없앤 뒤로 어그로를 움직이는 것은 도발뿐이다.
+{
+  const state = battle({ party: [{ defId: 'bran', level: 8 }, { defId: 'lyle', level: 8 },
+    { defId: 'mira', level: 8 }, { defId: 'noa', level: 8 }] });
+  gather(state);
+  const tank = named(state, '강철의 브란');
+  const reserve = AI.tauntReserve(tank);
+
+  check('도발 몫이 잡혀 있다', reserve > 0, true);
+  check('들고 있는 도발을 한 번씩 쓸 만큼이다', reserve,
+    tank.skills
+      .map((slot) => D.UNIT_SKILLS[slot.id])
+      .filter((def) => def.kind === 'taunt' || def.kind === 'taunt-area')
+      .reduce((sum, def) => sum + def.mp, 0));
+
+  // 도발이 필요 없는 상황에서도 남은 마나가 도발 몫뿐이면 때리지 않는다.
+  enemies(state).forEach((u) => { u.targetUid = tank.uid; });
+  tank.mp = reserve + 1;
+  check('마나가 도발 몫뿐이면 때리는 스킬을 아낀다',
+    AI.chooseSkill(tank, state, enemies(state)[0]), null);
+
+  tank.mp = tank.maxMp;
+  const rich = AI.chooseSkill(tank, state, enemies(state)[0]);
+  check('여유가 있으면 때린다', rich && D.UNIT_SKILLS[rich.id].kind.startsWith('taunt'), false);
+
+  // 남겨 둔 덕에, 적이 힐러에게 붙는 순간 도발이 나간다.
+  tank.mp = reserve;
+  enemyOf(state, 'dealer').targetUid = named(state, '사제 노아').uid;
+  const pull = AI.chooseSkill(tank, state, enemyOf(state, 'dealer'));
+  check('힐러가 맞으면 남긴 마나로 도발한다',
+    pull && D.UNIT_SKILLS[pull.id].kind.startsWith('taunt'), true);
+
+  // 마나를 되찾는 스킬까지 막으면 바닥난 탱커가 영영 도발을 못 한다.
+  const caster = battle({ party: [{ defId: 'noa', level: 8 }] });
+  const priest = named(caster, '사제 노아');
+  priest.mp = 0;
+  const refill = AI.chooseSkill(priest, caster, enemies(caster)[0]);
+  check('마나 회복 스킬은 예약에 막히지 않는다',
+    refill && D.UNIT_SKILLS[refill.id].kind, 'mana');
+}
+
+// --- 회복시킬 사람이 없으면 힐러도 때린다 -------------------------------
+{
+  const state = battle();
+  const healer = named(state, '사제 노아');
+  const tank = named(state, '강철의 브란');
+  const foe = enemies(state)[0];
+
+  // 아무도 안 다쳤고 적이 멀다: 사거리 안까지 나간다.
+  AI.alive(state, 'ally').forEach((u) => { u.x = 20; u.y = 28; });
+  enemies(state).forEach((u) => { u.x = 80; u.y = 28; });
+  tank.x = 40;
+  const step = AI.chooseMove(healer, state, foe);
+  check('때리러 나간다', step && step.x > healer.x, true);
+  check('탱커를 앞지르지는 않는다', step.x <= tank.x, true);
+
+  // 회복할 사람이 생기면 때리러 나가지 않는다.
+  tank.hp = tank.maxHp - D.UNIT_SKILLS.mend.heal;
+  const toTank = AI.chooseMove(healer, state, foe);
+  check('회복이 먼저다', !toTank || toTank.x <= tank.x, true);
+
+  // 붙을 자리에 이미 서 있고 적도 사거리 안이면 움직이지 않는다.
+  tank.hp = tank.maxHp;
+  tank.x = foe.x - 12;
+  healer.x = tank.x - AI.STICK;
+  check('제자리면 그대로 선다', AI.chooseMove(healer, state, foe), null);
+  check('그리고 때린다', AI.decide(healer, state).attack, foe.uid);
+}
+
 console.log(`${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);

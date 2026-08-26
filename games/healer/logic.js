@@ -671,16 +671,14 @@ function step(state, dt) {
     if (unit.cast) { tickCast(state, unit); continue; }
 
     const decision = AI.decide(unit, state);
+    unit.targetUid = decision.targetUid;
 
-    // 주인공이 조작하는 것은 여전히 스킬뿐이다. 이동만 다른 힐러와 같은 규칙에
-    // 맡긴다 — 스킬에 사거리가 생긴 이상 제자리에 서 있으면 힐이 앞줄에 닿지 않는다.
+    // 주인공이 **손으로** 하는 것은 여전히 스킬뿐이다. 이동과 기본 공격은 다른
+    // 힐러와 같은 규칙에 맡긴다 — 스킬에 사거리가 생긴 이상 제자리에 서 있으면
+    // 힐이 앞줄에 닿지 않고, 마나가 바닥나면 아무것도 안 하는 캐릭터가 된다.
     if (unit.uid === HERO_UID) {
       if (decision.move) moveToward(state, unit, decision.move, dt);
-      continue;
-    }
-
-    unit.targetUid = decision.targetUid;
-    if (decision.potion) drink(state, unit, decision.potion);
+    } else if (decision.potion) drink(state, unit, decision.potion);
     else if (decision.skill) startCast(state, unit, decision.skill);
     else if (decision.move) moveToward(state, unit, decision.move, dt);
 
