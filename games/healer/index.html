@@ -54,6 +54,15 @@
       </div>
 
       <div class="panel">
+        <div class="panel-head">
+          <h2>능력치</h2>
+          <span class="count" id="attr-points">남은 점수 0</span>
+        </div>
+        <p class="panel-note">캐릭터 레벨이 오를 때마다 점수를 받는다. 한번 넣으면 되돌릴 수 없다.</p>
+        <ul class="attrs" id="char-attrs"></ul>
+      </div>
+
+      <div class="panel">
         <div class="panel-head"><h2>장비</h2></div>
         <p class="panel-note">인벤토리의 물건을 눌러 장착한다. 슬롯을 누르면 벗는다.</p>
         <ul class="slots" id="char-slots"></ul>
@@ -79,7 +88,7 @@
           <h2>스킬</h2>
           <span class="count" id="skill-open">0 / 8</span>
         </div>
-        <p class="panel-note">직업 레벨이 오르면 열린다. 전투에는 이 중 다섯까지 가져간다.</p>
+        <p class="panel-note">직업 레벨이 오르면 열린다. 전투에는 이 중 다섯까지 가져간다. 적힌 회복량은 기준값이고, 여기에 회복력 배수가 곱해진다.</p>
         <ul class="skill-list" id="char-skills"></ul>
       </div>
     </div>
@@ -243,9 +252,12 @@
       <li><b>범위·장판 스킬은 기준점을 고른다.</b> 아래쪽 <b>동료 초상화</b>를
         누르면 그 동료를 기준으로, <b>전투 화면</b>을 누르면 그 위치를 기준으로
         발동한다.</li>
-      <li><b>레벨이 둘이다.</b> 캐릭터 레벨은 체력과 마나를, 직업 레벨은 회복량과
-        스킬 해금을 올린다. <b>회복시킨 만큼 직업 경험치가 쌓인다</b> — 흘린 힐은
-        빼고 실제로 채운 만큼만이다.</li>
+      <li><b>능력치가 모든 수치를 정한다.</b> 힘은 물리 공격력, 민첩은 회피,
+        지능은 마법 공격력·회복량·최대 마나, 체력은 최대 체력을 올린다.
+        <b>캐릭터 레벨이 오를 때마다 점수를 받아 캐릭터 메뉴에서 나눈다.</b></li>
+      <li><b>레벨이 둘이다.</b> 캐릭터 레벨은 능력치를, 직업 레벨은 스킬 해금을
+        맡는다. <b>회복시킨 만큼 직업 경험치가 쌓인다</b> — 흘린 힐은 빼고 실제로
+        채운 만큼만이다.</li>
       <li>주인공이 쓰러지거나 파티가 전멸하면 실패한다. 실패해도 길드 몫의 절반은
         받는다.</li>
     </ul>

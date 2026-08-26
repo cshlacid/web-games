@@ -34,7 +34,7 @@ const gear = (defId, tier) => Items.make(defId, tier || 0, 3);
   check('처음 열린 스킬은 둘', P.unlockedSkills(progress).map((def) => def.id), ['touch', 'quick']);
 
   const stats = P.stats(progress);
-  check('기본 체력', stats.hp, D.LEVEL.heroHp(1));
+  check('기본 체력은 체력 능력치에서 나온다', stats.hp, D.HERO.attrs.vit * D.ATTR.hpPerVit);
   check('기본 회복력은 배수 1', stats.heal, 1);
 }
 

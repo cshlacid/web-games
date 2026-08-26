@@ -287,22 +287,30 @@ const run = (state, seconds) => {
 
   // 주인공의 수치는 성장 상태에서 계산해 넘어온다. 전투가 레벨 규칙을 다시
   // 알지 못하게 하려는 것이라, 넘긴 값이 그대로 쓰여야 한다.
-  const strong = battle({ heroStats: { hp: 1000, mp: 500, heal: 2, armor: 0.5 } });
-  check('넘긴 체력이 그대로', L.hero(strong).maxHp, 1000);
-  check('넘긴 마나가 그대로', L.hero(strong).maxMp, 500);
+  // 능력치를 넘기면 그것이 곧 수치가 된다. 체력 100 → 최대 체력 1400.
+  const strong = battle({ heroStats: { attrs: { str: 8, agi: 10, int: 60, vit: 100 }, armor: 0.5 } });
+  check('체력이 최대 체력을 정한다', L.hero(strong).maxHp, 100 * D.ATTR.hpPerVit);
+  check('지능이 최대 마나를 정한다', L.hero(strong).maxMp, 60 * D.ATTR.mpPerInt);
 
   const tank = unit(strong, '강철의 브란');
   tank.hp = 100;
   L.castSkill(strong, 'touch', { uid: tank.uid });
-  check('회복력 배수가 힐에 곱해진다', tank.hp, 100 + D.PLAYER_SKILLS.touch.heal * 2);
+  // 지능 60은 기준(25)의 2.4배 → 회복량은 그 몫의 40%만 받아 ×1.56.
+  const power = 1 + (60 / D.HERO.attrs.int - 1) * D.ATTR.healRatio;
+  check('지능이 회복량을 올린다', tank.hp, 100 + Math.round(D.PLAYER_SKILLS.touch.heal * power));
 
   // 피해에는 곱해지지 않는다. 힐러의 성장이 딜러 노릇을 잘하게 만드는 쪽으로
   // 흐르면 이 게임이 아니게 된다.
-  const flame = battle({ skills: ['flame'], heroStats: { hp: 900, mp: 400, heal: 3, armor: 0.9 } });
+  // 마법 피해도 지능을 타지만 계수가 회복량보다 작다 — 힐러의 성장이 딜러
+  // 노릇을 잘하게 만드는 쪽으로 흐르면 이 게임이 아니게 된다.
+  const flame = battle({ skills: ['flame'],
+    heroStats: { attrs: { str: 8, agi: 10, int: 60, vit: 70 }, armor: 0.9 } });
   const foe = AI.alive(flame, 'enemy')[0];
   L.castSkill(flame, 'flame', { uid: foe.uid });
-  check('피해에는 배수가 붙지 않는다',
-    flame.dots.find((dot) => dot.targetUid === foe.uid).amount, D.PLAYER_SKILLS.flame.tick);
+  const dot = flame.dots.find((entry) => entry.targetUid === foe.uid);
+  check('지능이 마법 피해도 올린다', dot.amount > D.PLAYER_SKILLS.flame.tick, true);
+  check('회복량보다는 덜 오른다',
+    dot.amount / D.PLAYER_SKILLS.flame.tick < power, true);
 }
 
 // --- 광역 도발 ----------------------------------------------------------
@@ -420,6 +428,14 @@ const run = (state, seconds) => {
     if (missing >= 60 && ready('quick')) return void L.castSkill(state, 'quick', { uid: worst.uid });
   }
 
+  // 점수를 고르게 나눈 주인공의 수치. progress.js를 거치지 않고 만드는 것은
+  // 저장·인벤토리 없이 능력치만 보려는 것이기 때문이다.
+  function heroAt(level) {
+    const each = Math.floor((level - 1) * D.ATTR.pointsPerLevel / 4);
+    const spent = { str: each, agi: each, int: each, vit: each };
+    return { attrs: D.attrsAt(D.HERO, level, spent), armor: D.HERO.armor };
+  }
+
   // 게시판에서 사람이 고를 법한 의뢰: 내 레벨에 가장 가까운 것과, 확실히 벅찬 것.
   function questAt(playerLevel, seed, wanted) {
     const quests = Q.generate(playerLevel, seed);
@@ -443,12 +459,9 @@ const run = (state, seconds) => {
       quest,
       party: party.map(R.toParty),
       skills: ['touch', 'quick', 'regen', 'ripple', 'focus'],
-      heroStats: {
-        hp: D.LEVEL.heroHp(playerLevel),
-        mp: D.LEVEL.heroMp(playerLevel, playerLevel),
-        heal: D.LEVEL.heroHeal(playerLevel),
-        armor: D.HERO.armor,
-      },
+      // 점수를 네 능력치에 고르게 나눈 주인공. 한쪽에 몰면 그쪽이 세지므로
+      // 난이도를 잴 때는 치우치지 않은 쪽을 기준으로 삼는다.
+      heroStats: heroAt(playerLevel),
       heroLevel: playerLevel,
       potions: { mana: 3, health: 1 },
       seed,

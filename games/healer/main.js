@@ -187,13 +187,54 @@ const STAT_LABELS = {
   hp: '최대 체력',
   mp: '최대 마나',
   heal: '회복력',
+  dodge: '회피',
   armor: '받는 피해',
 };
 
 function statText(key, value) {
-  if (key === 'heal') return `×${value.toFixed(2)}`;
-  if (key === 'armor') return `×${value.toFixed(2)}`;
+  if (key === 'heal' || key === 'armor') return `×${value.toFixed(2)}`;
+  if (key === 'dodge') return `${(value * 100).toFixed(1)}%`;
   return String(Math.round(value));
+}
+
+// 능력치 한 줄. 남은 점수가 있으면 오른쪽에 넣는 단추가 붙는다.
+function renderAttrs() {
+  const progress = app.progress;
+  const own = P.attrs(progress);
+  const left = P.freePoints(progress);
+  $('attr-points').textContent = left ? `남은 점수 ${left}` : '남은 점수 없음';
+
+  const list = $('char-attrs');
+  list.textContent = '';
+  for (const attr of Object.values(D.ATTRS)) {
+    const row = el('li', 'attr-row');
+    const body = el('div', 'pick-body');
+    const name = el('div', 'pick-name');
+    name.append(document.createTextNode(attr.name));
+    // 자동으로 오른 몫과 내가 넣은 몫을 나눠 보여 준다. 합쳐서 보여 주면
+    // 점수를 어디에 넣었는지 알 수 없다.
+    const put = progress.spent[attr.id] || 0;
+    if (put) name.append(text('span', 'job', `투자 +${put}`));
+    body.append(name);
+    body.append(text('div', 'pick-sub', attr.effect));
+    row.append(body);
+    row.append(text('b', 'attr-value', String(own[attr.id])));
+
+    const add = el('button', 'attr-add');
+    add.type = 'button';
+    add.textContent = '＋';
+    add.disabled = left <= 0;
+    add.setAttribute('aria-label', `${attr.name} 올리기`);
+    add.addEventListener('click', () => {
+      const spent = P.spendPoint(progress, attr.id);
+      sound.play(spent.ok ? 'click' : 'deny');
+      if (!spent.ok) return;
+      persist();
+      renderCharacter();
+    });
+    row.append(add);
+    list.append(row);
+  }
 }
 
 function renderCharacter() {
@@ -245,6 +286,7 @@ function renderCharacter() {
     slots.append(row);
   }
 
+  renderAttrs();
   renderPotions();
   renderInventory();
 
@@ -968,6 +1010,11 @@ let lastFrame = 0;
 
 function handleEvents(state, events) {
   for (const event of events) {
+    if (event.type === 'dodge') {
+      const unit = AI.byUid(state, event.uid);
+      if (unit) floatText(unit, '빗나감', 'miss');
+      continue;
+    }
     if (event.type === 'damage' || event.type === 'heal') {
       const unit = AI.byUid(state, event.uid);
       if (unit && event.amount > 0) {

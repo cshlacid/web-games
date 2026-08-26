@@ -39,6 +39,7 @@ node games/chess-puzzle/logic.test.js
 node games/chess-puzzle/data.test.js
 node games/healer/logic.test.js
 node games/healer/ai.test.js
+node games/healer/attrs.test.js
 node games/healer/items.test.js
 node games/healer/roster.test.js
 node games/healer/progress.test.js

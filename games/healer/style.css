@@ -504,7 +504,7 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .level.deadly { color: var(--harm); }
 
 /* --- 레벨과 경험치 --- */
-.levels, .stats, .slots, .inventory, .skill-list {
+.levels, .stats, .slots, .inventory, .skill-list, .attrs {
   list-style: none; margin: 0; padding: 0;
   display: flex; flex-direction: column; gap: 6px;
 }
@@ -577,3 +577,27 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 
 /* --- 레벨이 오른 줄 --- */
 .stat-value.up { color: var(--hp); }
+
+
+/* --- 능력치 --- */
+/* 값과 올리는 단추가 오른쪽에 붙는다. 남은 점수가 없으면 단추가 흐려질 뿐
+   자리는 그대로 둔다 — 자리가 사라지면 줄 폭이 바뀌어 값이 움직인다. */
+.attr-row {
+  display: flex; align-items: center; gap: 10px;
+  border: 1px solid var(--line); border-radius: 11px; padding: 8px 12px;
+}
+.attr-value {
+  flex: none; min-width: 44px; text-align: right;
+  font-size: 17px; font-variant-numeric: tabular-nums;
+}
+.attr-add {
+  flex: none; width: 34px; height: 34px;
+  border: 1px solid var(--btn-bg); border-radius: 9px;
+  background: none; color: var(--btn-bg);
+  font-family: inherit; font-size: 17px; font-weight: 700; cursor: pointer;
+}
+.attr-add:hover:not(:disabled) { background: var(--sel); }
+.attr-add:disabled { opacity: 0.25; cursor: default; }
+
+/* 빗나간 공격. 숫자가 아니라 글자라 피해·회복과 헷갈리지 않는다. */
+.float.miss { color: var(--muted); font-size: clamp(10px, 2vw, 13px); }
