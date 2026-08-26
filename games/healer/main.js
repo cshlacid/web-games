@@ -304,6 +304,9 @@ function renderCharacter() {
     name.append(text('span', 'job', def.type));
     body.append(name);
     body.append(text('div', 'pick-sub', open.has(def.id) ? def.desc : `힐러 Lv ${def.unlock}에 열린다`));
+    // 시전 시간과 사거리는 등록 화면에서 고르는 근거다. 캐스팅 스킬은 외우는
+    // 동안 아무것도 못 하고 움직이면 취소되므로, 회복량만 보고 고르면 안 된다.
+    if (open.has(def.id)) body.append(text('div', 'pick-sub dim', castLine(def)));
     row.append(body);
     skills.append(row);
   }
@@ -311,6 +314,13 @@ function renderCharacter() {
 }
 
 
+
+// 스킬 하나의 시전 시간과 사거리. 아군·적 스킬과 주인공 스킬이 같은 형태로
+// 적혀 있어 한 함수로 쓴다.
+function castLine(def) {
+  const cast = def.cast ? `시전 ${def.cast}초` : '즉시 시전';
+  return def.range ? `${cast} · 사거리 ${def.range}` : cast;
+}
 
 // 지금 낀 것과 견준 차이. 이걸 보여 주지 않으면 갈아 끼울지 말지를 매번 머리로
 // 계산해야 하고, 결국 아무도 계산하지 않는다.
@@ -578,7 +588,7 @@ function renderRoster() {
     for (const id of Roster.skillsOf(member)) {
       const skill = D.UNIT_SKILLS[id];
       const chip = text('span', 'chip', `${skill.name} ${skill.mp}`);
-      chip.title = `${skill.desc} · 마나 ${skill.mp}`;
+      chip.title = `${skill.desc} · 마나 ${skill.mp} · ${castLine(skill)}`;
       chips.append(chip);
     }
     for (const [id, count] of Object.entries(Roster.potionsOf(member))) {
@@ -720,6 +730,12 @@ function makeUnitNode(unit) {
   bar.append(el('span'));
   node.append(bar);
 
+  // 시전 막대. 누가 무엇을 외우고 있는지 보이지 않으면 캐스팅과 즉시 시전을
+  // 나눈 것이 화면에서는 그냥 "가끔 늦게 나가는 스킬"로만 보인다.
+  const cast = el('div', 'castbar');
+  cast.append(el('span'));
+  node.append(cast);
+
   field.append(node);
   unitNodes.set(unit.uid, node);
   return node;
@@ -733,7 +749,16 @@ function syncUnits(state) {
     node.classList.toggle('dead', unit.dead);
     node.classList.toggle('low', unit.hp / unit.maxHp <= 0.3);
     node.querySelector('.hpbar span').style.width = `${(unit.hp / unit.maxHp) * 100}%`;
-    node.classList.toggle('valid', Boolean(app.aiming) && isValidUnitTarget(unit));
+    node.classList.toggle('valid', Boolean(app.aiming) && isValidUnitTarget(state, unit));
+
+    const cast = unit.cast;
+    const bar = node.querySelector('.castbar');
+    bar.hidden = !cast || unit.dead;
+    if (cast && !unit.dead) {
+      const span = Math.max(0.001, cast.endsAt - cast.startedAt);
+      const done = Math.min(1, (state.t - cast.startedAt) / span);
+      bar.firstChild.style.width = `${done * 100}%`;
+    }
   }
 }
 
@@ -815,7 +840,7 @@ function syncPortraits(state) {
     const mana = button.querySelector('.bar.mp');
     if (unit.maxMp > 0) mana.firstElementChild.style.width = `${(unit.mp / unit.maxMp) * 100}%`;
     button.classList.toggle('dead', unit.dead);
-    button.classList.toggle('valid', Boolean(app.aiming) && isValidUnitTarget(unit));
+    button.classList.toggle('valid', Boolean(app.aiming) && isValidUnitTarget(state, unit));
   }
 }
 
@@ -891,12 +916,15 @@ const AIM_HINT = {
   'area-enemy': '기준점을 고른다 — 전투 화면의 위치',
 };
 
-function isValidUnitTarget(unit) {
+// 사거리 밖은 고를 수 있는 대상이 아니다. 눌러 보고 나서야 "사거리 밖"이라고
+// 알려 주면, 그동안 쿨타임이 도는 다른 스킬을 놓친다.
+function isValidUnitTarget(state, unit) {
   if (!app.aiming || unit.dead) return false;
   const def = D.PLAYER_SKILLS[app.aiming];
-  if (def.targeting === 'ally' || def.targeting === 'area-ally') return unit.side === 'ally';
-  if (def.targeting === 'enemy' || def.targeting === 'area-enemy') return unit.side === 'enemy';
-  return false;
+  const side = (def.targeting === 'ally' || def.targeting === 'area-ally') ? 'ally'
+    : (def.targeting === 'enemy' || def.targeting === 'area-enemy') ? 'enemy' : null;
+  if (unit.side !== side) return false;
+  return AI.dist(L.hero(state), unit) <= def.range;
 }
 
 function setAiming(skillId) {
@@ -1001,6 +1029,20 @@ field.addEventListener('pointermove', (event) => {
 
 field.addEventListener('pointerleave', () => { $('aim').hidden = true; });
 
+// 조준 중인 스킬의 사거리를 주인공 발밑에 그린다. 주인공이 저절로 움직이므로
+// 매 프레임 따라다녀야 한다.
+function syncReach(state) {
+  const reach = $('reach');
+  const def = app.aiming ? D.PLAYER_SKILLS[app.aiming] : null;
+  if (!def || !def.range) { reach.hidden = true; return; }
+  const hero = L.hero(state);
+  reach.hidden = false;
+  reach.style.left = `${pctX(hero.x)}%`;
+  reach.style.top = `${pctY(hero.y)}%`;
+  reach.style.width = `${pctX(def.range * 2)}%`;
+  reach.style.height = `${pctY(def.range * 2)}%`;
+}
+
 function note(label) {
   $('log').textContent = label;
 }
@@ -1067,6 +1109,7 @@ function loop(now) {
   syncZones(state);
   syncPortraits(state);
   syncSkillbar(state);
+  syncReach(state);
 
   if (state.status !== 'fighting') finishBattle(state);
 }

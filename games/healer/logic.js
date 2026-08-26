@@ -79,7 +79,8 @@ function makeUnit(def, side, uid, x, y, level, override, bonus, potions, name) {
     potionReadyAt: 0,
     range: def.range, speed: def.speed,
     attackCd: def.attackCd, nextAttackAt: 0,
-    threatMul: def.threatMul,
+    // 시전 중인 스킬. 서서 외우는 동안 여기 들어 있고, 움직이면 지워진다.
+    cast: null,
     exp: Math.round((def.exp || 0) * (1 + 0.25 * (level - 1))),
     // 레벨이 낮으면 아직 못 배운 스킬이 있다. 편성 화면이 보여 준 것과 전투에서
     // 실제로 쓰는 것이 같아야 하므로 같은 규칙으로 거른다.
@@ -118,10 +119,8 @@ function spawnWave(state, index) {
       : 10 + (i * (D.FIELD.h - 20)) / (wave.length - 1);
     // 적도 직업에 따라 물약을 들고 온다. 아군만 마나를 되찾을 수 있으면
     // 뒤 웨이브의 주술사가 그냥 서 있는 상대가 된다.
-    const unit = makeUnit(def, 'enemy', `e${index}_${i}`, x, y, state.quest.level || 1,
-      null, null, D.JOB_POTIONS[def.job]);
-    state.units.push(unit);
-    state.threat[unit.uid] = {};
+    state.units.push(makeUnit(def, 'enemy', `e${index}_${i}`, x, y, state.quest.level || 1,
+      null, null, D.JOB_POTIONS[def.job]));
   });
   emit(state, { type: 'wave', index, total: state.quest.waves.length,
     text: `${index + 1}번째 무리 (${state.quest.waves.length} 중)` });
@@ -148,7 +147,7 @@ function createBattle(config) {
   const state = {
     quest, rng: createRng(config.seed == null ? 1 : config.seed),
     t: 0, waveIndex: -1, nextWaveAt: 0,
-    units: [], zones: [], dots: [], threat: {},
+    units: [], zones: [], dots: [],
     skills: skills.map((id) => ({ id, readyAt: 0 })),
     // 주인공이 들고 온 물약. 상점에서 사서 채운 것이 그대로 들어온다.
     potions: Object.assign({ mana: 0, health: 0 }, config.potions),
@@ -172,12 +171,6 @@ const hero = (state) => byUid(state, HERO_UID);
 const magicPowerOf = (unit) => unit.spellPower;
 
 // --- 피해와 회복 -------------------------------------------------------
-
-function addThreat(state, source, target, amount) {
-  if (!source || target.side !== 'enemy') return;
-  const table = state.threat[target.uid] || (state.threat[target.uid] = {});
-  table[source.uid] = (table[source.uid] || 0) + amount * source.threatMul;
-}
 
 // 치명타. 확률은 때리는 쪽의 민첩이, 추가 피해는 그쪽의 힘이 정한다.
 //
@@ -217,7 +210,6 @@ function applyDamage(state, source, target, raw, dodgeable) {
   const crit = rollCrit(state, source, target);
   const amount = Math.max(1, Math.round(raw * crit * target.armor));
   target.hp = Math.max(0, target.hp - amount);
-  addThreat(state, source, target, amount);
   state.stats.damage += source && source.side === 'ally' ? amount : 0;
   emit(state, { type: 'damage', uid: target.uid, amount, crit: crit > 1 });
   if (target.hp === 0) kill(state, target);
@@ -304,14 +296,14 @@ function updateZones(state) {
 
 // --- 동료·적 행동 실행 -------------------------------------------------
 
+// 스킬이 실제로 터지는 자리. 쿨타임과 마나는 여기가 아니라 시전을 **시작할 때**
+// 낸다(startCast) — 캐스팅이 취소되어도 자원이 돌아오지 않아야 캐스팅 스킬을
+// 고르는 것이 판단이 된다.
 function runUnitSkill(state, unit, choice) {
   const def = D.UNIT_SKILLS[choice.id];
-  const slot = unit.skills.find((s) => s.id === choice.id);
   const target = byUid(state, choice.targetUid);
-  if (!def || !slot || !target || target.dead) return;
+  if (!def || !target || target.dead) return;
 
-  slot.readyAt = state.t + def.cd;
-  unit.mp -= def.mp;
   emit(state, { type: 'cast', uid: unit.uid, name: def.name,
     text: `${unit.name}: ${def.name}` });
 
@@ -326,10 +318,6 @@ function runUnitSkill(state, unit, choice) {
       foe.tauntUid = unit.uid;
       foe.tauntUntil = state.t + def.duration;
       foe.targetUid = unit.uid;
-      // 도발이 풀린 뒤에도 곧바로 다시 놓치지 않도록 위협도 자체를 올려 둔다.
-      const table = state.threat[foe.uid] || (state.threat[foe.uid] = {});
-      const top = Math.max(0, ...Object.values(table));
-      table[unit.uid] = top + 400;
     }
     return;
   }
@@ -343,11 +331,54 @@ function runUnitSkill(state, unit, choice) {
   }
 }
 
-function moveToward(unit, point, dt) {
+// --- 시전 -------------------------------------------------------------
+
+// 모든 스킬은 즉시 시전이거나 캐스팅이다(data.js의 cast). 캐스팅은 그 시간 동안
+// 서서 외우고, 그 사이에 스스로 움직이면 취소된다.
+//
+// **자원은 시작할 때 낸다.** 끝날 때 내면 취소가 아무 손해도 아니게 되어,
+// 캐스팅 스킬과 즉시 시전 스킬을 가르는 뜻이 사라진다.
+function startCast(state, unit, choice) {
+  const def = D.UNIT_SKILLS[choice.id];
+  const slot = unit.skills.find((s) => s.id === choice.id);
+  if (!def || !slot) return;
+
+  slot.readyAt = state.t + def.cd;
+  unit.mp -= def.mp;
+
+  if (!def.cast) { runUnitSkill(state, unit, choice); return; }
+  unit.cast = { skillId: def.id, name: def.name, targetUid: choice.targetUid,
+    startedAt: state.t, endsAt: state.t + def.cast, player: false };
+}
+
+function cancelCast(state, unit) {
+  if (!unit.cast) return;
+  emit(state, { type: 'castCancel', uid: unit.uid, name: unit.cast.name });
+  unit.cast = null;
+}
+
+// 시전 중인 유닛의 한 틱. 대상이 쓰러지면 거기서 끝난다 — 죽은 것을 계속
+// 외우고 있으면 그 시간만큼 아무것도 안 한 것이 된다.
+function tickCast(state, unit) {
+  const cast = unit.cast;
+  const target = cast.targetUid ? byUid(state, cast.targetUid) : null;
+  if (cast.targetUid && (!target || target.dead)) { cancelCast(state, unit); return; }
+  if (state.t < cast.endsAt) return;
+
+  unit.cast = null;
+  if (cast.player) resolvePlayerSkill(state, D.PLAYER_SKILLS[cast.skillId], cast);
+  else runUnitSkill(state, unit, { id: cast.skillId, targetUid: cast.targetUid });
+}
+
+// **스스로 움직이면 시전이 취소된다.** 밀려나는 것(separate)은 여기를 거치지
+// 않으므로 취소가 아니다 — 대열을 벌리는 힘까지 취소로 치면 캐스팅 스킬이 아예
+// 나가지 않는다.
+function moveToward(state, unit, point, dt) {
   const dx = point.x - unit.x;
   const dy = point.y - unit.y;
   const d = Math.sqrt(dx * dx + dy * dy);
   if (d < 0.4) return;
+  cancelCast(state, unit);
   const step = Math.min(d, unit.speed * dt);
   unit.x += (dx / d) * step;
   unit.y += (dy / d) * step;
@@ -421,25 +452,20 @@ function resolveTarget(state, def, target) {
   return null;
 }
 
-function castSkill(state, skillId, target) {
-  if (state.status !== 'fighting') return { ok: false, reason: '전투가 끝났다' };
-  const def = D.PLAYER_SKILLS[skillId];
-  const slot = skillSlot(state, skillId);
-  if (!def || !slot) return { ok: false, reason: '등록되지 않은 스킬' };
-  if (state.t < slot.readyAt) return { ok: false, reason: '쿨타임' };
-
+// 시전이 끝났을 때(즉시 시전이면 곧바로) 실제로 터지는 자리.
+//
+// 대상은 여기서 다시 찾는다 — 캐스팅하는 동안 대상이 움직였을 수 있다. 장판은
+// 고를 때 찍은 자리에 그대로 깔리고, 대상 지정 스킬은 그 사람을 따라간다.
+function resolvePlayerSkill(state, def, spot) {
   const caster = hero(state);
-  if (caster.dead) return { ok: false, reason: '쓰러졌다' };
-  if (caster.mp < def.mp) return { ok: false, reason: '마나 부족' };
+  if (!def || !caster || caster.dead) return;
 
-  const spot = resolveTarget(state, def, target);
-  if (!spot) return { ok: false, reason: '대상이 올바르지 않다' };
+  const unit = spot.targetUid ? byUid(state, spot.targetUid) : null;
+  if (spot.targetUid && (!unit || unit.dead)) return;
+  const point = { x: unit ? unit.x : spot.x, y: unit ? unit.y : spot.y };
 
-  slot.readyAt = state.t + def.cd;
-  caster.mp -= def.mp;
-  state.stats.casts++;
-  emit(state, { type: 'cast', uid: caster.uid, skillId, name: def.name,
-    x: spot.x, y: spot.y, radius: def.radius || 0, text: `${def.name}` });
+  emit(state, { type: 'cast', uid: caster.uid, skillId: def.id, name: def.name,
+    x: point.x, y: point.y, radius: def.radius || 0, text: `${def.name}` });
 
   // 회복량은 회복력 배수를, 피해는 마법 공격력 배수를 탄다. 지능이 둘 다
   // 올리지만 계수가 달라서, 지능을 올린다고 딜러 노릇이 힐러 노릇을 앞지르지는
@@ -448,20 +474,49 @@ function castSkill(state, skillId, target) {
   const harm = (base) => Math.round(base * magicPowerOf(caster));
 
   if (def.mana) caster.mp = Math.min(caster.maxMp, caster.mp + def.mana);
-  else if (def.targeting === 'ally' && def.heal) applyHeal(state, caster, spot.unit, heal(def.heal));
-  else if (def.targeting === 'ally') addDot(state, caster, spot.unit, def, 'heal', heal(def.tick));
-  else if (def.targeting === 'enemy') addDot(state, caster, spot.unit, def, 'damage', harm(def.tick));
+  else if (def.targeting === 'ally' && def.heal) applyHeal(state, caster, unit, heal(def.heal));
+  else if (def.targeting === 'ally') addDot(state, caster, unit, def, 'heal', heal(def.tick));
+  else if (def.targeting === 'enemy') addDot(state, caster, unit, def, 'damage', harm(def.tick));
   else if (def.targeting === 'area-ally' && def.heal) {
-    for (const unit of alive(state, 'ally')) {
-      if (dist(unit, spot) <= def.radius) applyHeal(state, caster, unit, heal(def.heal));
+    for (const ally of alive(state, 'ally')) {
+      if (dist(ally, point) <= def.radius) applyHeal(state, caster, ally, heal(def.heal));
     }
   } else if (def.targeting === 'area-ally') {
-    addZone(state, caster, def, spot.x, spot.y, 'heal', heal(def.tick));
+    addZone(state, caster, def, point.x, point.y, 'heal', heal(def.tick));
   } else if (def.targeting === 'area-enemy') {
-    addZone(state, caster, def, spot.x, spot.y, 'damage', harm(def.tick));
+    addZone(state, caster, def, point.x, point.y, 'damage', harm(def.tick));
   }
+}
 
-  return { ok: true };
+function castSkill(state, skillId, target) {
+  if (state.status !== 'fighting') return { ok: false, reason: '전투가 끝났다' };
+  const def = D.PLAYER_SKILLS[skillId];
+  const slot = skillSlot(state, skillId);
+  if (!def || !slot) return { ok: false, reason: '등록되지 않은 스킬' };
+
+  const caster = hero(state);
+  if (caster.dead) return { ok: false, reason: '쓰러졌다' };
+  // 시전 중인 것이 쿨타임보다 먼저다. 외우는 중에 다른 것을 누르면 화면에
+  // 뜨는 이유가 "쿨타임"이면 무엇이 막고 있는지 알 수 없다.
+  if (caster.cast) return { ok: false, reason: '시전 중' };
+  if (state.t < slot.readyAt) return { ok: false, reason: '쿨타임' };
+  if (caster.mp < def.mp) return { ok: false, reason: '마나 부족' };
+
+  const spot = resolveTarget(state, def, target);
+  if (!spot) return { ok: false, reason: '대상이 올바르지 않다' };
+  // 주인공의 스킬도 사거리가 있다. 닿지 않으면 쓸 수 없고, 대신 주인공이
+  // 저절로 앞줄 쪽으로 붙으므로 잠시 뒤에는 닿는다.
+  if (dist(caster, spot) > def.range) return { ok: false, reason: '사거리 밖' };
+
+  slot.readyAt = state.t + def.cd;
+  caster.mp -= def.mp;
+  state.stats.casts++;
+
+  const cast = { skillId, name: def.name, targetUid: spot.unit ? spot.unit.uid : null,
+    x: spot.x, y: spot.y, startedAt: state.t, endsAt: state.t + def.cast, player: true };
+  if (!def.cast) { resolvePlayerSkill(state, def, cast); return { ok: true }; }
+  caster.cast = cast;
+  return { ok: true, casting: def.cast };
 }
 
 // 물약은 마시는 순간 회복된다. 마나 물약과 체력 물약이 쿨타임을 함께 쓰는 것은,
@@ -525,12 +580,25 @@ function step(state, dt) {
   updateDots(state);
 
   for (const unit of state.units) {
-    if (unit.dead || unit.uid === HERO_UID) continue;
+    if (unit.dead) continue;
+
+    // 시전 중이면 그 틱은 외우는 데만 쓴다. 다시 판단하지 않는 것은, 매 틱 새로
+    // 고르면 이동이 걸려 캐스팅이 시작하자마자 취소되기 때문이다.
+    if (unit.cast) { tickCast(state, unit); continue; }
+
     const decision = AI.decide(unit, state);
+
+    // 주인공이 조작하는 것은 여전히 스킬뿐이다. 이동만 다른 힐러와 같은 규칙에
+    // 맡긴다 — 스킬에 사거리가 생긴 이상 제자리에 서 있으면 힐이 앞줄에 닿지 않는다.
+    if (unit.uid === HERO_UID) {
+      if (decision.move) moveToward(state, unit, decision.move, dt);
+      continue;
+    }
+
     unit.targetUid = decision.targetUid;
     if (decision.potion) drink(state, unit, decision.potion);
-    else if (decision.skill) runUnitSkill(state, unit, decision.skill);
-    else if (decision.move) moveToward(unit, decision.move, dt);
+    else if (decision.skill) startCast(state, unit, decision.skill);
+    else if (decision.move) moveToward(state, unit, decision.move, dt);
 
     if (decision.attack && state.t >= unit.nextAttackAt && isFinite(unit.attackCd)) {
       const target = byUid(state, decision.attack);
@@ -585,7 +653,8 @@ const api = {
   HERO_UID, TICK, WAVE_GAP, rewardOf,
   createRng, createBattle, advance, step, drainEvents,
   castSkill, usePotion, drink, magicPowerOf, rollCrit, applyDamage, applyHeal, addDot, addZone,
-  hero, skillSlot, resolveTarget,
+  hero, skillSlot, resolveTarget, moveToward,
+  startCast, tickCast, cancelCast, runUnitSkill, resolvePlayerSkill,
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = api;

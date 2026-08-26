@@ -273,6 +273,15 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
   background: rgba(0, 0, 0, 0.55); overflow: hidden;
 }
 .unit .hpbar span { display: block; height: 100%; background: var(--hp); }
+
+/* 시전 막대. 체력 막대와 색을 나눠 두지 않으면 외우는 중인지 회복 중인지
+   구분이 안 된다. 시전은 잠깐이라 늘 떠 있지 않다. */
+.unit .castbar {
+  width: 118%; height: 3px; border-radius: 2px;
+  background: rgba(0, 0, 0, 0.55); overflow: hidden;
+}
+.unit .castbar span { display: block; height: 100%; width: 0; background: #f0e2a8; }
+.unit.dead .castbar { display: none; }
 .unit.low .hpbar span { background: var(--hp-low); }
 /* 유닛 이름표는 없다. 아홉 그림이 실루엣만으로 갈리도록 그렸고, 아군의 이름은
    아래 초상화 줄에 있다. 뭉쳐 싸울 때 이름표가 서로 겹쳐 읽히지도 않으면서
@@ -292,6 +301,15 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
   background: color-mix(in srgb, var(--zone-heal) 16%, transparent);
 }
 .zone.damage { border-color: var(--zone-harm); background: color-mix(in srgb, var(--zone-harm) 16%, transparent); }
+
+/* 주인공의 사거리. 눌러 보고 나서 "사거리 밖"을 듣는 것보다 먼저 보이는 것이
+   낫다 — 그동안 다른 스킬의 쿨타임이 돈다. */
+.reach {
+  position: absolute; border-radius: 50%;
+  transform: translate(-50%, -50%);
+  border: 1px dashed rgba(240, 226, 168, 0.5);
+  pointer-events: none;
+}
 
 .aim {
   position: absolute; border-radius: 50%;
@@ -572,6 +590,8 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 /* 옵션 줄과 차이 줄이 같은 색이면 무엇이 지금 붙어 있고 무엇이 달라지는지
    구분되지 않는다. */
 .pick-sub.diff { color: var(--btn-bg); font-weight: 600; }
+/* 시전 시간·사거리 줄. 설명보다 한 단계 물러나 있어야 설명이 먼저 읽힌다. */
+.pick-sub.dim { font-size: 11px; opacity: 0.75; }
 .item .pick-cost { white-space: nowrap; }
 .item:disabled { opacity: 0.45; cursor: default; }
 

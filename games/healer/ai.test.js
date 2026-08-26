@@ -1,8 +1,11 @@
 'use strict';
 
 // 실행: node games/healer/ai.test.js
-// 기획서 10~14장의 직업별 행동 우선순위를 상태만 만들어 놓고 확인한다.
-// 전투를 굴려서 보면 우연히 맞은 것인지 규칙대로인지 가릴 수 없다.
+// 직업별 행동 우선순위를 상태만 만들어 놓고 확인한다. 전투를 굴려서 보면
+// 우연히 맞은 것인지 규칙대로인지 가릴 수 없다.
+//
+// **아군과 적이 같은 규칙을 쓴다는 것도 여기서 확인한다.** 한쪽만 고치고 다른
+// 쪽을 잊는 것이 이 파일이 막으려는 것이다.
 const D = require('./data.js');
 const L = require('./logic.js');
 const AI = require('./ai.js');
@@ -39,6 +42,7 @@ const battle = (over) => L.createBattle(Object.assign({
 
 const named = (state, name) => state.units.find((u) => u.name === name);
 const enemies = (state) => AI.alive(state, 'enemy');
+const enemyOf = (state, job) => enemies(state).find((u) => u.job === job);
 
 // 서로 사거리 안에 들어와 있게 모아 둔다. 대상 선택을 보려는 것이지
 // 누가 먼저 도착하는지를 보려는 것이 아니다.
@@ -47,38 +51,57 @@ function gather(state) {
   for (const unit of enemies(state)) { unit.x = 46; unit.y = 28; }
 }
 
-// --- 딜러 (기획서 12장) -------------------------------------------------
+// --- 역할 구분 ---------------------------------------------------------
+{
+  const state = battle();
+  check('탱커는 탱커', AI.roleOf(named(state, '강철의 브란')), 'tank');
+  check('사거리 짧은 딜러는 근접', AI.roleOf(named(state, '검사 라일')), 'melee');
+  check('사거리 긴 딜러는 원거리', AI.roleOf(named(state, '궁수 미라')), 'ranged');
+  check('힐러는 힐러', AI.roleOf(named(state, '사제 노아')), 'healer');
+  check('주인공도 힐러', AI.roleOf(L.hero(state)), 'healer');
+  check('적도 같은 잣대로 갈린다', AI.roleOf(enemyOf(state, 'dealer')), 'melee');
+}
+
+// --- 딜러 --------------------------------------------------------------
 {
   const state = battle();
   gather(state);
   const dealer = named(state, '검사 라일');
-  const tank = named(state, '강철의 브란');
 
-  // 탱커가 어그로를 잡은 적이 없으면 적 힐러 → 딜러 → 탱커.
-  const first = AI.chooseTarget(dealer, state);
-  check('탱커가 잡은 적이 없으면 적 힐러부터', first.job, 'healer');
+  // 아무도 우리 힐러를 안 치고 있으면 적 힐러 → 원거리 → 근접 → 탱커.
+  check('우리 힐러가 안전하면 적 힐러부터', AI.chooseTarget(dealer, state).job, 'healer');
 
-  first.dead = true;
-  check('적 힐러가 없으면 적 딜러', AI.chooseTarget(dealer, state).job, 'dealer');
+  enemyOf(state, 'healer').dead = true;
+  check('적 힐러가 없으면 딜러', AI.chooseTarget(dealer, state).job, 'dealer');
 
-  enemies(state).filter((u) => u.job === 'dealer').forEach((u) => { u.dead = true; });
-  check('그다음이 적 탱커', AI.chooseTarget(dealer, state).job, 'tank');
+  enemyOf(state, 'dealer').dead = true;
+  check('탱커가 마지막', AI.chooseTarget(dealer, state).job, 'tank');
 
   enemies(state).forEach((u) => { u.dead = true; });
   check('남은 적이 없으면 대상도 없다', AI.chooseTarget(dealer, state), null);
+}
+{
+  // 우리 힐러를 치는 적이 있으면 그쪽이 먼저다. 우선순위상 맨 뒤인 탱커라도.
+  const state = battle();
+  gather(state);
+  const orc = enemyOf(state, 'tank');
+  orc.targetUid = named(state, '사제 노아').uid;
+  check('힐러를 치는 적을 먼저 친다',
+    AI.chooseTarget(named(state, '검사 라일'), state).uid, orc.uid);
+  check('원거리 딜러도 같은 규칙',
+    AI.chooseTarget(named(state, '궁수 미라'), state).uid, orc.uid);
+  check('그 적은 우선순위상 맨 뒤인 탱커다', orc.job, 'tank');
 
-  // 탱커가 어그로를 잡고 있으면 그 적이 우선이다. 우선순위상 마지막인 탱커라도.
-  const held = battle();
-  gather(held);
-  const orc = enemies(held).find((u) => u.job === 'tank');
-  orc.targetUid = named(held, '강철의 브란').uid;
-  check('탱커가 잡은 적을 먼저 친다',
-    AI.chooseTarget(named(held, '검사 라일'), held).uid, orc.uid);
-  check('그 적은 우선순위상 마지막인 탱커다', orc.job, 'tank');
-  check('탱커가 살아 있어야 성립한다', tank.dead, false);
+  // 주인공도 힐러다. 주인공을 치는 적도 같은 대접을 받는다.
+  const other = battle();
+  gather(other);
+  const scout = enemyOf(other, 'dealer');
+  scout.targetUid = L.HERO_UID;
+  check('주인공을 치는 적도 먼저 친다',
+    AI.chooseTarget(named(other, '검사 라일'), other).uid, scout.uid);
 }
 
-// --- 탱커 (기획서 11장) -------------------------------------------------
+// --- 탱커 --------------------------------------------------------------
 {
   const state = battle();
   gather(state);
@@ -86,33 +109,76 @@ function gather(state) {
 
   // 모든 적이 탱커를 보고 있으면 도발할 이유가 없다.
   enemies(state).forEach((u) => { u.targetUid = tank.uid; });
-  check('어그로가 붙어 있으면 도발하지 않는다', AI.chooseSkill(tank, state, enemies(state)[0]), null);
+  check('어그로가 붙어 있으면 도발하지 않는다',
+    AI.chooseSkill(tank, state, enemies(state)[0]), null);
 
   // 하나라도 다른 아군을 때리기 시작하면 도발로 회수한다.
-  const loose = enemies(state)[0];
+  const loose = enemyOf(state, 'dealer');
   loose.targetUid = named(state, '궁수 미라').uid;
   const choice = AI.chooseSkill(tank, state, loose);
   check('어그로가 풀리면 도발한다', choice && choice.id, 'taunt');
   check('풀린 적을 겨냥한다', choice.targetUid, loose.uid);
+  check('그쪽으로 대상을 돌린다', AI.chooseTarget(tank, state).uid, loose.uid);
 
   L.step(state, L.TICK);
   check('도발이 나가면 그 적이 탱커를 본다', AI.byUid(state, loose.uid).targetUid, tank.uid);
-  check('도발은 지속 시간이 있다',
-    AI.byUid(state, loose.uid).tauntUntil > state.t, true);
+  check('도발은 지속 시간이 있다', AI.byUid(state, loose.uid).tauntUntil > state.t, true);
 
   // 도발이 쿨타임이면 다시 나가지 않는다.
-  const again = enemies(state)[1];
+  const again = enemyOf(state, 'tank');
   again.targetUid = named(state, '사제 노아').uid;
   check('도발은 쿨타임 동안 다시 안 나간다', AI.chooseSkill(tank, state, again), null);
 }
+{
+  // 여럿이 풀렸으면 힐러 → 원거리 → 근접 순으로 구한다.
+  const state = battle();
+  gather(state);
+  const tank = named(state, '강철의 브란');
+  const onMelee = enemyOf(state, 'dealer');
+  const onHealer = enemyOf(state, 'healer');
+  const onRanged = enemyOf(state, 'tank');
+  onMelee.targetUid = named(state, '검사 라일').uid;
 
-// --- 동료 힐러 (기획서 13장) --------------------------------------------
+  check('근접만 맞고 있으면 그쪽',
+    AI.chooseSkill(tank, state, onMelee).targetUid, onMelee.uid);
+
+  onRanged.targetUid = named(state, '궁수 미라').uid;
+  check('원거리가 맞기 시작하면 그쪽이 먼저',
+    AI.chooseSkill(tank, state, onMelee).targetUid, onRanged.uid);
+
+  onHealer.targetUid = named(state, '사제 노아').uid;
+  check('힐러가 맞기 시작하면 그쪽이 먼저',
+    AI.chooseSkill(tank, state, onMelee).targetUid, onHealer.uid);
+
+  onHealer.dead = true;
+  check('힐러가 안전하면 원거리 딜러',
+    AI.chooseSkill(tank, state, onMelee).targetUid, onRanged.uid);
+}
+{
+  // 광역 도발은 둘 이상 풀렸을 때만 쓴다. 쿨타임이 길어 하나에 쓰면 아깝다.
+  const state = battle({ party: [{ defId: 'bran', level: 4 }, { defId: 'lyle', level: 1 },
+    { defId: 'mira', level: 1 }, { defId: 'noa', level: 1 }] });
+  gather(state);
+  const tank = named(state, '강철의 브란');
+  check('레벨이 되면 광역 도발을 들고 온다',
+    tank.skills.some((s) => s.id === 'roar'), true);
+
+  enemies(state).forEach((u) => { u.targetUid = tank.uid; });
+  enemyOf(state, 'dealer').targetUid = named(state, '궁수 미라').uid;
+  check('하나만 풀리면 단일 도발', AI.chooseSkill(tank, state, null).id, 'taunt');
+
+  enemyOf(state, 'healer').targetUid = named(state, '사제 노아').uid;
+  check('둘 이상 풀리면 광역 도발', AI.chooseSkill(tank, state, null).id, 'roar');
+}
+
+// --- 힐러 --------------------------------------------------------------
 {
   const state = battle();
   gather(state);
   const healer = named(state, '사제 노아');
   const tank = named(state, '강철의 브란');
-  const dealer = named(state, '검사 라일');
+  const melee = named(state, '검사 라일');
+  const ranged = named(state, '궁수 미라');
   const heal = D.UNIT_SKILLS.mend.heal;
 
   check('아무도 안 다쳤으면 힐 대상이 없다', AI.healTarget(healer, state, heal), null);
@@ -121,18 +187,21 @@ function gather(state) {
   tank.hp = tank.maxHp - Math.floor(heal * 0.5);
   check('조금 깎인 정도로는 힐하지 않는다', AI.healTarget(healer, state, heal), null);
 
-  // 한 번의 힐로 거의 다 채울 만큼 깎이면 쓴다.
   tank.hp = tank.maxHp - heal;
-  const pick = AI.healTarget(healer, state, heal);
-  check('거의 다 채울 수 있으면 힐한다', pick && pick.uid, tank.uid);
+  check('거의 다 채울 수 있으면 힐한다', AI.healTarget(healer, state, heal).uid, tank.uid);
 
   // 탱커 최우선. 딜러가 더 많이 깎였어도 탱커가 조건을 만족하면 탱커부터.
-  dealer.hp = 1;
+  melee.hp = 1;
   check('탱커를 먼저 본다', AI.healTarget(healer, state, heal).uid, tank.uid);
 
-  // 탱커가 멀쩡하면 위급한 다른 아군으로 간다.
+  // 탱커에게 여유가 있으면 힐러 → 근접 → 원거리.
   tank.hp = tank.maxHp;
-  check('탱커가 멀쩡하면 위급한 쪽', AI.healTarget(healer, state, heal).uid, dealer.uid);
+  ranged.hp = 1;
+  check('탱커가 멀쩡하면 근접이 원거리보다 먼저',
+    AI.healTarget(healer, state, heal).uid, melee.uid);
+
+  healer.hp = healer.maxHp - heal;
+  check('힐러가 근접보다 먼저', AI.healTarget(healer, state, heal).uid, healer.uid);
 
   // 마나가 없으면 판단 자체가 성립하지 않는다.
   healer.mp = 0;
@@ -141,33 +210,109 @@ function gather(state) {
     AI.chooseSkill(healer, state, enemies(state)[0]), null);
 }
 
-// --- 적 어그로 ----------------------------------------------------------
+// --- 적도 같은 논리로 움직인다 -----------------------------------------
 {
   const state = battle();
   gather(state);
-  const foe = enemies(state)[0];
+  const scout = enemyOf(state, 'dealer');
+  const orc = enemyOf(state, 'tank');
+  const shaman = enemyOf(state, 'healer');
+  const lyle = named(state, '검사 라일');
+
+  // 적 딜러도 상대편 힐러부터 노린다.
+  check('적 딜러는 우리 힐러부터', AI.roleOf(AI.chooseTarget(scout, state)), 'healer');
+
+  // 그 편의 힐러를 치는 쪽이 있으면 그쪽이 먼저다.
+  lyle.targetUid = shaman.uid;
+  check('적 딜러는 제 힐러를 치는 쪽을 먼저', AI.chooseTarget(scout, state).uid, lyle.uid);
+  check('적 탱커도 그쪽으로 간다', AI.chooseTarget(orc, state).uid, lyle.uid);
+
+  // 같은 논리를 쓴다는 것은 같은 수단을 갖는다는 뜻이기도 하다. 도발이 이쪽에만
+  // 있으면 적 힐러는 아무에게도 보호받지 못한다.
+  check('적 탱커도 도발을 들고 온다', orc.skills.map((slot) => slot.id), ['taunt']);
+  const pull = AI.chooseSkill(orc, state, lyle);
+  check('제 힐러를 치는 쪽에게 도발한다', pull && pull.targetUid, lyle.uid);
+
+  // 도발은 아군이든 적이든 다른 모든 판단을 이긴다.
+  scout.tauntUid = named(state, '강철의 브란').uid;
+  scout.tauntUntil = state.t + 3;
+  check('도발이 우선순위를 이긴다', AI.chooseTarget(scout, state).job, 'tank');
+  scout.tauntUntil = state.t - 1;
+  check('도발이 풀리면 다시 우선순위대로', AI.chooseTarget(scout, state).uid, lyle.uid);
+}
+
+// --- 사거리 ------------------------------------------------------------
+{
+  const state = battle();
+  gather(state);
+  const melee = named(state, '검사 라일');
+  const ranged = named(state, '궁수 미라');
+  const healer = named(state, '사제 노아');
   const tank = named(state, '강철의 브란');
-  const dealer = named(state, '검사 라일');
+  const foe = enemyOf(state, 'healer');
 
-  state.threat[foe.uid] = { [tank.uid]: 100, [dealer.uid]: 300 };
-  check('위협도가 가장 높은 쪽을 본다', AI.chooseTarget(foe, state).uid, dealer.uid);
+  check('강타는 사거리가 짧다', D.UNIT_SKILLS.cleave.range < D.UNIT_SKILLS.aimed.range, true);
 
-  foe.tauntUid = tank.uid;
-  foe.tauntUntil = state.t + 3;
-  check('도발은 위협도를 이긴다', AI.chooseTarget(foe, state).uid, tank.uid);
+  melee.x = foe.x - D.UNIT_SKILLS.cleave.range - 2;
+  check('사거리 밖이면 근접 스킬이 안 나간다', AI.chooseSkill(melee, state, foe), null);
+  melee.x = foe.x - D.UNIT_SKILLS.cleave.range + 2;
+  check('들어오면 나간다', AI.chooseSkill(melee, state, foe).id, 'cleave');
+  check('사거리 밖이면 대신 다가간다',
+    (() => { melee.x = foe.x - 40; const m = AI.chooseMove(melee, state, foe); return m && m.x > melee.x; })(),
+    true);
 
-  foe.tauntUntil = state.t - 1;
-  check('도발이 풀리면 다시 위협도대로', AI.chooseTarget(foe, state).uid, dealer.uid);
+  // 원거리는 멀리서 쏜다.
+  ranged.x = foe.x - D.UNIT_SKILLS.aimed.range + 2;
+  check('원거리는 멀리서도 나간다', AI.chooseSkill(ranged, state, foe).id, 'aimed');
 
-  // 주인공이 공격 스킬로 어그로를 끌 수 있어야 기획서 9장의 도트가 선택이 된다.
-  // 첫 째깍이기 전에 죽지 않도록 가장 단단한 적에게 건다.
-  const heroState = battle({ skills: ['flame', 'touch', 'quick', 'regen', 'focus'] });
-  gather(heroState);
-  const target = enemies(heroState).find((u) => u.job === 'tank');
-  L.castSkill(heroState, 'flame', { uid: target.uid });
-  for (let i = 0; i < Math.round(3 / L.TICK); i++) L.step(heroState, L.TICK);
-  check('주인공이 피해를 주면 위협도가 쌓인다',
-    (heroState.threat[target.uid] || {})[L.HERO_UID] > 0, true);
+  // 힐도 사거리가 있다. 닿지 않으면 대신 그쪽으로 간다.
+  tank.hp = tank.maxHp - D.UNIT_SKILLS.mend.heal;
+  healer.x = tank.x - D.UNIT_SKILLS.mend.range - 5;
+  check('사거리 밖이면 힐이 안 나간다', AI.chooseSkill(healer, state, foe), null);
+  const step = AI.chooseMove(healer, state, foe);
+  check('대신 탱커 쪽으로 간다', step && step.x > healer.x, true);
+  healer.x = tank.x - 5;
+  check('들어오면 힐이 나간다', AI.chooseSkill(healer, state, foe).id, 'mend');
+}
+
+// --- 붙기와 물러서기 ---------------------------------------------------
+{
+  // 후열은 맞아도 도망가지 않는다. 탱커 곁에 붙어야 탱커가 어그로를 가져간다.
+  const state = battle();
+  gather(state);
+  const tank = named(state, '강철의 브란');
+  const ranged = named(state, '궁수 미라');
+  const melee = named(state, '검사 라일');
+  const foe = enemyOf(state, 'dealer');
+
+  tank.x = 60; tank.y = 28;
+  ranged.x = 20; ranged.y = 28;
+  foe.x = 22; foe.y = 28;
+  foe.targetUid = ranged.uid;
+  const stick = AI.chooseMove(ranged, state, foe);
+  check('맞고 있어도 탱커에게 붙는다', stick && stick.x > ranged.x, true);
+
+  // 탱커가 없으면 근접 딜러에게 붙는다.
+  tank.dead = true;
+  melee.x = 60; melee.y = 28;
+  const toMelee = AI.chooseMove(ranged, state, foe);
+  check('탱커가 없으면 근접 딜러에게', toMelee && toMelee.x > ranged.x, true);
+  check('붙을 자리가 근접 딜러다', AI.anchorOf(ranged, state).uid, melee.uid);
+
+  // 둘 다 없으면 그제야 물러선다.
+  melee.dead = true;
+  const away = AI.chooseMove(ranged, state, foe);
+  check('붙을 곳이 없으면 물러선다', away && away.x < ranged.x, true);
+  check('그래도 때리는 것은 멈추지 않는다', AI.decide(ranged, state).attack !== null, true);
+}
+{
+  // 근접은 대상 쪽으로 붙는다.
+  const state = battle();
+  const tank = named(state, '강철의 브란');
+  const foe = enemies(state)[0];
+  tank.x = 10; tank.y = 28;
+  foe.x = 80; foe.y = 28;
+  check('근접은 대상 쪽으로 간다', AI.chooseMove(tank, state, foe).x > tank.x, true);
 }
 
 // --- 물약 (마나를 다 쓴 동료가 서 있지 않게) ----------------------------
@@ -220,32 +365,6 @@ function gather(state) {
     Math.round(bran.hp - before), Math.round(bran.maxHp * D.POTIONS.health.ratio));
   check('물약이 준다', bran.potions.health, D.JOB_POTIONS.tank.health - 1);
   check('연달아 못 마신다', L.drink(drinker, bran, 'health').ok, false);
-}
-
-// --- 이동 --------------------------------------------------------------
-{
-  const state = battle();
-  const tank = named(state, '강철의 브란');
-  const healer = named(state, '사제 노아');
-  const foe = enemies(state)[0];
-
-  // 근접은 붙는다.
-  tank.x = 10; tank.y = 28;
-  foe.x = 80; foe.y = 28;
-  const step = AI.chooseMove(tank, state, foe);
-  check('근접은 대상 쪽으로 간다', step.x > tank.x, true);
-
-  // 힐러는 적이 붙으면 물러선다.
-  healer.x = 78; healer.y = 28;
-  const away = AI.chooseMove(healer, state, foe);
-  check('힐러는 적이 붙으면 물러선다', away.x < healer.x, true);
-
-  // 탱커가 앞서 나가면 힐러가 따라붙는다 — 사거리를 벗어나면 힐이 끊긴다.
-  healer.x = 5; healer.y = 28;
-  tank.x = 70; tank.y = 28;
-  foe.x = 95;
-  const follow = AI.chooseMove(healer, state, foe);
-  check('힐러는 탱커를 따라간다', follow && follow.x > healer.x, true);
 }
 
 console.log(`${passed}개 통과, ${failed}개 실패`);

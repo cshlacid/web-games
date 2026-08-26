@@ -16,10 +16,23 @@ const FIELD = { w: 100, h: 46 };
 // 피해 감소는 곱셈 계수다. 방어력을 빼기로 하면 공격력이 낮은 적의 피해가
 // 0이 되어 탱커가 무적이 되는 구간이 생긴다.
 const JOBS = {
-  tank: { name: '탱커', role: '최전선에서 어그로 확보 및 방어' },
-  dealer: { name: '딜러', role: '탱커가 어그로를 잡은 적 우선 공격' },
+  tank: { name: '탱커', role: '아군 후열을 노리는 적의 어그로를 끈다' },
+  dealer: { name: '딜러', role: '아군 힐러를 치는 적을 먼저 친다' },
   healer: { name: '힐러', role: '탱커 체력 관리 최우선' },
 };
+
+// 딜러는 근접과 원거리가 하는 일이 다르고, 우선순위 표가 그 구분을 쓴다.
+// 사거리로 가르는 것은 정의에 이미 적혀 있는 것을 두 번 적지 않기 위해서다.
+const MELEE_RANGE = 12;
+const roleOf = (def) => (def.job === 'dealer'
+  ? (def.range > MELEE_RANGE ? 'ranged' : 'melee')
+  : def.job);
+
+// 누구를 먼저 치고 먼저 살리는가. **아군과 적이 같은 표를 쓴다.**
+const ATTACK_ORDER = ['healer', 'ranged', 'melee', 'tank'];
+const HEAL_ORDER = ['tank', 'healer', 'melee', 'ranged'];
+// 탱커가 어그로를 끌 때의 순서 — 후열부터 구한다.
+const PULL_ORDER = ['healer', 'ranged', 'melee'];
 
 // 능력치 넷. 모든 캐릭터가 갖고, 화면에 보이는 수치는 전부 여기서 나온다.
 //
@@ -229,14 +242,20 @@ const HERO = {
   job: 'healer',
   sprite: 'hero',
   growth: 'hero',
-  // 능력치가 곧 수치다: 체력 30 → 최대 체력 420, 지능 25 → 최대 마나 200.
+  // 능력치가 곧 수치다: 체력 42 → 최대 체력 588, 지능 25 → 최대 마나 200.
+  //
+  // 동료 힐러(사제 노아, 체력 40)보다 조금 단단하다. 적 딜러가 힐러를 먼저
+  // 노리는 규칙이 들어온 뒤로 주인공이 늘 표적이 되는데, 주인공이 쓰러지면
+  // 그대로 패배라 여기서 밀리면 전투가 아니라 사고가 된다.
   // 레벨이 오르면 자동으로 조금 오르고, 그 위에 나눠 주는 점수가 얹힌다.
-  attrs: { str: 8, agi: 10, int: 25, vit: 30 },
+  attrs: { str: 8, agi: 10, int: 25, vit: 42 },
   attackType: 'magic',
-  hp: 420, mp: 200,
-  atk: 0, attackCd: Infinity, range: 0, speed: 0,
+  hp: 588, mp: 200,
+  // 주인공도 움직인다. 스킬에 사거리가 생긴 이상 제자리에 서 있으면 앞줄에
+  // 힐이 닿지 않는다. 다만 조작하는 것은 여전히 스킬뿐이고, 이동은 다른
+  // 힐러와 같은 규칙으로 저절로 된다.
+  atk: 0, attackCd: Infinity, range: 30, speed: 15,
   armor: 0.9,
-  threatMul: 1,
   skills: [],
 };
 
@@ -253,42 +272,42 @@ const COMPANIONS = {
   bran:  { id: 'bran',  name: '강철의 브란', job: 'tank',   sprite: 'tank',
            hp: 1148, mp: 88,  atk: 26, attackCd: 1.6, range: 7,  speed: 17,
            attrs: { str: 20, agi: 8, int: 11, vit: 82 },
-           armor: 0.55, threatMul: 3.5, skills: ['roar', 'taunt'],
+           armor: 0.55, skills: ['roar', 'taunt'],
            note: '공격이 매워 어그로를 잘 붙든다' },
   corin: { id: 'corin', name: '방패병 코린', job: 'tank',   sprite: 'tank',
            hp: 1316, mp: 80,  atk: 21, attackCd: 1.8, range: 7,  speed: 15,
            attrs: { str: 16, agi: 6, int: 10, vit: 94 },
-           armor: 0.48, threatMul: 3.5, skills: ['roar', 'taunt'],
+           armor: 0.48, skills: ['roar', 'taunt'],
            note: '더 단단하지만 더 느리다' },
   lyle:  { id: 'lyle',  name: '검사 라일',   job: 'dealer', sprite: 'melee',
            hp: 644, mp: 80,  atk: 46, attackCd: 1.2, range: 7,  speed: 21,
            attrs: { str: 35, agi: 14, int: 10, vit: 46 },
-           armor: 0.82, threatMul: 1, skills: ['cleave'],
+           armor: 0.82, skills: ['cleave'],
            note: '근접. 강타로 한 번에 크게 넣는다' },
   sera:  { id: 'sera',  name: '도적 세라',   job: 'dealer', sprite: 'melee',
            hp: 560, mp: 88,  atk: 38, attackCd: 0.9, range: 7,  speed: 24,
            attrs: { str: 29, agi: 22, int: 11, vit: 40 },
-           armor: 0.86, threatMul: 1, skills: ['cleave'],
+           armor: 0.86, skills: ['cleave'],
            note: '근접. 빠르게 여러 번 때린다' },
   mira:  { id: 'mira',  name: '궁수 미라',   job: 'dealer', sprite: 'ranged',
            hp: 518, mp: 104, atk: 42, attackCd: 1.4, range: 34, speed: 17,
            attrs: { str: 32, agi: 18, int: 13, vit: 37 },
-           armor: 0.9,  threatMul: 1, skills: ['aimed', 'volley'],
+           armor: 0.9, skills: ['aimed', 'volley'],
            note: '원거리. 화살비로 적 여럿을 친다' },
   yuri:  { id: 'yuri',  name: '마법사 유리', job: 'dealer', sprite: 'ranged',
            hp: 476, mp: 112, atk: 52, attackCd: 1.9, range: 36, speed: 15,
            attrs: { str: 14, agi: 12, int: 14, vit: 34 }, attackType: 'magic',
-           armor: 0.92, threatMul: 1, skills: ['aimed', 'volley'],
+           armor: 0.92, skills: ['aimed', 'volley'],
            note: '원거리. 느리지만 한 방이 무겁다' },
   noa:   { id: 'noa',   name: '사제 노아',   job: 'healer', sprite: 'healer',
            hp: 560, mp: 104, atk: 18, attackCd: 2.0, range: 30, speed: 16,
            attrs: { str: 12, agi: 10, int: 13, vit: 40 }, attackType: 'magic',
-           armor: 0.9,  threatMul: 1, skills: ['greaterMend', 'mend'],
+           armor: 0.9, skills: ['greaterMend', 'mend'],
            note: '마나가 많아 오래 버틴다' },
   dean:  { id: 'dean',  name: '수도사 딘',   job: 'healer', sprite: 'healer',
            hp: 616, mp: 88,  atk: 24, attackCd: 1.7, range: 26, speed: 18,
            attrs: { str: 14, agi: 12, int: 11, vit: 44 }, attackType: 'magic',
-           armor: 0.86, threatMul: 1, skills: ['mend'],
+           armor: 0.86, skills: ['mend'],
            note: '힐량이 작은 대신 때리기도 한다' },
 };
 
@@ -298,33 +317,44 @@ const COMPANIONS = {
 // minLevel은 그 스킬이 열리는 동료 레벨이다. 같은 동료라도 레벨이 낮으면
 // 광역 도발을 못 들고 온다 — 편성 화면에서 누구를 데려갈지 고르는 이유가 된다.
 const UNIT_SKILLS = {
-  taunt:  { id: 'taunt',  name: '도발', cd: 12, mp: 14, kind: 'taunt', duration: 6, minLevel: 1,
+  // 쿨타임이 지속 시간보다 짧다. 이것이 탱커가 하나를 계속 붙들 수 있는 근거다 —
+  // 위협도 표를 없앤 뒤로 어그로를 유지하는 수단이 도발뿐이라, 끊기면 그 순간
+  // 적이 곧장 후열로 간다.
+  taunt:  { id: 'taunt',  name: '도발', cd: 5, mp: 10, kind: 'taunt', duration: 6, minLevel: 1, range: 30, cast: 0,
             desc: '적 하나의 어그로를 가져온다' },
   // 광역 도발. 탱커 하나로는 여러 적의 어그로를 다 잡을 수 없어 후방이 무너지는데,
   // 이 스킬이 그것을 푼다. 대신 쿨타임이 길어 아무 때나 쓸 수는 없다.
-  roar:   { id: 'roar',   name: '전투 함성', cd: 22, mp: 30, kind: 'taunt-area', duration: 7,
-            radius: 34, minLevel: 4, desc: '주변 적 전부의 어그로를 한 번에 가져온다' },
-  cleave: { id: 'cleave', name: '강타', cd: 7,  mp: 16, kind: 'damage', mul: 2.6, minLevel: 1,
+  roar:   { id: 'roar',   name: '전투 함성', cd: 14, mp: 26, kind: 'taunt-area', duration: 8, range: 34, cast: 0,
+            radius: 34, minLevel: 3, desc: '주변 적 전부의 어그로를 한 번에 가져온다' },
+  cleave: { id: 'cleave', name: '강타', cd: 7,  mp: 16, kind: 'damage', mul: 2.6, minLevel: 1, range: 8, cast: 0,
             desc: '한 번에 크게 넣는다' },
   // 원거리 딜러의 기본기. 레벨 1 동료가 스킬을 하나도 못 들고 오면 편성 화면에
   // "스킬 없음"이라고 적히는데, 그건 고를 이유가 없는 동료라는 뜻이다.
-  aimed:  { id: 'aimed',  name: '조준 사격', cd: 6, mp: 14, kind: 'damage', mul: 2.2, minLevel: 1,
+  aimed:  { id: 'aimed',  name: '조준 사격', cd: 6, mp: 14, kind: 'damage', mul: 2.2, minLevel: 1, range: 34, cast: 1.0,
             desc: '한 발을 겨눠 크게 넣는다' },
-  volley: { id: 'volley', name: '화살비', cd: 9, mp: 26, kind: 'damage-area', mul: 1.5, radius: 15,
+  volley: { id: 'volley', name: '화살비', cd: 9, mp: 26, kind: 'damage-area', mul: 1.5, radius: 15, range: 34, cast: 1.2,
             minLevel: 3, desc: '겹쳐 있는 적 여럿을 친다' },
   // 동료 힐러는 보조다. 물약까지 들고 나면서 주인공이 손을 놓아도 파티가 버티기
   // 시작했고, 그러면 이 게임이 성립하지 않는다 — 힐량과 마나를 함께 줄였다.
-  mend:   { id: 'mend',   name: '치유술', cd: 3.0, mp: 24, kind: 'heal', heal: 145, minLevel: 1,
+  mend:   { id: 'mend',   name: '치유술', cd: 3.0, mp: 24, kind: 'heal', heal: 145, minLevel: 1, range: 30, cast: 1.5,
             desc: '탱커 체력을 본다' },
-  greaterMend: { id: 'greaterMend', name: '대치유술', cd: 6, mp: 40, kind: 'heal', heal: 290,
+  greaterMend: { id: 'greaterMend', name: '대치유술', cd: 6, mp: 40, kind: 'heal', heal: 290, range: 30, cast: 2.5,
             minLevel: 5, desc: '크게 회복시킨다. 마나를 많이 먹는다' },
-  hex:    { id: 'hex',    name: '저주', cd: 8, mp: 18, kind: 'dot', tick: 14, interval: 1,
+  hex:    { id: 'hex',    name: '저주', cd: 8, mp: 18, kind: 'dot', tick: 14, interval: 1, range: 30, cast: 1.0,
             duration: 5, minLevel: 1, desc: '지속 피해' },
-  mendEnemy: { id: 'mendEnemy', name: '주술 치유', cd: 4.5, mp: 20, kind: 'heal', heal: 140,
+  mendEnemy: { id: 'mendEnemy', name: '주술 치유', cd: 4.5, mp: 20, kind: 'heal', heal: 140, range: 30, cast: 1.5,
             minLevel: 1, desc: '같은 편을 회복시킨다' },
 };
 
 // 기획서에 나온 다섯 유형을 모두 쓴다: 개별 대상 / 범위 / 장판 / 도트 / 마나 회복.
+//
+// **쿨타임은 시전 시간만큼 덜어 두었다.** 시전의 대가는 그동안 서 있어야 한다는
+// 것이지 힐을 덜 넣는 것이 아니다 — 둘을 겹쳐 물리면 캐스팅 스킬이 그냥 나쁜
+// 스킬이 되고, 즉시 시전만 고르게 된다.
+//
+// range는 사거리, cast는 시전 시간(초)이다. cast가 0이면 즉시 시전이고, 그렇지
+// 않으면 그 시간 동안 서서 외운다 — **움직이면 취소된다.**
+//
 // unlock은 이 스킬이 열리는 직업 레벨이다. 처음부터 여덟 개를 다 주면 등록 화면이
 // 고르는 자리가 아니라 외우는 자리가 된다.
 // targeting은 전투 화면이 무엇을 받아야 하는지다.
@@ -333,43 +363,43 @@ const UNIT_SKILLS = {
 //   self — 대상 선택 없이 즉시
 const PLAYER_SKILLS = {
   touch: {
-    id: 'touch', unlock: 1, name: '치유의 손길', type: '개별 대상', targeting: 'ally',
-    mp: 14, cd: 2.4, heal: 130, icon: '✚',
+    id: 'touch', unlock: 1, range: 40, cast: 1.0, name: '치유의 손길', type: '개별 대상', targeting: 'ally',
+    mp: 14, cd: 1.4, heal: 130, icon: '✚',
     desc: '동료 하나의 체력을 130 회복한다.',
   },
   quick: {
-    id: 'quick', unlock: 1, name: '신속한 치유', type: '개별 대상', targeting: 'ally',
+    id: 'quick', unlock: 1, range: 36, cast: 0, name: '신속한 치유', type: '개별 대상', targeting: 'ally',
     mp: 9, cd: 1.2, heal: 62, icon: '✦',
     desc: '싸고 빠르지만 회복량이 작다. 62 회복.',
   },
   regen: {
-    id: 'regen', unlock: 2, name: '재생의 축복', type: '도트', targeting: 'ally',
-    mp: 20, cd: 9, tick: 26, interval: 1, duration: 8, icon: '❃',
+    id: 'regen', unlock: 2, range: 40, cast: 1.0, name: '재생의 축복', type: '도트', targeting: 'ally',
+    mp: 20, cd: 8, tick: 26, interval: 1, duration: 8, icon: '❃',
     desc: '8초 동안 1초마다 26씩 회복한다. 총 208.',
   },
   ripple: {
-    id: 'ripple', unlock: 4, name: '빛의 파문', type: '범위', targeting: 'area-ally',
-    mp: 30, cd: 9, heal: 76, radius: 20, icon: '◎',
+    id: 'ripple', unlock: 4, range: 44, cast: 1.5, name: '빛의 파문', type: '범위', targeting: 'area-ally',
+    mp: 30, cd: 7.5, heal: 76, radius: 20, icon: '◎',
     desc: '기준점 주변 아군을 한 번에 76씩 회복한다.',
   },
   sanctuary: {
-    id: 'sanctuary', unlock: 6, name: '생명의 성역', type: '장판', targeting: 'area-ally',
-    mp: 38, cd: 22, tick: 22, interval: 1, duration: 10, radius: 21, icon: '⬡',
+    id: 'sanctuary', unlock: 6, range: 48, cast: 2.0, name: '생명의 성역', type: '장판', targeting: 'area-ally',
+    mp: 38, cd: 20, tick: 22, interval: 1, duration: 10, radius: 21, icon: '⬡',
     desc: '10초 동안 남는 장판. 안에 있는 아군을 1초마다 22씩 회복한다.',
   },
   focus: {
-    id: 'focus', unlock: 3, name: '정신 집중', type: '마나 회복', targeting: 'self',
-    mp: 0, cd: 30, mana: 70, icon: '☾',
+    id: 'focus', unlock: 3, range: 0, cast: 2.0, name: '정신 집중', type: '마나 회복', targeting: 'self',
+    mp: 0, cd: 28, mana: 70, icon: '☾',
     desc: '자신의 마나를 70 회복한다.',
   },
   flame: {
-    id: 'flame', unlock: 5, name: '심판의 불꽃', type: '도트', targeting: 'enemy',
-    mp: 16, cd: 10, tick: 22, interval: 1, duration: 6, icon: '✹',
+    id: 'flame', unlock: 5, range: 40, cast: 1.0, name: '심판의 불꽃', type: '도트', targeting: 'enemy',
+    mp: 16, cd: 9, tick: 22, interval: 1, duration: 6, icon: '✹',
     desc: '적 하나에게 6초 동안 1초마다 22의 피해. 어그로를 끌 수 있다.',
   },
   pyre: {
-    id: 'pyre', unlock: 8, name: '성스러운 불길', type: '장판', targeting: 'area-enemy',
-    mp: 34, cd: 20, tick: 26, interval: 1, duration: 8, radius: 18, icon: '⌘',
+    id: 'pyre', unlock: 8, range: 44, cast: 1.8, name: '성스러운 불길', type: '장판', targeting: 'area-enemy',
+    mp: 34, cd: 18, tick: 26, interval: 1, duration: 8, radius: 18, icon: '⌘',
     desc: '8초 동안 남는 장판. 안에 있는 적에게 1초마다 26의 피해.',
   },
 };
@@ -411,27 +441,31 @@ const POTION_MAX = 5;
 
 // growth를 적어 두는 것은 기본값이 아군 성장률이기 때문이다. 빠뜨리면 적이
 // 아군보다 천천히 자라 높은 레벨 의뢰가 저절로 쉬워진다.
+//
+// **적 탱커도 도발을 들고 온다.** 아군과 같은 논리로 움직인다는 것은 같은 표를
+// 본다는 뜻만이 아니라 같은 수단을 갖는다는 뜻이다 — 도발이 이쪽에만 있으면
+// 적 힐러가 아무에게도 보호받지 못하고, 후열을 먼저 치는 규칙이 한쪽에서만 돈다.
 const ENEMIES = {
   scout:  { id: 'scout', exp: 14,  name: '고블린 척후병', job: 'dealer', sprite: 'goblin',
             hp: 336, mp: 64,  atk: 52, attackCd: 1.5, range: 7,  speed: 21,
            attrs: { str: 40, agi: 16, int: 8, vit: 24 }, growth: 'enemy',
-            armor: 0.95, threatMul: 1, skills: [] },
+            armor: 0.95, skills: [] },
   shaman: { id: 'shaman', exp: 18, name: '고블린 주술사', job: 'healer', sprite: 'shaman',
             hp: 294, mp: 128, atk: 36, attackCd: 2.2, range: 30, speed: 15,
            attrs: { str: 12, agi: 10, int: 16, vit: 21 }, growth: 'enemy', attackType: 'magic',
-            armor: 1, threatMul: 1, skills: ['mendEnemy'] },
+            armor: 1, skills: ['mendEnemy'] },
   orc:    { id: 'orc', exp: 32,    name: '오크 전사',     job: 'tank',   sprite: 'orc',
             hp: 784, mp: 80,  atk: 76, attackCd: 1.8, range: 7,  speed: 16,
            attrs: { str: 58, agi: 8, int: 10, vit: 56 }, growth: 'enemy',
-            armor: 0.7,  threatMul: 3, skills: [] },
+            armor: 0.7,  skills: ['taunt'] },
   hexer:  { id: 'hexer', exp: 30,  name: '오크 주술사',   job: 'healer', sprite: 'shaman',
             hp: 476, mp: 152, atk: 48, attackCd: 2.4, range: 30, speed: 14,
            attrs: { str: 16, agi: 8, int: 19, vit: 34 }, growth: 'enemy', attackType: 'magic',
-            armor: 0.9,  threatMul: 1, skills: ['mendEnemy', 'hex'] },
+            armor: 0.9, skills: ['mendEnemy', 'hex'] },
   chief:  { id: 'chief', exp: 90,  name: '오크 우두머리', job: 'tank',   sprite: 'boss',
             hp: 1904, mp: 160, atk: 116, attackCd: 2.0, range: 8,  speed: 14,
            attrs: { str: 89, agi: 6, int: 20, vit: 136 }, growth: 'enemy',
-            armor: 0.62, threatMul: 3, skills: [] },
+            armor: 0.62, skills: ['roar', 'taunt'] },
 };
 
 // 동료 이름 조각. 명부에 새 동료가 들어올 때 조합해 쓴다 — 이름이 곧 신원이고,
@@ -488,7 +522,7 @@ const PARTY_MAX = 5;   // 주인공을 포함한 수
 const SKILL_MAX = 5;   // 전투에 등록할 수 있는 주인공 스킬 수
 
 const api = {
-  FIELD, JOBS, LEVEL, ATTRS, ATTR, ATTR_GROWTH, attrsAt, derive, STATS, LOWER_IS_BETTER, TIERS, AFFIX_COUNT, AFFIX_BASE, AFFIX_POOL,
+  FIELD, JOBS, MELEE_RANGE, roleOf, ATTACK_ORDER, HEAL_ORDER, PULL_ORDER, LEVEL, ATTRS, ATTR, ATTR_GROWTH, attrsAt, derive, STATS, LOWER_IS_BETTER, TIERS, AFFIX_COUNT, AFFIX_BASE, AFFIX_POOL,
   SLOTS, GEAR, MATERIALS, REGIONS, NAMES,
   HERO, COMPANIONS, UNIT_SKILLS, PLAYER_SKILLS, POTIONS, JOB_POTIONS, POTION_MAX, ENEMIES,
   PARTY_MAX, SKILL_MAX,
