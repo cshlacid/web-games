@@ -403,15 +403,21 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .verdict-note { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.6; }
 
 .loot, .awards { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+/* 한 줄에 아이콘·이름·이유·받는 사람·굴린 값을 다 밀어 넣었더니 이름이 글자
+   단위로 쪼개졌다. 넘치면 줄을 바꾸고, 이름 쪽에만 남는 폭을 준다. */
 .loot li, .awards li {
-  display: flex; align-items: center; gap: 8px;
-  font-size: 14px; padding: 5px 0;
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px;
+  font-size: 14px; padding: 6px 0;
   border-bottom: 1px solid var(--line);
 }
 .loot li:last-child, .awards li:last-child { border-bottom: 0; }
-.awards .to { margin-left: auto; font-weight: 700; }
-.awards .why { color: var(--muted); font-size: 12px; }
-.awards .rolls { width: 100%; color: var(--muted); font-size: 11px; padding-left: 26px; }
+.awards .iname { flex: 1 1 auto; min-width: 0; }
+.awards .to { margin-left: auto; font-weight: 700; white-space: nowrap; }
+.awards .why { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.awards .rolls {
+  flex: 1 0 100%; color: var(--muted); font-size: 11px; padding-left: 26px;
+  line-height: 1.5;
+}
 
 .methods { display: flex; gap: 6px; flex-wrap: wrap; }
 .method {

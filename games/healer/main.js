@@ -1148,7 +1148,7 @@ function openResult(state) {
       const owner = members.find((m) => m.id === award.toId);
       const row = el('li');
       row.append(text('span', null, def.icon));
-      row.append(text('span', null, Items.name(award.item)));
+      row.append(text('span', 'iname', Items.name(award.item)));
       row.append(text('span', 'why', award.reason));
       row.append(text('span', 'to', owner.name));
       if (award.rolls) {
