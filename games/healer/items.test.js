@@ -118,7 +118,7 @@ const SEEDS = [1, 7, 42, 999, 20260825];
 
 // --- 이름과 요약 --------------------------------------------------------
 {
-  check('장비에는 등급 이름이 붙는다', Items.name(Items.make('robe', 2, 1)), '튼튼한 사제의 로브');
+  check('장비에는 등급 이름이 붙는다', Items.name(Items.make('robe', 2, 1)), '희귀 사제의 로브');
   check('재료에는 붙지 않는다', Items.name(Items.make('pelt', 3, 1)), '거친 가죽');
   check('모르는 물건도 터지지 않는다', Items.name({ defId: '없음', tier: 0 }), '?');
   check('요약에 스탯 이름이 들어간다', Items.summary(Items.make('mail', 0, 1)).includes('체력'), true);
@@ -200,6 +200,84 @@ const SEEDS = [1, 7, 42, 999, 20260825];
   check('딜러에게는 지팡이가 아니다', Items.score(rod, 'dealer') > Items.score(staff, 'dealer'), true);
   check('탱커에게는 방패가 낫다', Items.score(shield, 'tank') > Items.score(robe, 'tank'), true);
   check('힐러에게는 로브가 낫다', Items.score(robe, 'healer') > Items.score(shield, 'healer'), true);
+}
+
+// --- 등급이 높으면 옵션이 좋다 ------------------------------------------
+//
+// 이것이 색을 나눈 이유다. 구간이 겹치면 잘 나온 고급이 못 나온 희귀보다 나은
+// 일이 생기고, 그러면 등급을 보고 고를 수 없다.
+{
+  check('등급이 여섯이다', D.TIERS.length, 6);
+  check('이름이 붙어 있다', D.TIERS.map((t) => t.name),
+    ['일반', '고급', '희귀', '영웅', '전설', '신화']);
+  check('색 이름도 붙어 있다', D.TIERS.every((t) => typeof t.css === 'string'), true);
+
+  check('등급마다 하한과 상한이 있다', D.AFFIX_RANGE.length, D.TIERS.length);
+  const gaps = [];
+  for (let tier = 1; tier < D.AFFIX_RANGE.length; tier++) {
+    const [lo] = D.AFFIX_RANGE[tier];
+    const [, prevHi] = D.AFFIX_RANGE[tier - 1];
+    if (lo <= prevHi) gaps.push(D.TIERS[tier].name);
+  }
+  check('구간이 겹치지 않는다', gaps, []);
+  check('하한이 상한보다 낮다',
+    D.AFFIX_RANGE.every(([lo, hi]) => lo < hi), true);
+
+  // 실제로 굴려도 그렇다. 같은 스탯이 붙은 것끼리 견준다.
+  const worst = [];
+  for (let tier = 1; tier < D.TIERS.length; tier++) {
+    for (const seed of SEEDS) {
+      const low = Items.make('mail', tier - 1, seed);
+      const high = Items.make('mail', tier, seed);
+      const hpOf = (item) => (item.affixes.find((a) => a.stat === 'hp') || {}).value || 0;
+      if (hpOf(low) && hpOf(high) && hpOf(high) <= hpOf(low)) worst.push(D.TIERS[tier].name);
+    }
+  }
+  check('굴려도 위 등급이 낫다', [...new Set(worst)], []);
+
+  // 기본 수치도 등급을 따라 오른다.
+  check('등급이 오르면 기본 수치도 오른다',
+    D.TIER_POWER.every((v, i) => i === 0 || v > D.TIER_POWER[i - 1]), true);
+  check('옵션 수도 줄지 않는다',
+    D.AFFIX_COUNT.every((v, i) => i === 0 || v >= D.AFFIX_COUNT[i - 1]), true);
+  check('등급이 오르면 값도 오른다', (() => {
+    let last = -1;
+    for (let tier = 0; tier < D.TIERS.length; tier++) {
+      const price = Items.price(Items.make('mail', tier, 5));
+      if (price <= last) return `등급 ${tier}`;
+      last = price;
+    }
+    return true;
+  })(), true);
+}
+
+// --- 적의 등급과 레벨이 전리품 등급을 정한다 ----------------------------
+{
+  const rolls = (rank, level, count) => {
+    const rng = Items.createRng(rank.length * 31 + level);
+    const out = [];
+    for (let i = 0; i < count; i++) out.push(D.tierRoll(rank, level, rng));
+    return out;
+  };
+  const mean = (list) => list.reduce((a, b) => a + b, 0) / list.length;
+
+  const trash = mean(rolls('trash', 10, 4000));
+  const elite = mean(rolls('elite', 10, 4000));
+  const boss = mean(rolls('boss', 10, 4000));
+  check('센 적일수록 좋은 등급이 나온다', trash < elite && elite < boss, true);
+
+  check('레벨이 오르면 등급도 오른다',
+    mean(rolls('trash', 5, 4000)) < mean(rolls('trash', 25, 4000)), true);
+
+  // 잡졸에게서도 아주 드물게는 나온다 — 확률이 0이면 등급이 아니라 자물쇠다.
+  check('잡졸에게서도 나올 수는 있다',
+    rolls('trash', 20, 20000).some((tier) => tier >= 4), true);
+  // 다만 낮은 레벨의 잡졸이 신화를 흘리면 우두머리를 잡을 이유가 없다.
+  check('1레벨 잡졸이 신화를 흘리지는 않는다',
+    rolls('trash', 1, 20000).every((tier) => tier < D.TIERS.length - 1), true);
+
+  check('등급은 표 안에 있다',
+    rolls('boss', 30, 2000).every((tier) => tier >= 0 && tier < D.TIERS.length), true);
 }
 
 console.log(`${passed}개 통과, ${failed}개 실패`);

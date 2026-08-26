@@ -28,11 +28,12 @@ function createRng(seed) {
 
 const pick = (rng, list) => list[(rng() * list.length) | 0];
 
-// 등급은 주인공 레벨을 따라간다. 1레벨에게 전설을 팔면 골드를 모을 이유만 남고
-// 의뢰를 깰 이유가 사라진다.
+// 등급은 주인공 레벨을 따라가되 **희귀에서 멈춘다**(`D.SHOP_MAX_TIER`). 영웅
+// 위로는 적에게서만 나온다 — 골드로 살 수 있으면 의뢰를 깰 이유가 상점 값을
+// 모으는 것으로 바뀌고, 등급에 색을 입힌 뜻도 옅어진다.
 function tierFor(level, rng) {
-  const base = Math.min(D.TIERS.length - 1, Math.floor((level - 1) / 5));
-  const lucky = rng() < 0.22 && base + 1 < D.TIERS.length;
+  const base = Math.min(D.SHOP_MAX_TIER, Math.floor((level - 1) / 6));
+  const lucky = rng() < 0.22 && base + 1 <= D.SHOP_MAX_TIER;
   return lucky ? base + 1 : base;
 }
 

@@ -146,7 +146,9 @@ function renderQuests() {
     meta.append(text('span', 'tag place', Scenes.SCENES[quest.scene].name));
     for (const label of enemyCounts(quest)) meta.append(text('span', 'tag', label));
     meta.append(text('span', 'tag gold', `${quest.guildReward.gold} 골드 · ${quest.guildReward.exp} exp`));
-    meta.append(text('span', 'tag', `전리품 ${quest.drops.length}`));
+    // 전리품 목록은 미리 알 수 없다 — 쓰러뜨린 적에게서 굴려진다. 게시판이
+    // 말할 수 있는 것은 어떤 적이 나오는가까지다.
+    meta.append(text('span', `tag rank-${quest.rank}`, `${D.RANKS[quest.rank].name} 출현`));
     button.append(meta);
 
     button.addEventListener('click', () => {
@@ -282,7 +284,7 @@ function renderCharacter() {
     button.append(text('span', 'slot-name', slot.name));
     if (item) {
       button.append(text('span', 'icon', D.GEAR[item.defId].icon));
-      button.append(text('span', 'item-name', Items.name(item)));
+      button.append(itemName(item, 'item-name'));
       button.append(text('span', 'why', Items.summary(item)));
     } else {
       button.append(text('span', 'item-name empty', '비어 있음'));
@@ -390,7 +392,7 @@ function itemButton(item, action) {
 
   const body = el('div', 'pick-body');
   const name = el('div', 'pick-name');
-  name.append(document.createTextNode(Items.name(item)));
+  name.append(itemName(item));
   name.append(text('span', 'job', D.SLOTS[def.slot].name));
   body.append(name);
   body.append(text('div', 'pick-sub', Items.summary(item)));
@@ -557,6 +559,15 @@ function avatar(kind) {
 
 // 역할과 계열을 함께 적는다. 역할만 적으면 궁수와 마법사가 같은 줄로 보이고,
 // 계열만 적으면 누가 앞에 서는지 알 수 없다 — 둘 다 있어야 편성이 고민이 된다.
+// 아이템 이름 한 줄. **등급이 색으로 먼저 읽혀야 한다** — 목록에서 이름을
+// 하나하나 읽어 등급을 가리게 하면 색을 나눈 뜻이 없다.
+function itemName(item, cls) {
+  const node = text('span', `iname tier-${Items.tier(item).css}${cls ? ` ${cls}` : ''}`,
+    Items.name(item));
+  node.title = D.tierName(item.tier);
+  return node;
+}
+
 function jobTag(job, spec) {
   const label = spec ? `${D.JOBS[job].name} · ${D.SPECS[spec]}` : D.JOBS[job].name;
   return text('span', `job ${job}`, label);
@@ -638,7 +649,9 @@ function renderRoster() {
       if (count > 0) chips.append(text('span', 'chip dim', `${D.POTIONS[id].icon}${count}`));
     }
     for (const item of Roster.gearOf(member)) {
-      chips.append(text('span', 'chip gear', `${D.GEAR[item.defId].icon} ${Items.name(item)}`));
+      const chip = text('span', `chip gear tier-${Items.tier(item).css}`,
+        `${D.GEAR[item.defId].icon} ${Items.name(item)}`);
+      chips.append(chip);
     }
     body.append(chips);
     button.append(body);
@@ -1297,6 +1310,9 @@ function openResult(state) {
   const quest = state.quest;
   const members = partyMembers(state);
   const reward = L.rewardOf(state);
+  // 전리품은 쓰러뜨린 적에게서 굴린다. **한 번만 굴린다** — 전투의 난수를 쓰는
+  // 함수라 다시 부르면 다른 것이 나온다.
+  const drops = L.dropsOf(state);
 
   $('verdict').textContent = won ? '퀘스트 완료' : '퀘스트 실패';
   $('verdict').className = `verdict ${won ? 'won' : 'lost'}`;
@@ -1352,16 +1368,23 @@ function openResult(state) {
 
     const method = Loot.METHODS[app.lootMethod];
     $('method-name').textContent = method.name;
-    const result = Loot.distribute(quest.drops, members, app.lootMethod, app.lootSeed);
+    const result = Loot.distribute(drops, members, app.lootMethod, app.lootSeed);
 
     const awards = $('awards');
     awards.textContent = '';
+    // 아무것도 안 떨어질 수 있다. 빈 목록을 그냥 두면 분배가 고장 난 것으로 보인다.
+    if (!result.awards.length) {
+      const none = el('li');
+      none.append(text('span', null, '·'));
+      none.append(text('span', 'why', '이번에는 아무것도 나오지 않았다'));
+      awards.append(none);
+    }
     for (const award of result.awards) {
       const def = Items.def(award.item);
       const owner = members.find((m) => m.id === award.toId);
       const row = el('li');
       row.append(text('span', null, def.icon));
-      row.append(text('span', 'iname', Items.name(award.item)));
+      row.append(itemName(award.item));
       row.append(text('span', 'why', award.reason));
       row.append(text('span', 'to', owner.name));
       if (award.rolls) {
