@@ -39,6 +39,44 @@ const HEAL_ORDER = ['tank', 'healer', 'melee', 'ranged'];
 // 탱커가 어그로를 끌 때의 순서 — 후열부터 구한다.
 const PULL_ORDER = ['healer', 'ranged', 'melee'];
 
+// 종족. **모든 캐릭터가 하나씩 갖는다.**
+//
+// 두 가지를 정한다.
+//
+// - **물약을 쓸 수 있는가.** 인간형(인간·엘프·드워프)만 마신다. 고블린과 오크가
+//   유리병을 들고 다니며 홀짝이는 그림이 이상해서 넣은 구분이지만, 전투에서는
+//   "저쪽은 마나가 떨어지면 스킬이 끊긴다"는 뜻이 된다 — 그래서 마나를 주로
+//   쓰는 비인간형에게는 마나를 되찾는 스킬을 반드시 쥐여 준다.
+// - **기본 능력치를 얼마나 비트는가.** 정의에 적힌 능력치에 곱해진다. 인간은
+//   1.0으로 균등하고, 엘프는 지능·민첩 쪽으로, 드워프는 힘·체력 쪽으로 기운다.
+//   합이 4.0 언저리로 맞춰져 있어 어느 종족도 그냥 더 세지는 않는다.
+//
+// 오우거와 언데드는 표에만 있고 아직 쓰는 유닛이 없다. 적을 늘릴 자리다.
+const RACES = {
+  human:  { id: 'human',  name: '인간',   humanoid: 1,
+            attrs: { str: 1.00, agi: 1.00, int: 1.00, vit: 1.00 } },
+  elf:    { id: 'elf',    name: '엘프',   humanoid: 1,
+            attrs: { str: 0.85, agi: 1.25, int: 1.25, vit: 0.85 } },
+  dwarf:  { id: 'dwarf',  name: '드워프', humanoid: 1,
+            attrs: { str: 1.25, agi: 0.80, int: 0.85, vit: 1.25 } },
+  goblin: { id: 'goblin', name: '고블린', humanoid: 0,
+            attrs: { str: 0.90, agi: 1.25, int: 0.95, vit: 0.90 } },
+  orc:    { id: 'orc',    name: '오크',   humanoid: 0,
+            attrs: { str: 1.25, agi: 0.85, int: 0.85, vit: 1.20 } },
+  ogre:   { id: 'ogre',   name: '오우거', humanoid: 0,
+            attrs: { str: 1.45, agi: 0.70, int: 0.70, vit: 1.45 } },
+  undead: { id: 'undead', name: '언데드', humanoid: 0,
+            attrs: { str: 1.05, agi: 0.85, int: 1.10, vit: 1.15 } },
+};
+
+const raceOf = (def) => RACES[(def && def.race) || 'human'] || RACES.human;
+
+// **물약은 인간형만 마신다.** 직업이 무엇을 들고 가는지는 JOB_POTIONS가 정하고,
+// 종족이 마실 수 있는지를 정한다.
+const potionsFor = (def) => (raceOf(def).humanoid
+  ? Object.assign({}, JOB_POTIONS[def && def.job] || {})
+  : {});
+
 // 능력치 넷. 모든 캐릭터가 갖고, 화면에 보이는 수치는 전부 여기서 나온다.
 //
 // **최대 체력과 최대 마나는 능력치에서 곧바로 나오고, 공격력과 회복량은 배수로
@@ -99,11 +137,30 @@ const ATTR_GROWTH = {
 };
 
 // 레벨과 나눠 준 점수를 반영한 실제 능력치.
-function attrsAt(def, level, spent) {
-  const growth = ATTR_GROWTH[def.growth || 'ally'];
+// 정의에 적힌 능력치에 종족을 곱한 것. **이것이 그 캐릭터의 기본 능력치다** —
+// 레벨 성장도 비율 계산도 전부 여기서 출발한다. 정의 쪽 숫자는 종족을 빼고
+// 보았을 때의 값이라, 같은 숫자를 적어도 엘프와 드워프가 다른 캐릭터가 된다.
+//
+// 정의는 바뀌지 않으므로 한 번 계산해 두고 쓴다.
+const raceCache = new Map();
+
+function raceAttrs(def) {
+  if (raceCache.has(def)) return raceCache.get(def);
+  const mul = raceOf(def).attrs;
   const out = {};
   for (const key of Object.keys(ATTRS)) {
-    const base = (def.attrs || {})[key] || 1;
+    out[key] = Math.max(1, Math.round(((def.attrs || {})[key] || 1) * mul[key]));
+  }
+  raceCache.set(def, out);
+  return out;
+}
+
+function attrsAt(def, level, spent) {
+  const growth = ATTR_GROWTH[def.growth || 'ally'];
+  const raced = raceAttrs(def);
+  const out = {};
+  for (const key of Object.keys(ATTRS)) {
+    const base = raced[key];
     out[key] = Math.round(base * (1 + growth[key] * (Math.max(1, level) - 1)))
       + ((spent || {})[key] || 0);
   }
@@ -116,7 +173,9 @@ function attrsAt(def, level, spent) {
 const ratioOf = (attrs, base, key) => attrs[key] / ((base || {})[key] || attrs[key] || 1);
 
 function derive(def, attrs) {
-  const base = def.attrs || {};
+  // 비율의 기준도 종족이 곱해진 값이다. 정의 쪽 숫자를 기준으로 삼으면 레벨 1의
+  // 엘프가 이미 기준을 넘어선 것이 되어, 적어 둔 공격력과 실제가 어긋난다.
+  const base = raceAttrs(def);
   // 마법을 쓰는 쪽은 지능이, 나머지는 힘이 공격력을 올린다.
   const key = def.attackType === 'magic' ? 'int' : 'str';
   const power = ratioOf(attrs, base, key);
@@ -348,6 +407,7 @@ const HERO = {
   id: 'hero',
   name: '주인공',
   job: 'healer',
+  race: 'human',
   sprite: 'hero',
   growth: 'hero',
   // 능력치가 곧 수치다: 체력 42 → 최대 체력 588, 지능 25 → 최대 마나 200.
@@ -388,44 +448,44 @@ const HERO = {
 // 기본 공격만 남는 상태가 모든 직업에 똑같이 오게 하기 위해서다. 그래야 직업별
 // 물약 구성(JOB_POTIONS)이 전투 중에 뜻을 가진다.
 const COMPANIONS = {
-  bran:  { id: 'bran',  name: '강철의 브란', job: 'tank',   sprite: 'tank',
-           hp: 1148, mp: 88,  atk: 26, attackCd: 1.6, range: 7,  speed: 17,
-           attrs: { str: 20, agi: 8, int: 11, vit: 82 },
+  bran:  { id: 'bran', race: 'dwarf',  name: '강철의 브란', job: 'tank',   sprite: 'tank',
+           hp: 1162, mp: 72,  atk: 26, attackCd: 1.6, range: 7,  speed: 17,
+           attrs: { str: 20, agi: 8, int: 11, vit: 66 },
            armor: 0.55, spec: 'tank',
            note: '공격이 매워 어그로를 잘 붙든다' },
-  corin: { id: 'corin', name: '방패병 코린', job: 'tank',   sprite: 'tank',
+  corin: { id: 'corin', race: 'human', name: '방패병 코린', job: 'tank',   sprite: 'tank',
            hp: 1316, mp: 80,  atk: 21, attackCd: 1.8, range: 7,  speed: 15,
            attrs: { str: 16, agi: 6, int: 10, vit: 94 },
            armor: 0.48, spec: 'tank',
            note: '더 단단하지만 더 느리다' },
-  lyle:  { id: 'lyle',  name: '검사 라일',   job: 'dealer', sprite: 'warrior',
+  lyle:  { id: 'lyle', race: 'human',  name: '검사 라일',   job: 'dealer', sprite: 'warrior',
            hp: 644, mp: 80,  atk: 46, attackCd: 1.2, range: 7,  speed: 21,
            attrs: { str: 35, agi: 14, int: 10, vit: 46 },
            armor: 0.82, spec: 'warrior',
            note: '근접. 강타로 한 번에 크게 넣는다' },
-  sera:  { id: 'sera',  name: '도적 세라',   job: 'dealer', sprite: 'rogue',
-           hp: 560, mp: 88,  atk: 38, attackCd: 0.9, range: 7,  speed: 24,
-           attrs: { str: 29, agi: 22, int: 11, vit: 40 },
+  sera:  { id: 'sera', race: 'elf',  name: '도적 세라',   job: 'dealer', sprite: 'rogue',
+           hp: 560, mp: 112,  atk: 38, attackCd: 0.9, range: 7,  speed: 24,
+           attrs: { str: 29, agi: 22, int: 11, vit: 47 },
            armor: 0.86, spec: 'rogue',
            note: '근접. 빠르게 여러 번 때린다' },
-  mira:  { id: 'mira',  name: '궁수 미라',   job: 'dealer', sprite: 'archer',
-           hp: 518, mp: 104, atk: 42, attackCd: 1.4, range: 34, speed: 17,
-           attrs: { str: 32, agi: 18, int: 13, vit: 37 },
+  mira:  { id: 'mira', race: 'elf',  name: '궁수 미라',   job: 'dealer', sprite: 'archer',
+           hp: 518, mp: 128, atk: 42, attackCd: 1.4, range: 34, speed: 17,
+           attrs: { str: 32, agi: 18, int: 13, vit: 44 },
            armor: 0.9, spec: 'archer',
            note: '원거리. 화살비로 적 여럿을 친다' },
-  yuri:  { id: 'yuri',  name: '마법사 유리', job: 'dealer', sprite: 'mage',
+  yuri:  { id: 'yuri', race: 'human',  name: '마법사 유리', job: 'dealer', sprite: 'mage',
            hp: 476, mp: 112, atk: 52, attackCd: 1.9, range: 36, speed: 15,
            attrs: { str: 14, agi: 12, int: 14, vit: 34 }, attackType: 'magic',
            armor: 0.92, spec: 'mage',
            note: '원거리. 느리지만 한 방이 무겁다' },
-  noa:   { id: 'noa',   name: '사제 노아',   job: 'healer', sprite: 'priest',
+  noa:   { id: 'noa', race: 'human',   name: '사제 노아',   job: 'healer', sprite: 'priest',
            hp: 560, mp: 104, atk: 18, attackCd: 2.0, range: 30, speed: 16,
            attrs: { str: 12, agi: 10, int: 13, vit: 40 }, attackType: 'magic',
            armor: 0.9, spec: 'priest',
            note: '마나가 많아 오래 버틴다' },
-  dean:  { id: 'dean',  name: '수도사 딘',   job: 'healer', sprite: 'priest',
-           hp: 616, mp: 88,  atk: 24, attackCd: 1.7, range: 26, speed: 18,
-           attrs: { str: 14, agi: 12, int: 11, vit: 44 }, attackType: 'magic',
+  dean:  { id: 'dean', race: 'dwarf',  name: '수도사 딘',   job: 'healer', sprite: 'priest',
+           hp: 616, mp: 72,  atk: 24, attackCd: 1.7, range: 26, speed: 18,
+           attrs: { str: 14, agi: 12, int: 11, vit: 35 }, attackType: 'magic',
            armor: 0.86, spec: 'priest',
            note: '힐량이 작은 대신 때리기도 한다' },
 };
@@ -545,7 +605,7 @@ const UNIT_SKILLS = {
             tick: 18, interval: 1, duration: 6, range: 36, cast: 0.8, minLevel: 2,
             desc: '불이 옮겨붙어 계속 탄다' },
   channel:{ id: 'channel', icon: '🔮', name: '마나 순환', spec: 'mage', cd: 26, mp: 0, kind: 'mana',
-            mana: 60, range: 0, cast: 2.0, minLevel: 4,
+            mana: 60, range: 0, cast: 2.0, minLevel: 1,
             desc: '자기 마나를 되찾는다' },
   bolt:   { id: 'bolt', icon: '☄', name: '화염구', spec: 'mage', cd: 5, mp: 14, kind: 'damage',
             mul: 2.0, range: 36, cast: 1.0, minLevel: 1,
@@ -570,7 +630,7 @@ const UNIT_SKILLS = {
             heal: 145, range: 30, cast: 1.5, minLevel: 1,
             desc: '탱커 체력을 본다' },
   meditate:{ id: 'meditate', icon: '🧘', name: '명상', spec: 'priest', cd: 30, mp: 0, kind: 'mana',
-            mana: 50, range: 0, cast: 2.2, minLevel: 3,
+            mana: 50, range: 0, cast: 2.2, minLevel: 1,
             desc: '자기 마나를 되찾는다' },
   smite:  { id: 'smite', icon: '⚡', name: '심판', spec: 'priest', cd: 7, mp: 12, kind: 'damage',
             mul: 1.6, range: 30, cast: 1.0, minLevel: 1,
@@ -606,7 +666,7 @@ const UNIT_SKILLS = {
             tick: 14, interval: 1, duration: 5, range: 30, cast: 1.0, minLevel: 1,
             desc: '지속 피해' },
   drain:  { id: 'drain', icon: '🕳', name: '마력 흡수', spec: 'shaman', cd: 24, mp: 0, kind: 'mana',
-            mana: 55, range: 0, cast: 2.0, minLevel: 2,
+            mana: 55, range: 0, cast: 2.0, minLevel: 1,
             desc: '자기 마나를 되찾는다' },
   spirit: { id: 'spirit', icon: '👻', name: '정령 화살', spec: 'shaman', cd: 5, mp: 12, kind: 'damage',
             mul: 1.7, range: 30, cast: 1.0, minLevel: 1,
@@ -662,9 +722,13 @@ const SPEC_SKILLS = {
   warrior: ['whirl', 'execute', 'rend', 'charge', 'cleave', 'overpower'],
   rogue:   ['smoke', 'backstab', 'flurry', 'venom', 'stab', 'quickCut'],
   archer:  ['volley', 'pierce', 'poisonCloud', 'barbed', 'aimed', 'quickShot'],
-  // 마나 회복 스킬(마나 순환·명상·마력 흡수)을 앞쪽에 둔 것은 잘리지 않게 하려는
-  // 것이다. 뒤에 두었더니 레벨이 오르면서 강한 스킬에 밀려 나갔고, 마나를 다 쓴
-  // 시전자가 남은 전투 내내 기본 공격만 하는 상태가 레벨이 오를수록 잦아졌다.
+  // 마나 회복 스킬(마나 순환·명상·마력 흡수)을 앞쪽에 두고 1레벨부터 열어 둔다.
+  // 뒤에 두었더니 레벨이 오르면서 강한 스킬에 밀려 나갔고, 마나를 다 쓴 시전자가
+  // 남은 전투 내내 기본 공격만 하는 상태가 레벨이 오를수록 잦아졌다.
+  //
+  // **비인간형은 물약을 못 마시므로 이것이 유일한 길이다.** 고블린 주술사에게
+  // 마력 흡수가 2레벨부터였을 때에는, 1레벨 주술사가 마나를 다 쓰고 나면 남은
+  // 전투 내내 아무것도 못 했다.
   mage:    ['frost', 'inferno', 'channel', 'ember', 'bolt', 'spark'],
   priest:  ['wave', 'greaterMend', 'meditate', 'mend', 'renew', 'smite'],
   shaman:  ['curse', 'mendEnemy', 'drain', 'hex', 'spirit'],
@@ -850,25 +914,25 @@ const POTION_MAX = 5;
 // 본다는 뜻만이 아니라 같은 수단을 갖는다는 뜻이다 — 도발이 이쪽에만 있으면
 // 적 힐러가 아무에게도 보호받지 못하고, 후열을 먼저 치는 규칙이 한쪽에서만 돈다.
 const ENEMIES = {
-  scout:  { id: 'scout', rank: 'trash', exp: 14,  name: '고블린 척후병', job: 'dealer', sprite: 'goblin',
-            hp: 476, mp: 64,  atk: 20, attackCd: 1.5, range: 7,  speed: 21,
-           attrs: { str: 40, agi: 16, int: 8, vit: 34 }, growth: 'enemy',
+  scout:  { id: 'scout', race: 'goblin', rank: 'trash', exp: 14,  name: '고블린 척후병', job: 'dealer', sprite: 'goblin',
+            hp: 644, mp: 64,  atk: 20, attackCd: 1.5, range: 7,  speed: 21,
+           attrs: { str: 40, agi: 16, int: 8, vit: 51 }, growth: 'enemy',
             armor: 0.95, spec: 'grunt' },
-  shaman: { id: 'shaman', rank: 'trash', exp: 18, name: '고블린 주술사', job: 'healer', sprite: 'shaman',
-            hp: 406, mp: 128, atk: 19, attackCd: 2.2, range: 30, speed: 15,
-           attrs: { str: 12, agi: 10, int: 16, vit: 29 }, growth: 'enemy', attackType: 'magic',
+  shaman: { id: 'shaman', race: 'goblin', rank: 'trash', exp: 18, name: '고블린 주술사', job: 'healer', sprite: 'shaman',
+            hp: 546, mp: 120, atk: 19, attackCd: 2.2, range: 30, speed: 15,
+           attrs: { str: 12, agi: 10, int: 16, vit: 43 }, growth: 'enemy', attackType: 'magic',
             armor: 1, spec: 'shaman' },
-  orc:    { id: 'orc', rank: 'elite', exp: 32,    name: '오크 전사',     job: 'tank',   sprite: 'orc',
-            hp: 1092, mp: 80,  atk: 31, attackCd: 1.8, range: 7,  speed: 16,
-           attrs: { str: 58, agi: 8, int: 10, vit: 78 }, growth: 'enemy',
+  orc:    { id: 'orc', race: 'orc', rank: 'elite', exp: 32,    name: '오크 전사',     job: 'tank',   sprite: 'orc',
+            hp: 1484, mp: 72,  atk: 31, attackCd: 1.8, range: 7,  speed: 16,
+           attrs: { str: 58, agi: 8, int: 10, vit: 88 }, growth: 'enemy',
             armor: 0.7,  spec: 'tank' },
-  hexer:  { id: 'hexer', rank: 'elite', exp: 30,  name: '오크 주술사',   job: 'healer', sprite: 'shaman',
-            hp: 672, mp: 152, atk: 23, attackCd: 2.4, range: 30, speed: 14,
-           attrs: { str: 16, agi: 8, int: 19, vit: 48 }, growth: 'enemy', attackType: 'magic',
+  hexer:  { id: 'hexer', race: 'orc', rank: 'elite', exp: 30,  name: '오크 주술사',   job: 'healer', sprite: 'shaman',
+            hp: 910, mp: 128, atk: 23, attackCd: 2.4, range: 30, speed: 14,
+           attrs: { str: 16, agi: 8, int: 19, vit: 54 }, growth: 'enemy', attackType: 'magic',
             armor: 0.9, spec: 'shaman' },
-  chief:  { id: 'chief', rank: 'boss', exp: 90,  name: '오크 우두머리', job: 'tank',   sprite: 'boss',
-            hp: 2660, mp: 160, atk: 49, attackCd: 2.0, range: 8,  speed: 14,
-           attrs: { str: 89, agi: 6, int: 20, vit: 190 }, growth: 'enemy',
+  chief:  { id: 'chief', race: 'orc', rank: 'boss', exp: 90,  name: '오크 우두머리', job: 'tank',   sprite: 'boss',
+            hp: 3584, mp: 136, atk: 49, attackCd: 2.0, range: 8,  speed: 14,
+           attrs: { str: 89, agi: 6, int: 20, vit: 213 }, growth: 'enemy',
             armor: 0.62, spec: 'tank' },
 };
 
@@ -967,7 +1031,7 @@ const PARTY_MAX = 5;   // 주인공을 포함한 수
 const SKILL_MAX = 5;   // 전투에 등록할 수 있는 주인공 스킬 수
 
 const api = {
-  FIELD, JOBS, SPECS, MELEE_RANGE, roleOf, ATTACK_ORDER, HEAL_ORDER, PULL_ORDER, LEVEL, ATTRS, ATTR, ATTR_GROWTH, attrsAt, derive, STATS, LOWER_IS_BETTER, TIERS, AFFIX_COUNT, AFFIX_BASE, AFFIX_POOL,
+  FIELD, JOBS, SPECS, RACES, raceOf, raceAttrs, potionsFor, MELEE_RANGE, roleOf, ATTACK_ORDER, HEAL_ORDER, PULL_ORDER, LEVEL, ATTRS, ATTR, ATTR_GROWTH, attrsAt, derive, STATS, LOWER_IS_BETTER, TIERS, AFFIX_COUNT, AFFIX_BASE, AFFIX_POOL,
   tierName, tierFloor, tierRoll, tierCeiling, TIER_POWER, AFFIX_RANGE, SHOP_MAX_TIER,
   RANKS, rankOf,
   SLOTS, GEAR, MATERIALS, REGIONS, NAMES, SPECIAL_POOL, SPECIAL_CHANCE,

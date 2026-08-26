@@ -42,6 +42,53 @@ const everyDef = () => [D.HERO, ...Object.values(D.COMPANIONS), ...Object.values
   check('레벨 1에서는 정의값과 같다', off, []);
 }
 
+// --- 종족 ---------------------------------------------------------------
+{
+  const unknown = everyDef()
+    .filter((def) => !def.race || !D.RACES[def.race])
+    .map((def) => def.name);
+  check('빠짐없이 아는 종족을 갖는다', unknown, []);
+
+  // 인간형만 물약을 마신다. 이것이 종족을 나눈 첫 이유라, 표가 아니라 함수가
+  // 정해야 한다 — 정의마다 물약을 적어 두면 종족과 어긋난 물약이 생긴다.
+  const wrong = [];
+  for (const def of everyDef()) {
+    const has = Object.keys(D.potionsFor(def)).length > 0;
+    const humanoid = !!D.RACES[def.race].humanoid;
+    // 물약을 아예 안 받는 직업이 있으므로 인간형에게는 표대로인지만 본다.
+    const wanted = humanoid && Object.keys(D.JOB_POTIONS[def.job] || {}).length > 0;
+    if (has !== wanted) wrong.push(`${def.name}(${D.RACES[def.race].name})`);
+  }
+  check('인간형만 물약을 든다', wrong, []);
+
+  // 표를 그대로 넘겨주면 한 유닛이 마신 물약이 정의에서 줄어든다.
+  const copy = D.potionsFor(D.COMPANIONS.bran);
+  copy.health = 999;
+  check('물약 표는 복사해 준다', D.potionsFor(D.COMPANIONS.bran).health === 999, false);
+
+  // 인간이 기준선이라 곱해도 적어 둔 값 그대로다.
+  check('인간은 적힌 대로', D.raceAttrs(D.HERO),
+    Object.assign({}, D.HERO.attrs));
+
+  // 엘프는 지능·민첩 쪽, 드워프는 힘·체력 쪽. 같은 정의를 두 종족으로 굴려
+  // 비교하는 것은 실제 동료의 능력치가 종족과 함께 잡혀 있어서다.
+  const plain = { attrs: { str: 20, agi: 20, int: 20, vit: 20 } };
+  const elf = D.raceAttrs(Object.assign({ race: 'elf' }, plain));
+  const dwarf = D.raceAttrs(Object.assign({ race: 'dwarf' }, plain));
+  const human = D.raceAttrs(Object.assign({ race: 'human' }, plain));
+  check('엘프는 지능이 인간보다 높다', elf.int > human.int, true);
+  check('엘프는 민첩이 인간보다 높다', elf.agi > human.agi, true);
+  check('엘프는 힘이 인간보다 낮다', elf.str < human.str, true);
+  check('드워프는 힘이 인간보다 높다', dwarf.str > human.str, true);
+  check('드워프는 체력이 인간보다 높다', dwarf.vit > human.vit, true);
+  check('드워프는 민첩이 인간보다 낮다', dwarf.agi < human.agi, true);
+
+  // 0으로 내려가면 그 능력치가 만드는 수치가 통째로 사라진다.
+  const tiny = D.raceAttrs({ race: 'ogre', attrs: { str: 1, agi: 1, int: 1, vit: 1 } });
+  check('곱해도 0이 되지 않는다',
+    Object.keys(D.ATTRS).every((key) => tiny[key] >= 1), true);
+}
+
 // --- 무엇이 무엇을 올리는가 ---------------------------------------------
 {
   const base = { str: 20, agi: 10, int: 20, vit: 50 };

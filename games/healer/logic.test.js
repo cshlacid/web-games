@@ -354,11 +354,31 @@ function cast(state, skillId, target) {
 
   // 마나를 쓰는 계열은 스스로 되찾을 길이 있어야 한다. 넷으로 자르면서 마나
   // 회복 스킬이 밀려 나가면, 레벨이 오를수록 시전자가 더 빨리 멈춘다.
+  //
+  // **레벨 1부터 있어야 한다.** 물약은 인간형만 마시므로, 고블린 주술사에게는
+  // 이 스킬이 마나를 되찾는 유일한 길이다. 열리는 레벨을 뒤로 미뤄 두었을 때에는
+  // 저레벨 주술사가 한 번 마나를 쓰고 나면 남은 전투 내내 기본 공격만 했다.
   for (const spec of ['mage', 'priest', 'shaman']) {
     const has = (level) => D.skillsFor(spec, level)
       .some((id) => D.UNIT_SKILLS[id].kind === 'mana');
+    check(`${D.SPECS[spec]}는 레벨 1부터 마나를 되찾는다`, has(1), true);
     check(`${D.SPECS[spec]}는 높은 레벨에서도 마나를 되찾는다`, has(12), true);
   }
+}
+
+// --- 비인간형은 물약을 못 마신다 ----------------------------------------
+{
+  // 적은 전부 비인간형이라 전투에 물약을 들고 오지 않는다. 직업 표만 보고
+  // 채우던 동안에는 고블린 척후병이 체력 물약을 마셨다.
+  const state = battle({});
+  const drinkers = AI.alive(state, 'foe')
+    .filter((u) => Object.values(u.potions).some((n) => n > 0))
+    .map((u) => u.name);
+  check('적은 물약을 들고 오지 않는다', drinkers, []);
+
+  // 동료는 인간형이라 직업 표대로 채워진다.
+  const bran = unit(state, '강철의 브란');
+  check('인간형 동료는 물약을 든다', bran.potions.health > 0, true);
 }
 
 // --- 새 스킬 종류 -------------------------------------------------------

@@ -142,10 +142,10 @@ function spawnWave(state, index) {
     const def = D.ENEMIES[defId];
     const x = D.FIELD.w - 10 - (i % 2) * 9;
     const y = laneY(i, wave.length);
-    // 적도 직업에 따라 물약을 들고 온다. 아군만 마나를 되찾을 수 있으면
-    // 뒤 웨이브의 주술사가 그냥 서 있는 상대가 된다.
+    // 물약은 인간형만 마신다. 지금 적은 전부 비인간형이라 빈손으로 오는데,
+    // 그 대신 마나를 쓰는 계열은 마나를 되찾는 스킬을 1레벨부터 들고 온다.
     state.units.push(makeUnit(def, 'enemy', `e${index}_${i}`, x, y, state.quest.level || 1,
-      null, null, D.JOB_POTIONS[def.job]));
+      null, null, D.potionsFor(def)));
   });
   emit(state, { type: 'wave', index, total: state.quest.waves.length,
     text: `${index + 1}번째 무리 (${state.quest.waves.length} 중)` });
@@ -163,7 +163,7 @@ function createBattle(config) {
       def: D.COMPANIONS[entry.defId],
       level: entry.level || 1,
       bonus: entry.bonus,
-      potions: entry.potions || D.JOB_POTIONS[(D.COMPANIONS[entry.defId] || {}).job],
+      potions: entry.potions || D.potionsFor(D.COMPANIONS[entry.defId]),
       name: entry.name,
     }))
     .filter((entry) => entry.def);

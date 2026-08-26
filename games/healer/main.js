@@ -261,6 +261,10 @@ function renderCharacter() {
   const stats = P.stats(progress);
   const max = progress.charLevel >= D.LEVEL.maxLevel;
 
+  const jobSlot = $('char-job');
+  jobSlot.textContent = '';
+  jobSlot.append(jobTag('healer', D.HERO.spec, D.HERO.race));
+
   $('char-gold').textContent = `${progress.gold} 골드`;
 
   const levels = $('char-levels');
@@ -573,10 +577,13 @@ function itemName(item, cls) {
   return node;
 }
 
-function jobTag(job, spec) {
-  const label = spec ? `${D.JOBS[job].name} · ${D.SPECS[spec]}` : D.JOBS[job].name;
+function jobTag(job, spec, race) {
+  const parts = [D.JOBS[job].name];
+  if (spec) parts.push(D.SPECS[spec]);
+  // 종족은 능력치와 물약 사용 여부를 함께 정하므로 편성할 때 보여야 한다.
+  if (race) parts.push(D.RACES[race].name);
   // 계열마다 색이 다르다. 역할 색만으로는 궁수와 마법사가 같은 줄로 보인다.
-  return text('span', `job ${job}${spec ? ` spec-${spec}` : ''}`, label);
+  return text('span', `job ${job}${spec ? ` spec-${spec}` : ''}`, parts.join(' · '));
 }
 
 function renderBrief() {
@@ -613,7 +620,7 @@ function renderRoster() {
   const heroBody = el('div', 'pick-body');
   const heroName = el('div', 'pick-name');
   heroName.append(document.createTextNode(`주인공 Lv ${app.progress.charLevel}`));
-  heroName.append(jobTag('healer', D.HERO.spec));
+  heroName.append(jobTag('healer', D.HERO.spec, D.HERO.race));
   heroBody.append(heroName);
   const stats = P.stats(app.progress);
   heroBody.append(text('div', 'pick-sub',
@@ -637,7 +644,7 @@ function renderRoster() {
     const body = el('div', 'pick-body');
     const name = el('div', 'pick-name');
     name.append(document.createTextNode(`${member.name} Lv ${member.level}`));
-    name.append(jobTag(def.job, def.spec));
+    name.append(jobTag(def.job, def.spec, def.race));
     body.append(name);
     body.append(text('div', 'pick-sub', memberSummary(member)));
 

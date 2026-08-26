@@ -206,6 +206,7 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
   display: flex; flex-direction: column; gap: 8px;
 }
 .panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+#char-job { margin-right: auto; }
 .count { color: var(--muted); font-size: 13px; font-weight: 600; }
 .panel-note { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
 
