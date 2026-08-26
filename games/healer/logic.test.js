@@ -330,6 +330,161 @@ function cast(state, skillId, target) {
   check('대상이 쓰러지면 취소된다', healer.cast, null);
 }
 
+// --- 계열 스킬 ----------------------------------------------------------
+//
+// 계열마다 제 스킬을 가지고, 그중 넷만 들고 들어간다. 궁수와 마법사가 같은
+// 스킬을 쓰던 때에는 둘을 고르는 것이 그림 고르기였다.
+{
+  const state = battle({ party: [{ defId: 'mira', level: 6 }, { defId: 'yuri', level: 6 },
+    { defId: 'lyle', level: 6 }, { defId: 'sera', level: 6 }] });
+  const kit = (name) => unit(state, name).skills.map((slot) => slot.id);
+
+  check('궁수와 마법사가 다른 스킬을 쓴다',
+    kit('궁수 미라').some((id) => kit('마법사 유리').indexOf(id) >= 0), false);
+  check('전사와 도적도 다르다',
+    kit('검사 라일').some((id) => kit('도적 세라').indexOf(id) >= 0), false);
+  check('넷씩 들고 온다', kit('궁수 미라').length, D.UNIT_SKILL_MAX);
+
+  // 스킬은 제 계열의 것만 들고 온다. 섞이면 편성 화면에 적힌 계열이 거짓말이 된다.
+  for (const [name, spec] of [['궁수 미라', 'archer'], ['마법사 유리', 'mage'],
+    ['검사 라일', 'warrior'], ['도적 세라', 'rogue']]) {
+    check(`${D.SPECS[spec]}는 제 계열 스킬만 든다`,
+      kit(name).every((id) => D.UNIT_SKILLS[id].spec === spec), true);
+  }
+
+  // 마나를 쓰는 계열은 스스로 되찾을 길이 있어야 한다. 넷으로 자르면서 마나
+  // 회복 스킬이 밀려 나가면, 레벨이 오를수록 시전자가 더 빨리 멈춘다.
+  for (const spec of ['mage', 'priest', 'shaman']) {
+    const has = (level) => D.skillsFor(spec, level)
+      .some((id) => D.UNIT_SKILLS[id].kind === 'mana');
+    check(`${D.SPECS[spec]}는 높은 레벨에서도 마나를 되찾는다`, has(12), true);
+  }
+}
+
+// --- 새 스킬 종류 -------------------------------------------------------
+{
+  const state = battle({ party: [{ defId: 'noa', level: 6 }, { defId: 'bran', level: 6 },
+    { defId: 'mira', level: 8 }] });
+  const noa = unit(state, '사제 노아');
+  const bran = unit(state, '강철의 브란');
+  const mira = unit(state, '궁수 미라');
+
+  // 범위 회복: 기준점 주변 아군을 한 번에 채운다.
+  AI.alive(state, 'ally').forEach((u) => { u.x = 40; u.y = 30; u.hp = u.maxHp - 200; });
+  L.runUnitSkill(state, noa, { id: 'wave', targetUid: bran.uid });
+  check('범위 회복은 반경 안을 다 채운다',
+    AI.alive(state, 'ally').every((u) => u.hp > u.maxHp - 200), true);
+
+  // 지속 회복: 즉시 차지 않고 시간을 두고 찬다.
+  bran.hp = bran.maxHp - 400;
+  const before = bran.hp;
+  // 전투가 함께 굴러가므로 체력만 보면 적의 피해와 동료 힐이 섞인다. 이 도트가
+  // 째깍였는지는 회복량이 정확히 tick인 이벤트로 가린다 — 치명타가 터지면 값이
+  // 달라지므로 여기서만 꺼 둔다.
+  noa.crit = 0;
+  L.runUnitSkill(state, noa, { id: 'renew', targetUid: bran.uid });
+  check('지속 회복은 즉시 채우지 않는다', bran.hp, before);
+  L.drainEvents(state);
+  run(state, D.UNIT_SKILLS.renew.interval + 0.05);
+  check('시간이 지나면 찬다',
+    L.drainEvents(state).some((e) => e.type === 'heal' && e.uid === bran.uid
+      && e.amount === D.UNIT_SKILLS.renew.tick), true);
+
+  // 마나 회복: 자기 마나를 되찾는다.
+  noa.mp = 0;
+  L.runUnitSkill(state, noa, { id: 'meditate', targetUid: noa.uid });
+  check('마나 회복 스킬로 제 마나를 채운다', noa.mp, D.UNIT_SKILLS.meditate.mana);
+
+  // 장판: 깐 자리에 남아 반대편을 깎는다.
+  const foe = AI.alive(state, 'enemy')[0];
+  L.runUnitSkill(state, mira, { id: 'poisonCloud', targetUid: foe.uid });
+  check('장판이 생긴다', state.zones.length, 1);
+  check('아군이 깐 장판은 적에게 걸린다', state.zones[0].side, 'enemy');
+
+  // 적이 깐 장판은 아군에게 걸려야 한다. 예전에는 회복이면 아군, 아니면 적이라고
+  // 보았는데 그것은 장판을 까는 것이 주인공뿐이던 때의 규칙이었다.
+  const mirror = battle();
+  const shaman = AI.alive(mirror, 'enemy').find((u) => u.job === 'healer')
+    || AI.alive(mirror, 'enemy')[0];
+  L.addZone(mirror, shaman, D.UNIT_SKILLS.poisonCloud, 40, 30, 'damage', 10);
+  check('적이 깐 장판은 아군에게 걸린다', mirror.zones[0].side, 'ally');
+}
+
+// --- 마나가 없으면 기본 공격 -------------------------------------------
+//
+// 모든 직업에 걸리는 규칙이다. 마나가 바닥난 유닛이 남은 전투 내내 서 있으면
+// 화면에서는 고장 난 것으로 보인다.
+{
+  const state = battle();
+  for (const who of AI.alive(state, 'ally')) {
+    check(`${who.name}은 기본 공격이 있다`, who.atk > 0 && isFinite(who.attackCd), true);
+  }
+  check('주인공도 예외가 아니다', L.hero(state).atk > 0, true);
+
+  // 마나를 0으로 두고 굴려도 적은 계속 깎인다. 물약과 마나 회복 스킬까지
+  // 없애야 남은 것이 기본 공격뿐이라는 것을 볼 수 있다.
+  const dry = battle();
+  for (const who of AI.alive(dry, 'ally')) {
+    who.mp = 0;
+    who.potions = { mana: 0, health: 0 };
+    who.skills = who.skills.filter((slot) => D.UNIT_SKILLS[slot.id].mp > 0);
+  }
+  dry.potions = { mana: 0, health: 0 };
+  const total = () => AI.alive(dry, 'enemy').reduce((sum, u) => sum + u.hp, 0);
+  const before = total();
+  run(dry, 12);
+  check('마나가 없어도 적을 깎는다', total() < before, true);
+  check('스킬은 한 번도 나가지 않았다',
+    AI.alive(dry, 'ally').every((u) => u.mp === 0), true);
+}
+
+// --- 전장의 위아래 여백 -------------------------------------------------
+//
+// 유닛은 발밑을 기준으로 그려지고 몸통이 그 위로 뻗는다. 위쪽 여백이 없으면
+// 맨 윗줄에 선 유닛의 머리가 화면 밖으로 잘린다.
+{
+  const state = battle();
+  check('위쪽에 여백이 있다', D.FIELD.top > 0, true);
+  check('아래쪽도 화면 안이다', D.FIELD.bottom < D.FIELD.h, true);
+
+  for (const unit of state.units) {
+    unit.y = unit.side === 'ally' ? -50 : 999;
+  }
+  run(state, 0.1);
+  check('여백 밖으로 나가지 않는다',
+    state.units.every((u) => u.y >= D.FIELD.top - 1e-6 && u.y <= D.FIELD.bottom + 1e-6), true);
+
+  // 처음 세울 때부터 여백 안이다.
+  const fresh = battle();
+  check('배치도 여백 안에서 한다',
+    fresh.units.every((u) => u.y >= D.FIELD.top && u.y <= D.FIELD.bottom), true);
+}
+
+// --- 무리 사이의 이동 ---------------------------------------------------
+//
+// 다음 무리가 있으면 그 자리에 적이 솟는 것이 아니라, 걸어가서 만나는 것으로
+// 보여야 한다. 배경이 흘러가고 아군은 대열을 다시 짠다.
+{
+  const state = battle();
+  AI.alive(state, 'enemy').forEach((u) => L.applyDamage(state, null, u, 99999));
+  // 대열이 흐트러진 상태에서 시작해야 다시 짜는 것이 보인다.
+  AI.alive(state, 'ally').forEach((u) => { u.x = 80; });
+  run(state, 0.2);
+  check('무리를 정리하면 이동이 시작된다', state.marching, true);
+
+  const scrolled = state.scroll;
+  run(state, 1);
+  check('배경이 흘러간다', state.scroll > scrolled, true);
+  check('아군이 제자리로 대열을 다시 짠다',
+    AI.alive(state, 'ally').every((u) => !u.speed || u.x < 80), true);
+
+  run(state, L.WAVE_GAP);
+  check('다음 무리가 나온다', state.waveIndex, 1);
+  check('이동이 끝난다', state.marching, false);
+  check('싸우는 동안에는 배경이 멈춘다',
+    (() => { const at = state.scroll; run(state, 1); return state.scroll === at; })(), true);
+}
+
 // --- 웨이브와 승패 -----------------------------------------------------
 {
   const state = battle();
@@ -375,10 +530,18 @@ function cast(state, skillId, target) {
   const branOf = (state) => unit(state, '강철의 브란');
   check('동료도 레벨로 세진다', branOf(veteran).maxHp > branOf(rookie).maxHp, true);
   check('낮은 레벨은 광역 도발을 못 쓴다',
-    branOf(rookie).skills.map((slot) => slot.id), ['taunt']);
-  // 순서는 data.js에 적힌 그대로다 — 그 순서가 곧 AI의 우선순위다.
+    branOf(rookie).skills.map((slot) => slot.id), ['taunt', 'bash']);
+  // 순서는 data.js에 적힌 그대로다 — 그 순서가 곧 AI의 우선순위이자 넷을 고르는
+  // 순서다. 레벨이 오르면 앞쪽이 열리면서 뒤쪽의 싸구려 스킬이 밀려난다.
   check('레벨이 오르면 들고 온다',
-    branOf(veteran).skills.map((slot) => slot.id), ['roar', 'taunt']);
+    branOf(veteran).skills.map((slot) => slot.id), ['roar', 'taunt', 'sweep', 'slam']);
+  check('넷을 넘겨 들고 가지 않는다',
+    branOf(veteran).skills.length <= D.UNIT_SKILL_MAX, true);
+  // 동료가 쓰는 계열은 목록이 넷보다 길어야 "그중 넷"이 고르는 일이 된다.
+  // 적 전용 계열(잡졸)은 예외다 — 고블린은 넷을 채울 만큼 배운 것이 없다.
+  const companionSpecs = new Set(Object.values(D.COMPANIONS).map((def) => def.spec));
+  check('동료 계열은 목록이 넷보다 길다',
+    [...companionSpecs].every((spec) => D.SPEC_SKILLS[spec].length > D.UNIT_SKILL_MAX), true);
 
   // 주인공의 수치는 성장 상태에서 계산해 넘어온다. 전투가 레벨 규칙을 다시
   // 알지 못하게 하려는 것이라, 넘긴 값이 그대로 쓰여야 한다.

@@ -18,7 +18,10 @@ const byUid = AI.byUid;
 
 const HERO_UID = 'hero';
 const TICK = 1 / 30;          // 시뮬레이션 한 걸음
-const WAVE_GAP = 2.5;         // 웨이브 사이 간격(초)
+const WAVE_GAP = 3.2;         // 웨이브 사이 간격(초)
+// 무리와 무리 사이에 배경이 흘러가는 속도(전장 격자/초). 그 사이 아군은 대열을
+// 다시 짜고, 화면은 배경을 왼쪽으로 흘려 "걸어서 다음 무리를 만나러 간다"로 읽힌다.
+const MARCH_SPEED = 26;
 const EVENT_CAP = 400;        // 화면이 안 가져가도 무한히 쌓이지 않게
 
 function createRng(seed) {
@@ -66,6 +69,9 @@ function makeUnit(def, side, uid, x, y, level, override, bonus, potions, name) {
     hp, maxHp: hp,
     mp, maxMp: mp,
     atk: stats.atk * (1 + (gear.atk || 0)),
+    // 레벨에 따른 공격력 배수. 도트와 장판의 초당 피해가 정액이라 이것을 곱해
+    // 준다 — 곱하지 않으면 높은 레벨의 저주가 1레벨 저주와 같은 값을 넣는다.
+    power: stats.atk / (def.atk || 1),
     armor: Math.max(0.35, ((override && override.armor) || def.armor) + (gear.armor || 0)),
     healPower: stats.heal + (gear.heal || 0),
     spellPower: stats.spell,
@@ -82,11 +88,9 @@ function makeUnit(def, side, uid, x, y, level, override, bonus, potions, name) {
     // 시전 중인 스킬. 서서 외우는 동안 여기 들어 있고, 움직이면 지워진다.
     cast: null,
     exp: Math.round((def.exp || 0) * (1 + 0.25 * (level - 1))),
-    // 레벨이 낮으면 아직 못 배운 스킬이 있다. 편성 화면이 보여 준 것과 전투에서
-    // 실제로 쓰는 것이 같아야 하므로 같은 규칙으로 거른다.
-    skills: (def.skills || [])
-      .filter((id) => level >= D.UNIT_SKILLS[id].minLevel)
-      .map((id) => ({ id, readyAt: 0 })),
+    // 계열의 목록 중 레벨이 되는 것을 앞에서부터 넷. 편성 화면이 보여 준 것과
+    // 전투에서 실제로 쓰는 것이 같아야 하므로 같은 함수를 쓴다.
+    skills: D.skillsFor(def.spec, level).map((id) => ({ id, readyAt: 0 })),
     targetUid: null, tauntUid: null, tauntUntil: 0,
     dead: false,
   };
@@ -96,15 +100,25 @@ function makeUnit(def, side, uid, x, y, level, override, bonus, potions, name) {
 // 첫 몇 초 동안 힐러가 최전선에 서 있게 된다.
 const ALLY_LANE = { tank: 32, dealer: 22, healer: 12 };
 
+// 줄 세우기. 위아래로 FIELD.top~bottom 안에서만 세운다 — 그 밖은 유닛의 몸통이
+// 화면을 벗어나는 자리다.
+function laneY(index, count) {
+  const top = D.FIELD.top;
+  const span = D.FIELD.bottom - top;
+  return count <= 1 ? top + span / 2 : top + (index * span) / (count - 1);
+}
+
 function placeAllies(state, members) {
-  const rows = members.length;
   members.forEach((member, i) => {
     const def = member.def;
     const hero = def.id === D.HERO.id;
-    const x = hero ? 7 : ALLY_LANE[def.job];
-    const y = rows === 1 ? D.FIELD.h / 2 : 10 + (i * (D.FIELD.h - 20)) / (rows - 1);
-    state.units.push(makeUnit(def, 'ally', hero ? HERO_UID : `a${i}`, x, y,
-      member.level, member.stats, member.bonus, member.potions, member.name));
+    const unit = makeUnit(def, 'ally', hero ? HERO_UID : `a${i}`,
+      hero ? 7 : ALLY_LANE[def.job], laneY(i, members.length),
+      member.level, member.stats, member.bonus, member.potions, member.name);
+    // 웨이브 사이에 되돌아갈 자리. 다음 무리를 만나러 갈 때 대열을 다시 짠다.
+    unit.homeX = unit.x;
+    unit.homeY = unit.y;
+    state.units.push(unit);
   });
 }
 
@@ -114,9 +128,7 @@ function spawnWave(state, index) {
   wave.forEach((defId, i) => {
     const def = D.ENEMIES[defId];
     const x = D.FIELD.w - 10 - (i % 2) * 9;
-    const y = wave.length === 1
-      ? D.FIELD.h / 2
-      : 10 + (i * (D.FIELD.h - 20)) / (wave.length - 1);
+    const y = laneY(i, wave.length);
     // 적도 직업에 따라 물약을 들고 온다. 아군만 마나를 되찾을 수 있으면
     // 뒤 웨이브의 주술사가 그냥 서 있는 상대가 된다.
     state.units.push(makeUnit(def, 'enemy', `e${index}_${i}`, x, y, state.quest.level || 1,
@@ -148,6 +160,8 @@ function createBattle(config) {
     quest, rng: createRng(config.seed == null ? 1 : config.seed),
     t: 0, waveIndex: -1, nextWaveAt: 0,
     units: [], zones: [], dots: [],
+    // 배경이 지금까지 흘러간 거리. 무리 사이에만 늘고, 화면이 이 값으로 배경을 민다.
+    scroll: 0, marching: false,
     skills: skills.map((id) => ({ id, readyAt: 0 })),
     // 주인공이 들고 온 물약. 상점에서 사서 채운 것이 그대로 들어온다.
     potions: Object.assign({ mana: 0, health: 0 }, config.potions),
@@ -254,9 +268,14 @@ function addDot(state, source, target, def, kind, amount) {
   if (!existing) state.dots.push(dot);
 }
 
+// **누구에게 걸리는 장판인지를 여기서 정해 둔다.** 예전에는 회복이면 아군,
+// 아니면 적이라고 봤는데, 그것은 장판을 까는 것이 주인공뿐이던 때의 이야기다.
+// 적 궁수가 깐 독 구름은 아군에게 걸려야 한다.
 function addZone(state, source, def, x, y, kind, amount) {
+  const own = source ? source.side : 'ally';
   state.zones.push({
     id: state.nextZoneId++, sourceUid: source ? source.uid : null, kind,
+    side: kind === 'heal' ? own : AI.opposite(own),
     x, y, radius: def.radius, amount: amount == null ? def.tick : amount,
     interval: def.interval,
     endsAt: state.t + def.duration, nextAt: state.t + def.interval,
@@ -281,9 +300,8 @@ function updateDots(state) {
 function updateZones(state) {
   for (const zone of state.zones) {
     while (zone.nextAt <= state.t && zone.nextAt <= zone.endsAt + 1e-6) {
-      const side = zone.kind === 'heal' ? 'ally' : 'enemy';
       const source = zone.sourceUid ? byUid(state, zone.sourceUid) : null;
-      for (const unit of alive(state, side)) {
+      for (const unit of alive(state, zone.side)) {
         if (dist(unit, zone) > zone.radius) continue;
         if (zone.kind === 'heal') applyHeal(state, source, unit, zone.amount);
         else applyDamage(state, source, unit, zone.amount);
@@ -321,8 +339,26 @@ function runUnitSkill(state, unit, choice) {
     }
     return;
   }
+  // 도트와 장판의 초당 피해는 정액이라 레벨 배수를 곱해 준다. 곱하지 않으면
+  // 9레벨 저주가 1레벨 저주와 같은 값을 넣는다.
+  const over = (base) => base * unit.power;
+
   if (def.kind === 'heal') { applyHeal(state, unit, target, def.heal); return; }
-  if (def.kind === 'dot') { addDot(state, unit, target, def, 'damage'); return; }
+  if (def.kind === 'heal-dot') { addDot(state, unit, target, def, 'heal'); return; }
+  if (def.kind === 'heal-area') {
+    for (const mate of alive(state, unit.side)) {
+      if (dist(mate, target) <= def.radius) applyHeal(state, unit, mate, def.heal);
+    }
+    return;
+  }
+  // 자기 마나를 되찾는다. 마나를 다 쓴 시전자가 남은 전투 내내 기본 공격만
+  // 하는 것을 막는 것이 이 종류의 목적이다.
+  if (def.kind === 'mana') { unit.mp = Math.min(unit.maxMp, unit.mp + def.mana); return; }
+  if (def.kind === 'dot') { addDot(state, unit, target, def, 'damage', over(def.tick)); return; }
+  if (def.kind === 'zone') {
+    addZone(state, unit, def, target.x, target.y, 'damage', over(def.tick));
+    return;
+  }
   if (def.kind === 'damage') { applyDamage(state, unit, target, unit.atk * def.mul, true); return; }
   if (def.kind === 'damage-area') {
     for (const foe of alive(state, AI.opposite(unit.side))) {
@@ -423,7 +459,7 @@ function separate(state) {
   for (const unit of state.units) {
     if (unit.dead) continue;
     unit.x = Math.min(D.FIELD.w - 4, Math.max(4, unit.x));
-    unit.y = Math.min(D.FIELD.h - 5, Math.max(5, unit.y));
+    unit.y = Math.min(D.FIELD.bottom, Math.max(D.FIELD.top, unit.y));
   }
 }
 
@@ -563,9 +599,13 @@ function checkEnd(state) {
   if (alive(state, 'enemy').length) return;
 
   if (state.waveIndex + 1 < state.quest.waves.length) {
-    if (!state.nextWaveAt) state.nextWaveAt = state.t + WAVE_GAP;
-    else if (state.t >= state.nextWaveAt) {
+    if (!state.nextWaveAt) {
+      state.nextWaveAt = state.t + WAVE_GAP;
+      state.marching = true;
+      emit(state, { type: 'march', text: '다음 무리를 찾아 나선다' });
+    } else if (state.t >= state.nextWaveAt) {
       state.nextWaveAt = 0;
+      state.marching = false;
       spawnWave(state, state.waveIndex + 1);
     }
     return;
@@ -574,10 +614,28 @@ function checkEnd(state) {
   emit(state, { type: 'end', result: 'won', text: '퀘스트 완료' });
 }
 
+// 무리와 무리 사이. 싸울 상대가 없으므로 판단을 돌리지 않고, 아군은 처음 섰던
+// 자리로 대열을 다시 짜며 배경이 흘러간다. 적을 새로 깔아 놓고 아군을 그 앞에
+// 세우는 것보다, 걸어가서 만나는 편이 무엇이 일어났는지 보인다.
+function march(state, dt) {
+  state.scroll += MARCH_SPEED * dt;
+  for (const unit of alive(state, 'ally')) {
+    if (!unit.speed) continue;
+    moveToward(state, unit, { x: unit.homeX, y: unit.homeY }, dt);
+  }
+}
+
 function step(state, dt) {
   state.t += dt;
   updateZones(state);
   updateDots(state);
+
+  if (state.marching) {
+    march(state, dt);
+    separate(state);
+    checkEnd(state);
+    return;
+  }
 
   for (const unit of state.units) {
     if (unit.dead) continue;
@@ -650,7 +708,7 @@ function rewardOf(state) {
 }
 
 const api = {
-  HERO_UID, TICK, WAVE_GAP, rewardOf,
+  HERO_UID, TICK, WAVE_GAP, MARCH_SPEED, rewardOf,
   createRng, createBattle, advance, step, drainEvents,
   castSkill, usePotion, drink, magicPowerOf, rollCrit, applyDamage, applyHeal, addDot, addZone,
   hero, skillSlot, resolveTarget, moveToward,

@@ -20,7 +20,7 @@
   --sel: #d9e4f2;
   /* 전투 화면이 가로로 길어 다른 게임(440px)보다 넓게 잡았다. 좁히면 아군과 적
      사이가 붙어 버려 거리와 장판 반경이 눈에 들어오지 않는다. */
-  --app-max: 720px;
+  --app-max: 860px;
   --pad-x: clamp(10px, 3vmin, 24px);
 }
 
@@ -212,7 +212,7 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
    다르게 늘어나 원이 타원으로 보인다. */
 .field {
   position: relative;
-  aspect-ratio: 100 / 46;
+  aspect-ratio: 100 / 56;
   border: 1px solid var(--line); border-radius: 14px;
   background: #1d1a24;
   overflow: hidden;
@@ -221,8 +221,15 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 
 /* 배경은 퀘스트 장소에 따라 scenes.js가 만들어 넣는다. 밝은 테마에서도 배경은
    그대로 어둡다 — 던전 안이 페이지 설정에 따라 밝아질 이유가 없다. */
-.scene-layer { position: absolute; inset: 0; }
-.scene { display: block; width: 100%; height: 100%; }
+/* 배경을 두 장 이어 붙여 놓고 통째로 왼쪽으로 민다. 두 장이 똑같으므로 한 장
+   폭만큼 밀렸을 때 되감으면 이음매가 보이지 않는다 — 무리와 무리 사이에 걸어서
+   이동하는 것으로 보이게 하는 방법이고, 유닛 좌표는 건드리지 않는다. */
+.scene-layer {
+  position: absolute; inset: 0;
+  display: flex; width: 200%;
+  will-change: transform;
+}
+.scene { display: block; width: 50%; height: 100%; flex: none; }
 .field.aiming { cursor: crosshair; }
 .field.aiming::after {
   content: ""; position: absolute; inset: 0;
@@ -281,6 +288,15 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
   background: rgba(0, 0, 0, 0.55); overflow: hidden;
 }
 .unit .castbar span { display: block; height: 100%; width: 0; background: #f0e2a8; }
+
+/* 무리와 무리 사이의 걸음. 배경이 흘러가는 동안 유닛도 걷는 티가 나야 이동하는
+   것으로 읽힌다 — 배경만 움직이면 화면이 미끄러지는 것처럼 보인다. */
+.field.marching .unit.ally .sprite { animation: trudge 0.42s steps(2, end) infinite; }
+@keyframes trudge {
+  from { transform: translateY(0); }
+  50% { transform: translateY(-4%); }
+  to { transform: translateY(0); }
+}
 .unit.dead .castbar { display: none; }
 .unit.low .hpbar span { background: var(--hp-low); }
 /* 유닛 이름표는 없다. 아홉 그림이 실루엣만으로 갈리도록 그렸고, 아군의 이름은
@@ -353,8 +369,16 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 /* 초상화. 범위 스킬의 기준점을 동료로 잡는 통로이기도 해서(기획서 8.1)
    전투 중 가장 자주 눌리는 곳이다 — 손가락이 닿는 크기를 유지한다. */
 .portraits { list-style: none; margin: 0; padding: 0; display: flex; gap: 6px; }
+/* 적 줄은 아군 줄보다 작다. 손가락이 닿아야 하는 것은 아군 쪽이고(범위 스킬의
+   기준점), 적 줄은 누가 몇이나 남았는지 읽는 자리다. */
+.portraits.enemies .portrait { padding: 4px 3px 4px; gap: 2px; }
+.portraits.enemies .avatar { width: 20px; height: 26px; }
+.portraits.enemies .pname { font-size: 10px; }
+.portrait.enemy { border-color: color-mix(in srgb, var(--enemy) 45%, var(--line)); }
+.portrait.enemy .bar span { background: var(--enemy); }
 
 .portrait {
+  position: relative;
   flex: 1; min-width: 0;
   border: 1px solid var(--line); border-radius: 11px;
   background: var(--card-bg); color: inherit; font-family: inherit;
@@ -362,6 +386,7 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
   display: flex; flex-direction: column; align-items: center; gap: 3px;
 }
 .portrait .avatar { width: 22px; height: 30px; color: var(--ally); }
+.portrait.enemy .avatar { color: var(--enemy); }
 .portrait.is-hero .avatar { color: var(--hero); }
 .portrait .pname {
   font-size: 10px; font-weight: 700; max-width: 100%;
@@ -592,6 +617,30 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .pick-sub.diff { color: var(--btn-bg); font-weight: 600; }
 /* 시전 시간·사거리 줄. 설명보다 한 단계 물러나 있어야 설명이 먼저 읽힌다. */
 .pick-sub.dim { font-size: 11px; opacity: 0.75; }
+
+/* 초상화 위로 떠오르는 피해·회복 숫자. 전장에서도 같은 숫자가 뜨지만, 뭉쳐
+   싸울 때에는 그쪽이 서로 겹쳐 읽히지 않는다. */
+.pops {
+  position: absolute; left: 0; right: 0; top: -2px;
+  pointer-events: none;
+}
+.pop {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  font-size: 12px; font-weight: 800; white-space: nowrap;
+  animation: pop-rise 0.85s ease-out forwards;
+}
+.pop.harm { color: var(--harm); }
+.pop.heal { color: var(--heal); }
+.pop.crit { font-size: 14px; }
+
+@keyframes pop-rise {
+  from { opacity: 1; transform: translate(-50%, 0); }
+  to { opacity: 0; transform: translate(-50%, -16px); }
+}
+
+/* 시전 중인 유닛은 초상화 테두리가 밝아진다. 누가 무엇을 외우고 있는지가
+   전장에서만 보이면 뭉쳐 있을 때 놓친다. */
+.portrait.casting { border-color: #f0e2a8; }
 .item .pick-cost { white-space: nowrap; }
 .item:disabled { opacity: 0.45; cursor: default; }
 

@@ -186,6 +186,8 @@ function levelRow(label, level, exp, toNext) {
 const STAT_LABELS = {
   hp: '최대 체력',
   mp: '최대 마나',
+  // 주인공도 마나가 떨어지면 기본 공격을 한다. 쓰지 않는 수치가 아니므로 적는다.
+  atk: '공격력',
   heal: '회복력',
   crit: '치명타 확률',
   critDamage: '치명타 피해',
@@ -515,8 +517,11 @@ function avatar(kind) {
   return wrap;
 }
 
-function jobTag(job) {
-  return text('span', `job ${job}`, D.JOBS[job].name);
+// 역할과 계열을 함께 적는다. 역할만 적으면 궁수와 마법사가 같은 줄로 보이고,
+// 계열만 적으면 누가 앞에 서는지 알 수 없다 — 둘 다 있어야 편성이 고민이 된다.
+function jobTag(job, spec) {
+  const label = spec ? `${D.JOBS[job].name} · ${D.SPECS[spec]}` : D.JOBS[job].name;
+  return text('span', `job ${job}`, label);
 }
 
 function renderBrief() {
@@ -553,7 +558,7 @@ function renderRoster() {
   const heroBody = el('div', 'pick-body');
   const heroName = el('div', 'pick-name');
   heroName.append(document.createTextNode(`주인공 Lv ${app.progress.charLevel}`));
-  heroName.append(jobTag('healer'));
+  heroName.append(jobTag('healer', D.HERO.spec));
   heroBody.append(heroName);
   const stats = P.stats(app.progress);
   heroBody.append(text('div', 'pick-sub',
@@ -577,7 +582,7 @@ function renderRoster() {
     const body = el('div', 'pick-body');
     const name = el('div', 'pick-name');
     name.append(document.createTextNode(`${member.name} Lv ${member.level}`));
-    name.append(jobTag(def.job));
+    name.append(jobTag(def.job, def.spec));
     body.append(name);
     body.append(text('div', 'pick-sub', memberSummary(member)));
 
@@ -743,6 +748,8 @@ function makeUnitNode(unit) {
 
 function syncUnits(state) {
   for (const unit of state.units) {
+    // 무리 사이에 치운 시체를 다시 만들지 않는다.
+    if (unit.dead && !unitNodes.has(unit.uid)) continue;
     const node = unitNodes.get(unit.uid) || makeUnitNode(unit);
     node.style.left = `${pctX(unit.x)}%`;
     node.style.top = `${pctY(unit.y)}%`;
@@ -800,48 +807,78 @@ function pulse(x, y, radius, cls) {
   node.addEventListener('animationend', () => node.remove());
 }
 
+// 초상화는 아군과 적 두 줄이다. 적 줄이 없을 때에는 누가 몇이나 남았는지를
+// 전장에서 세어야 했는데, 뭉쳐 싸우는 화면에서 그것은 세어지지 않는다. 적
+// 초상화는 적을 겨냥하는 스킬의 대상 자리이기도 하다.
+function makePortrait(unit) {
+  const button = el('button', `portrait ${unit.side}`);
+  button.type = 'button';
+  button.dataset.uid = unit.uid;
+  if (unit.uid === L.HERO_UID) button.classList.add('is-hero');
+  button.append(avatar(unit.sprite));
+  button.append(text('span', 'pname', unit.name));
+
+  const hp = el('div', 'bar');
+  hp.append(el('span'));
+  button.append(hp);
+
+  // 동료도 마나를 쓰므로 마나가 보여야 한다. 사제가 왜 가만히 있는지가
+  // 화면에 없으면 고장 난 것처럼 보인다. 마나가 없는 유닛에게는 빈 자리를
+  // 두지 않는다 — 지금은 없지만 앞으로 생길 수 있어서 클래스로 가른다.
+  const mp = el('div', 'bar mp thin');
+  mp.append(el('span'));
+  mp.hidden = unit.maxMp <= 0;
+  button.append(mp);
+
+  // 피해와 회복이 뜨는 자리. 전장에서 유닛이 뭉쳐 있으면 누가 맞았는지 숫자가
+  // 겹쳐 읽히지 않아서, 초상화 위에도 같은 숫자를 띄운다.
+  button.append(el('div', 'pops'));
+
+  button.addEventListener('click', () => onPortrait(unit.uid));
+  const item = el('li');
+  item.append(button);
+  return item;
+}
+
 function renderPortraits(state) {
-  const list = $('portraits');
-  list.textContent = '';
-  for (const unit of state.units.filter((u) => u.side === 'ally')) {
-    const button = el('button', 'portrait');
-    button.type = 'button';
-    button.dataset.uid = unit.uid;
-    if (unit.uid === L.HERO_UID) button.classList.add('is-hero');
-    button.append(avatar(unit.sprite));
-    button.append(text('span', 'pname', unit.name));
-
-    const hp = el('div', 'bar');
-    hp.append(el('span'));
-    button.append(hp);
-
-    // 동료도 마나를 쓰므로 마나가 보여야 한다. 사제가 왜 가만히 있는지가
-    // 화면에 없으면 고장 난 것처럼 보인다. 마나가 없는 유닛에게는 빈 자리를
-    // 두지 않는다 — 지금은 없지만 앞으로 생길 수 있어서 클래스로 가른다.
-    const mp = el('div', 'bar mp thin');
-    mp.append(el('span'));
-    mp.hidden = unit.maxMp <= 0;
-    button.append(mp);
-
-    button.addEventListener('click', () => onPortrait(unit.uid));
-    const item = el('li');
-    item.append(button);
-    list.append(item);
+  for (const [id, side] of [['enemy-portraits', 'enemy'], ['portraits', 'ally']]) {
+    const list = $(id);
+    list.textContent = '';
+    for (const unit of state.units.filter((u) => u.side === side && !u.dead)) {
+      list.append(makePortrait(unit));
+    }
   }
 }
 
-function syncPortraits(state) {
-  for (const item of $('portraits').children) {
+function syncPortraitList(state, id) {
+  for (const item of $(id).children) {
     const button = item.firstElementChild;
     const unit = AI.byUid(state, button.dataset.uid);
+    if (!unit) continue;
     const bar = button.querySelector('.bar');
     bar.firstElementChild.style.width = `${(unit.hp / unit.maxHp) * 100}%`;
     bar.classList.toggle('low', unit.hp / unit.maxHp <= 0.3);
     const mana = button.querySelector('.bar.mp');
     if (unit.maxMp > 0) mana.firstElementChild.style.width = `${(unit.mp / unit.maxMp) * 100}%`;
     button.classList.toggle('dead', unit.dead);
+    button.classList.toggle('casting', Boolean(unit.cast));
     button.classList.toggle('valid', Boolean(app.aiming) && isValidUnitTarget(state, unit));
   }
+}
+
+function syncPortraits(state) {
+  syncPortraitList(state, 'portraits');
+  syncPortraitList(state, 'enemy-portraits');
+}
+
+// 초상화 위에 뜨는 숫자. 전장의 숫자와 같은 값이고, 뭉쳐 싸울 때 그쪽이
+// 겹쳐 읽히지 않아 여기에도 띄운다.
+function popPortrait(uid, label, cls) {
+  const button = document.querySelector(`.portrait[data-uid="${uid}"]`);
+  if (!button) return;
+  const node = text('div', `pop ${cls}`, label);
+  button.querySelector('.pops').append(node);
+  node.addEventListener('animationend', () => node.remove());
 }
 
 function renderSkillbar() {
@@ -1029,6 +1066,14 @@ field.addEventListener('pointermove', (event) => {
 
 field.addEventListener('pointerleave', () => { $('aim').hidden = true; });
 
+// 무리 사이에 배경을 흘린다. 유닛 좌표는 그대로 두고 배경만 미는 것이라
+// 사거리와 장판 반경은 아무 영향을 받지 않는다.
+function syncScene(state) {
+  const shift = (state.scroll || 0) % D.FIELD.w;
+  $('scene').style.transform = `translateX(${-(shift / D.FIELD.w) * 50}%)`;
+  field.classList.toggle('marching', Boolean(state.marching));
+}
+
 // 조준 중인 스킬의 사거리를 주인공 발밑에 그린다. 주인공이 저절로 움직이므로
 // 매 프레임 따라다녀야 한다.
 function syncReach(state) {
@@ -1066,7 +1111,9 @@ function handleEvents(state, events) {
         // 치명타는 느낌표와 큰 글자로 가른다. 색만 다르게 하면 피해·회복과
         // 헷갈리고, 숫자만 크게 하면 그냥 많이 맞은 것으로 보인다.
         const kind = `${heal ? 'heal' : 'harm'}${event.crit ? ' crit' : ''}`;
-        floatText(unit, `${heal ? '+' : '−'}${event.amount}${event.crit ? '!' : ''}`, kind);
+        const label = `${heal ? '+' : '−'}${event.amount}${event.crit ? '!' : ''}`;
+        floatText(unit, label, kind);
+        popPortrait(unit.uid, label, kind);
       }
       continue;
     }
@@ -1082,6 +1129,16 @@ function handleEvents(state, events) {
     if (event.type === 'death') {
       note(event.text);
       if (event.side === 'ally') sound.play('down');
+      continue;
+    }
+    // 다음 무리를 찾아 나선다. 쓰러진 적을 치우지 않으면 걸어서 다른 곳에 온
+    // 것인데 시체가 따라온 꼴이 된다.
+    if (event.type === 'march') {
+      for (const [uid, node] of unitNodes) {
+        const unit = AI.byUid(state, uid);
+        if (unit && unit.dead) { node.remove(); unitNodes.delete(uid); }
+      }
+      note(event.text);
       continue;
     }
     if (event.type === 'wave') {
@@ -1110,6 +1167,7 @@ function loop(now) {
   syncPortraits(state);
   syncSkillbar(state);
   syncReach(state);
+  syncScene(state);
 
   if (state.status !== 'fighting') finishBattle(state);
 }
@@ -1121,7 +1179,11 @@ function startBattle() {
 
   // 배경은 전투당 한 번만 만든다. 씨앗을 퀘스트에 묶어 두어 같은 퀘스트가 늘
   // 같은 모습이 되게 했다 — 다시 도전할 때마다 돌 배치가 바뀌면 다른 곳으로 보인다.
-  $('scene').innerHTML = Scenes.svg(app.quest.scene, app.quest.id.length * 977 + app.quest.level);
+  // 두 장을 이어 붙인다. 무리 사이에 배경을 흘릴 때 한 장 폭만큼 밀린 자리에서
+  // 되감아야 이음매가 안 보이는데, 같은 그림 두 장이면 그 자리가 정확히 맞는다.
+  const scene = Scenes.svg(app.quest.scene, app.quest.id.length * 977 + app.quest.level);
+  $('scene').innerHTML = scene + scene;
+  $('scene').style.transform = 'translateX(0)';
 
   app.battle = L.createBattle({
     quest: app.quest,

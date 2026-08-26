@@ -166,6 +166,37 @@ function healTarget(unit, state, heal) {
   return ordered.find((u) => u.hp / u.maxHp <= EMERGENCY) || null;
 }
 
+// --- 물약과 마나 -------------------------------------------------------
+
+// 마나를 다 쓴 사제가 남은 전투 내내 서 있는 것을 막는다. 물약은 수가 적으므로
+// 아무 때나 마시면 정작 필요할 때 없다.
+//
+// 체력이 먼저다. 마나가 없어 못 싸우는 것보다 죽는 것이 급하다.
+const POTION_HP = 0.35;   // 이 아래로 내려가면 체력 물약
+const POTION_MP = 1.15;   // 가장 싼 스킬도 못 쓸 지경(비용의 이만큼)이면 마나 물약
+
+function cheapestSkillCost(unit) {
+  let cheapest = Infinity;
+  for (const slot of unit.skills) {
+    const def = D.UNIT_SKILLS[slot.id];
+    if (def && def.mp > 0) cheapest = Math.min(cheapest, def.mp);
+  }
+  return cheapest;
+}
+
+function choosePotion(unit, state) {
+  if (!unit.potions || state.t < unit.potionReadyAt) return null;
+
+  if (unit.potions.health > 0 && unit.hp / unit.maxHp <= POTION_HP) return 'health';
+
+  if (unit.potions.mana > 0) {
+    const cost = cheapestSkillCost(unit);
+    // 쓸 스킬이 없으면 마나를 채울 이유도 없다.
+    if (cost !== Infinity && unit.mp < cost * POTION_MP) return 'mana';
+  }
+  return null;
+}
+
 // --- 스킬 판단 ---------------------------------------------------------
 
 // 사거리는 스킬마다 다르다. 적어 두지 않은 스킬은 유닛의 사거리를 따른다.
@@ -199,9 +230,31 @@ function chooseSkill(unit, state, target) {
       return { id: def.id, targetUid: nearest(unit, inReach).uid };
     }
 
-    if (def.kind === 'heal') {
-      const hurt = healTarget(unit, state, def.heal);
+    // 자기 마나를 되찾는 스킬. 물약과 같은 잣대로 본다 — 아직 쓸 마나가
+    // 남아 있으면 아낀다. 이것이 없으면 시전자가 곧바로 기본 공격만 하게 된다.
+    if (def.kind === 'mana') {
+      const cost = cheapestSkillCost(unit);
+      if (cost === Infinity || unit.mp >= cost * POTION_MP) continue;
+      if (unit.mp + def.mana > unit.maxMp * 1.3) continue;
+      return { id: def.id, targetUid: unit.uid };
+    }
+
+    if (def.kind === 'heal' || def.kind === 'heal-dot') {
+      // 도트 힐은 한 번에 채우는 것이 아니라 지속 시간 동안 다 채운다.
+      const worth = def.kind === 'heal-dot' ? def.tick * def.duration : def.heal;
+      const hurt = healTarget(unit, state, worth);
       if (hurt && dist(unit, hurt) <= reach) return { id: def.id, targetUid: hurt.uid };
+      continue;
+    }
+
+    // 범위 회복은 둘 이상이 함께 깎였을 때만 쓴다. 하나에게 쓰면 단일 힐보다
+    // 비싸고 덜 채우는 스킬이 된다.
+    if (def.kind === 'heal-area') {
+      const hurt = healTarget(unit, state, def.heal);
+      if (!hurt || dist(unit, hurt) > reach) continue;
+      const covered = alive(state, unit.side)
+        .filter((mate) => dist(mate, hurt) <= def.radius && missing(mate) >= def.heal * EFFICIENT);
+      if (covered.length >= 2) return { id: def.id, targetUid: hurt.uid };
       continue;
     }
 
@@ -210,7 +263,7 @@ function chooseSkill(unit, state, target) {
       continue;
     }
 
-    if (def.kind === 'damage-area') {
+    if (def.kind === 'damage-area' || def.kind === 'zone') {
       // 여럿이 겹쳐 있을 때만 쓴다. 하나에게 쓰면 쿨타임만 버리는 셈이다.
       if (!target || dist(unit, target) > reach) continue;
       const hit = foesOf(unit, state).filter((foe) => dist(foe, target) <= def.radius);
@@ -221,13 +274,17 @@ function chooseSkill(unit, state, target) {
   return null;
 }
 
+// 회복을 맡는 종류. 어디에 설지 정할 때와 마나를 아낄지 정할 때 같은 목록을 본다.
+const HEAL_KINDS = ['heal', 'heal-area', 'heal-dot'];
+
 // 지금 사거리 안에 들어가야 하는 회복 대상. 쿨타임과 마나는 보지 않는다 —
 // 쿨타임이 도는 동안 자리를 잡아 두어야 돌아오자마자 힐이 나간다.
 function healReach(unit, state) {
   for (const slot of unit.skills) {
     const def = D.UNIT_SKILLS[slot.id];
-    if (!def || def.kind !== 'heal') continue;
-    const hurt = healTarget(unit, state, def.heal);
+    if (!def || HEAL_KINDS.indexOf(def.kind) < 0) continue;
+    const worth = def.kind === 'heal-dot' ? def.tick * def.duration : def.heal;
+    const hurt = healTarget(unit, state, worth);
     if (hurt) return { unit: hurt, range: rangeOf(def, unit) };
   }
   return null;
@@ -300,37 +357,6 @@ function chooseMove(unit, state, target) {
   if (!target) return null;
   const want = unit.range * 0.85;
   return dist(unit, target) > want ? standoff(unit, target, want) : null;
-}
-
-// --- 물약 --------------------------------------------------------------
-
-// 마나를 다 쓴 사제가 남은 전투 내내 서 있는 것을 막는다. 물약은 수가 적으므로
-// 아무 때나 마시면 정작 필요할 때 없다.
-//
-// 체력이 먼저다. 마나가 없어 못 싸우는 것보다 죽는 것이 급하다.
-const POTION_HP = 0.35;   // 이 아래로 내려가면 체력 물약
-const POTION_MP = 1.15;   // 가장 싼 스킬도 못 쓸 지경(비용의 이만큼)이면 마나 물약
-
-function cheapestSkillCost(unit) {
-  let cheapest = Infinity;
-  for (const slot of unit.skills) {
-    const def = D.UNIT_SKILLS[slot.id];
-    if (def && def.mp > 0) cheapest = Math.min(cheapest, def.mp);
-  }
-  return cheapest;
-}
-
-function choosePotion(unit, state) {
-  if (!unit.potions || state.t < unit.potionReadyAt) return null;
-
-  if (unit.potions.health > 0 && unit.hp / unit.maxHp <= POTION_HP) return 'health';
-
-  if (unit.potions.mana > 0) {
-    const cost = cheapestSkillCost(unit);
-    // 쓸 스킬이 없으면 마나를 채울 이유도 없다.
-    if (cost !== Infinity && unit.mp < cost * POTION_MP) return 'mana';
-  }
-  return null;
 }
 
 function decide(unit, state) {
