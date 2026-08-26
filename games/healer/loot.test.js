@@ -35,13 +35,28 @@ const jobOf = (id) => MEMBERS.find((m) => m.id === id).job;
 const gear = (defId, tier) => Items.make(defId, tier || 0, 1);
 const names = (list) => list.map((item) => Items.name(item));
 
-// --- 전리품은 퀘스트가 들고 온다 ----------------------------------------
+// --- 전리품은 쓰러뜨린 적에게서 나온다 ----------------------------------
 {
   const Q = require('./quests.js');
+  const L = require('./logic.js');
   const quest = Q.generate(6, 99)[0];
-  check('의뢰에 전리품이 붙어 있다', quest.drops.length > 0, true);
-  check('전부 아는 물건이다', quest.drops.every((item) => Boolean(Items.def(item))), true);
-  check('같은 씨앗이면 같은 전리품', names(Q.generate(6, 99)[0].drops), names(quest.drops));
+
+  // 적을 전부 눕히고 굴린다. 실제 전투를 굴리지 않는 것은, 여기서 보려는 것이
+  // 난이도가 아니라 "쓰러진 적에게서 나오는가"이기 때문이다.
+  const battle = (seed) => {
+    const state = L.createBattle({ quest, party: [{ defId: 'bran', level: 6 }], skills: [], seed });
+    for (const unit of state.units) if (unit.side === 'enemy') unit.dead = true;
+    return state;
+  };
+
+  const drops = L.dropsOf(battle(3));
+  check('쓰러뜨린 적에게서 나온다', drops.length > 0, true);
+  check('전부 아는 물건이다', drops.every((item) => Boolean(Items.def(item))), true);
+  check('같은 씨앗이면 같은 전리품', names(L.dropsOf(battle(3))), names(drops));
+
+  // 아무도 못 눕혔으면 나올 것도 없다.
+  const empty = L.createBattle({ quest, party: [{ defId: 'bran', level: 6 }], skills: [], seed: 3 });
+  check('못 눕히면 전리품도 없다', L.dropsOf(empty).length, 0);
 }
 
 // --- 균등 분배 ----------------------------------------------------------
@@ -143,7 +158,7 @@ const names = (list) => list.map((item) => Items.name(item));
 
 // --- 이름 표시 ----------------------------------------------------------
 {
-  check('장비 이름에는 등급이 붙는다', Items.name(gear('shield', 2)), '튼튼한 참나무 방패');
+  check('장비 이름에는 등급이 붙는다', Items.name(gear('shield', 2)), '희귀 참나무 방패');
   check('재료 이름에는 등급이 붙지 않는다', Items.name(gear('fang', 2)), '고블린 이빨');
   check('등급이 오르면 수치도 오른다',
     Items.stats(gear('shield', 2)).hp > Items.stats(gear('shield', 0)).hp, true);

@@ -65,8 +65,18 @@ function everyQuest(fn) {
     everyQuest((q) => (q.waves.flat().every((id) => D.ENEMIES[id]) ? null : '모르는 적')), []);
   check('아는 장소에서 싸운다',
     everyQuest((q) => (D.REGIONS[q.region] && q.scene ? null : '모르는 지역')), []);
-  check('전리품이 붙어 있다',
-    everyQuest((q) => (q.drops.length && q.drops.every((i) => Items.def(i)) ? null : '전리품')), []);
+  // 전리품 목록은 의뢰에 붙지 않는다. 쓰러뜨린 적에게서 굴려지므로(logic.dropsOf)
+  // 게시판이 미리 말할 수 있는 것은 "가장 높은 적 등급"까지다.
+  check('전리품 목록을 미리 들고 있지 않다',
+    everyQuest((q) => (q.drops === undefined ? null : '전리품 목록')), []);
+  check('적 등급을 알린다',
+    everyQuest((q) => (D.RANKS[q.rank] ? null : '모르는 등급')), []);
+  check('등급은 실제로 나오는 적 중 가장 높은 것이다', everyQuest((q) => {
+    const order = Object.keys(D.RANKS);
+    const best = q.waves.flat()
+      .reduce((top, id) => Math.max(top, order.indexOf(D.rankOf(D.ENEMIES[id]).id)), 0);
+    return order[best] === q.rank ? null : `${q.rank} vs ${order[best]}`;
+  }), []);
   check('보상이 0보다 크다',
     everyQuest((q) => (q.guildReward.gold > 0 && q.guildReward.exp > 0 ? null : '보상 없음')), []);
 
@@ -83,11 +93,11 @@ function everyQuest(fn) {
   check('지역의 최소 레벨을 지킨다',
     everyQuest((q) => (q.level >= D.REGIONS[q.region].minLevel ? null : '최소 레벨')), []);
 
-  // 등급이 적정 레벨을 따라야 낮은 의뢰만 반복하는 것이 최선이 되지 않는다.
-  check('등급이 레벨을 크게 앞지르지 않는다', everyQuest((q) => {
-    const cap = Math.min(D.TIERS.length - 1, Math.floor((q.level - 1) / 5) + 1);
-    return q.drops.every((item) => item.tier <= cap) ? null : '등급 과다';
-  }), []);
+  // 등급의 바닥이 레벨을 따라야 낮은 의뢰만 반복하는 것이 최선이 되지 않는다.
+  check('레벨이 낮으면 등급 바닥도 낮다', D.tierFloor(1), 0);
+  check('레벨이 오르면 바닥도 오른다', D.tierFloor(30) > D.tierFloor(1), true);
+  check('바닥이 맨 위까지 오르지는 않는다',
+    D.tierFloor(D.LEVEL.maxLevel) < D.TIERS.length - 1, true);
 }
 
 // --- 보상은 규모를 따른다 -----------------------------------------------

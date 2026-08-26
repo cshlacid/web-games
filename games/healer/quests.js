@@ -31,12 +31,18 @@ const COMPANION_COUNT = 6;
 // 아래쪽이 좁은 것은, 쉬운 퀘스트만 반복하는 것이 최선이 되면 곤란해서다.
 const LEVEL_SPREAD = [-1, 0, 0, 1, 1, 2, 3];
 
-// 등급은 적정 레벨을 따라간다. 낮은 퀘스트에서 전설이 나오면 높은 퀘스트를 갈
-// 이유가 없어진다.
-function tierFor(level, rng) {
-  const base = Math.min(D.TIERS.length - 1, Math.floor((level - 1) / 5));
-  const lucky = rng() < 0.18 && base + 1 < D.TIERS.length;
-  return lucky ? base + 1 : base;
+// 이 의뢰에 나오는 가장 높은 적 등급. 전리품의 등급은 쓰러뜨린 적에게서
+// 굴려지므로, 게시판이 미리 말할 수 있는 것은 "무엇이 나오는가"까지다.
+function rankOf(waves) {
+  const order = Object.keys(D.RANKS);
+  let best = order[0];
+  for (const wave of waves) {
+    for (const defId of wave) {
+      const rank = D.rankOf(D.ENEMIES[defId]).id;
+      if (order.indexOf(rank) > order.indexOf(best)) best = rank;
+    }
+  }
+  return best;
 }
 
 // 지역은 적정 레벨이 지역의 최소 레벨 이상인 것 중에서 고른다. 1레벨 주인공에게
@@ -82,16 +88,7 @@ function questValue(waves, level) {
 function makeQuest(rng, level, index) {
   const region = pick(rng, regionsFor(level));
   const waves = buildWaves(region, level, rng);
-  const tier = tierFor(level, rng);
   const value = questValue(waves, level);
-
-  const drops = [];
-  const dropCount = 3 + ((rng() * 3) | 0);
-  for (let i = 0; i < dropCount; i++) {
-    const defId = pick(rng, region.drops);
-    // 재료는 등급이 낮게 나와도 상관없지만 장비는 퀘스트 등급을 따른다.
-    drops.push({ defId, tier: D.GEAR[defId] ? tier : Math.max(0, tier - 1) });
-  }
 
   return {
     id: `q${index}-${region.id}-${level}`,
@@ -107,7 +104,9 @@ function makeQuest(rng, level, index) {
       // 않게 하려는 것이다 — 실패하면 이 몫만 절반으로 받는다.
       exp: Math.round(value * 0.45),
     },
-    drops,
+    // 전리품 목록은 여기서 만들지 않는다. 쓰러뜨린 적에게서 굴려지므로
+    // (`logic.dropsOf`) 미리 적어 두면 게시판에서 결과를 읽을 수 있게 된다.
+    rank: rankOf(waves),
     exp: value,
   };
 }

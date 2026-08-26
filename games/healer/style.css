@@ -18,6 +18,14 @@
   --zone-heal: #4f9a63;
   --zone-harm: #c1503f;
   --sel: #d9e4f2;
+  /* 아이템 등급 색. 밝은 테마에서는 흰색이 배경에 묻히므로 일반만 글자색을
+     그대로 쓴다 — 여섯을 다 물들이면 "색이 없는 것"이라는 등급이 사라진다. */
+  --tier-common: #5b6577;
+  --tier-uncommon: #2f8a4c;
+  --tier-rare: #2f6fd0;
+  --tier-epic: #8a4fd0;
+  --tier-legend: #b8860b;
+  --tier-myth: #c23b30;
   /* 전투 화면이 가로로 길어 다른 게임(440px)보다 넓게 잡았다. 좁히면 아군과 적
      사이가 붙어 버려 거리와 장판 반경이 눈에 들어오지 않는다. */
   --app-max: 860px;
@@ -42,6 +50,13 @@
     --heal: #6fb883;
     --harm: #dd7a68;
     --sel: #35435a;
+    /* 어두운 바탕에서는 같은 색이 가라앉는다. 등급 색만 한 단계씩 올린다. */
+    --tier-common: #b9c2d2;
+    --tier-uncommon: #5fc47f;
+    --tier-rare: #6b9ee8;
+    --tier-epic: #b587ea;
+    --tier-legend: #e8c352;
+    --tier-myth: #ec7367;
   }
 }
 
@@ -596,6 +611,27 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .slot-name { flex: none; min-width: 52px; font-size: 12px; font-weight: 700; color: var(--muted); }
 .item-name { flex: 1; min-width: 0; font-weight: 600; font-size: 14px; }
 .item-name.empty { color: var(--muted); font-weight: 400; }
+
+/* **등급은 색으로 먼저 읽힌다.** 이름을 하나하나 읽어 등급을 가리게 하면
+   목록에서 훑어지지 않는다. 색만으로 가르지 않도록 이름에도 등급이 적혀 있다. */
+.tier-common { color: var(--tier-common); }
+.tier-uncommon { color: var(--tier-uncommon); }
+.tier-rare { color: var(--tier-rare); }
+.tier-epic { color: var(--tier-epic); }
+.tier-legend { color: var(--tier-legend); }
+.tier-myth { color: var(--tier-myth); }
+/* 이름표로 쓰일 때에는 테두리도 같이 물든다. */
+.chip.gear.tier-common { border-color: var(--tier-common); color: var(--tier-common); }
+.chip.gear.tier-uncommon { border-color: var(--tier-uncommon); color: var(--tier-uncommon); }
+.chip.gear.tier-rare { border-color: var(--tier-rare); color: var(--tier-rare); }
+.chip.gear.tier-epic { border-color: var(--tier-epic); color: var(--tier-epic); }
+.chip.gear.tier-legend { border-color: var(--tier-legend); color: var(--tier-legend); }
+.chip.gear.tier-myth { border-color: var(--tier-myth); color: var(--tier-myth); }
+
+/* 게시판의 적 등급. 우두머리가 나오는 의뢰인지가 한눈에 보여야 전리품을 노리고
+   고르는 일이 생긴다. */
+.tag.rank-elite { color: var(--tier-rare); border-color: currentColor; }
+.tag.rank-boss { color: var(--tier-myth); border-color: currentColor; font-weight: 700; }
 /* 이름과 수치가 서로 밀면 이름이 한 글자씩 접힌다. 수치 쪽을 좁게 묶어 둔다. */
 .slot-row .why { flex: none; max-width: 46%; text-align: right; line-height: 1.4; }
 

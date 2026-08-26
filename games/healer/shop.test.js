@@ -144,5 +144,32 @@ const LEVELS = [1, 4, 9, 16, 25, 30];
   check('장비 값이 의뢰 보상과 맞물린다', off, []);
 }
 
+// --- 상점은 희귀까지만 판다 ---------------------------------------------
+//
+// 영웅 위로는 적에게서만 나온다. 골드로 살 수 있으면 의뢰를 깰 이유가 상점 값을
+// 모으는 것으로 바뀐다.
+{
+  const over = [];
+  for (const level of [1, 5, 10, 20, 30, D.LEVEL.maxLevel]) {
+    for (let seed = 1; seed <= 40; seed++) {
+      for (const item of Shop.stock(level, seed).gear) {
+        if (item.tier > D.SHOP_MAX_TIER) over.push(`Lv${level} ${Items.name(item)}`);
+      }
+    }
+  }
+  check('희귀보다 높은 등급은 팔지 않는다', over.slice(0, 3), []);
+  check('희귀가 상한이다', D.tierName(D.SHOP_MAX_TIER), '희귀');
+
+  // 그래도 레벨이 오르면 진열대가 좋아져야 들를 이유가 생긴다.
+  const best = (level) => {
+    let top = 0;
+    for (let seed = 1; seed <= 40; seed++) {
+      for (const item of Shop.stock(level, seed).gear) top = Math.max(top, item.tier);
+    }
+    return top;
+  };
+  check('레벨이 오르면 진열대 등급도 오른다', best(1) < best(20), true);
+}
+
 console.log(`${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);

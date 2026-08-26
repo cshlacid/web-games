@@ -34,7 +34,7 @@ function check(name, actual, expected) {
 }
 
 // 결과 화면이 하는 일을 순서 그대로. 화면에서 이 순서가 바뀌면 여기도 바뀌어야 한다.
-function settle(progress, state, party, method, lootSeed) {
+function settle(progress, state, party, method, lootSeed, dropsOverride) {
   const won = state.status === 'won';
   const quest = state.quest;
   const members = state.units.filter((u) => u.side === 'ally')
@@ -52,7 +52,10 @@ function settle(progress, state, party, method, lootSeed) {
   let handed = 0;
 
   if (won) {
-    const result = Loot.distribute(quest.drops, members, method, lootSeed);
+    // 화면과 같은 자리에서 굴린다 — 전리품은 쓰러뜨린 적에게서 나온다.
+    // 손으로 짠 목록을 넘길 수 있게 둔 것은, 아래에서 장비와 재료가 섞인 판을
+    // 확실히 만들어 그리는 코드를 다 밟아 보기 위해서다.
+    const result = Loot.distribute(dropsOverride || L.dropsOf(state), members, method, lootSeed);
     for (const award of result.awards) {
       // 화면이 이 줄을 그린다: 아이콘·이름·이유·받는 사람.
       const def = Items.def(award.item);
@@ -143,7 +146,13 @@ function runQuest(progress, seed, autoHeal, questOver) {
   check('이겼다', state.status, 'won');
 
   const goldBefore = progress.gold;
-  const out = settle(progress, state, party, 'job', 99);
+  // 화면이 실제로 쓰는 길: 쓰러뜨린 적에게서 굴린다.
+  const rolled = L.dropsOf(state);
+  check('쓰러뜨린 적에게서 전리품을 굴린다',
+    rolled.every((item) => Boolean(Items.def(item))), true);
+  check('한 번 굴린 것은 다시 굴리지 않는다', Array.isArray(rolled), true);
+
+  const out = settle(progress, state, party, 'job', 99, quest.drops);
 
   check('분배 줄을 전부 그린다', out.lines.length, quest.drops.length);
   check('물음표가 섞이지 않는다', out.lines.some((line) => line.includes('?')), false);

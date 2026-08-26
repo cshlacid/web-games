@@ -39,6 +39,8 @@ const isGear = (item) => Boolean(item && D.GEAR[item.defId]);
 // **직업 옵션은 모든 장비에 하나 이상 붙고**(AFFIX_COUNT), 그 위에 치명타·회피가
 // 확률로 하나 더 붙는다. 확률로 둔 것은 모든 물건에 붙으면 그것이 옵션이 아니라
 // 기본 수치가 되기 때문이다.
+const affixRange = (tier) => D.AFFIX_RANGE[Math.max(0, Math.min(D.AFFIX_RANGE.length - 1, tier))];
+
 function rollAffixes(defId, tier, rng) {
   const gear = D.GEAR[defId];
   if (!gear) return [];
@@ -48,23 +50,21 @@ function rollAffixes(defId, tier, rng) {
   const affixes = [];
   const used = new Set();
   const roll = (stat) => {
-    // 등급이 오르면 옵션 값도 오른다. ±25%로 흔들어야 같은 등급 안에서도
-    // "이건 잘 나왔다"가 생긴다.
-    const base = D.AFFIX_BASE[stat] * (1 + tier * 0.8);
-    affixes.push({ stat, value: base * (0.75 + rng() * 0.5) });
+    // **등급마다 하한과 상한이 있고 구간이 겹치지 않는다**(AFFIX_RANGE). 그
+    // 안에서 무작위라 같은 등급에서도 "이건 잘 나왔다"가 남는다.
+    const [lo, hi] = affixRange(tier);
+    affixes.push({ stat, value: D.AFFIX_BASE[stat] * (lo + rng() * (hi - lo)) });
     used.add(stat);
   };
 
   for (let i = 0; i < count; i++) {
     // 같은 스탯이 두 번 붙으면 한 줄로 합쳐 보여야 해서 읽기가 나빠진다.
-    // 몇 번 다시 뽑아 보고 안 되면 그냥 개수를 줄인다.
-    let stat = null;
-    for (let attempt = 0; attempt < 6 && !stat; attempt++) {
-      const candidate = pool[(rng() * pool.length) | 0];
-      if (!used.has(candidate)) stat = candidate;
-    }
-    if (!stat) break;
-    roll(stat);
+    // **이미 붙은 것을 빼고 뽑는다** — 다시 뽑아 보는 방식이었더니 표가 좁은
+    // 등급(신화는 넷을 요구한다)에서 가끔 하나가 모자란 채로 나왔다. 표에
+    // 같은 스탯을 여러 번 적어 둔 무게는 걸러 낸 뒤에도 그대로 남는다.
+    const remaining = pool.filter((stat) => !used.has(stat));
+    if (!remaining.length) break;
+    roll(remaining[(rng() * remaining.length) | 0]);
   }
 
   // 치명타·회피는 직업을 가리지 않으므로 직업 표에 섞지 않는다. 섞으면 탱커
@@ -76,8 +76,19 @@ function rollAffixes(defId, tier, rng) {
   return affixes;
 }
 
+// 같은 씨앗으로 다른 물건을 만들면 옵션이 서로를 베낀다 — 굴림 순서가 같기
+// 때문이다. 물건 이름과 등급을 씨앗에 섞어 그것을 끊는다. 한 진열대의 물건들이
+// 같은 자리에서 같은 결과를 내던 것이 이것 때문이었다.
+function seedOf(defId, tier, seed) {
+  let h = ((seed >>> 0) ^ Math.imul(tier + 1, 0x9E3779B1)) >>> 0;
+  for (let i = 0; i < defId.length; i++) {
+    h = Math.imul(h ^ defId.charCodeAt(i), 0x85EBCA6B) >>> 0;
+  }
+  return h >>> 0;
+}
+
 function make(defId, tier, seed) {
-  const rng = createRng(seed == null ? (Math.random() * 1e9) | 0 : seed);
+  const rng = createRng(seedOf(defId, tier, seed == null ? (Math.random() * 1e9) | 0 : seed));
   const item = { uid: uid(), defId, tier: Math.max(0, Math.min(D.TIERS.length - 1, tier | 0)) };
   if (D.GEAR[defId]) item.affixes = rollAffixes(defId, item.tier, rng);
   return item;
@@ -103,7 +114,7 @@ function adopt(item) {
 function stats(item) {
   const gear = item && D.GEAR[item.defId];
   if (!gear) return {};
-  const mul = 1 + item.tier * 0.6;
+  const mul = D.TIER_POWER[Math.min(item.tier, D.TIER_POWER.length - 1)];
   const out = {};
   for (const [key, value] of Object.entries(gear.stats)) out[key] = value * mul;
   for (const affix of item.affixes || []) {
@@ -127,8 +138,11 @@ function name(item) {
   const base = def(item);
   if (!base) return '?';
   if (!isGear(item)) return base.name;
-  return `${D.TIERS[item.tier] || D.TIERS[0]} ${base.name}`;
+  return `${D.tierName(item.tier)} ${base.name}`;
 }
+
+// 등급 하나. 화면이 색을 입히는 데 쓴다 — 이름만으로는 목록에서 훑어지지 않는다.
+const tier = (item) => D.TIERS[Math.max(0, Math.min(D.TIERS.length - 1, (item && item.tier) | 0))];
 
 function statLine(key, value) {
   const stat = D.STATS[key];
@@ -195,11 +209,16 @@ function score(item, job) {
 const SELL_RATE = 0.35;
 
 // 옵션이 얼마나 잘 붙었는지. 개수만 세면 잘 나온 물건과 못 나온 물건이 같은
-// 값이 되어, 상점에서 옵션을 들여다볼 이유가 사라진다. 기준값 대비 몇 배인지를
-// 더해 1옵션 ≈ 1.0이 되게 했다.
+// 값이 되어, 상점에서 옵션을 들여다볼 이유가 사라진다.
+//
+// 재는 자리는 **그 등급의 구간 안**이다. 등급을 섞어 재면 신화는 무엇이 붙어도
+// 잘 나온 것이 되어, 같은 등급끼리 견주는 뜻이 사라진다. 구간의 한가운데면
+// 1옵션이 1.0쯤이 되게 잡았다.
 function quality(item) {
+  const [lo, hi] = affixRange(item.tier);
+  const mid = (lo + hi) / 2;
   return (item.affixes || []).reduce((total, affix) => {
-    const base = D.AFFIX_BASE[affix.stat] * (1 + item.tier * 0.8);
+    const base = D.AFFIX_BASE[affix.stat] * mid;
     return total + (base ? Math.abs(affix.value / base) : 0);
   }, 0);
 }
@@ -210,14 +229,15 @@ function price(item) {
   if (!isGear(item)) return base.gold * (1 + item.tier);
   // 기준값이 낮으면 첫 의뢰의 보상만으로 진열대를 통째로 살 수 있고, 그러면
   // 전리품이 나올 이유가 없어진다. 등급 하나가 의뢰 반 판에서 한 판쯤 되게 잡았다.
-  const affixWorth = quality(item) * 140 * (1 + item.tier * 0.5);
-  return Math.round((160 + item.tier * 260) * (1 + item.tier * 0.4) + affixWorth);
+  const power = D.TIER_POWER[Math.min(item.tier, D.TIER_POWER.length - 1)];
+  const affixWorth = quality(item) * 150 * power;
+  return Math.round(160 * power * power + affixWorth);
 }
 
 const sellPrice = (item) => Math.max(1, Math.round(price(item) * SELL_RATE));
 
 const api = {
-  createRng, make, adopt, def, isGear, stats, sum, name, summary, statLine,
+  createRng, seedOf, make, adopt, def, isGear, tier, stats, sum, name, summary, statLine,
   diff, isUpgrade, gainOf, score, quality, price, sellPrice, SELL_RATE,
 };
 

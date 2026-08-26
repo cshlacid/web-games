@@ -208,11 +208,43 @@ const LOWER_IS_BETTER = new Set(['armor']);
 
 // 장비. 슬롯 셋뿐이고 아이템마다 등급(tier)이 붙는다. 등급별로 이름을 따로
 // 적어 두면 자료가 몇 배로 길어지므로, 정의 하나에 배수를 곱해 쓴다.
-const TIERS = ['낡은', '쓸 만한', '튼튼한', '빼어난', '전설의'];
+// 아이템 등급 여섯. **색이 곧 등급이다** — 이름만으로는 목록에서 훑어지지 않는다.
+// 실제 색은 `style.css`가 `css` 이름으로 정한다. 밝은 테마와 어두운 테마에서
+// 읽히는 색이 달라야 하는데, 그것은 화면 쪽 사정이라 여기에 두지 않는다.
+const TIERS = [
+  { id: 'common',   name: '일반',  css: 'common' },
+  { id: 'uncommon', name: '고급',  css: 'uncommon' },
+  { id: 'rare',     name: '희귀',  css: 'rare' },
+  { id: 'epic',     name: '영웅',  css: 'epic' },
+  { id: 'legend',   name: '전설',  css: 'legend' },
+  { id: 'myth',     name: '신화',  css: 'myth' },
+];
+
+const tierName = (tier) => (TIERS[tier] || TIERS[0]).name;
+
+// **상점은 희귀까지만 판다.** 그 위는 적에게서만 나온다 — 골드로 살 수 있으면
+// 의뢰를 깰 이유가 상점 값을 모으는 것으로 바뀐다.
+const SHOP_MAX_TIER = 2;
+
+// 등급이 기본 옵션에 곱하는 배수. 등급 하나가 눈에 띄게 세야 색을 보는 뜻이 산다.
+const TIER_POWER = [1, 1.6, 2.2, 2.9, 3.7, 4.6];
 
 // 등급이 오르면 붙는 무작위 옵션 수. **가장 낮은 등급에도 하나는 붙는다** —
 // 옵션이 없는 물건은 같은 등급이면 전부 같은 물건이라 들여다볼 이유가 없다.
-const AFFIX_COUNT = [1, 1, 2, 2, 3];
+const AFFIX_COUNT = [1, 1, 2, 2, 3, 4];
+
+// **등급마다 옵션 값의 하한과 상한이 있다**(기준값의 배수). 구간이 서로 겹치지
+// 않으므로 "등급이 높으면 옵션이 좋다"가 예외 없이 성립한다 — 겹쳐 두었더니
+// 잘 나온 고급이 못 나온 희귀보다 나은 일이 생겼고, 그러면 색을 보는 뜻이 없다.
+// 구간 안에서는 무작위라 같은 등급에서도 "이건 잘 나왔다"가 남는다.
+const AFFIX_RANGE = [
+  [0.60, 0.90],   // 일반
+  [0.95, 1.30],   // 고급
+  [1.35, 1.80],   // 희귀
+  [1.85, 2.50],   // 영웅
+  [2.55, 3.40],   // 전설
+  [3.45, 4.50],   // 신화
+];
 
 // 무작위 옵션의 기준값. 직업에 어울리는 스탯 위주로 붙어야 탱커 방패에 회복력이
 // 붙는 일이 생기지 않는다.
@@ -220,13 +252,17 @@ const AFFIX_BASE = {
   hp: 14, mp: 7, atk: 0.05, heal: 0.04, armor: -0.02,
   crit: 0.02, critDamage: 0.06, dodge: 0.015,
 };
+// 뽑기 표. 같은 스탯을 여러 번 적어 무게를 준다 — **직업에 어울리는 쪽이 자주
+// 붙어야** 탱커 방패에 회복력이 붙는 일이 생기지 않는다.
+//
+// 표마다 **서로 다른 스탯이 넷 이상 있어야 한다.** 신화가 직업 옵션 넷을
+// 요구하는데(AFFIX_COUNT) 표에 셋뿐이면 하나가 모자란 채로 나온다.
 const AFFIX_POOL = {
-  tank: ['hp', 'armor', 'hp', 'mp'],
-  dealer: ['atk', 'hp', 'atk', 'mp'],
-  healer: ['heal', 'mp', 'heal', 'hp'],
-  none: ['hp', 'mp'],
+  tank: ['hp', 'armor', 'hp', 'mp', 'atk'],
+  dealer: ['atk', 'hp', 'atk', 'mp', 'armor'],
+  healer: ['heal', 'mp', 'heal', 'hp', 'armor'],
+  none: ['hp', 'mp', 'atk', 'armor'],
 };
-
 // 직업 옵션 위에 **확률로** 하나 더 붙는 자리. 치명타와 회피는 직업을 가리지
 // 않으므로 직업 표에 섞으면 탱커 방패에서 회복력을 밀어내는 일이 생긴다.
 //
@@ -304,7 +340,11 @@ const HERO = {
   // 예외가 아니다 — 마나가 바닥난 힐러가 남은 전투 내내 구경만 하는 것이
   // 동료에게 문제였다면 조작하는 쪽에서는 더 문제다. 여전히 손으로 하는 것은
   // 스킬뿐이고, 기본 공격은 사거리 안에 적이 있으면 저절로 나간다.
-  atk: 22, attackCd: 2.2, range: 30, speed: 15,
+  //
+  // **일부러 약하게 잡았다.** 손을 놓아도 이기면 이 게임이 성립하지 않는데,
+  // 주인공의 공격이 딜러 몫을 하면 그쪽으로 기운다. 이것은 "가만히 서 있지
+  // 않는다"까지고, 판을 가르는 것은 여전히 힐이다.
+  atk: 14, attackCd: 2.6, range: 30, speed: 15,
   armor: 0.9,
   // 스킬 목록은 비어 있다. 주인공이 쓰는 것은 PLAYER_SKILLS에서 직접 고른
   // 다섯이고, 계열은 화면에 적기 위해서만 들고 있다.
@@ -741,6 +781,9 @@ const JOB_POTIONS = {
 // 주인공이 들고 갈 수 있는 최대치. 상점에서 사서 채운다.
 const POTION_MAX = 5;
 
+// **rank는 적의 등급이다.** 전리품의 등급 확률이 여기서 나온다 — 고블린 무리를
+// 아무리 베어도 신화가 나오면 우두머리를 잡을 이유가 없다.
+//
 // growth를 적어 두는 것은 기본값이 아군 성장률이기 때문이다. 빠뜨리면 적이
 // 아군보다 천천히 자라 높은 레벨 의뢰가 저절로 쉬워진다.
 //
@@ -752,23 +795,23 @@ const POTION_MAX = 5;
 // 본다는 뜻만이 아니라 같은 수단을 갖는다는 뜻이다 — 도발이 이쪽에만 있으면
 // 적 힐러가 아무에게도 보호받지 못하고, 후열을 먼저 치는 규칙이 한쪽에서만 돈다.
 const ENEMIES = {
-  scout:  { id: 'scout', exp: 14,  name: '고블린 척후병', job: 'dealer', sprite: 'goblin',
+  scout:  { id: 'scout', rank: 'trash', exp: 14,  name: '고블린 척후병', job: 'dealer', sprite: 'goblin',
             hp: 336, mp: 64,  atk: 24, attackCd: 1.5, range: 7,  speed: 21,
            attrs: { str: 40, agi: 16, int: 8, vit: 24 }, growth: 'enemy',
             armor: 0.95, spec: 'grunt' },
-  shaman: { id: 'shaman', exp: 18, name: '고블린 주술사', job: 'healer', sprite: 'shaman',
+  shaman: { id: 'shaman', rank: 'trash', exp: 18, name: '고블린 주술사', job: 'healer', sprite: 'shaman',
             hp: 294, mp: 128, atk: 22, attackCd: 2.2, range: 30, speed: 15,
            attrs: { str: 12, agi: 10, int: 16, vit: 21 }, growth: 'enemy', attackType: 'magic',
             armor: 1, spec: 'shaman' },
-  orc:    { id: 'orc', exp: 32,    name: '오크 전사',     job: 'tank',   sprite: 'orc',
+  orc:    { id: 'orc', rank: 'elite', exp: 32,    name: '오크 전사',     job: 'tank',   sprite: 'orc',
             hp: 784, mp: 80,  atk: 37, attackCd: 1.8, range: 7,  speed: 16,
            attrs: { str: 58, agi: 8, int: 10, vit: 56 }, growth: 'enemy',
             armor: 0.7,  spec: 'tank' },
-  hexer:  { id: 'hexer', exp: 30,  name: '오크 주술사',   job: 'healer', sprite: 'shaman',
+  hexer:  { id: 'hexer', rank: 'elite', exp: 30,  name: '오크 주술사',   job: 'healer', sprite: 'shaman',
             hp: 476, mp: 152, atk: 27, attackCd: 2.4, range: 30, speed: 14,
            attrs: { str: 16, agi: 8, int: 19, vit: 34 }, growth: 'enemy', attackType: 'magic',
             armor: 0.9, spec: 'shaman' },
-  chief:  { id: 'chief', exp: 90,  name: '오크 우두머리', job: 'tank',   sprite: 'boss',
+  chief:  { id: 'chief', rank: 'boss', exp: 90,  name: '오크 우두머리', job: 'tank',   sprite: 'boss',
             hp: 1904, mp: 160, atk: 58, attackCd: 2.0, range: 8,  speed: 14,
            attrs: { str: 89, agi: 6, int: 20, vit: 136 }, growth: 'enemy',
             armor: 0.62, spec: 'tank' },
@@ -831,11 +874,47 @@ const REGIONS = {
   },
 };
 
+// 적의 등급. 전리품이 나올 확률과 등급이 여기서 갈린다.
+const RANKS = {
+  trash: { id: 'trash', name: '잡졸', drop: 0.22, luck: 0.09 },
+  elite: { id: 'elite', name: '정예', drop: 0.55, luck: 0.20 },
+  boss:  { id: 'boss',  name: '우두머리', drop: 1, luck: 0.40 },
+};
+
+const rankOf = (def) => RANKS[(def && def.rank) || 'trash'] || RANKS.trash;
+
+// 레벨이 등급의 바닥을 올린다. 30레벨에서 바닥이 영웅이 되도록 잡았다 — 바닥이
+// 없으면 높은 의뢰에서도 일반이 쏟아져 레벨을 올릴 이유가 전리품에서 사라진다.
+const TIER_FLOOR_PER_LEVEL = 1 / 10;
+// 레벨 하나가 등급을 한 칸 더 올릴 확률에 얹는 몫.
+const TIER_LUCK_PER_LEVEL = 0.008;
+const TIER_LUCK_CAP = 0.55;
+
+const tierFloor = (level) =>
+  Math.min(TIERS.length - 2, Math.floor((Math.max(1, level) - 1) * TIER_FLOOR_PER_LEVEL));
+
+// **적의 등급과 레벨이 전리품의 등급을 정한다.** 바닥에서 시작해 한 칸씩 올리는
+// 굴림을 이어 가는 방식이라, 등급마다 확률을 손으로 적지 않아도 위로 갈수록
+// 가파르게 드물어진다. 등급을 하나 더해도 표를 다시 짜지 않아도 된다.
+function tierRoll(rank, level, rng) {
+  const luck = Math.min(TIER_LUCK_CAP, rankOf({ rank }).luck + Math.max(1, level) * TIER_LUCK_PER_LEVEL);
+  let tier = tierFloor(level);
+  while (tier < TIERS.length - 1 && rng() < luck) tier++;
+  return tier;
+}
+
+// 이 등급·레벨의 적에게서 나올 수 있는 가장 높은 등급. 게시판이 "무엇을 노리고
+// 가는가"를 적는 데 쓴다 — 몇 개가 나오는지는 굴려 봐야 알지만, 어디까지
+// 나올 수 있는지는 미리 말할 수 있다.
+const tierCeiling = () => TIERS.length - 1;
+
 const PARTY_MAX = 5;   // 주인공을 포함한 수
 const SKILL_MAX = 5;   // 전투에 등록할 수 있는 주인공 스킬 수
 
 const api = {
   FIELD, JOBS, SPECS, MELEE_RANGE, roleOf, ATTACK_ORDER, HEAL_ORDER, PULL_ORDER, LEVEL, ATTRS, ATTR, ATTR_GROWTH, attrsAt, derive, STATS, LOWER_IS_BETTER, TIERS, AFFIX_COUNT, AFFIX_BASE, AFFIX_POOL,
+  tierName, tierFloor, tierRoll, tierCeiling, TIER_POWER, AFFIX_RANGE, SHOP_MAX_TIER,
+  RANKS, rankOf,
   SLOTS, GEAR, MATERIALS, REGIONS, NAMES, SPECIAL_POOL, SPECIAL_CHANCE, withGear,
   HERO, COMPANIONS, UNIT_SKILLS, SPEC_SKILLS, UNIT_SKILL_MAX, skillsFor,
   PLAYER_SKILLS, SKILL, skillAt, skillEffect, skillLevelOf,

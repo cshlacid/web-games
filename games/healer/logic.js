@@ -11,6 +11,8 @@
 const node = typeof module !== 'undefined' && module.exports;
 const D = node ? require('./data.js') : root.HealerData;
 const AI = node ? require('./ai.js') : root.HealerAI;
+// 전리품을 쓰러뜨린 적에게서 굴리므로 여기서도 아이템을 만든다.
+const Items = node ? require('./items.js') : root.HealerItems;
 
 const dist = AI.dist;
 const alive = AI.alive;
@@ -669,16 +671,14 @@ function step(state, dt) {
     if (unit.cast) { tickCast(state, unit); continue; }
 
     const decision = AI.decide(unit, state);
+    unit.targetUid = decision.targetUid;
 
-    // 주인공이 조작하는 것은 여전히 스킬뿐이다. 이동만 다른 힐러와 같은 규칙에
-    // 맡긴다 — 스킬에 사거리가 생긴 이상 제자리에 서 있으면 힐이 앞줄에 닿지 않는다.
+    // 주인공이 **손으로** 하는 것은 여전히 스킬뿐이다. 이동과 기본 공격은 다른
+    // 힐러와 같은 규칙에 맡긴다 — 스킬에 사거리가 생긴 이상 제자리에 서 있으면
+    // 힐이 앞줄에 닿지 않고, 마나가 바닥나면 아무것도 안 하는 캐릭터가 된다.
     if (unit.uid === HERO_UID) {
       if (decision.move) moveToward(state, unit, decision.move, dt);
-      continue;
-    }
-
-    unit.targetUid = decision.targetUid;
-    if (decision.potion) drink(state, unit, decision.potion);
+    } else if (decision.potion) drink(state, unit, decision.potion);
     else if (decision.skill) startCast(state, unit, decision.skill);
     else if (decision.move) moveToward(state, unit, decision.move, dt);
 
@@ -713,6 +713,31 @@ function advance(state, elapsed) {
 //
 // 실패해도 길드 몫의 절반은 준다. 아무것도 없이 끝나면 어려운 퀘스트를 시도할
 // 이유가 사라진다.
+// **전리품은 쓰러뜨린 적에게서 나온다.** 의뢰에 미리 붙여 두었을 때에는 어떤
+// 적을 몇이나 잡았는지가 결과에 아무 영향이 없었고, 게시판에서 목록을 미리
+// 읽을 수 있어 "확률로 얻는다"가 말뿐이었다.
+//
+// 등급과 확률은 적의 등급(`rank`)과 의뢰의 적정 레벨이 함께 정한다 — 잡졸을
+// 아무리 베어도 신화가 나오면 우두머리를 잡을 이유가 없다.
+function dropsOf(state) {
+  const region = D.REGIONS[state.quest.region] || D.REGIONS.mine;
+  const level = state.quest.level || 1;
+  const drops = [];
+
+  for (const unit of state.units) {
+    if (unit.side !== 'enemy' || !unit.dead) continue;
+    const rank = D.rankOf(D.ENEMIES[unit.defId]);
+    if (state.rng() >= rank.drop) continue;
+
+    const defId = region.drops[(state.rng() * region.drops.length) | 0];
+    // 재료는 등급이 값에만 걸리므로 장비보다 한 칸 낮게 나와도 상관없다.
+    const tier = D.tierRoll(rank.id, level, state.rng);
+    drops.push(Items.make(defId, D.GEAR[defId] ? tier : Math.max(0, tier - 1),
+      (state.rng() * 1e9) | 0));
+  }
+  return drops;
+}
+
 function rewardOf(state) {
   const won = state.status === 'won';
   const kills = state.units
@@ -748,7 +773,7 @@ function battleReport(state) {
 }
 
 const api = {
-  HERO_UID, TICK, WAVE_GAP, MARCH_SPEED, rewardOf, battleReport,
+  HERO_UID, TICK, WAVE_GAP, MARCH_SPEED, rewardOf, dropsOf, battleReport,
   createRng, createBattle, advance, step, drainEvents,
   castSkill, playerSkill, usePotion, drink, magicPowerOf, rollCrit, applyDamage, applyHeal, addDot, addZone,
   hero, skillSlot, resolveTarget, moveToward,

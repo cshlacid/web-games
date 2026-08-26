@@ -933,25 +933,28 @@ function cast(state, skillId, target) {
     return state.status;
   }
 
-  // 씨앗 열둘로 잰다. 다섯으로 재던 것을 늘린 이유는, 실제 승률이 7할쯤일 때
-  // 다섯 판의 기댓값이 3.5라 "넷 이상"이라는 기준이 사실상 동전 던지기였기
-  // 때문이다. 한 판이 흔들려도 결론이 바뀌지 않을 만큼은 굴려야 한다.
-  const seeds = [11, 22, 33, 44, 55, 66, 77, 88, 99, 101, 111, 121];
+  // **씨앗 스물넷으로 재고 기준을 비율로 잡는다.** 판 수를 세는 기준은 참값이
+  // 기준선 근처일 때 동전 던지기가 된다 — 벅찬 의뢰를 손 놓고 깨는 참값이
+  // 15%쯤인데 열둘에서 "둘 이하"를 요구하면 우연히 셋이 나오는 판이 네 번에
+  // 한 번꼴이다. 판을 늘리고 기준을 참값에서 넉넉히 떨어뜨렸다.
+  const seeds = [];
+  for (let i = 1; i <= 24; i++) seeds.push(i * 11);
   const wins = (playerLevel, wanted, withHealer) =>
     seeds.filter((seed) => play(playerLevel, seed, wanted, withHealer) === 'won').length;
+  const rate = (playerLevel, wanted, withHealer) =>
+    wins(playerLevel, wanted, withHealer) / seeds.length;
 
   // 적정 레벨이 내 레벨과 같은 의뢰는 힐이 들어가면 대체로 넘어간다.
-  check('알맞은 의뢰는 힐이 들어가면 깬다', wins(6, 6, true) >= 7, true);
+  check('알맞은 의뢰는 힐이 들어가면 깬다', rate(6, 6, true) >= 0.5, true);
 
-  // 벅찬 의뢰(적정 레벨 +3)는 손을 놓으면 넘어가지 못한다. 실시간 전투에 난수가
-  // 섞여 있어 어쩌다 넘어가는 판이 나오므로 몇 판까지는 봐준다.
-  check('벅찬 의뢰는 손을 놓으면 거의 못 깬다', wins(6, 9, false) <= 2, true);
+  // 벅찬 의뢰(적정 레벨 +3)는 손을 놓으면 넘어가지 못한다.
+  check('벅찬 의뢰는 손을 놓으면 거의 못 깬다', rate(6, 9, false) <= 0.35, true);
 
   // 힐이 들어가도 적지 않게 진다. 그래서 "벅참"이다 — 여기서 다 이기면 게시판의
   // 난이도 표시가 거짓말이 된다. 위 자동 힐러는 사람보다 서투르므로 실제로는
   // 이보다 잘 나온다.
-  const hardWins = wins(6, 9, true);
-  check('벅찬 의뢰는 힐이 들어가도 만만치 않다', hardWins >= 4 && hardWins <= 10, true);
+  const hard = rate(6, 9, true);
+  check('벅찬 의뢰는 힐이 들어가도 만만치 않다', hard >= 0.3 && hard <= 0.9, true);
 
   // 어느 레벨에서든 힐이 들어간 쪽이 더 많이 이겨야 한다. 이 게임에서 플레이어가
   // 하는 일이 그것뿐이다.
