@@ -5,6 +5,7 @@
 // 눈으로는 잘 안 보인다 — 화면에서는 팔 하나가 사라진 정도로만 나타난다.
 const D = require('./data.js');
 const Sprites = require('./sprites.js');
+const Icons = require('./icons.js');
 const Scenes = require('./scenes.js');
 
 let passed = 0;
@@ -221,6 +222,60 @@ function check(name, actual, expected) {
     D.skillKind({ kind: 'heal' }).css === D.skillKind({ kind: 'damage' }).css, false);
   check('도발은 또 다른 색이다',
     new Set(['heal', 'damage', 'taunt', 'mana'].map((k) => D.skillKind({ kind: k }).css)).size, 4);
+}
+
+// --- 아이콘도 도형으로 그린다 -------------------------------------------
+//
+// 예전에는 이모지 한 글자였다. 글꼴이 그리는 그림이라 기기마다 모양과 크기와
+// 색이 달랐고, 무엇보다 제 색을 들고 와서 "색이 무엇을 하는가를 알린다"는
+// 규칙을 깼다. 지금은 `icons.js`가 경로로 그리고 색은 놓인 자리가 정한다.
+{
+  const tables = {
+    UNIT_SKILLS: D.UNIT_SKILLS, PLAYER_SKILLS: D.PLAYER_SKILLS,
+    GEAR: D.GEAR, MATERIALS: D.MATERIALS, POTIONS: D.POTIONS,
+  };
+  const missing = [];
+  for (const [name, table] of Object.entries(tables)) {
+    for (const def of Object.values(table)) {
+      if (!Icons.has(def.icon)) missing.push(`${name}.${def.id}`);
+    }
+  }
+  check('적어 둔 아이콘이 전부 그려져 있다', missing, []);
+
+  // 화면이 이름만 보고 부르는 것들. 자료에 없으므로 여기서 따로 챙긴다.
+  check('화면이 쓰는 아이콘도 있다',
+    ['lock', 'coin', 'scroll', 'cart'].filter((name) => !Icons.has(name)), []);
+
+  // 이모지가 남아 있으면 그 자리만 글꼴이 그린다.
+  const emoji = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}]/u;
+  const stray = [];
+  for (const [name, table] of Object.entries(tables)) {
+    for (const def of Object.values(table)) {
+      if (emoji.test(def.icon)) stray.push(`${name}.${def.id}`);
+    }
+  }
+  check('이모지가 남아 있지 않다', stray, []);
+
+  // 색은 아이콘이 아니라 놓인 자리가 정한다. 경로에 색을 박아 두면 스킬 종류
+  // 색이 걸리지 않는다.
+  const painted = Object.keys(Icons.ICONS)
+    .filter((name) => /(fill|stroke)="(?!none|currentColor)/.test(Icons.svg(name)));
+  check('아이콘은 제 색을 갖지 않는다', painted, []);
+
+  // 24칸 격자를 넘으면 그만큼 잘린다. 도형 그림과 같은 이유다.
+  const outside = [];
+  for (const [name, parts] of Object.entries(Icons.ICONS)) {
+    for (const part of parts) {
+      const nums = (part.c || (part.d.match(/-?\d*\.?\d+/g) || []).map(Number));
+      if (nums.some((n) => n < -1 || n > Icons.BOX + 1)) outside.push(name);
+    }
+  }
+  check('아이콘이 격자를 크게 벗어나지 않는다', [...new Set(outside)], []);
+
+  // 모르는 이름이 와도 화면이 비면 안 된다 — 아이콘 하나가 빠졌다고 스킬을
+  // 못 누르게 되면 곤란하다.
+  check('모르는 이름은 대신 그린다', Icons.svg('없는아이콘').startsWith('<svg'), true);
+  check('같은 아이콘을 다시 만들지 않는다', Icons.svg('mend') === Icons.svg('mend'), true);
 }
 
 // --- 배경 --------------------------------------------------------------

@@ -15,6 +15,7 @@ const Items = window.HealerItems;
 const Roster = window.HealerRoster;
 const Shop = window.HealerShop;
 const Sprites = window.HealerSprites;
+const Icons = window.HealerIcons;
 const Scenes = window.HealerScenes;
 const sound = window.HealerSound;
 
@@ -27,6 +28,13 @@ const el = (tag, cls) => {
 const text = (tag, cls, value) => {
   const node = el(tag, cls);
   node.textContent = value;
+  return node;
+};
+// 아이콘은 글자가 아니라 그림이다. `currentColor`로 그리므로 놓인 자리의 색을
+// 그대로 입는다 — 스킬 종류 색이 아이콘에 걸리는 것이 그 때문이다.
+const icon = (name, cls) => {
+  const node = el('span', `ico-box${cls ? ` ${cls}` : ''}`);
+  node.innerHTML = Icons.svg(name);
   return node;
 };
 
@@ -99,6 +107,12 @@ for (const button of $('tabbar').children) {
     sound.play('click');
     openHome(button.dataset.tab);
   });
+}
+
+// 탭 아이콘은 HTML에 이름만 적어 두고 여기서 그린다. 경로를 HTML에도 적으면
+// 같은 그림이 두 곳에 생겨 한쪽만 고치는 일이 난다.
+for (const slot of document.querySelectorAll('[data-icon]')) {
+  slot.innerHTML = Icons.svg(slot.dataset.icon);
 }
 
 // --- 퀘스트 게시판 -----------------------------------------------------
@@ -292,7 +306,7 @@ function renderCharacter() {
     button.disabled = !item;
     button.append(text('span', 'slot-name', slot.name));
     if (item) {
-      button.append(text('span', 'icon', D.GEAR[item.defId].icon));
+      button.append(icon(D.GEAR[item.defId].icon, 'icon'));
       button.append(itemName(item, 'item-name'));
       button.append(text('span', 'why', Items.summary(item)));
     } else {
@@ -323,7 +337,7 @@ function renderCharacter() {
     const def = P.skillDef(progress, base.id);
 
     const row = el('li', isOpen ? 'skill-row' : 'skill-row locked');
-    row.append(text('span', 'icon', isOpen ? base.icon : '🔒'));
+    row.append(icon(isOpen ? base.icon : 'lock', 'icon'));
     const body = el('div', 'pick-body');
     const name = el('div', 'pick-name');
     name.append(document.createTextNode(base.name));
@@ -397,7 +411,7 @@ function itemButton(item, action) {
 
   const button = el('button', `item ${compare.upgrade ? 'better' : ''}`);
   button.type = 'button';
-  button.append(text('span', 'icon', def.icon));
+  button.append(icon(def.icon, 'icon'));
 
   const body = el('div', 'pick-body');
   const name = el('div', 'pick-name');
@@ -420,7 +434,10 @@ function renderPotions() {
   list.textContent = '';
   for (const potion of Object.values(D.POTIONS)) {
     const row = el('li');
-    row.append(text('span', null, `${potion.icon} ${potion.name}`));
+    const label = el('span', 'with-ico');
+    label.append(icon(potion.icon));
+    label.append(document.createTextNode(potion.name));
+    row.append(label);
     row.append(text('b', 'stat-value', `${app.progress.potions[potion.id] || 0} / ${D.POTION_MAX}`));
     list.append(row);
   }
@@ -481,7 +498,7 @@ function renderShop() {
     const button = el('button', 'item');
     button.type = 'button';
     button.disabled = full || progress.gold < entry.price;
-    button.append(text('span', 'icon', potion.icon));
+    button.append(icon(potion.icon, 'icon'));
     const body = el('div', 'pick-body');
     const name = el('div', 'pick-name');
     name.append(document.createTextNode(potion.name));
@@ -657,16 +674,24 @@ function renderRoster() {
       const kind = D.skillKind(skill);
       // 아이콘이 "어떤 스킬인가"를, 색이 "무엇을 하는가"를 알린다. 이름만
       // 늘어놓았을 때에는 넷을 훑는 데 넷을 다 읽어야 했다.
-      const chip = text('span', `chip skill ${kind.css}`, `${skill.icon} ${skill.name} ${skill.mp}`);
+      const chip = el('span', `chip skill ${kind.css}`);
+      chip.append(icon(skill.icon));
+      chip.append(document.createTextNode(`${skill.name} ${skill.mp}`));
       chip.title = `${kind.name} · ${skill.desc} · 마나 ${skill.mp} · ${castLine(skill)}`;
       chips.append(chip);
     }
     for (const [id, count] of Object.entries(Roster.potionsOf(member))) {
-      if (count > 0) chips.append(text('span', 'chip dim', `${D.POTIONS[id].icon}${count}`));
+      if (count > 0) {
+        const chip = el('span', 'chip dim');
+        chip.append(icon(D.POTIONS[id].icon));
+        chip.append(document.createTextNode(String(count)));
+        chips.append(chip);
+      }
     }
     for (const item of Roster.gearOf(member)) {
-      const chip = text('span', `chip gear tier-${Items.tier(item).css}`,
-        `${D.GEAR[item.defId].icon} ${Items.name(item)}`);
+      const chip = el('span', `chip gear tier-${Items.tier(item).css}`);
+      chip.append(icon(D.GEAR[item.defId].icon));
+      chip.append(document.createTextNode(Items.name(item)));
       chips.append(chip);
     }
     body.append(chips);
@@ -703,7 +728,7 @@ function renderSkillPicks() {
     button.type = 'button';
     button.setAttribute('aria-pressed', String(picked));
     button.disabled = !picked && full;
-    button.append(text('span', 'icon', def.icon));
+    button.append(icon(def.icon, 'icon'));
 
     const body = el('div', 'pick-body');
     const name = el('div', 'pick-name');
@@ -864,6 +889,17 @@ function syncZones(state) {
 
 function floatText(unit, label, cls) {
   const node = text('div', `float ${cls}`, label);
+  return place(node, unit);
+}
+
+// 시전 아이콘은 글자가 아니라 그림이라 같은 자리에 다른 내용을 넣는다.
+function floatIcon(unit, name, cls) {
+  const node = el('div', `float ico-float ${cls}`);
+  node.innerHTML = Icons.svg(name);
+  return place(node, unit);
+}
+
+function place(node, unit) {
   node.style.left = `${pctX(unit.x)}%`;
   node.style.top = `${pctY(unit.y) - 6}%`;
   field.append(node);
@@ -969,7 +1005,7 @@ function renderSkillbar() {
     button.type = 'button';
     button.dataset.skill = id;
     button.setAttribute('aria-pressed', 'false');
-    button.append(text('span', 'glyph', def.icon));
+    button.append(icon(def.icon, 'glyph'));
     button.append(text('span', 'sname', def.name));
     button.append(text('span', 'cost', def.mp ? String(def.mp) : '－'));
     const cool = el('div', 'cool');
@@ -986,7 +1022,7 @@ function renderSkillbar() {
     const button = el('button', 'slot');
     button.type = 'button';
     button.dataset.potion = potion.id;
-    button.append(text('span', 'glyph', potion.icon));
+    button.append(icon(potion.icon, 'glyph'));
     button.append(text('span', 'sname', potion.name));
     button.append(text('span', 'cost', `×${app.battle.potions[potion.id]}`));
     const cool = el('div', 'cool');
@@ -1209,7 +1245,7 @@ function handleEvents(state, events) {
       // 누가 무엇을 썼는지가 글자로만 지나가면 전투를 보면서는 못 읽는다.
       // 시전한 유닛 머리 위로 그 스킬의 아이콘을 띄운다.
       const caster = AI.byUid(state, event.uid);
-      if (caster && event.icon) floatText(caster, event.icon, `skill ${event.css || ''}`);
+      if (caster && event.icon) floatIcon(caster, event.icon, `skill ${event.css || ''}`);
       if (event.skillId) {
         if (event.radius) pulse(event.x, event.y, event.radius, event.skillId === 'pyre' ? 'harm' : '');
       } else {
@@ -1386,7 +1422,7 @@ function openResult(state) {
     const guild = $('guild-loot');
     guild.textContent = '';
     const gold = el('li');
-    gold.append(text('span', null, '🪙'));
+    gold.append(icon('coin'));
     gold.append(text('span', null, `${quest.guildReward.gold} 골드`));
     guild.append(gold);
 
@@ -1407,7 +1443,7 @@ function openResult(state) {
       const def = Items.def(award.item);
       const owner = members.find((m) => m.id === award.toId);
       const row = el('li');
-      row.append(text('span', null, def.icon));
+      row.append(icon(def.icon));
       row.append(itemName(award.item));
       row.append(text('span', 'why', award.reason));
       row.append(text('span', 'to', owner.name));
