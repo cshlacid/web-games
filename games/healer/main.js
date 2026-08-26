@@ -215,6 +215,9 @@ function statText(key, value) {
 function renderAttrs() {
   const progress = app.progress;
   const own = P.attrs(progress);
+  // 장비가 얹어 준 몫은 따로 센다. 합쳐 놓으면 점수를 어디에 넣었는지도, 장비를
+  // 벗으면 얼마가 빠지는지도 알 수 없다.
+  const gear = P.gearAttrs(progress);
   const left = P.freePoints(progress);
   $('attr-points').textContent = left ? `남은 점수 ${left}` : '남은 점수 없음';
 
@@ -229,10 +232,12 @@ function renderAttrs() {
     // 점수를 어디에 넣었는지 알 수 없다.
     const put = progress.spent[attr.id] || 0;
     if (put) name.append(text('span', 'job', `투자 +${put}`));
+    const worn = Math.round(gear[attr.id] || 0);
+    if (worn) name.append(text('span', 'job gear', `장비 +${worn}`));
     body.append(name);
     body.append(text('div', 'pick-sub', attr.effect));
     row.append(body);
-    row.append(text('b', 'attr-value', String(own[attr.id])));
+    row.append(text('b', 'attr-value', String(own[attr.id] + worn)));
 
     const add = el('button', 'attr-add');
     add.type = 'button';
@@ -1001,6 +1006,10 @@ function syncSkillbar(state) {
     button.classList.toggle('short', hero.mp < def.mp);
     button.setAttribute('aria-pressed', String(app.aiming === def.id));
   }
+
+  // 주인공이 쓰러져도 전투는 이어진다. 스킬이 왜 안 나가는지가 화면에 없으면
+  // 고장 난 것으로 보인다.
+  $('skillbar').classList.toggle('down', hero.dead);
 
   $('hero-mp-fill').style.width = `${(hero.mp / hero.maxMp) * 100}%`;
   $('hero-mp-text').textContent = `마나 ${Math.round(hero.mp)} / ${hero.maxMp}`;

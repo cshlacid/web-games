@@ -200,6 +200,8 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .pick-name .job.tank { color: var(--ally); }
 .pick-name .job.dealer { color: var(--enemy); }
 .pick-name .job.healer { color: var(--heal); }
+/* 장비가 얹어 준 능력치. 내가 넣은 점수와 색으로 갈라 둔다. */
+.pick-name .job.gear { color: var(--hero); }
 .pick-sub { font-size: 12px; color: var(--muted); line-height: 1.45; }
 .pick-cost { font-size: 12px; color: var(--muted); flex: none; text-align: right; }
 
@@ -640,6 +642,11 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .item .pick-cost { color: var(--btn-bg); font-weight: 700; }
 
 .empty-note { color: var(--muted); font-size: 13px; padding: 6px 0; }
+
+/* 주인공이 쓰러진 뒤. 전투는 이어지지만 스킬은 나가지 않는다 — 눌러도 아무 일이
+   없으면 화면이 고장 난 것으로 보인다. */
+.skillbar.down { opacity: 0.45; }
+.skillbar.down .slot { cursor: default; }
 
 .skill-row {
   display: flex; align-items: center; gap: 10px;

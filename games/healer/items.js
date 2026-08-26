@@ -53,7 +53,10 @@ function rollAffixes(defId, tier, rng) {
     // **등급마다 하한과 상한이 있고 구간이 겹치지 않는다**(AFFIX_RANGE). 그
     // 안에서 무작위라 같은 등급에서도 "이건 잘 나왔다"가 남는다.
     const [lo, hi] = affixRange(tier);
-    affixes.push({ stat, value: D.AFFIX_BASE[stat] * (lo + rng() * (hi - lo)) });
+    const raw = D.AFFIX_BASE[stat] * (lo + rng() * (hi - lo));
+    // 능력치는 정수로 붙는다. 화면에 '체력 +2'라고 적어 놓고 속으로 1.7을 쓰면
+    // 캐릭터 창의 합이 안 맞는다.
+    affixes.push({ stat, value: D.WHOLE_AFFIX.has(stat) ? Math.max(1, Math.round(raw)) : raw });
     used.add(stat);
   };
 
@@ -185,14 +188,18 @@ function score(item, job) {
   // 처음에 -2600을 줬더니 방패가 모든 직업에게 최고의 방어구가 됐다.
   // 치명타·회피의 무게는 옵션 하나가 다른 옵션 하나와 엇비슷한 값이 되도록
   // 잡았다. 0으로 두면 그 옵션이 붙은 물건을 동료가 거저 흘려보낸다.
+  // 능력치의 무게는 그것이 만드는 수치에서 나온다 — 체력 1은 최대 체력 14이고,
+  // 지능 1은 최대 마나 8에 회복량 몫이 얹힌다. 0으로 두면 능력치가 붙은 물건을
+  // 동료가 거저 흘려보낸다.
   const weight = {
     hp: 1, mp: 1.4, atk: 900, heal: 0, armor: -800,
     crit: 2000, critDamage: 700, dodge: 2500,
+    str: 30, agi: 12, int: 12, vit: 14,
   };
   const jobBonus = {
-    tank: { hp: 0.6, armor: -700 },
-    dealer: { atk: 400 },
-    healer: { heal: 1400, mp: 0.8 },
+    tank: { hp: 0.6, armor: -700, vit: 8 },
+    dealer: { atk: 400, str: 10 },
+    healer: { heal: 1400, mp: 0.8, int: 8 },
   };
   const bonus = jobBonus[job] || {};
   let total = 0;

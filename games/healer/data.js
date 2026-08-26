@@ -143,6 +143,15 @@ function derive(def, attrs) {
 //
 // 상한은 여기서도 걸린다. 능력치로 올린 것이든 장비로 올린 것이든 회피·치명타가
 // 같은 천장을 보아야, 장비 옵션 하나로 규칙이 무너지지 않는다.
+// **장비가 올린 능력치는 derive 앞에 얹는다.** 결과 수치에 더하면 체력 옵션이
+// 최대 체력만 올리고 끝나는데, 능력치는 거기서 나오는 것을 전부 올려야 한다 —
+// 지능 하나가 최대 마나와 회복량과 마법 공격력을 같이 올리는 것이 능력치의 뜻이다.
+function attrsWithGear(attrs, gear) {
+  const out = Object.assign({}, attrs);
+  for (const id of Object.keys(ATTRS)) out[id] = (out[id] || 0) + ((gear && gear[id]) || 0);
+  return out;
+}
+
 function withGear(base, gear, armorBase) {
   const g = gear || {};
   return {
@@ -189,9 +198,18 @@ const LEVEL = {
 //
 // heal과 atk가 따로 있는 것은 회복량 배수를 공격에 얹지 않기 위해서다. 힐러의
 // 성장이 딜러 노릇을 잘하게 만드는 쪽으로 흐르면 이 게임이 아니게 된다.
+// 아이템 옵션으로 보이는 수치의 이름과 적는 법.
+//
+// **최대 체력·최대 마나라고 적는다.** 능력치에도 '체력'이 있어서(그쪽은 최대
+// 체력을 만드는 능력치다) 그냥 '체력'이라고 적으면 한 물건에 '체력 +5'와
+// '체력 +72'가 나란히 붙어 무엇이 무엇인지 알 수 없다.
 const STATS = {
-  hp:    { id: 'hp',    name: '체력',      fmt: (v) => `+${Math.round(v)}` },
-  mp:    { id: 'mp',    name: '마나',      fmt: (v) => `+${Math.round(v)}` },
+  str:   { id: 'str',   name: '힘',        fmt: (v) => `+${Math.round(v)}` },
+  agi:   { id: 'agi',   name: '민첩',      fmt: (v) => `+${Math.round(v)}` },
+  int:   { id: 'int',   name: '지능',      fmt: (v) => `+${Math.round(v)}` },
+  vit:   { id: 'vit',   name: '체력',      fmt: (v) => `+${Math.round(v)}` },
+  hp:    { id: 'hp',    name: '최대 체력', fmt: (v) => `+${Math.round(v)}` },
+  mp:    { id: 'mp',    name: '최대 마나', fmt: (v) => `+${Math.round(v)}` },
   atk:   { id: 'atk',   name: '공격력',    fmt: (v) => `+${Math.round(v * 100)}%` },
   heal:  { id: 'heal',  name: '회복력',    fmt: (v) => `+${Math.round(v * 100)}%` },
   // 받는 피해는 계수라 낮을수록 좋다. 부호를 뒤집어 적어야 읽는 사람이 헷갈리지 않는다.
@@ -248,20 +266,29 @@ const AFFIX_RANGE = [
 
 // 무작위 옵션의 기준값. 직업에 어울리는 스탯 위주로 붙어야 탱커 방패에 회복력이
 // 붙는 일이 생기지 않는다.
+// **능력치도 옵션으로 붙는다.** 능력치가 오르면 거기서 나오는 수치가 함께 오르므로
+// (체력 하나가 최대 체력을, 지능 하나가 최대 마나와 회복량을 같이 올린다) 값이
+// 작아도 무게가 있다. 최대 체력 옵션 하나와 엇비슷해지도록 잡았다 —
+// 체력 1 = 최대 체력 14이므로 1.6이면 22~25쯤이다.
 const AFFIX_BASE = {
+  str: 2, agi: 2, int: 1.6, vit: 1.6,
   hp: 14, mp: 7, atk: 0.05, heal: 0.04, armor: -0.02,
   crit: 0.02, critDamage: 0.06, dodge: 0.015,
 };
+
+// 능력치 옵션은 정수로 붙는다. 화면에 '체력 +2'라고 적어 놓고 속으로 1.7을
+// 쓰면 캐릭터 창의 합이 안 맞는다.
+const WHOLE_AFFIX = new Set(Object.keys(ATTRS));
 // 뽑기 표. 같은 스탯을 여러 번 적어 무게를 준다 — **직업에 어울리는 쪽이 자주
 // 붙어야** 탱커 방패에 회복력이 붙는 일이 생기지 않는다.
 //
 // 표마다 **서로 다른 스탯이 넷 이상 있어야 한다.** 신화가 직업 옵션 넷을
 // 요구하는데(AFFIX_COUNT) 표에 셋뿐이면 하나가 모자란 채로 나온다.
 const AFFIX_POOL = {
-  tank: ['hp', 'armor', 'hp', 'mp', 'atk'],
-  dealer: ['atk', 'hp', 'atk', 'mp', 'armor'],
-  healer: ['heal', 'mp', 'heal', 'hp', 'armor'],
-  none: ['hp', 'mp', 'atk', 'armor'],
+  tank: ['hp', 'armor', 'hp', 'mp', 'atk', 'vit', 'vit', 'str', 'agi'],
+  dealer: ['atk', 'hp', 'atk', 'mp', 'armor', 'str', 'str', 'agi', 'int'],
+  healer: ['heal', 'mp', 'heal', 'hp', 'armor', 'int', 'int', 'vit', 'agi'],
+  none: ['hp', 'mp', 'atk', 'armor', 'vit', 'int', 'str', 'agi'],
 };
 // 직업 옵션 위에 **확률로** 하나 더 붙는 자리. 치명타와 회피는 직업을 가리지
 // 않으므로 직업 표에 섞으면 탱커 방패에서 회복력을 밀어내는 일이 생긴다.
@@ -787,33 +814,37 @@ const POTION_MAX = 5;
 // growth를 적어 두는 것은 기본값이 아군 성장률이기 때문이다. 빠뜨리면 적이
 // 아군보다 천천히 자라 높은 레벨 의뢰가 저절로 쉬워진다.
 //
-// **기본 공격력이 예전보다 낮다.** 적도 계열 스킬을 넷씩 들고 오게 되면서 실제로
-// 넣는 피해가 두 배 남짓이 되었다 — 예전에는 고블린 척후병과 오크에게 스킬이
-// 아예 없었고, 적어 둔 atk이 곧 그 유닛의 전부였다.
+// **기본 공격력이 예전보다 낮고 체력은 높다.** 적도 계열 스킬을 넷씩 들고 오게
+// 되면서 실제로 넣는 피해가 두 배 남짓이 되었고, 그만큼 공격력을 내렸다.
+//
+// 체력을 올린 것은 주인공이 쓰러져도 전투가 이어지게 하면서다. 그전까지는 "손을
+// 놓으면 진다"의 절반을 주인공의 죽음이 맡고 있었는데, 그것이 빠지자 파티가
+// 혼자서도 절반은 이겼다. **전투가 짧으면 회복이 판을 가르지 못한다** — 적을
+// 단단하게 만들어 전투를 길게 끌어야 힐이 있는 쪽과 없는 쪽이 갈린다.
 //
 // **적 탱커도 도발을 들고 온다.** 아군과 같은 논리로 움직인다는 것은 같은 표를
 // 본다는 뜻만이 아니라 같은 수단을 갖는다는 뜻이다 — 도발이 이쪽에만 있으면
 // 적 힐러가 아무에게도 보호받지 못하고, 후열을 먼저 치는 규칙이 한쪽에서만 돈다.
 const ENEMIES = {
   scout:  { id: 'scout', rank: 'trash', exp: 14,  name: '고블린 척후병', job: 'dealer', sprite: 'goblin',
-            hp: 336, mp: 64,  atk: 24, attackCd: 1.5, range: 7,  speed: 21,
-           attrs: { str: 40, agi: 16, int: 8, vit: 24 }, growth: 'enemy',
+            hp: 476, mp: 64,  atk: 20, attackCd: 1.5, range: 7,  speed: 21,
+           attrs: { str: 40, agi: 16, int: 8, vit: 34 }, growth: 'enemy',
             armor: 0.95, spec: 'grunt' },
   shaman: { id: 'shaman', rank: 'trash', exp: 18, name: '고블린 주술사', job: 'healer', sprite: 'shaman',
-            hp: 294, mp: 128, atk: 22, attackCd: 2.2, range: 30, speed: 15,
-           attrs: { str: 12, agi: 10, int: 16, vit: 21 }, growth: 'enemy', attackType: 'magic',
+            hp: 406, mp: 128, atk: 19, attackCd: 2.2, range: 30, speed: 15,
+           attrs: { str: 12, agi: 10, int: 16, vit: 29 }, growth: 'enemy', attackType: 'magic',
             armor: 1, spec: 'shaman' },
   orc:    { id: 'orc', rank: 'elite', exp: 32,    name: '오크 전사',     job: 'tank',   sprite: 'orc',
-            hp: 784, mp: 80,  atk: 37, attackCd: 1.8, range: 7,  speed: 16,
-           attrs: { str: 58, agi: 8, int: 10, vit: 56 }, growth: 'enemy',
+            hp: 1092, mp: 80,  atk: 31, attackCd: 1.8, range: 7,  speed: 16,
+           attrs: { str: 58, agi: 8, int: 10, vit: 78 }, growth: 'enemy',
             armor: 0.7,  spec: 'tank' },
   hexer:  { id: 'hexer', rank: 'elite', exp: 30,  name: '오크 주술사',   job: 'healer', sprite: 'shaman',
-            hp: 476, mp: 152, atk: 27, attackCd: 2.4, range: 30, speed: 14,
-           attrs: { str: 16, agi: 8, int: 19, vit: 34 }, growth: 'enemy', attackType: 'magic',
+            hp: 672, mp: 152, atk: 23, attackCd: 2.4, range: 30, speed: 14,
+           attrs: { str: 16, agi: 8, int: 19, vit: 48 }, growth: 'enemy', attackType: 'magic',
             armor: 0.9, spec: 'shaman' },
   chief:  { id: 'chief', rank: 'boss', exp: 90,  name: '오크 우두머리', job: 'tank',   sprite: 'boss',
-            hp: 1904, mp: 160, atk: 58, attackCd: 2.0, range: 8,  speed: 14,
-           attrs: { str: 89, agi: 6, int: 20, vit: 136 }, growth: 'enemy',
+            hp: 2660, mp: 160, atk: 49, attackCd: 2.0, range: 8,  speed: 14,
+           attrs: { str: 89, agi: 6, int: 20, vit: 190 }, growth: 'enemy',
             armor: 0.62, spec: 'tank' },
 };
 
@@ -915,7 +946,8 @@ const api = {
   FIELD, JOBS, SPECS, MELEE_RANGE, roleOf, ATTACK_ORDER, HEAL_ORDER, PULL_ORDER, LEVEL, ATTRS, ATTR, ATTR_GROWTH, attrsAt, derive, STATS, LOWER_IS_BETTER, TIERS, AFFIX_COUNT, AFFIX_BASE, AFFIX_POOL,
   tierName, tierFloor, tierRoll, tierCeiling, TIER_POWER, AFFIX_RANGE, SHOP_MAX_TIER,
   RANKS, rankOf,
-  SLOTS, GEAR, MATERIALS, REGIONS, NAMES, SPECIAL_POOL, SPECIAL_CHANCE, withGear,
+  SLOTS, GEAR, MATERIALS, REGIONS, NAMES, SPECIAL_POOL, SPECIAL_CHANCE,
+  withGear, attrsWithGear, WHOLE_AFFIX,
   HERO, COMPANIONS, UNIT_SKILLS, SPEC_SKILLS, UNIT_SKILL_MAX, skillsFor,
   PLAYER_SKILLS, SKILL, skillAt, skillEffect, skillLevelOf,
   POTIONS, JOB_POTIONS, POTION_MAX, ENEMIES,

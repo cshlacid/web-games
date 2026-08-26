@@ -478,6 +478,19 @@ function cast(state, skillId, target) {
   check('아군이 제자리로 대열을 다시 짠다',
     AI.alive(state, 'ally').every((u) => !u.speed || u.x < 80), true);
 
+  // **이동 중에도 시전은 이어진다.** 대열을 다시 짜자고 끌고 가면 그 순간
+  // 시전이 취소되는데, 무리 사이는 사람이 힐을 넣는 자리라 누른 스킬이 그냥
+  // 사라지는 것으로 보인다.
+  const hurt = unit(state, '강철의 브란');
+  hurt.hp = hurt.maxHp - 400;
+  check('이동 중에도 스킬을 쓸 수 있다',
+    L.castSkill(state, 'touch', { uid: hurt.uid }).ok, true);
+  check('외우는 중에는 걸음을 멈춘다',
+    (() => { const at = L.hero(state).x; run(state, 0.3); return L.hero(state).x === at; })(), true);
+  const healedBefore = state.stats.healed;
+  run(state, L.playerSkill(state, 'touch').cast + 0.2);
+  check('이동 중에 건 힐이 실제로 들어간다', state.stats.healed > healedBefore, true);
+
   run(state, L.WAVE_GAP);
   check('다음 무리가 나온다', state.waveIndex, 1);
   check('이동이 끝난다', state.marching, false);
@@ -505,12 +518,28 @@ function cast(state, skillId, target) {
   run(wipe, 0.1);
   check('파티가 전멸하면 패배', wipe.status, 'lost');
 
-  // 주인공이 죽으면 남은 동료가 있어도 진다 — 조작할 대상이 없어진다.
+  // **주인공이 쓰러져도 전투는 이어진다.** 조작할 것이 없어졌다는 이유로 끝내면
+  // 남은 넷이 이길 수 있는 판까지 함께 사라진다.
   const dead = battle();
   L.applyDamage(dead, null, L.hero(dead), 99999);
-  run(dead, 0.1);
-  check('주인공이 쓰러지면 패배', dead.status, 'lost');
+  run(dead, 0.5);
+  check('주인공이 쓰러져도 계속한다', dead.status, 'fighting');
   check('동료는 남아 있었다', AI.alive(dead, 'ally').length > 0, true);
+  check('스킬은 더 못 쓴다',
+    L.castSkill(dead, 'touch', { uid: AI.alive(dead, 'ally')[0].uid }).reason, '쓰러졌다');
+
+  // 남은 동료가 다 정리하면 주인공이 없어도 이긴다.
+  AI.alive(dead, 'enemy').forEach((u) => L.applyDamage(dead, null, u, 99999));
+  run(dead, L.WAVE_GAP + 0.2);
+  AI.alive(dead, 'enemy').forEach((u) => L.applyDamage(dead, null, u, 99999));
+  run(dead, L.WAVE_GAP + 0.2);
+  check('주인공 없이도 이길 수 있다', dead.status, 'won');
+
+  // 마지막 하나까지 쓰러져야 진다.
+  const wiped = battle();
+  AI.alive(wiped, 'ally').forEach((u) => L.applyDamage(wiped, null, u, 99999));
+  run(wiped, 0.1);
+  check('전부 쓰러지면 그때 진다', wiped.status, 'lost');
 }
 
 // --- 레벨과 성장 --------------------------------------------------------

@@ -59,7 +59,10 @@ function drainEvents(state) {
 // progress.js가 계산한다), bonus는 장비 몫이다. 장비는 능력치가 아니라 결과
 // 수치에 더한다 — 장비까지 레벨로 곱하면 높은 레벨에서 장비가 전부를 결정한다.
 function makeUnit(def, side, uid, x, y, level, override, bonus, potions, name) {
-  const attrs = (override && override.attrs) || D.attrsAt(def, level, null);
+  // 장비가 올린 능력치는 derive 앞에 얹는다 — 그래야 체력 옵션이 최대 체력을,
+  // 지능 옵션이 최대 마나와 회복량을 함께 올린다.
+  const attrs = (override && override.attrs)
+    || D.attrsWithGear(D.attrsAt(def, level, null), bonus);
   const base = D.derive(def, attrs);
   // **주인공은 캐릭터 창이 계산해 둔 최종 수치를 그대로 받는다.** 여기서 다시
   // 계산하던 동안에는 창에 적힌 장비 몫이 전투에 들어가지 않아, 같은 캐릭터가
@@ -617,7 +620,10 @@ function usePotion(state, potionId) {
 // --- 진행 --------------------------------------------------------------
 
 function checkEnd(state) {
-  if (hero(state).dead || !alive(state, 'ally').length) {
+  // **주인공이 쓰러져도 전투는 이어진다.** 예전에는 그 자리에서 졌는데, 조작할
+  // 것이 없어졌다는 이유로 끝내면 남은 넷이 이길 수 있는 판까지 함께 사라진다.
+  // 힐러가 빠진 파티가 버티는지를 보는 것도 이 게임의 한 장면이다.
+  if (!alive(state, 'ally').length) {
     state.status = 'lost';
     emit(state, { type: 'end', result: 'lost', text: '파티 전멸' });
     return;
@@ -646,6 +652,10 @@ function checkEnd(state) {
 function march(state, dt) {
   state.scroll += MARCH_SPEED * dt;
   for (const unit of alive(state, 'ally')) {
+    // **외우는 중이면 걸음을 멈춘다.** 대열을 다시 짜자고 끌고 가면 그 순간
+    // 시전이 취소되는데, 무리 사이는 사람이 힐을 넣는 자리라 누른 스킬이
+    // 그냥 사라지는 것으로 보인다. 늦게 출발해도 다음 무리 전에 따라잡는다.
+    if (unit.cast) { tickCast(state, unit); continue; }
     if (!unit.speed) continue;
     moveToward(state, unit, { x: unit.homeX, y: unit.homeY }, dt);
   }

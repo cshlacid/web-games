@@ -280,5 +280,63 @@ const SEEDS = [1, 7, 42, 999, 20260825];
     rolls('boss', 30, 2000).every((tier) => tier >= 0 && tier < D.TIERS.length), true);
 }
 
+// --- 능력치도 옵션으로 붙는다 -------------------------------------------
+//
+// 능력치가 오르면 거기서 나오는 수치가 함께 오른다. 그래서 결과 수치에 더하는
+// 것이 아니라 derive 앞에 얹어야 한다.
+{
+  const attrIds = Object.keys(D.ATTRS);
+  check('능력치가 옵션 표에 있다',
+    attrIds.every((id) => Number.isFinite(D.AFFIX_BASE[id])), true);
+  check('능력치마다 어느 표에든 들어 있다',
+    attrIds.filter((id) => !Object.values(D.AFFIX_POOL).some((pool) => pool.includes(id))), []);
+  check('이름이 적혀 있다', attrIds.every((id) => D.STATS[id]), true);
+
+  // 최대 체력·최대 마나와 이름이 갈려야 한 물건 안에서 구별된다.
+  check('최대 체력이라고 적는다', D.STATS.hp.name, '최대 체력');
+  check('최대 마나라고 적는다', D.STATS.mp.name, '최대 마나');
+  check('능력치 체력과 이름이 다르다', D.STATS.vit.name !== D.STATS.hp.name, true);
+
+  // 실제로 굴려서 붙는지. 등급이 높을수록 옵션이 많아 잘 걸린다.
+  const rolled = new Set();
+  for (const seed of SEEDS) {
+    for (const defId of Object.keys(D.GEAR)) {
+      for (const affix of Items.make(defId, D.TIERS.length - 1, seed).affixes) {
+        if (attrIds.includes(affix.stat)) rolled.add(affix.stat);
+      }
+    }
+  }
+  check('네 능력치가 모두 붙어 본다', attrIds.filter((id) => !rolled.has(id)), []);
+
+  // 정수로 붙는다. 화면에 +2라고 적고 속으로 1.7을 쓰면 캐릭터 창의 합이 안 맞는다.
+  const fractions = [];
+  for (const seed of SEEDS) {
+    for (let tier = 0; tier < D.TIERS.length; tier++) {
+      for (const affix of Items.make('mail', tier, seed).affixes) {
+        if (attrIds.includes(affix.stat) && affix.value !== Math.round(affix.value)) {
+          fractions.push(`${affix.stat} ${affix.value}`);
+        }
+      }
+    }
+  }
+  check('능력치는 정수로 붙는다', fractions, []);
+
+  // 능력치를 올리면 거기서 나오는 수치가 함께 오른다.
+  const base = D.attrsAt(D.HERO, 5, null);
+  const geared = D.attrsWithGear(base, { vit: 10, int: 10 });
+  check('장비 능력치가 얹힌다', geared.vit - base.vit, 10);
+  const before = D.derive(D.HERO, base);
+  const after = D.derive(D.HERO, geared);
+  check('체력이 최대 체력을 올린다', after.hp - before.hp, 10 * D.ATTR.hpPerVit);
+  check('지능이 최대 마나를 올린다', after.mp - before.mp, 10 * D.ATTR.mpPerInt);
+  check('지능이 회복량도 올린다', after.heal > before.heal, true);
+
+  // 동료도 능력치가 붙은 물건을 알아본다.
+  const plain = { uid: 'a', defId: 'mail', tier: 0, affixes: [] };
+  const withVit = { uid: 'b', defId: 'mail', tier: 0, affixes: [{ stat: 'vit', value: 5 }] };
+  check('능력치가 붙으면 점수가 오른다',
+    Items.score(withVit, 'tank') > Items.score(plain, 'tank'), true);
+}
+
 console.log(`${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);

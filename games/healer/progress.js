@@ -115,10 +115,21 @@ function spendPoint(progress, attr) {
 // 것이 곧 전투에서 쓰이는 값이다 — 여기서 따로 더하던 동안에는 주인공의 장비가
 // 창에만 반영되고 전투에는 들어가지 않았다.
 function stats(progress) {
-  const own = attrs(progress);
+  // 장비가 올린 능력치는 derive **앞에** 얹는다. 결과 수치에 더하면 체력 옵션이
+  // 최대 체력만 올리고 끝나는데, 능력치는 거기서 나오는 것을 전부 올려야 한다.
   const bonus = Items.sum(equippedItems(progress));
+  const own = D.attrsWithGear(attrs(progress), bonus);
   return Object.assign({ attrs: own },
     D.withGear(D.derive(D.HERO, own), bonus, D.HERO.armor));
+}
+
+// 장비가 얹어 준 능력치만. 캐릭터 창이 "나눠 준 것"과 "장비가 준 것"을 갈라
+// 보여 주는 데 쓴다 — 합쳐 놓으면 점수를 어디에 넣었는지 알 수 없다.
+function gearAttrs(progress) {
+  const bonus = Items.sum(equippedItems(progress));
+  const out = {};
+  for (const id of Object.keys(D.ATTRS)) out[id] = bonus[id] || 0;
+  return out;
 }
 
 function equippedItems(progress) {
@@ -351,7 +362,7 @@ function reset() {
 
 const api = {
   STORAGE_KEY, VERSION, create, load, save, reset,
-  addExp, gainLevels, stats, attrs, equippedItems,
+  addExp, gainLevels, stats, attrs, gearAttrs, equippedItems,
   earnedPoints, spentPoints, freePoints, spendPoint,
   addItem, findItem, equip, unequip, compare,
   spend, buyGear, buyPotion, sell,
