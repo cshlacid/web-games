@@ -53,7 +53,7 @@ function persist() {
 // --- 화면 전환 ---------------------------------------------------------
 
 const SCREENS = {
-  home: { node: 'screen-home', name: '길드', note: '', back: null, tabs: true },
+  home: { node: 'screen-home', name: '모험가 길드', note: '', back: null, tabs: true },
   party: { node: 'screen-party', name: '편성', note: '파티와 스킬을 정한다', back: 'home' },
   battle: { node: 'screen-battle', name: '전투', note: '', back: null },
   result: { node: 'screen-result', name: '결과', note: '', back: null },
@@ -1270,7 +1270,7 @@ function openResult(state) {
   expList.append(levelRow(`힐러 +${reward.jobExp}`, app.progress.jobLevel, app.progress.jobExp,
     app.progress.jobLevel >= D.LEVEL.maxLevel ? 0 : D.LEVEL.jobExpTo(app.progress.jobLevel)));
 
-  const lines = [`처치 ${reward.kills} · 길드 ${reward.guild} · 회복 ${reward.healExp}`];
+  const lines = [`처치 ${reward.kills} · 모험가 길드 ${reward.guild} · 회복 ${reward.healExp}`];
   if (gained.charLevels) lines.push(`캐릭터 레벨 ${before.char} → ${app.progress.charLevel}`);
   if (gained.jobLevels) lines.push(`힐러 레벨 ${before.job} → ${app.progress.jobLevel}`);
   if (gained.unlocked.length) {
@@ -1345,9 +1345,36 @@ function openResult(state) {
     refreshQuests();
   }
 
+  renderBattleReport(L.battleReport(state));
   renderRosterReport(roster, joined);
   persist();
   show('result', quest.name);
+}
+
+// 캐릭터별로 준 피해·받은 피해·힐량. 흘린 힐은 힐을 넣은 캐릭터에게만 붙인다 —
+// 0을 다 적으면 딜러 줄까지 힐 이야기가 되어 읽는 눈이 흩어진다.
+function renderBattleReport(rows) {
+  const list = $('battle-report');
+  list.textContent = '';
+
+  const head = el('li', 'head-row');
+  head.append(text('span', 'rname', '캐릭터'));
+  for (const label of ['준 피해', '받은 피해', '힐량']) head.append(text('span', null, label));
+  list.append(head);
+
+  for (const row of rows) {
+    const line = el('li');
+    const name = el('span', 'rname');
+    name.append(document.createTextNode(row.name));
+    if (row.dead) name.append(text('span', 'why', ' 쓰러짐'));
+    line.append(name);
+    line.append(text('b', 'stat-value', String(row.dealt)));
+    line.append(text('b', 'stat-value', String(row.taken)));
+    const heal = text('b', 'stat-value', String(row.healed));
+    if (row.overheal) heal.append(text('small', 'why', ` +${row.overheal}`));
+    line.append(heal);
+    list.append(line);
+  }
 }
 
 function renderRosterReport(report, joined) {

@@ -720,6 +720,44 @@ function cast(state, skillId, target) {
   check('골드는 없다', failure.gold, 0);
 }
 
+// --- 전투 리포트 --------------------------------------------------------
+{
+  // 전투가 끝난 뒤 캐릭터별로 무엇을 했는지. 화면이 이 숫자를 그대로 그린다.
+  const state = battle();
+  const tank = unit(state, '강철의 브란');
+  tank.hp = tank.maxHp - 200;
+  cast(state, 'touch', { uid: tank.uid });
+  run(state, 6);
+
+  const rows = L.battleReport(state);
+  check('아군만 줄을 갖는다', rows.length,
+    state.units.filter((u) => u.side === 'ally').length);
+  check('주인공이 첫 줄', rows[0].uid, L.HERO_UID);
+
+  const hero = rows[0];
+  check('주인공의 힐량이 잡힌다', hero.healed > 0, true);
+  // 힐량 합계는 전투 통계와 같은 수를 보아야 한다. 두 곳에서 따로 세면 결과
+  // 화면의 위아래가 서로 다른 숫자를 말한다.
+  check('주인공 힐량이 전투 통계와 맞는다', hero.healed, Math.round(state.stats.healed));
+
+  const dealt = rows.reduce((sum, row) => sum + row.dealt, 0);
+  check('아군이 준 피해가 잡힌다', dealt > 0, true);
+  check('아군이 준 피해가 전투 통계와 맞는다', dealt, Math.round(state.stats.damage));
+
+  const wounded = rows.filter((row) => row.taken > 0);
+  check('맞은 만큼 받은 피해가 쌓인다', wounded.length > 0, true);
+
+  // 쓰러진 동료도 줄에서 빠지지 않는다. 죽은 캐릭터가 사라지면 왜 졌는지가
+  // 리포트에서 지워진다.
+  const fallen = battle();
+  const mira = unit(fallen, '궁수 미라');
+  L.applyDamage(fallen, null, mira, 99999);
+  const row = L.battleReport(fallen).find((entry) => entry.name === mira.name);
+  check('쓰러진 동료도 남는다', Boolean(row), true);
+  check('쓰러진 것으로 표시된다', row.dead, true);
+  check('받은 피해가 남는다', row.taken > 0, true);
+}
+
 // --- 재현성 -------------------------------------------------------------
 {
   const digest = (seed) => {

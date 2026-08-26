@@ -92,6 +92,9 @@ function makeUnit(def, side, uid, x, y, level, override, bonus, potions, name) {
     // 전투에서 실제로 쓰는 것이 같아야 하므로 같은 함수를 쓴다.
     skills: D.skillsFor(def.spec, level).map((id) => ({ id, readyAt: 0 })),
     targetUid: null, tauntUid: null, tauntUntil: 0,
+    // 전투가 끝난 뒤 캐릭터별로 무엇을 했는지 보여 주기 위한 집계. 이벤트를
+    // 모아 두었다가 세지 않는 것은, 이벤트가 화면을 위해 지워지기 때문이다.
+    tally: { dealt: 0, taken: 0, healed: 0, overheal: 0 },
     dead: false,
   };
 }
@@ -225,6 +228,8 @@ function applyDamage(state, source, target, raw, dodgeable) {
   const amount = Math.max(1, Math.round(raw * crit * target.armor));
   target.hp = Math.max(0, target.hp - amount);
   state.stats.damage += source && source.side === 'ally' ? amount : 0;
+  if (source) source.tally.dealt += amount;
+  target.tally.taken += amount;
   emit(state, { type: 'damage', uid: target.uid, amount, crit: crit > 1 });
   if (target.hp === 0) kill(state, target);
   return amount;
@@ -240,6 +245,10 @@ function applyHeal(state, source, target, raw) {
   if (source && source.uid === HERO_UID) {
     state.stats.healed += amount;
     state.stats.overheal += healed - amount;
+  }
+  if (source) {
+    source.tally.healed += amount;
+    source.tally.overheal += healed - amount;
   }
   emit(state, { type: 'heal', uid: target.uid, amount, over: healed - amount, crit: crit > 1 });
   return amount;
@@ -707,8 +716,24 @@ function rewardOf(state) {
   };
 }
 
+// 캐릭터별 전투 리포트. 전투 중에는 누가 얼마나 맞고 있는지가 체력 막대로만
+// 보이고 끝나면 그것마저 사라진다 — 편성을 다시 짤 근거가 남지 않는다.
+//
+// 적은 빼고 아군만 본다. 무리마다 새로 솟는 적은 이름이 겹쳐 줄이 늘기만 한다.
+function battleReport(state) {
+  return state.units
+    .filter((unit) => unit.side === 'ally')
+    .map((unit) => ({
+      uid: unit.uid, name: unit.name, job: unit.job, level: unit.level, dead: unit.dead,
+      dealt: Math.round(unit.tally.dealt),
+      taken: Math.round(unit.tally.taken),
+      healed: Math.round(unit.tally.healed),
+      overheal: Math.round(unit.tally.overheal),
+    }));
+}
+
 const api = {
-  HERO_UID, TICK, WAVE_GAP, MARCH_SPEED, rewardOf,
+  HERO_UID, TICK, WAVE_GAP, MARCH_SPEED, rewardOf, battleReport,
   createRng, createBattle, advance, step, drainEvents,
   castSkill, usePotion, drink, magicPowerOf, rollCrit, applyDamage, applyHeal, addDot, addZone,
   hero, skillSlot, resolveTarget, moveToward,

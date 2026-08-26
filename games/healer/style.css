@@ -546,6 +546,22 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .level.hard { color: var(--hero); }
 .level.deadly { color: var(--harm); }
 
+/* --- 전투 리포트 --- */
+/* 숫자 칸을 고정폭으로 잡아 줄마다 자리가 맞는다. 이름만 남는 폭을 갖는 것은
+   이름 길이가 제각각이라 이름 쪽을 고정하면 잘리는 줄이 생기기 때문이다. */
+.report { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.report li {
+  display: grid; grid-template-columns: 1fr repeat(3, 58px);
+  gap: 6px; align-items: baseline;
+  font-size: 13px; padding: 5px 0; border-bottom: 1px solid var(--line);
+}
+.report li:last-child { border-bottom: 0; }
+.report .rname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.report b { text-align: right; font-weight: 600; }
+.report .head-row { color: var(--muted); font-size: 11px; }
+.report .head-row span:not(.rname) { text-align: right; }
+.report .why { color: var(--muted); font-size: 11px; font-weight: 400; }
+
 /* --- 레벨과 경험치 --- */
 .levels, .stats, .slots, .inventory, .skill-list, .attrs {
   list-style: none; margin: 0; padding: 0;
