@@ -137,6 +137,29 @@ function derive(def, attrs) {
   };
 }
 
+// 능력치가 만든 수치에 장비를 얹은 **최종 수치**. 캐릭터 창(progress.stats)과
+// 전투(logic.makeUnit)가 같은 함수를 봐야 창에 적힌 숫자와 전투가 어긋나지
+// 않는다 — 따로 계산하던 동안 주인공의 장비가 전투에 반영되지 않았다.
+//
+// 상한은 여기서도 걸린다. 능력치로 올린 것이든 장비로 올린 것이든 회피·치명타가
+// 같은 천장을 보아야, 장비 옵션 하나로 규칙이 무너지지 않는다.
+function withGear(base, gear, armorBase) {
+  const g = gear || {};
+  return {
+    hp: Math.round(base.hp + (g.hp || 0)),
+    mp: Math.round(base.mp + (g.mp || 0)),
+    atk: base.atk * (1 + (g.atk || 0)),
+    heal: base.heal + (g.heal || 0),
+    spell: base.spell,
+    dodge: Math.min(ATTR.dodgeCap, base.dodge + (g.dodge || 0)),
+    crit: Math.min(ATTR.critCap, base.crit + (g.crit || 0)),
+    critDamage: Math.min(ATTR.critDamageCap, base.critDamage + (g.critDamage || 0)),
+    // 방어 계수가 0 아래로 내려가면 피해가 회복이 된다. 장비를 아무리 겹쳐도
+    // 넘지 못하는 바닥을 둔다.
+    armor: Math.max(0.35, armorBase + (g.armor || 0)),
+  };
+}
+
 // 레벨과 경험치. 캐릭터 레벨과 직업 레벨을 따로 두는 것은 둘이 오르는 이유가
 // 다르기 때문이다 — 캐릭터 레벨은 전투를 치르면 오르고, 직업 레벨은 힐러 노릇을
 // 얼마나 했는지로 오른다. 힐만 하다 전투가 끝나도 남는 것이 있어야 한다.
@@ -173,6 +196,11 @@ const STATS = {
   heal:  { id: 'heal',  name: '회복력',    fmt: (v) => `+${Math.round(v * 100)}%` },
   // 받는 피해는 계수라 낮을수록 좋다. 부호를 뒤집어 적어야 읽는 사람이 헷갈리지 않는다.
   armor: { id: 'armor', name: '받는 피해', fmt: (v) => `${Math.round(v * 100)}%` },
+  // 치명타와 회피는 예전에 능력치에서만 왔다. 장비에도 붙게 하면서 여기 들어왔다 —
+  // 확률로 붙는 것이라 모든 물건에 있지는 않고, 그래서 잘 나온 물건이 갈린다.
+  crit:  { id: 'crit',  name: '치명타 확률', fmt: (v) => `+${(v * 100).toFixed(1)}%` },
+  critDamage: { id: 'critDamage', name: '치명타 피해', fmt: (v) => `+${Math.round(v * 100)}%` },
+  dodge: { id: 'dodge', name: '회피',        fmt: (v) => `+${(v * 100).toFixed(1)}%` },
 };
 
 // 낮을수록 좋은 스탯. 견주기와 상점의 "더 나은가" 판정이 이걸 봐야 한다.
@@ -182,19 +210,31 @@ const LOWER_IS_BETTER = new Set(['armor']);
 // 적어 두면 자료가 몇 배로 길어지므로, 정의 하나에 배수를 곱해 쓴다.
 const TIERS = ['낡은', '쓸 만한', '튼튼한', '빼어난', '전설의'];
 
-// 등급이 오르면 붙는 무작위 옵션 수. 등급만으로 수치가 오르면 같은 등급의 물건이
-// 전부 같은 물건이라 상점을 들여다볼 이유가 없다.
-const AFFIX_COUNT = [0, 1, 1, 2, 3];
+// 등급이 오르면 붙는 무작위 옵션 수. **가장 낮은 등급에도 하나는 붙는다** —
+// 옵션이 없는 물건은 같은 등급이면 전부 같은 물건이라 들여다볼 이유가 없다.
+const AFFIX_COUNT = [1, 1, 2, 2, 3];
 
 // 무작위 옵션의 기준값. 직업에 어울리는 스탯 위주로 붙어야 탱커 방패에 회복력이
 // 붙는 일이 생기지 않는다.
-const AFFIX_BASE = { hp: 14, mp: 7, atk: 0.05, heal: 0.04, armor: -0.02 };
+const AFFIX_BASE = {
+  hp: 14, mp: 7, atk: 0.05, heal: 0.04, armor: -0.02,
+  crit: 0.02, critDamage: 0.06, dodge: 0.015,
+};
 const AFFIX_POOL = {
   tank: ['hp', 'armor', 'hp', 'mp'],
   dealer: ['atk', 'hp', 'atk', 'mp'],
   healer: ['heal', 'mp', 'heal', 'hp'],
   none: ['hp', 'mp'],
 };
+
+// 직업 옵션 위에 **확률로** 하나 더 붙는 자리. 치명타와 회피는 직업을 가리지
+// 않으므로 직업 표에 섞으면 탱커 방패에서 회복력을 밀어내는 일이 생긴다.
+//
+// 예전에는 이 셋이 능력치에서만 왔다. 장비에 붙이면 그것만 쌓는 것이 최선이
+// 될까 봐 막아 두었는데, 상한(dodgeCap·critCap·critDamageCap)이 능력치든
+// 장비든 똑같이 걸리므로 무한히 쌓이지는 않는다.
+const SPECIAL_POOL = ['crit', 'critDamage', 'dodge'];
+const SPECIAL_CHANCE = 0.35;
 
 const SLOTS = {
   weapon: { id: 'weapon', name: '무기' },
@@ -566,48 +606,105 @@ function skillsFor(spec, level) {
 //   ally/enemy — 대상 하나
 //   area-ally/area-enemy — 동료 초상화 또는 전투 화면의 위치 (기획서 8장)
 //   self — 대상 선택 없이 즉시
+//
+// 적힌 수치는 **스킬 레벨 1의 값**이다. 직업 레벨이 오르면 받는 점수로 스킬
+// 레벨을 올리고, 그때 효과와 소비 마나가 함께 오른다(SKILL, skillAt). desc에
+// 숫자를 적지 않는 것은 그 때문이다 — 숫자는 skillEffect가 레벨에서 만든다.
 const PLAYER_SKILLS = {
   touch: {
     id: 'touch', unlock: 1, range: 40, cast: 1.0, name: '치유의 손길', type: '개별 대상', targeting: 'ally',
     mp: 14, cd: 1.4, heal: 130, icon: '✚',
-    desc: '동료 하나의 체력을 130 회복한다.',
+    desc: '동료 하나의 체력을 한 번에 크게 회복한다.',
   },
   quick: {
     id: 'quick', unlock: 1, range: 36, cast: 0, name: '신속한 치유', type: '개별 대상', targeting: 'ally',
     mp: 9, cd: 1.2, heal: 62, icon: '✦',
-    desc: '싸고 빠르지만 회복량이 작다. 62 회복.',
+    desc: '싸고 빠르지만 회복량이 작다.',
   },
   regen: {
     id: 'regen', unlock: 2, range: 40, cast: 1.0, name: '재생의 축복', type: '도트', targeting: 'ally',
     mp: 20, cd: 8, tick: 26, interval: 1, duration: 8, icon: '❃',
-    desc: '8초 동안 1초마다 26씩 회복한다. 총 208.',
+    desc: '동료 하나에게 걸어 두면 시간을 두고 회복된다.',
   },
   ripple: {
     id: 'ripple', unlock: 4, range: 44, cast: 1.5, name: '빛의 파문', type: '범위', targeting: 'area-ally',
     mp: 30, cd: 7.5, heal: 76, radius: 20, icon: '◎',
-    desc: '기준점 주변 아군을 한 번에 76씩 회복한다.',
+    desc: '기준점 주변의 아군을 한 번에 회복한다.',
   },
   sanctuary: {
     id: 'sanctuary', unlock: 6, range: 48, cast: 2.0, name: '생명의 성역', type: '장판', targeting: 'area-ally',
     mp: 38, cd: 20, tick: 22, interval: 1, duration: 10, radius: 21, icon: '⬡',
-    desc: '10초 동안 남는 장판. 안에 있는 아군을 1초마다 22씩 회복한다.',
+    desc: '바닥에 남는 장판. 안에 서 있는 아군이 계속 회복된다.',
   },
   focus: {
     id: 'focus', unlock: 3, range: 0, cast: 2.0, name: '정신 집중', type: '마나 회복', targeting: 'self',
     mp: 0, cd: 28, mana: 70, icon: '☾',
-    desc: '자신의 마나를 70 회복한다.',
+    desc: '서서 외워 자신의 마나를 되찾는다.',
   },
   flame: {
     id: 'flame', unlock: 5, range: 40, cast: 1.0, name: '심판의 불꽃', type: '도트', targeting: 'enemy',
     mp: 16, cd: 9, tick: 22, interval: 1, duration: 6, icon: '✹',
-    desc: '적 하나에게 6초 동안 1초마다 22의 피해. 어그로를 끌 수 있다.',
+    desc: '적 하나를 태운다. 어그로를 끌 수 있다.',
   },
   pyre: {
     id: 'pyre', unlock: 8, range: 44, cast: 1.8, name: '성스러운 불길', type: '장판', targeting: 'area-enemy',
     mp: 34, cd: 18, tick: 26, interval: 1, duration: 8, radius: 18, icon: '⌘',
-    desc: '8초 동안 남는 장판. 안에 있는 적에게 1초마다 26의 피해.',
+    desc: '바닥에 남는 장판. 안에 선 적이 계속 탄다.',
   },
 };
+
+// 스킬 레벨. **직업 레벨이 오를 때마다 점수를 받아 스킬 하나를 올린다.**
+// 캐릭터 레벨이 능력치를 올리듯 직업 레벨은 스킬을 올린다 — 예전에는 직업
+// 레벨이 새 스킬을 여는 일만 했고, 여덟 개가 다 열린 뒤에는 아무것도 아니었다.
+//
+// 효과보다 마나가 천천히 오른다. 마나가 같이 오르는 것은 레벨을 올리는 것이
+// 공짜가 아니게 하려는 것이고, 덜 오르는 것은 그래도 올릴 이유를 남기려는
+// 것이다. 쿨타임·사거리·반경·지속은 레벨을 타지 않는다 — 그쪽까지 오르면
+// 스킬의 성격 자체가 바뀌어, 등록 화면에서 무엇을 고를지가 없어진다.
+const SKILL = {
+  max: 5,
+  pointsPerLevel: 1,
+  effect: 0.18,   // 레벨당 회복량·피해·마나 회복
+  cost: 0.09,     // 레벨당 소비 마나
+};
+
+const skillLevelOf = (level) => Math.max(1, Math.min(SKILL.max, level | 0 || 1));
+
+// 레벨을 반영한 스킬. 원본을 고치지 않고 새 물건을 돌려주는 것은, 화면과 전투가
+// 같은 정의를 돌려 쓰기 때문이다 — 제자리에서 고치면 한 번 올린 스킬이 모든
+// 유닛에게 올라간 것이 된다.
+function skillAt(def, level) {
+  if (!def) return null;
+  const lv = skillLevelOf(level);
+  const out = Object.assign({}, def, { level: lv });
+  if (lv === 1) return out;
+
+  const grow = 1 + SKILL.effect * (lv - 1);
+  const cost = 1 + SKILL.cost * (lv - 1);
+  for (const key of ['heal', 'tick', 'mana']) {
+    if (def[key]) out[key] = Math.round(def[key] * grow);
+  }
+  if (def.mp) out.mp = Math.round(def.mp * cost);
+  return out;
+}
+
+// 스킬이 지금 레벨에서 실제로 얼마를 하는지. 정의에 적어 둔 문장으로는 레벨이
+// 오른 것이 화면에 보이지 않는다.
+function skillEffect(def) {
+  if (!def) return '';
+  if (def.mana) return `마나 ${def.mana} 회복`;
+  const kind = def.targeting === 'enemy' || def.targeting === 'area-enemy' ? '피해' : '회복';
+  if (def.heal) {
+    return def.radius ? `반경 ${def.radius} 안의 아군을 ${def.heal}씩 회복`
+      : `${def.heal} 회복`;
+  }
+  if (def.tick) {
+    const total = Math.round(def.tick * (def.duration / (def.interval || 1)));
+    const where = def.radius ? `반경 ${def.radius} 장판, ` : '';
+    return `${where}${def.duration}초 동안 1초마다 ${def.tick} ${kind} (총 ${total})`;
+  }
+  return '';
+}
 
 // 소모성 물약. 전투 중 마나를 회복하는 두 방법 가운데 하나다.
 // 물약. 마나 회복과 체력 회복 두 가지다. 전투 중 마나가 저절로 차지 않는다는
@@ -739,9 +836,10 @@ const SKILL_MAX = 5;   // 전투에 등록할 수 있는 주인공 스킬 수
 
 const api = {
   FIELD, JOBS, SPECS, MELEE_RANGE, roleOf, ATTACK_ORDER, HEAL_ORDER, PULL_ORDER, LEVEL, ATTRS, ATTR, ATTR_GROWTH, attrsAt, derive, STATS, LOWER_IS_BETTER, TIERS, AFFIX_COUNT, AFFIX_BASE, AFFIX_POOL,
-  SLOTS, GEAR, MATERIALS, REGIONS, NAMES,
+  SLOTS, GEAR, MATERIALS, REGIONS, NAMES, SPECIAL_POOL, SPECIAL_CHANCE, withGear,
   HERO, COMPANIONS, UNIT_SKILLS, SPEC_SKILLS, UNIT_SKILL_MAX, skillsFor,
-  PLAYER_SKILLS, POTIONS, JOB_POTIONS, POTION_MAX, ENEMIES,
+  PLAYER_SKILLS, SKILL, skillAt, skillEffect, skillLevelOf,
+  POTIONS, JOB_POTIONS, POTION_MAX, ENEMIES,
   PARTY_MAX, SKILL_MAX,
   potionPrice,
 };

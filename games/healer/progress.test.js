@@ -170,6 +170,9 @@ const gear = (defId, tier) => Items.make(defId, tier || 0, 3);
   saved.inventory = [gear('staff', 1), { defId: '없는물건', tier: 0 }, null];
   saved.equipped.weapon = gear('robe', 0);   // 슬롯이 맞지 않는 장착
   saved.potions = { mana: 99, health: -3 };  // 범위를 벗어난 값
+  saved.jobLevel = 3;
+  // 받은 점수는 둘뿐인데 넷을 쓴 저장본. 손으로 고쳐도 점수가 늘지 않아야 한다.
+  saved.skillLevels = { touch: 3, quick: 3, regen: 9 };
   check('저장된다', P.save(saved), true);
 
   const loaded = P.load();
@@ -184,6 +187,10 @@ const gear = (defId, tier) => Items.make(defId, tier || 0, 3);
   check('아이템 uid를 다시 붙인다',
     new Set(loaded.inventory.map((item) => item.uid)).size, loaded.inventory.length);
 
+  check('스킬 레벨이 남는다', P.skillLevel(loaded, 'touch'), 3);
+  check('받은 점수를 넘지 않는다', P.spentSkillPoints(loaded), P.earnedSkillPoints(loaded));
+  check('남은 점수는 0', P.freeSkillPoints(loaded), 0);
+
   // 판이 바뀌면 저장본을 통째로 버린다. 어중간하게 읽으면 더 이상한 상태가 된다.
   global.localStorage.setItem('x', JSON.stringify({ version: 999, charLevel: 20 }));
   check('판이 다르면 새로 시작', P.load().charLevel, 1);
@@ -191,6 +198,37 @@ const gear = (defId, tier) => Items.make(defId, tier || 0, 3);
   global.localStorage.setItem('x', '깨진 저장본');
   check('깨진 저장본도 새로 시작', P.load().charLevel, 1);
   delete global.localStorage;
+}
+
+// --- 스킬 레벨과 점수 ---------------------------------------------------
+{
+  // 직업 레벨이 오르면 점수를 받는다. 능력치 점수와 같은 셈법이다 —
+  // 받은 것에서 쓴 것을 뺀다.
+  const progress = P.create();
+  check('1레벨에는 점수가 없다', P.freeSkillPoints(progress), 0);
+  check('점수 없이는 못 올린다', P.raiseSkill(progress, 'touch').ok, false);
+
+  progress.jobLevel = 6;
+  check('레벨마다 하나씩 받는다', P.freeSkillPoints(progress), 5 * D.SKILL.pointsPerLevel);
+  check('올린다', P.raiseSkill(progress, 'touch').level, 2);
+  check('쓴 만큼 준다', P.freeSkillPoints(progress), 5 * D.SKILL.pointsPerLevel - 1);
+  check('없는 스킬은 못 올린다', P.raiseSkill(progress, '없는스킬').ok, false);
+  // 열리기 전에 올려 두면 직업 레벨이 새 스킬을 여는 뜻이 옅어진다.
+  check('안 열린 스킬은 못 올린다', P.raiseSkill(progress, 'pyre').ok, false);
+
+  // 올린 레벨이 실제 수치로 이어진다. 화면과 전투가 이 함수를 같이 본다.
+  const def = P.skillDef(progress, 'touch');
+  check('회복량이 오른다', def.heal > D.PLAYER_SKILLS.touch.heal, true);
+  check('소비 마나도 오른다', def.mp > D.PLAYER_SKILLS.touch.mp, true);
+  check('전투에 넘길 표에 다 들어간다',
+    Object.keys(P.skillLevels(progress)).length, Object.keys(D.PLAYER_SKILLS).length);
+
+  // 상한까지만 오른다. 남은 점수가 있어도 더 넣을 수 없다.
+  const maxed = P.create();
+  maxed.jobLevel = D.LEVEL.maxLevel;
+  for (let i = 0; i < D.SKILL.max + 3; i++) P.raiseSkill(maxed, 'touch');
+  check('스킬 레벨에 상한이 있다', P.skillLevel(maxed, 'touch'), D.SKILL.max);
+  check('상한에서는 못 올린다', P.raiseSkill(maxed, 'touch').ok, false);
 }
 
 // --- 상점 --------------------------------------------------------------

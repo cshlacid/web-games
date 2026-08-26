@@ -35,6 +35,10 @@ const isGear = (item) => Boolean(item && D.GEAR[item.defId]);
 
 // 옵션은 그 물건을 쓸 직업에 어울리는 것 위주로 뽑는다. 탱커 방패에 회복력이
 // 붙으면 직업 우선 분배가 뜻을 잃는다.
+//
+// **직업 옵션은 모든 장비에 하나 이상 붙고**(AFFIX_COUNT), 그 위에 치명타·회피가
+// 확률로 하나 더 붙는다. 확률로 둔 것은 모든 물건에 붙으면 그것이 옵션이 아니라
+// 기본 수치가 되기 때문이다.
 function rollAffixes(defId, tier, rng) {
   const gear = D.GEAR[defId];
   if (!gear) return [];
@@ -43,6 +47,14 @@ function rollAffixes(defId, tier, rng) {
 
   const affixes = [];
   const used = new Set();
+  const roll = (stat) => {
+    // 등급이 오르면 옵션 값도 오른다. ±25%로 흔들어야 같은 등급 안에서도
+    // "이건 잘 나왔다"가 생긴다.
+    const base = D.AFFIX_BASE[stat] * (1 + tier * 0.8);
+    affixes.push({ stat, value: base * (0.75 + rng() * 0.5) });
+    used.add(stat);
+  };
+
   for (let i = 0; i < count; i++) {
     // 같은 스탯이 두 번 붙으면 한 줄로 합쳐 보여야 해서 읽기가 나빠진다.
     // 몇 번 다시 뽑아 보고 안 되면 그냥 개수를 줄인다.
@@ -52,12 +64,14 @@ function rollAffixes(defId, tier, rng) {
       if (!used.has(candidate)) stat = candidate;
     }
     if (!stat) break;
-    used.add(stat);
+    roll(stat);
+  }
 
-    // 등급이 오르면 옵션 값도 오른다. ±25%로 흔들어야 같은 등급 안에서도
-    // "이건 잘 나왔다"가 생긴다.
-    const base = D.AFFIX_BASE[stat] * (1 + tier * 0.8);
-    affixes.push({ stat, value: base * (0.75 + rng() * 0.5) });
+  // 치명타·회피는 직업을 가리지 않으므로 직업 표에 섞지 않는다. 섞으면 탱커
+  // 방패에서 체력을 밀어내고 들어가는 일이 생긴다.
+  if (rng() < D.SPECIAL_CHANCE) {
+    const special = D.SPECIAL_POOL[(rng() * D.SPECIAL_POOL.length) | 0];
+    if (!used.has(special)) roll(special);
   }
   return affixes;
 }
@@ -155,7 +169,12 @@ function score(item, job) {
   // 때문이다. 기본에 값을 주면 딜러가 지팡이를 들고 다닌다.
   // 받는 피해 계수 0.2를 덜어 내는 것은 체력 30% 정도를 더 얻는 것과 비슷하다.
   // 처음에 -2600을 줬더니 방패가 모든 직업에게 최고의 방어구가 됐다.
-  const weight = { hp: 1, mp: 1.4, atk: 900, heal: 0, armor: -800 };
+  // 치명타·회피의 무게는 옵션 하나가 다른 옵션 하나와 엇비슷한 값이 되도록
+  // 잡았다. 0으로 두면 그 옵션이 붙은 물건을 동료가 거저 흘려보낸다.
+  const weight = {
+    hp: 1, mp: 1.4, atk: 900, heal: 0, armor: -800,
+    crit: 2000, critDamage: 700, dodge: 2500,
+  };
   const jobBonus = {
     tank: { hp: 0.6, armor: -700 },
     dealer: { atk: 400 },

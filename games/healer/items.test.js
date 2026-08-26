@@ -45,26 +45,45 @@ const SEEDS = [1, 7, 42, 999, 20260825];
 
 // --- 옵션 ---------------------------------------------------------------
 {
-  // 등급이 오르면 옵션 수가 는다. 등급만으로 수치가 오르면 같은 등급의 물건이
-  // 전부 같은 물건이라 상점을 들여다볼 이유가 없다.
+  // 등급이 오르면 직업 옵션 수가 는다. 그 위에 치명타·회피가 확률로 하나 더
+  // 붙으므로, 실제 옵션 수는 정해진 수이거나 거기에 하나 많다.
+  const special = new Set(D.SPECIAL_POOL);
+  const jobCount = (item) => item.affixes.filter((a) => !special.has(a.stat)).length;
   for (let tier = 0; tier < D.TIERS.length; tier++) {
-    const counts = SEEDS.map((seed) => Items.make('shield', tier, seed).affixes.length);
-    check(`등급 ${tier}: 옵션 수가 정해진 만큼`,
-      counts.every((n) => n === D.AFFIX_COUNT[tier]), true);
+    const items = SEEDS.map((seed) => Items.make('shield', tier, seed));
+    check(`등급 ${tier}: 직업 옵션이 정해진 만큼`,
+      items.every((item) => jobCount(item) === D.AFFIX_COUNT[tier]), true);
+    // 옵션이 하나도 없는 물건은 같은 등급이면 전부 같은 물건이 된다.
+    check(`등급 ${tier}: 옵션이 하나는 붙는다`,
+      items.every((item) => item.affixes.length > 0), true);
   }
 
   // 직업에 어울리는 스탯 위주로 붙어야 탱커 방패에 회복력이 붙지 않는다.
+  // 치명타·회피는 직업을 가리지 않는 자리라 따로 센다.
   const wrong = [];
+  let withSpecial = 0;
+  let total = 0;
   for (const seed of SEEDS) {
     for (const [defId, gear] of Object.entries(D.GEAR)) {
       const item = Items.make(defId, D.TIERS.length - 1, seed);
       const pool = D.AFFIX_POOL[gear.job || 'none'];
+      total++;
+      if (item.affixes.some((affix) => special.has(affix.stat))) withSpecial++;
       for (const affix of item.affixes) {
-        if (!pool.includes(affix.stat)) wrong.push(`${defId}:${affix.stat}`);
+        if (!pool.includes(affix.stat) && !special.has(affix.stat)) {
+          wrong.push(`${defId}:${affix.stat}`);
+        }
       }
+      // 같은 스탯이 두 번 붙으면 한 줄로 합쳐 보여야 해서 읽기가 나빠진다.
+      const stats = item.affixes.map((affix) => affix.stat);
+      if (new Set(stats).size !== stats.length) wrong.push(`${defId}:중복`);
     }
   }
-  check('직업에 맞는 옵션만 붙는다', [...new Set(wrong)], []);
+  check('직업에 맞는 옵션이거나 치명타·회피다', [...new Set(wrong)], []);
+  // 확률로 붙는 자리다. 늘 붙으면 옵션이 아니라 기본 수치이고, 안 붙으면 없는
+  // 기능이다.
+  check('치명타·회피가 붙기는 한다', withSpecial > 0, true);
+  check('모든 물건에 붙지는 않는다', withSpecial < total, true);
 
   // 같은 스탯이 두 번 붙으면 한 줄로 합쳐 보여야 해서 읽기가 나빠진다.
   const dupes = [];

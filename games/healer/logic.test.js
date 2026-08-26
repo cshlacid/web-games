@@ -720,6 +720,70 @@ function cast(state, skillId, target) {
   check('골드는 없다', failure.gold, 0);
 }
 
+// --- 스킬 레벨 ----------------------------------------------------------
+{
+  // 직업 레벨로 올린 스킬은 더 많이 회복하고 마나를 더 먹는다. 효과보다 마나가
+  // 천천히 오르는 것이 올릴 이유를 남긴다.
+  const one = battle();
+  const five = battle({ skillLevels: { touch: 5 } });
+  check('레벨을 안 주면 1레벨', L.playerSkill(one, 'touch').level, 1);
+  check('레벨을 주면 그 레벨', L.playerSkill(five, 'touch').level, 5);
+
+  const low = L.playerSkill(one, 'touch');
+  const high = L.playerSkill(five, 'touch');
+  check('회복량이 오른다', high.heal > low.heal, true);
+  check('소비 마나가 오른다', high.mp > low.mp, true);
+  check('마나가 효과보다 덜 오른다', (high.mp / low.mp) < (high.heal / low.heal), true);
+  check('쿨타임은 그대로', high.cd, low.cd);
+  check('사거리도 그대로', high.range, low.range);
+
+  // 실제로 나가는 힐도 올라야 한다. 정의만 바뀌고 전투가 옛 값을 보면 점수를
+  // 넣은 것이 화면의 숫자로만 남는다.
+  const healed = (state) => {
+    const tank = unit(state, '강철의 브란');
+    tank.hp = 1;
+    cast(state, 'touch', { uid: tank.uid });
+    return tank.hp - 1;
+  };
+  check('전투에서도 더 회복한다', healed(five) > healed(one), true);
+
+  // 저장본이 이상해도 범위 밖으로 나가지 않는다.
+  const wild = battle({ skillLevels: { touch: 99 } });
+  check('레벨은 상한까지', L.playerSkill(wild, 'touch').level, D.SKILL.max);
+
+  // 마나도 실제로 그만큼 먹는다.
+  const drain = battle({ skillLevels: { quick: 5 } });
+  const hero = L.hero(drain);
+  const before = hero.mp;
+  cast(drain, 'quick', { uid: unit(drain, '강철의 브란').uid });
+  check('올린 만큼 마나를 낸다', before - hero.mp, L.playerSkill(drain, 'quick').mp);
+}
+
+// --- 주인공의 장비 ------------------------------------------------------
+{
+  // 캐릭터 창이 계산한 최종 수치가 그대로 전투에 들어가야 한다. 전투가 능력치만
+  // 보고 다시 계산하던 동안에는 장비를 낀 주인공이 창과 전투에서 다른 체력을
+  // 가졌다.
+  const gear = { hp: 200, mp: 50, atk: 0.3, heal: 0.25, armor: -0.05, crit: 0.05, dodge: 0.03 };
+  const attrs = D.attrsAt(D.HERO, 5, null);
+  const stats = Object.assign({ attrs }, D.withGear(D.derive(D.HERO, attrs), gear, D.HERO.armor));
+  const state = battle({ heroLevel: 5, heroStats: stats });
+  const hero = L.hero(state);
+  check('체력이 장비를 탄다', hero.maxHp, stats.hp);
+  check('마나도 장비를 탄다', hero.maxMp, stats.mp);
+  check('회복력도 장비를 탄다', hero.healPower, stats.heal);
+  check('치명타도 장비를 탄다', hero.crit, stats.crit);
+  check('회피도 장비를 탄다', hero.dodge, stats.dodge);
+  check('받는 피해도 장비를 탄다', hero.armor, stats.armor);
+
+  // 상한은 능력치로 올린 것이든 장비로 올린 것이든 같이 걸린다.
+  const capped = D.withGear(D.derive(D.HERO, attrs), { dodge: 1, crit: 1, critDamage: 5 },
+    D.HERO.armor);
+  check('회피 상한', capped.dodge, D.ATTR.dodgeCap);
+  check('치명타 상한', capped.crit, D.ATTR.critCap);
+  check('치명타 피해 상한', capped.critDamage, D.ATTR.critDamageCap);
+}
+
 // --- 전투 리포트 --------------------------------------------------------
 {
   // 전투가 끝난 뒤 캐릭터별로 무엇을 했는지. 화면이 이 숫자를 그대로 그린다.
