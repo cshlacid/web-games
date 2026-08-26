@@ -205,10 +205,18 @@ function gather(state) {
   healer.hp = healer.maxHp - heal;
   check('힐러가 근접보다 먼저', AI.healTarget(healer, state, heal).uid, healer.uid);
 
-  // 마나가 없으면 판단 자체가 성립하지 않는다.
+  // 마나가 없으면 힐이 아니라 마나를 되찾는 쪽을 고른다. 마나를 주로 쓰는
+  // 계열은 1레벨부터 그 스킬을 들고 온다.
   healer.mp = 0;
   tank.hp = tank.maxHp - heal;
+  const dry = AI.chooseSkill(healer, state, enemies(state)[0]);
   check('마나가 없으면 힐 스킬을 고르지 않는다',
+    dry && D.UNIT_SKILLS[dry.id].kind === 'heal', false);
+  check('대신 마나를 되찾는다', dry && D.UNIT_SKILLS[dry.id].kind, 'mana');
+
+  // 그 스킬마저 없으면 아무것도 고르지 않는다.
+  healer.skills = healer.skills.filter((slot) => D.UNIT_SKILLS[slot.id].kind !== 'mana');
+  check('되찾을 길이 없으면 아무것도 못 쓴다',
     AI.chooseSkill(healer, state, enemies(state)[0]), null);
 }
 

@@ -206,6 +206,7 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
   display: flex; flex-direction: column; gap: 8px;
 }
 .panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+#char-job { margin-right: auto; }
 .count { color: var(--muted); font-size: 13px; font-weight: 600; }
 .panel-note { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
 
@@ -222,7 +223,17 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .pick[aria-pressed="true"] { background: var(--sel); border-color: var(--btn-bg); }
 .pick.locked { opacity: 0.45; cursor: default; }
 .pick .avatar { width: 26px; height: 34px; flex: none; }
-.pick .icon { width: 26px; text-align: center; font-size: 18px; flex: none; }
+/* 아이콘은 글자가 아니라 SVG다. 글자 크기 대신 상자 크기로 재고, `currentColor`로
+   그리므로 색은 놓인 자리가 정한다. 줄 안에서는 글자와 밑선을 맞춘다. */
+.ico-box { display: inline-flex; flex: none; line-height: 0; vertical-align: -0.18em; }
+.ico-box svg { width: 1.15em; height: 1.15em; }
+.pick .icon, .item .icon, .slot-row .icon, .skill-row .icon {
+  width: 26px; justify-content: center; flex: none;
+}
+.pick .icon svg, .item .icon svg, .slot-row .icon svg, .skill-row .icon svg {
+  width: 22px; height: 22px;
+}
+.with-ico { display: inline-flex; align-items: center; gap: 6px; }
 .pick-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .pick-name { font-weight: 700; font-size: 15px; display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
 .pick-name .job { font-size: 12px; font-weight: 600; color: var(--muted); }
@@ -243,6 +254,8 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .job.spec-grunt { color: var(--spec-grunt); }
 
 /* 스킬 이름표. 색이 무엇을 하는 스킬인지를 알린다. */
+.chip { display: inline-flex; align-items: center; gap: 4px; }
+.chip .ico-box svg { width: 13px; height: 13px; }
 .chip.skill { border-color: currentColor; }
 .chip.skill.harm { color: var(--kind-harm); }
 .chip.skill.bane { color: var(--kind-bane); }
@@ -489,7 +502,7 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
   padding: 8px 4px 6px; cursor: pointer; overflow: hidden;
   display: flex; flex-direction: column; align-items: center; gap: 2px;
 }
-.slot .glyph { font-size: 19px; line-height: 1; }
+.slot .glyph svg { width: 22px; height: 22px; }
 .slot .sname {
   font-size: 10px; font-weight: 700; max-width: 100%;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -592,7 +605,8 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
   display: flex; flex-direction: column; align-items: center; gap: 3px;
   border-top: 2px solid transparent; margin-top: -1px;
 }
-.tab-icon { font-size: 19px; line-height: 1; }
+.tab-icon { display: inline-flex; line-height: 0; }
+.tab-icon svg { width: 21px; height: 21px; }
 .tab[aria-pressed="true"] { color: var(--fg); border-top-color: var(--btn-bg); }
 
 .tab-page { display: flex; flex-direction: column; gap: clamp(8px, 2vmin, 14px); }
@@ -747,6 +761,8 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
   font-size: clamp(13px, 2.8vw, 19px);
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
 }
+.float.ico-float { line-height: 0; }
+.float.ico-float svg { width: clamp(16px, 3.4vw, 24px); height: clamp(16px, 3.4vw, 24px); }
 .float.skill.harm { color: var(--kind-harm); }
 .float.skill.bane { color: var(--kind-bane); }
 .float.skill.mend { color: var(--kind-mend); }

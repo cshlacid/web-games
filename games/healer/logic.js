@@ -142,10 +142,10 @@ function spawnWave(state, index) {
     const def = D.ENEMIES[defId];
     const x = D.FIELD.w - 10 - (i % 2) * 9;
     const y = laneY(i, wave.length);
-    // 적도 직업에 따라 물약을 들고 온다. 아군만 마나를 되찾을 수 있으면
-    // 뒤 웨이브의 주술사가 그냥 서 있는 상대가 된다.
+    // 물약은 인간형만 마신다. 지금 적은 전부 비인간형이라 빈손으로 오는데,
+    // 그 대신 마나를 쓰는 계열은 마나를 되찾는 스킬을 1레벨부터 들고 온다.
     state.units.push(makeUnit(def, 'enemy', `e${index}_${i}`, x, y, state.quest.level || 1,
-      null, null, D.JOB_POTIONS[def.job]));
+      null, null, D.potionsFor(def)));
   });
   emit(state, { type: 'wave', index, total: state.quest.waves.length,
     text: `${index + 1}번째 무리 (${state.quest.waves.length} 중)` });
@@ -163,7 +163,7 @@ function createBattle(config) {
       def: D.COMPANIONS[entry.defId],
       level: entry.level || 1,
       bonus: entry.bonus,
-      potions: entry.potions || D.JOB_POTIONS[(D.COMPANIONS[entry.defId] || {}).job],
+      potions: entry.potions || D.potionsFor(D.COMPANIONS[entry.defId]),
       name: entry.name,
     }))
     .filter((entry) => entry.def);
@@ -637,6 +637,12 @@ function checkEnd(state) {
     if (!state.nextWaveAt) {
       state.nextWaveAt = state.t + WAVE_GAP;
       state.marching = true;
+      // **깔아 둔 장판은 그 자리에 두고 온다.** 장판은 유닛 좌표계에 있고 이동
+      // 중에는 그 좌표가 그대로라, 배경만 흘러가면 장판이 파티를 따라오는
+      // 것으로 보인다. 시체를 치우는 것과 같은 이유다. 남겨 두면 걸어가는 동안
+      // 회복 장판이 공짜로 도는 문제도 함께 있다. 도트는 몸에 붙은 것이라
+      // 따라가는 것이 맞으므로 건드리지 않는다.
+      state.zones = [];
       emit(state, { type: 'march', text: '다음 무리를 찾아 나선다' });
     } else if (state.t >= state.nextWaveAt) {
       state.nextWaveAt = 0;

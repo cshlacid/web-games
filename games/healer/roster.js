@@ -133,9 +133,10 @@ function bonusOf(member) {
 }
 
 // 직업에 따라 자동으로 들고 들어가는 물약. 마나를 다 쓴 사제가 남은 전투 내내
-// 서 있는 것을 막는 것이 이 표의 목적이다.
+// 서 있는 것을 막는 것이 이 표의 목적이다. **인간형만 마신다** — 종족이 그것을
+// 정하므로 여기서 다시 따지지 않고 data.js의 potionsFor에 맡긴다.
 function potionsOf(member) {
-  return Object.assign({}, D.JOB_POTIONS[jobOf(member)] || {});
+  return D.potionsFor(defOf(member));
 }
 
 // 전투가 받을 꼴로 바꾼다. 편성 화면이 고른 것을 그대로 넘기면 전투가 명부의

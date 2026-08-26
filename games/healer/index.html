@@ -6,7 +6,7 @@
 <title>힐러</title>
 <meta name="description" content="파티에서 힐러 하나만 맡는다. 나머지는 알아서 싸운다">
 <meta name="color-scheme" content="light dark">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>✚</text></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M10 3 H14 V10 H21 V14 H14 V21 H10 V14 H3 V10 H10 Z' fill='%23e05c6e'/></svg>">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -47,6 +47,7 @@
       <div class="panel">
         <div class="panel-head">
           <h2>주인공</h2>
+          <span id="char-job"></span>
           <span class="count" id="char-gold">0 골드</span>
         </div>
         <ul class="levels" id="char-levels"></ul>
@@ -239,13 +240,13 @@
 
   <nav class="tabbar" id="tabbar">
     <button class="tab" type="button" data-tab="quest" aria-pressed="true">
-      <span class="tab-icon">📜</span><span>퀘스트</span>
+      <span class="tab-icon" data-icon="scroll"></span><span>퀘스트</span>
     </button>
     <button class="tab" type="button" data-tab="character" aria-pressed="false">
-      <span class="tab-icon">✚</span><span>캐릭터</span>
+      <span class="tab-icon" data-icon="cross"></span><span>캐릭터</span>
     </button>
     <button class="tab" type="button" data-tab="shop" aria-pressed="false">
-      <span class="tab-icon">🛒</span><span>상점</span>
+      <span class="tab-icon" data-icon="cart"></span><span>상점</span>
     </button>
   </nav>
 
@@ -289,6 +290,7 @@
 <script src="../../shared/audio.js"></script>
 <script src="data.js"></script>
 <script src="sprites.js"></script>
+<script src="icons.js"></script>
 <script src="scenes.js"></script>
 <script src="items.js"></script>
 <script src="roster.js"></script>
