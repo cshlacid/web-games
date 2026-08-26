@@ -151,6 +151,13 @@ function runQuest(progress, seed, autoHeal, questOver) {
   check('경험치가 오른다', out.reward.charExp > 0, true);
   check('명부 전원이 보고에 들어간다', out.roster.length, progress.roster.length);
 
+  // 결과 화면이 그리는 캐릭터별 리포트. 화면 코드를 직접 돌릴 수 없으니 화면이
+  // 부르는 것을 여기서도 부른다.
+  const report = L.battleReport(state);
+  check('파티 전원이 리포트에 들어간다', report.length, party.length + 1);
+  check('숫자가 다 채워진다',
+    report.every((row) => Number.isFinite(row.dealt + row.taken + row.healed)), true);
+
   // 동료 몫 장비가 실제로 그 동료에게 간다. 이것이 없으면 직업 우선 분배가
   // 결과 화면의 글자로만 남는다.
   const gearDrops = quest.drops.filter((item) => Items.isGear(item));

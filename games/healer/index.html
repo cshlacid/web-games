@@ -26,7 +26,7 @@
     <div class="sub-row">
       <button class="step-back" id="step-back" type="button" hidden>← 뒤로</button>
       <span class="step" id="step-name">퀘스트</span>
-      <span class="step-note" id="step-note">길드 게시판</span>
+      <span class="step-note" id="step-note">모험가 길드 게시판</span>
     </div>
   </header>
 
@@ -169,7 +169,6 @@
         <div class="reach" id="reach" hidden></div>
         <div class="aim" id="aim" hidden></div>
       </div>
-      <p class="aim-hint" id="aim-hint" hidden></p>
     </div>
 
     <!-- 적 초상화가 위, 아군이 아래. 전장의 왼쪽/오른쪽과 같은 순서로 두면
@@ -182,12 +181,22 @@
     </div>
 
     <div class="skillbar" id="skillbar"></div>
+    <!-- 조준 안내는 스킬 아래에 둔다. 전장과 초상화 사이에 두었더니 스킬을
+         고를 때마다 안내가 나타나 스킬 버튼이 손가락 아래에서 밀렸다. -->
+    <p class="aim-hint" id="aim-hint" hidden></p>
   </section>
 
   <!-- 결과: 경험치·보상 분배·장착 -->
   <section class="screen" id="screen-result" hidden>
     <p class="verdict" id="verdict"></p>
     <p class="verdict-note" id="verdict-note"></p>
+
+    <!-- 전투 리포트. 전투 중에는 체력 막대로만 보이고 끝나면 그것도 사라져,
+         누구를 다음에 데려갈지 판단할 근거가 남지 않는다. -->
+    <div class="panel">
+      <div class="panel-head"><h2>전투 리포트</h2></div>
+      <ul class="report" id="battle-report"></ul>
+    </div>
 
     <div class="panel" id="exp-panel">
       <div class="panel-head"><h2>경험치</h2></div>
@@ -196,7 +205,7 @@
     </div>
 
     <div class="panel" id="guild-panel">
-      <div class="panel-head"><h2>길드 확정 보상</h2></div>
+      <div class="panel-head"><h2>모험가 길드 확정 보상</h2></div>
       <p class="panel-note">완료하면 나누지 않고 그대로 받는다.</p>
       <ul class="loot" id="guild-loot"></ul>
     </div>
@@ -217,7 +226,7 @@
 
     <div class="panel" id="gain-panel">
       <div class="panel-head"><h2>내 몫</h2></div>
-      <p class="panel-note">장비는 바로 장착할 수 있다. 재료는 길드에 팔아 골드가 된다.</p>
+      <p class="panel-note">장비는 바로 장착할 수 있다. 재료는 모험가 길드에 팔아 골드가 된다.</p>
       <ul class="inventory" id="gained"></ul>
     </div>
 
@@ -265,7 +274,7 @@
       <li><b>레벨이 둘이다.</b> 캐릭터 레벨은 능력치를, 직업 레벨은 스킬 해금을
         맡는다. <b>회복시킨 만큼 직업 경험치가 쌓인다</b> — 흘린 힐은 빼고 실제로
         채운 만큼만이다.</li>
-      <li>주인공이 쓰러지거나 파티가 전멸하면 실패한다. 실패해도 길드 몫의 절반은
+      <li>주인공이 쓰러지거나 파티가 전멸하면 실패한다. 실패해도 모험가 길드 몫의 절반은
         받는다.</li>
     </ul>
     <div class="sheet-actions">
