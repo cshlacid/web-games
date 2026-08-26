@@ -601,3 +601,13 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 
 /* 빗나간 공격. 숫자가 아니라 글자라 피해·회복과 헷갈리지 않는다. */
 .float.miss { color: var(--muted); font-size: clamp(10px, 2vw, 13px); }
+
+/* 치명타. 색만 다르게 하면 피해·회복과 헷갈리고 숫자만 키우면 그냥 많이 맞은
+   것으로 보인다 — 크기와 테두리를 함께 준다. */
+.float.crit {
+  font-size: clamp(15px, 3.2vw, 22px);
+  -webkit-text-stroke: 0.6px rgba(0, 0, 0, 0.55);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+.float.harm.crit { color: #ff9a3c; }
+.float.heal.crit { color: #8fe07a; }

@@ -28,8 +28,8 @@ const JOBS = {
 // 않다 — 탱커의 26과 우두머리의 116을 하나의 계수로 이으면 직업 색깔이 사라진다.
 // 그래서 공격력·회복량은 기준 능력치에서 얼마나 벗어났는지로 곱한다.
 const ATTRS = {
-  str: { id: 'str', name: '힘',   effect: '물리 공격력' },
-  agi: { id: 'agi', name: '민첩', effect: '회피' },
+  str: { id: 'str', name: '힘',   effect: '물리 공격력 · 치명타 피해' },
+  agi: { id: 'agi', name: '민첩', effect: '회피 · 치명타 확률' },
   int: { id: 'int', name: '지능', effect: '마법 공격력 · 회복량 · 최대 마나' },
   vit: { id: 'vit', name: '체력', effect: '최대 체력' },
 };
@@ -50,6 +50,24 @@ const ATTR = {
   // 회피율. 상한이 없으면 높은 레벨에서 서로 못 맞히는 전투가 된다.
   dodgePerAgi: 0.0025,
   dodgeCap: 0.30,
+
+  // 치명타. 확률은 민첩이, 추가 피해는 힘이 정한다. 둘 다 능력치에 곧바로 비례한다.
+  //
+  // 기준 대비 비율로 잡아 봤더니 같은 레벨의 모든 캐릭터가 거의 같은 치명타
+  // 피해를 냈다 — 비율은 레벨에 따라서만 오르기 때문이다. 치명타 피해는 그
+  // 캐릭터가 힘을 쓰는 쪽인지를 나타내야 하므로 힘 자체에 비례시키고, 대신
+  // 상한으로 높은 레벨에서 부풀지 않게 막는다.
+  critPerAgi: 0.002,
+  critCap: 0.40,
+  critBase: 1.5,             // 치명타의 기본 배수
+  critDamagePerStr: 0.004,
+  critDamageCap: 2.5,
+
+  // 회피는 치명타에도 걸린다. 맞더라도 치명타는 아닌 것으로 무르고(critAvoid),
+  // 그래도 터지면 추가 피해를 깎는다(critCut). 회피가 상한일 때 추가 피해가
+  // 절반이 되도록 잡았다.
+  critAvoid: 1,
+  critCut: 0.5,
   // 레벨당 나눠 줄 점수. 주인공만 받는다.
   pointsPerLevel: 3,
 };
@@ -93,6 +111,11 @@ function derive(def, attrs) {
     heal: 1 + (smarts - 1) * ATTR.healRatio,
     spell: 1 + (smarts - 1) * ATTR.spellRatio,
     dodge: Math.min(ATTR.dodgeCap, attrs.agi * ATTR.dodgePerAgi),
+    crit: Math.min(ATTR.critCap, attrs.agi * ATTR.critPerAgi),
+    // 공격 방식과 무관하게 힘이 정한다 — 시전자는 자주 터뜨려도 세게 때리지는
+    // 못한다는 뜻이고, 그것이 힘과 지능을 가르는 자리다.
+    critDamage: Math.min(ATTR.critDamageCap,
+      ATTR.critBase + attrs.str * ATTR.critDamagePerStr),
   };
 }
 
