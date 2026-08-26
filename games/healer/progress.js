@@ -24,6 +24,9 @@ function create() {
     version: VERSION,
     charLevel: 1, charExp: 0,
     jobLevel: 1, jobExp: 0,
+    // 레벨이 오를 때마다 받는 점수를 어디에 넣었는지. 자동으로 오르는 몫은
+    // 여기 없다 — 그쪽은 레벨에서 바로 계산된다.
+    spent: { str: 0, agi: 0, int: 0, vit: 0 },
     gold: 0,
     // 장착은 인벤토리 항목을 가리키는 것이 아니라 따로 들고 있는다. 인벤토리
     // 인덱스를 가리키면 아이템 하나가 빠질 때마다 장착이 엉뚱한 것으로 바뀐다.
@@ -78,26 +81,46 @@ function addExp(progress, charExp, jobExp) {
 
 // 기본값 + 장비. 화면과 전투가 같은 함수를 봐야 캐릭터 창의 수치와 실제 전투가
 // 어긋나지 않는다.
+// 레벨과 나눠 준 점수를 반영한 능력치. 화면과 전투가 같은 값을 봐야 캐릭터 창에
+// 적힌 것과 실제 전투가 어긋나지 않는다.
+function attrs(progress) {
+  return D.attrsAt(D.HERO, progress.charLevel, progress.spent);
+}
+
+// 레벨당 받는 점수. 아직 쓰지 않은 것이 몇인지는 받은 것에서 쓴 것을 뺀 값이다 —
+// 따로 세어 두면 저장본이 어긋났을 때 점수가 늘거나 줄어든다.
+function earnedPoints(progress) {
+  return (progress.charLevel - 1) * D.ATTR.pointsPerLevel;
+}
+
+function spentPoints(progress) {
+  return Object.values(progress.spent).reduce((sum, n) => sum + Math.max(0, n | 0), 0);
+}
+
+const freePoints = (progress) => Math.max(0, earnedPoints(progress) - spentPoints(progress));
+
+function spendPoint(progress, attr) {
+  if (!D.ATTRS[attr]) return { ok: false, reason: '없는 능력치' };
+  if (freePoints(progress) <= 0) return { ok: false, reason: '남은 점수가 없다' };
+  progress.spent[attr] = (progress.spent[attr] || 0) + 1;
+  return { ok: true, left: freePoints(progress) };
+}
+
 function stats(progress) {
-  const base = {
-    hp: D.LEVEL.heroHp(progress.charLevel),
-    mp: D.LEVEL.heroMp(progress.charLevel, progress.jobLevel),
-    heal: D.LEVEL.heroHeal(progress.jobLevel),
-    armor: D.HERO.armor,
-  };
-
+  const own = attrs(progress);
+  const derived = D.derive(D.HERO, own);
   const bonus = Items.sum(equippedItems(progress));
-  base.hp += bonus.hp || 0;
-  base.mp += bonus.mp || 0;
-  base.heal += bonus.heal || 0;
-  base.armor += bonus.armor || 0;
 
-  // 방어 계수가 0 아래로 내려가면 피해가 회복이 된다. 장비를 아무리 겹쳐도
-  // 넘지 못하는 바닥을 둔다.
-  base.armor = Math.max(0.35, base.armor);
-  base.hp = Math.round(base.hp);
-  base.mp = Math.round(base.mp);
-  return base;
+  return {
+    attrs: own,
+    hp: Math.round(derived.hp + (bonus.hp || 0)),
+    mp: Math.round(derived.mp + (bonus.mp || 0)),
+    heal: derived.heal + (bonus.heal || 0),
+    dodge: derived.dodge,
+    // 방어 계수가 0 아래로 내려가면 피해가 회복이 된다. 장비를 아무리 겹쳐도
+    // 넘지 못하는 바닥을 둔다.
+    armor: Math.max(0.35, D.HERO.armor + (bonus.armor || 0)),
+  };
 }
 
 function equippedItems(progress) {
@@ -252,6 +275,17 @@ function load() {
     progress.potions[id] = Math.max(0, Math.min(D.POTION_MAX, saved2 | 0));
   }
 
+  // 쓴 점수는 받은 점수를 넘을 수 없다. 저장본을 손대면 능력치가 무한히 오른다.
+  progress.spent = { str: 0, agi: 0, int: 0, vit: 0 };
+  let budget = (Math.max(1, Math.min(D.LEVEL.maxLevel, saved.charLevel | 0 || 1)) - 1)
+    * D.ATTR.pointsPerLevel;
+  for (const key of Object.keys(D.ATTRS)) {
+    const want = Math.max(0, (saved.spent || {})[key] | 0);
+    const give = Math.min(want, budget);
+    progress.spent[key] = give;
+    budget -= give;
+  }
+
   progress.roster = Roster.adopt(saved.roster);
   progress.charLevel = Math.max(1, Math.min(D.LEVEL.maxLevel, progress.charLevel | 0));
   progress.jobLevel = Math.max(1, Math.min(D.LEVEL.maxLevel, progress.jobLevel | 0));
@@ -266,7 +300,8 @@ function reset() {
 
 const api = {
   STORAGE_KEY, VERSION, create, load, save, reset,
-  addExp, gainLevels, stats, equippedItems,
+  addExp, gainLevels, stats, attrs, equippedItems,
+  earnedPoints, spentPoints, freePoints, spendPoint,
   addItem, findItem, equip, unequip, compare,
   spend, buyGear, buyPotion, sell,
   unlockedSkills, validSkills,

@@ -47,25 +47,30 @@ function drainEvents(state) {
 
 // 레벨은 수치를 곱하는 것으로만 표현한다. 레벨마다 다른 유닛을 적어 두면 자료가
 // 레벨 수만큼 불어나고, 레벨 하나를 고칠 때마다 다른 레벨과 어긋난다.
-// override는 주인공처럼 수치가 밖에서 정해지는 경우, bonus는 동료의 장비 몫이다.
-// 둘을 나눈 것은 동료의 기본 수치는 레벨로 곱해야 하고 장비는 그 위에 더해야
-// 하기 때문이다 — 장비까지 레벨로 곱하면 높은 레벨에서 장비가 전부를 결정한다.
+// **수치는 능력치에서 나온다**(data.js의 attrsAt/derive). 레벨은 능력치를 올리고,
+// 능력치가 체력·마나·공격력·회복량·회피를 만든다.
+//
+// override는 주인공처럼 능력치가 밖에서 정해지는 경우(나눠 준 점수까지 반영해
+// progress.js가 계산한다), bonus는 장비 몫이다. 장비는 능력치가 아니라 결과
+// 수치에 더한다 — 장비까지 레벨로 곱하면 높은 레벨에서 장비가 전부를 결정한다.
 function makeUnit(def, side, uid, x, y, level, override, bonus, potions, name) {
-  const hpMul = side === 'enemy' ? D.LEVEL.enemyHp(level) : D.LEVEL.allyHp(level);
-  const atkMul = side === 'enemy' ? D.LEVEL.enemyAtk(level) : D.LEVEL.allyAtk(level);
   const gear = bonus || {};
-  const hp = Math.round(((override && override.hp) || def.hp * hpMul) + (gear.hp || 0));
-  const baseMp = (override && override.mp) != null ? override.mp : def.mp * hpMul;
-  const mp = Math.round(baseMp + (gear.mp || 0));
+  const attrs = (override && override.attrs) || D.attrsAt(def, level, null);
+  const stats = D.derive(def, attrs);
+  const hp = Math.round(stats.hp + (gear.hp || 0));
+  const mp = Math.round(stats.mp + (gear.mp || 0));
 
   return {
     uid, defId: def.id, name: name || def.name, job: def.job, sprite: def.sprite, side, level,
-    x, y,
+    x, y, attrs,
     hp, maxHp: hp,
     mp, maxMp: mp,
-    atk: def.atk * atkMul * (1 + (gear.atk || 0)),
+    atk: stats.atk * (1 + (gear.atk || 0)),
     armor: Math.max(0.35, ((override && override.armor) || def.armor) + (gear.armor || 0)),
-    healPower: ((override && override.heal) || 1) + (gear.heal || 0),
+    healPower: stats.heal + (gear.heal || 0),
+    spellPower: stats.spell,
+    // 회피는 능력치에서만 온다. 장비에 붙이면 회피만 쌓는 것이 최선이 된다.
+    dodge: stats.dodge,
     // 직업에 따라 자동으로 들고 들어간다. 마나를 다 쓴 사제가 남은 전투 내내
     // 서 있는 것을 막는 것이 이것의 목적이다.
     potions: Object.assign({}, potions),
@@ -125,7 +130,8 @@ function spawnWave(state, index) {
 // 필요가 없고, 캐릭터 창에 적힌 수치가 곧 전투에서 쓰이는 수치가 된다.
 function createBattle(config) {
   const quest = config.quest;
-  const heroStats = config.heroStats || { hp: D.HERO.hp, mp: D.HERO.mp, heal: 1, armor: D.HERO.armor };
+  const heroStats = config.heroStats
+    || { attrs: D.attrsAt(D.HERO, config.heroLevel || 1, null), armor: D.HERO.armor };
   const party = (config.party || [])
     .map((entry) => ({
       def: D.COMPANIONS[entry.defId],
@@ -159,6 +165,10 @@ function createBattle(config) {
 
 const hero = (state) => byUid(state, HERO_UID);
 
+// 마법 피해 배수. 회복량과 같은 지능에서 오지만 몫이 작다 — 힐러의 성장이
+// 딜러 노릇을 잘하게 만드는 쪽으로 흐르면 이 게임이 아니게 된다.
+const magicPowerOf = (unit) => unit.spellPower;
+
 // --- 피해와 회복 -------------------------------------------------------
 
 function addThreat(state, source, target, amount) {
@@ -167,8 +177,16 @@ function addThreat(state, source, target, amount) {
   table[source.uid] = (table[source.uid] || 0) + amount * source.threatMul;
 }
 
-function applyDamage(state, source, target, raw) {
+// 회피는 때리는 것에만 걸린다. 장판과 도트까지 피할 수 있으면 민첩 하나로
+// 모든 것을 무르는 능력치가 되고, 어디에 장판을 깔지 고르는 뜻도 사라진다.
+function applyDamage(state, source, target, raw, dodgeable) {
   if (target.dead) return 0;
+
+  if (dodgeable && target.dodge > 0 && state.rng() < target.dodge) {
+    emit(state, { type: 'dodge', uid: target.uid });
+    return 0;
+  }
+
   const amount = Math.max(1, Math.round(raw * target.armor));
   target.hp = Math.max(0, target.hp - amount);
   addThreat(state, source, target, amount);
@@ -286,7 +304,7 @@ function runUnitSkill(state, unit, choice) {
   }
   if (def.kind === 'heal') { applyHeal(state, unit, target, def.heal); return; }
   if (def.kind === 'dot') { addDot(state, unit, target, def, 'damage'); return; }
-  if (def.kind === 'damage') { applyDamage(state, unit, target, unit.atk * def.mul); return; }
+  if (def.kind === 'damage') { applyDamage(state, unit, target, unit.atk * def.mul, true); return; }
   if (def.kind === 'damage-area') {
     for (const foe of alive(state, AI.opposite(unit.side))) {
       if (dist(foe, target) <= def.radius) applyDamage(state, unit, foe, unit.atk * def.mul);
@@ -392,21 +410,25 @@ function castSkill(state, skillId, target) {
   emit(state, { type: 'cast', uid: caster.uid, skillId, name: def.name,
     x: spot.x, y: spot.y, radius: def.radius || 0, text: `${def.name}` });
 
-  // 회복량에만 배수가 붙는다. 피해에 붙이지 않는 것은, 힐러의 성장이 딜러
-  // 노릇을 잘하게 만드는 쪽으로 흐르면 이 게임이 아니게 되기 때문이다.
+  // 회복량은 회복력 배수를, 피해는 마법 공격력 배수를 탄다. 지능이 둘 다
+  // 올리지만 계수가 달라서, 지능을 올린다고 딜러 노릇이 힐러 노릇을 앞지르지는
+  // 않는다 — 회복 쪽 계수가 더 크다.
   const heal = (base) => Math.round(base * caster.healPower);
+  const harm = (base) => Math.round(base * magicPowerOf(caster));
 
   if (def.mana) caster.mp = Math.min(caster.maxMp, caster.mp + def.mana);
   else if (def.targeting === 'ally' && def.heal) applyHeal(state, caster, spot.unit, heal(def.heal));
   else if (def.targeting === 'ally') addDot(state, caster, spot.unit, def, 'heal', heal(def.tick));
-  else if (def.targeting === 'enemy') addDot(state, caster, spot.unit, def, 'damage');
+  else if (def.targeting === 'enemy') addDot(state, caster, spot.unit, def, 'damage', harm(def.tick));
   else if (def.targeting === 'area-ally' && def.heal) {
     for (const unit of alive(state, 'ally')) {
       if (dist(unit, spot) <= def.radius) applyHeal(state, caster, unit, heal(def.heal));
     }
   } else if (def.targeting === 'area-ally') {
     addZone(state, caster, def, spot.x, spot.y, 'heal', heal(def.tick));
-  } else if (def.targeting === 'area-enemy') addZone(state, caster, def, spot.x, spot.y, 'damage');
+  } else if (def.targeting === 'area-enemy') {
+    addZone(state, caster, def, spot.x, spot.y, 'damage', harm(def.tick));
+  }
 
   return { ok: true };
 }
@@ -485,7 +507,7 @@ function step(state, dt) {
         unit.nextAttackAt = state.t + unit.attackCd;
         // 피해에 ±10%를 준다. 같은 적을 같은 순서로 때려도 죽는 시점이 조금씩
         // 달라야 힐 타이밍이 외워지지 않는다.
-        applyDamage(state, unit, target, unit.atk * (0.9 + state.rng() * 0.2));
+        applyDamage(state, unit, target, unit.atk * (0.9 + state.rng() * 0.2), true);
       }
     }
   }
@@ -531,7 +553,7 @@ function rewardOf(state) {
 const api = {
   HERO_UID, TICK, WAVE_GAP, rewardOf,
   createRng, createBattle, advance, step, drainEvents,
-  castSkill, usePotion, drink, applyDamage, applyHeal, addDot, addZone,
+  castSkill, usePotion, drink, magicPowerOf, applyDamage, applyHeal, addDot, addZone,
   hero, skillSlot, resolveTarget,
 };
 

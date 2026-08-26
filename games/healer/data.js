@@ -21,6 +21,81 @@ const JOBS = {
   healer: { name: '힐러', role: '탱커 체력 관리 최우선' },
 };
 
+// 능력치 넷. 모든 캐릭터가 갖고, 화면에 보이는 수치는 전부 여기서 나온다.
+//
+// **최대 체력과 최대 마나는 능력치에서 곧바로 나오고, 공격력과 회복량은 배수로
+// 붙는다.** 체력·마나는 직업이 달라도 같은 잣대로 잴 수 있지만, 공격력은 그렇지
+// 않다 — 탱커의 26과 우두머리의 116을 하나의 계수로 이으면 직업 색깔이 사라진다.
+// 그래서 공격력·회복량은 기준 능력치에서 얼마나 벗어났는지로 곱한다.
+const ATTRS = {
+  str: { id: 'str', name: '힘',   effect: '물리 공격력' },
+  agi: { id: 'agi', name: '민첩', effect: '회피' },
+  int: { id: 'int', name: '지능', effect: '마법 공격력 · 회복량 · 최대 마나' },
+  vit: { id: 'vit', name: '체력', effect: '최대 체력' },
+};
+
+const ATTR = {
+  hpPerVit: 14,
+  mpPerInt: 8,
+  // 공격력·회복량은 **기준 능력치 대비 비율**로 오른다. 차이(빼기)로 두었더니
+  // 기준이 낮은 유닛과 높은 유닛의 성장 속도가 달라졌다 — 힘 20짜리 탱커와
+  // 힘 89짜리 우두머리가 같은 계수에서 전혀 다른 곡선을 그렸다.
+  //
+  // 공격력은 비율을 그대로 쓰고(힘이 두 배면 공격력도 두 배), 회복량과 주문
+  // 피해는 그 일부만 받는다. 회복량 쪽이 큰 것은 의도한 것이다 — 지능을 올린
+  // 힐러가 딜러 노릇을 더 잘하게 되면 이 게임이 아니게 된다.
+  powerRatio: 1,      // 때리는 공격력(힘 또는 지능)
+  healRatio: 0.4,     // 회복량
+  spellRatio: 0.25,   // 주인공의 주문 피해
+  // 회피율. 상한이 없으면 높은 레벨에서 서로 못 맞히는 전투가 된다.
+  dodgePerAgi: 0.0025,
+  dodgeCap: 0.30,
+  // 레벨당 나눠 줄 점수. 주인공만 받는다.
+  pointsPerLevel: 3,
+};
+
+// 레벨당 능력치가 기준의 몇 분의 몇씩 오르는지. 예전의 체력·공격력 배수를 그대로
+// 옮긴 값이라, 레벨 1에서도 높은 레벨에서도 지금까지의 수치와 거의 같다.
+const ATTR_GROWTH = {
+  hero:  { str: 0.10, agi: 0.10, int: 0.15, vit: 0.095 },
+  ally:  { str: 0.20, agi: 0.20, int: 0.22, vit: 0.26 },
+  enemy: { str: 0.22, agi: 0.22, int: 0.26, vit: 0.30 },
+};
+
+// 레벨과 나눠 준 점수를 반영한 실제 능력치.
+function attrsAt(def, level, spent) {
+  const growth = ATTR_GROWTH[def.growth || 'ally'];
+  const out = {};
+  for (const key of Object.keys(ATTRS)) {
+    const base = (def.attrs || {})[key] || 1;
+    out[key] = Math.round(base * (1 + growth[key] * (Math.max(1, level) - 1)))
+      + ((spent || {})[key] || 0);
+  }
+  return out;
+}
+
+// 능력치에서 실제 수치로. 화면과 전투가 같은 함수를 봐야 캐릭터 창에 적힌 것과
+// 전투에서 쓰는 것이 어긋나지 않는다.
+// 기준 대비 몇 배인지. 기준이 0이면 나눌 수 없으므로 1로 본다.
+const ratioOf = (attrs, base, key) => attrs[key] / ((base || {})[key] || attrs[key] || 1);
+
+function derive(def, attrs) {
+  const base = def.attrs || {};
+  // 마법을 쓰는 쪽은 지능이, 나머지는 힘이 공격력을 올린다.
+  const key = def.attackType === 'magic' ? 'int' : 'str';
+  const power = ratioOf(attrs, base, key);
+  const smarts = ratioOf(attrs, base, 'int');
+
+  return {
+    hp: Math.round(attrs.vit * ATTR.hpPerVit),
+    mp: Math.round(attrs.int * ATTR.mpPerInt),
+    atk: (def.atk || 0) * (1 + (power - 1) * ATTR.powerRatio),
+    heal: 1 + (smarts - 1) * ATTR.healRatio,
+    spell: 1 + (smarts - 1) * ATTR.spellRatio,
+    dodge: Math.min(ATTR.dodgeCap, attrs.agi * ATTR.dodgePerAgi),
+  };
+}
+
 // 레벨과 경험치. 캐릭터 레벨과 직업 레벨을 따로 두는 것은 둘이 오르는 이유가
 // 다르기 때문이다 — 캐릭터 레벨은 전투를 치르면 오르고, 직업 레벨은 힐러 노릇을
 // 얼마나 했는지로 오른다. 힐만 하다 전투가 끝나도 남는 것이 있어야 한다.
@@ -29,19 +104,8 @@ const LEVEL = {
   charExpTo: (level) => Math.round(90 * Math.pow(level, 1.45)),
   jobExpTo: (level) => Math.round(70 * Math.pow(level, 1.4)),
 
-  // 주인공의 기본 수치. 레벨 1에서 예전 고정값과 같아지도록 맞췄다.
-  heroHp: (charLevel) => 380 + 40 * charLevel,
-  heroMp: (charLevel, jobLevel) => 170 + 20 * charLevel + 10 * jobLevel,
-  // 직업 레벨이 회복량을 올린다. 캐릭터 레벨이 올리지 않는 것은, 힐러로서의
-  // 숙련과 모험가로서의 성장을 가르기 위해서다.
-  heroHeal: (jobLevel) => 1 + 0.06 * (jobLevel - 1),
-
-  // 적과 동료는 레벨로 곱해 쓴다. 체력이 공격력보다 가파른 것은, 그래야 전투가
-  // 짧아지지 않고 힐러가 할 일이 남는다.
-  enemyHp: (level) => 1 + 0.30 * (level - 1),
-  enemyAtk: (level) => 1 + 0.22 * (level - 1),
-  allyHp: (level) => 1 + 0.26 * (level - 1),
-  allyAtk: (level) => 1 + 0.20 * (level - 1),
+  // 체력·마나·공격력·회복량은 이제 능력치(ATTRS)가 정한다. 레벨은 능력치를
+  // 올리고, 능력치가 수치를 만든다.
 
   // 힐 경험치. 흘린 힐은 세지 않는다 — 마나를 아껴 쓸 이유를 경험치가 무너뜨리면
   // 안 된다. 실제로 채운 만큼만 쌓인다.
@@ -141,6 +205,11 @@ const HERO = {
   name: '주인공',
   job: 'healer',
   sprite: 'hero',
+  growth: 'hero',
+  // 능력치가 곧 수치다: 체력 30 → 최대 체력 420, 지능 25 → 최대 마나 200.
+  // 레벨이 오르면 자동으로 조금 오르고, 그 위에 나눠 주는 점수가 얹힌다.
+  attrs: { str: 8, agi: 10, int: 25, vit: 30 },
+  attackType: 'magic',
   hp: 420, mp: 200,
   atk: 0, attackCd: Infinity, range: 0, speed: 0,
   armor: 0.9,
@@ -159,35 +228,43 @@ const HERO = {
 // 물약 구성(JOB_POTIONS)이 전투 중에 뜻을 가진다.
 const COMPANIONS = {
   bran:  { id: 'bran',  name: '강철의 브란', job: 'tank',   sprite: 'tank',
-           hp: 1150, mp: 90,  atk: 26, attackCd: 1.6, range: 7,  speed: 17,
+           hp: 1148, mp: 88,  atk: 26, attackCd: 1.6, range: 7,  speed: 17,
+           attrs: { str: 20, agi: 8, int: 11, vit: 82 },
            armor: 0.55, threatMul: 3.5, skills: ['roar', 'taunt'],
            note: '공격이 매워 어그로를 잘 붙든다' },
   corin: { id: 'corin', name: '방패병 코린', job: 'tank',   sprite: 'tank',
-           hp: 1320, mp: 80,  atk: 21, attackCd: 1.8, range: 7,  speed: 15,
+           hp: 1316, mp: 80,  atk: 21, attackCd: 1.8, range: 7,  speed: 15,
+           attrs: { str: 16, agi: 6, int: 10, vit: 94 },
            armor: 0.48, threatMul: 3.5, skills: ['roar', 'taunt'],
            note: '더 단단하지만 더 느리다' },
   lyle:  { id: 'lyle',  name: '검사 라일',   job: 'dealer', sprite: 'melee',
-           hp: 640, mp: 80,  atk: 46, attackCd: 1.2, range: 7,  speed: 21,
+           hp: 644, mp: 80,  atk: 46, attackCd: 1.2, range: 7,  speed: 21,
+           attrs: { str: 35, agi: 14, int: 10, vit: 46 },
            armor: 0.82, threatMul: 1, skills: ['cleave'],
            note: '근접. 강타로 한 번에 크게 넣는다' },
   sera:  { id: 'sera',  name: '도적 세라',   job: 'dealer', sprite: 'melee',
-           hp: 560, mp: 90,  atk: 38, attackCd: 0.9, range: 7,  speed: 24,
+           hp: 560, mp: 88,  atk: 38, attackCd: 0.9, range: 7,  speed: 24,
+           attrs: { str: 29, agi: 22, int: 11, vit: 40 },
            armor: 0.86, threatMul: 1, skills: ['cleave'],
            note: '근접. 빠르게 여러 번 때린다' },
   mira:  { id: 'mira',  name: '궁수 미라',   job: 'dealer', sprite: 'ranged',
-           hp: 520, mp: 100, atk: 42, attackCd: 1.4, range: 34, speed: 17,
+           hp: 518, mp: 104, atk: 42, attackCd: 1.4, range: 34, speed: 17,
+           attrs: { str: 32, agi: 18, int: 13, vit: 37 },
            armor: 0.9,  threatMul: 1, skills: ['aimed', 'volley'],
            note: '원거리. 화살비로 적 여럿을 친다' },
   yuri:  { id: 'yuri',  name: '마법사 유리', job: 'dealer', sprite: 'ranged',
-           hp: 470, mp: 110, atk: 52, attackCd: 1.9, range: 36, speed: 15,
+           hp: 476, mp: 112, atk: 52, attackCd: 1.9, range: 36, speed: 15,
+           attrs: { str: 14, agi: 12, int: 14, vit: 34 }, attackType: 'magic',
            armor: 0.92, threatMul: 1, skills: ['aimed', 'volley'],
            note: '원거리. 느리지만 한 방이 무겁다' },
   noa:   { id: 'noa',   name: '사제 노아',   job: 'healer', sprite: 'healer',
-           hp: 560, mp: 105, atk: 18, attackCd: 2.0, range: 30, speed: 16,
+           hp: 560, mp: 104, atk: 18, attackCd: 2.0, range: 30, speed: 16,
+           attrs: { str: 12, agi: 10, int: 13, vit: 40 }, attackType: 'magic',
            armor: 0.9,  threatMul: 1, skills: ['greaterMend', 'mend'],
            note: '마나가 많아 오래 버틴다' },
   dean:  { id: 'dean',  name: '수도사 딘',   job: 'healer', sprite: 'healer',
-           hp: 620, mp: 90,  atk: 24, attackCd: 1.7, range: 26, speed: 18,
+           hp: 616, mp: 88,  atk: 24, attackCd: 1.7, range: 26, speed: 18,
+           attrs: { str: 14, agi: 12, int: 11, vit: 44 }, attackType: 'magic',
            armor: 0.86, threatMul: 1, skills: ['mend'],
            note: '힐량이 작은 대신 때리기도 한다' },
 };
@@ -309,21 +386,28 @@ const JOB_POTIONS = {
 // 주인공이 들고 갈 수 있는 최대치. 상점에서 사서 채운다.
 const POTION_MAX = 5;
 
+// growth를 적어 두는 것은 기본값이 아군 성장률이기 때문이다. 빠뜨리면 적이
+// 아군보다 천천히 자라 높은 레벨 의뢰가 저절로 쉬워진다.
 const ENEMIES = {
   scout:  { id: 'scout', exp: 14,  name: '고블린 척후병', job: 'dealer', sprite: 'goblin',
-            hp: 330, mp: 60,  atk: 52, attackCd: 1.5, range: 7,  speed: 21,
+            hp: 336, mp: 64,  atk: 52, attackCd: 1.5, range: 7,  speed: 21,
+           attrs: { str: 40, agi: 16, int: 8, vit: 24 }, growth: 'enemy',
             armor: 0.95, threatMul: 1, skills: [] },
   shaman: { id: 'shaman', exp: 18, name: '고블린 주술사', job: 'healer', sprite: 'shaman',
-            hp: 300, mp: 130, atk: 36, attackCd: 2.2, range: 30, speed: 15,
+            hp: 294, mp: 128, atk: 36, attackCd: 2.2, range: 30, speed: 15,
+           attrs: { str: 12, agi: 10, int: 16, vit: 21 }, growth: 'enemy', attackType: 'magic',
             armor: 1, threatMul: 1, skills: ['mendEnemy'] },
   orc:    { id: 'orc', exp: 32,    name: '오크 전사',     job: 'tank',   sprite: 'orc',
-            hp: 780, mp: 80,  atk: 76, attackCd: 1.8, range: 7,  speed: 16,
+            hp: 784, mp: 80,  atk: 76, attackCd: 1.8, range: 7,  speed: 16,
+           attrs: { str: 58, agi: 8, int: 10, vit: 56 }, growth: 'enemy',
             armor: 0.7,  threatMul: 3, skills: [] },
   hexer:  { id: 'hexer', exp: 30,  name: '오크 주술사',   job: 'healer', sprite: 'shaman',
-            hp: 480, mp: 150, atk: 48, attackCd: 2.4, range: 30, speed: 14,
+            hp: 476, mp: 152, atk: 48, attackCd: 2.4, range: 30, speed: 14,
+           attrs: { str: 16, agi: 8, int: 19, vit: 34 }, growth: 'enemy', attackType: 'magic',
             armor: 0.9,  threatMul: 1, skills: ['mendEnemy', 'hex'] },
   chief:  { id: 'chief', exp: 90,  name: '오크 우두머리', job: 'tank',   sprite: 'boss',
-            hp: 1900, mp: 160, atk: 116, attackCd: 2.0, range: 8,  speed: 14,
+            hp: 1904, mp: 160, atk: 116, attackCd: 2.0, range: 8,  speed: 14,
+           attrs: { str: 89, agi: 6, int: 20, vit: 136 }, growth: 'enemy',
             armor: 0.62, threatMul: 3, skills: [] },
 };
 
@@ -381,7 +465,7 @@ const PARTY_MAX = 5;   // 주인공을 포함한 수
 const SKILL_MAX = 5;   // 전투에 등록할 수 있는 주인공 스킬 수
 
 const api = {
-  FIELD, JOBS, LEVEL, STATS, LOWER_IS_BETTER, TIERS, AFFIX_COUNT, AFFIX_BASE, AFFIX_POOL,
+  FIELD, JOBS, LEVEL, ATTRS, ATTR, ATTR_GROWTH, attrsAt, derive, STATS, LOWER_IS_BETTER, TIERS, AFFIX_COUNT, AFFIX_BASE, AFFIX_POOL,
   SLOTS, GEAR, MATERIALS, REGIONS, NAMES,
   HERO, COMPANIONS, UNIT_SKILLS, PLAYER_SKILLS, POTIONS, JOB_POTIONS, POTION_MAX, ENEMIES,
   PARTY_MAX, SKILL_MAX,
