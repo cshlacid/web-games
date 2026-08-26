@@ -26,6 +26,22 @@
   --tier-epic: #8a4fd0;
   --tier-legend: #b8860b;
   --tier-myth: #c23b30;
+  /* 스킬이 무엇을 하는가. 아이콘이 "어떤 스킬인가"를 알리고 이 색이 "무엇을
+     하는가"를 알린다 — 둘 중 하나만으로는 서른 몇 개를 훑을 수 없다. */
+  --kind-harm: #b4453c;
+  --kind-bane: #8a4fd0;
+  --kind-mend: #2f8a4c;
+  --kind-pull: #b8860b;
+  --kind-mana: #2f6fd0;
+  /* 계열. 역할 색만으로는 궁수와 마법사가 같은 줄로 보인다. */
+  --spec-tank: #4a72b8;
+  --spec-warrior: #b4453c;
+  --spec-rogue: #5b6577;
+  --spec-archer: #2f8a4c;
+  --spec-mage: #8a4fd0;
+  --spec-priest: #2f8a8a;
+  --spec-shaman: #9a5fb8;
+  --spec-grunt: #7a8a4a;
   /* 전투 화면이 가로로 길어 다른 게임(440px)보다 넓게 잡았다. 좁히면 아군과 적
      사이가 붙어 버려 거리와 장판 반경이 눈에 들어오지 않는다. */
   --app-max: 860px;
@@ -57,6 +73,19 @@
     --tier-epic: #b587ea;
     --tier-legend: #e8c352;
     --tier-myth: #ec7367;
+    --kind-harm: #e08a80;
+    --kind-bane: #b587ea;
+    --kind-mend: #5fc47f;
+    --kind-pull: #e8c352;
+    --kind-mana: #6b9ee8;
+    --spec-tank: #7fa6e8;
+    --spec-warrior: #e08a80;
+    --spec-rogue: #a9b3c4;
+    --spec-archer: #5fc47f;
+    --spec-mage: #b587ea;
+    --spec-priest: #5fc4c4;
+    --spec-shaman: #c79ae0;
+    --spec-grunt: #b3c47a;
   }
 }
 
@@ -202,6 +231,24 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .pick-name .job.healer { color: var(--heal); }
 /* 장비가 얹어 준 능력치. 내가 넣은 점수와 색으로 갈라 둔다. */
 .pick-name .job.gear { color: var(--hero); }
+
+/* 계열 색. 같은 딜러라도 궁수와 마법사가 다른 색으로 읽혀야 편성이 고민이 된다. */
+.job.spec-tank { color: var(--spec-tank); }
+.job.spec-warrior { color: var(--spec-warrior); }
+.job.spec-rogue { color: var(--spec-rogue); }
+.job.spec-archer { color: var(--spec-archer); }
+.job.spec-mage { color: var(--spec-mage); }
+.job.spec-priest { color: var(--spec-priest); }
+.job.spec-shaman { color: var(--spec-shaman); }
+.job.spec-grunt { color: var(--spec-grunt); }
+
+/* 스킬 이름표. 색이 무엇을 하는 스킬인지를 알린다. */
+.chip.skill { border-color: currentColor; }
+.chip.skill.harm { color: var(--kind-harm); }
+.chip.skill.bane { color: var(--kind-bane); }
+.chip.skill.mend { color: var(--kind-mend); }
+.chip.skill.pull { color: var(--kind-pull); }
+.chip.skill.mana { color: var(--kind-mana); }
 .pick-sub { font-size: 12px; color: var(--muted); line-height: 1.45; }
 .pick-cost { font-size: 12px; color: var(--muted); flex: none; text-align: right; }
 
@@ -693,6 +740,18 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .pop.harm { color: var(--harm); }
 .pop.heal { color: var(--heal); }
 .pop.crit { font-size: 14px; }
+
+/* 전투 중 머리 위로 뜨는 스킬 아이콘. 숫자보다 크게 띄워야 피해량과 섞이지
+   않고, 같은 색 규칙을 써야 이름표에서 본 것과 같은 것으로 읽힌다. */
+.float.skill {
+  font-size: clamp(13px, 2.8vw, 19px);
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
+}
+.float.skill.harm { color: var(--kind-harm); }
+.float.skill.bane { color: var(--kind-bane); }
+.float.skill.mend { color: var(--kind-mend); }
+.float.skill.pull { color: var(--kind-pull); }
+.float.skill.mana { color: var(--kind-mana); }
 
 @keyframes pop-rise {
   from { opacity: 1; transform: translate(-50%, 0); }

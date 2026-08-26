@@ -575,7 +575,8 @@ function itemName(item, cls) {
 
 function jobTag(job, spec) {
   const label = spec ? `${D.JOBS[job].name} · ${D.SPECS[spec]}` : D.JOBS[job].name;
-  return text('span', `job ${job}`, label);
+  // 계열마다 색이 다르다. 역할 색만으로는 궁수와 마법사가 같은 줄로 보인다.
+  return text('span', `job ${job}${spec ? ` spec-${spec}` : ''}`, label);
 }
 
 function renderBrief() {
@@ -646,8 +647,11 @@ function renderRoster() {
     const chips = el('div', 'skill-chips');
     for (const id of Roster.skillsOf(member)) {
       const skill = D.UNIT_SKILLS[id];
-      const chip = text('span', 'chip', `${skill.name} ${skill.mp}`);
-      chip.title = `${skill.desc} · 마나 ${skill.mp} · ${castLine(skill)}`;
+      const kind = D.skillKind(skill);
+      // 아이콘이 "어떤 스킬인가"를, 색이 "무엇을 하는가"를 알린다. 이름만
+      // 늘어놓았을 때에는 넷을 훑는 데 넷을 다 읽어야 했다.
+      const chip = text('span', `chip skill ${kind.css}`, `${skill.icon} ${skill.name} ${skill.mp}`);
+      chip.title = `${kind.name} · ${skill.desc} · 마나 ${skill.mp} · ${castLine(skill)}`;
       chips.append(chip);
     }
     for (const [id, count] of Object.entries(Roster.potionsOf(member))) {
@@ -1195,6 +1199,10 @@ function handleEvents(state, events) {
       continue;
     }
     if (event.type === 'cast') {
+      // 누가 무엇을 썼는지가 글자로만 지나가면 전투를 보면서는 못 읽는다.
+      // 시전한 유닛 머리 위로 그 스킬의 아이콘을 띄운다.
+      const caster = AI.byUid(state, event.uid);
+      if (caster && event.icon) floatText(caster, event.icon, `skill ${event.css || ''}`);
       if (event.skillId) {
         if (event.radius) pulse(event.x, event.y, event.radius, event.skillId === 'pyre' ? 'harm' : '');
       } else {
