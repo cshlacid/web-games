@@ -366,20 +366,22 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 
 .aim-hint { margin: 0; font-size: 13px; color: var(--btn-bg); font-weight: 600; text-align: center; }
 
-/* 초상화. 범위 스킬의 기준점을 동료로 잡는 통로이기도 해서(기획서 8.1)
-   전투 중 가장 자주 눌리는 곳이다 — 손가락이 닿는 크기를 유지한다. */
-.portraits { list-style: none; margin: 0; padding: 0; display: flex; gap: 6px; }
-/* 적 줄은 아군 줄보다 작다. 손가락이 닿아야 하는 것은 아군 쪽이고(범위 스킬의
-   기준점), 적 줄은 누가 몇이나 남았는지 읽는 자리다. */
-.portraits.enemies .portrait { padding: 4px 3px 4px; gap: 2px; }
-.portraits.enemies .avatar { width: 20px; height: 26px; }
-.portraits.enemies .pname { font-size: 10px; }
+/* 초상화. 범위 스킬의 기준점을 동료로 잡는 통로이자 공격 스킬의 대상 자리라
+   (기획서 8.1) 전투 중 가장 자주 눌리는 곳이다 — 손가락이 닿는 크기를 지킨다.
+   두 줄이 같은 칸을 쓴다. 줄마다 flex로 늘려 두었더니 셋이 남은 적 줄과
+   다섯이 선 아군 줄의 초상화 크기가 달랐고, 적 줄을 따로 작게까지 두어
+   공격 스킬의 대상 자리인데도 손가락이 빗나갔다. 양쪽 다 최대 다섯이라
+   다섯 칸으로 나눈다 — 빈 칸은 오른쪽에 남는다. */
+.portraits {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px;
+}
 .portrait.enemy { border-color: color-mix(in srgb, var(--enemy) 45%, var(--line)); }
 .portrait.enemy .bar span { background: var(--enemy); }
 
 .portrait {
   position: relative;
-  flex: 1; min-width: 0;
+  width: 100%; min-width: 0;
   border: 1px solid var(--line); border-radius: 11px;
   background: var(--card-bg); color: inherit; font-family: inherit;
   padding: 6px 4px 5px; cursor: pointer;

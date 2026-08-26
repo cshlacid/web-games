@@ -948,9 +948,9 @@ function syncSkillbar(state) {
 
 const AIM_HINT = {
   ally: '회복할 대상을 고른다 — 초상화나 전투 화면의 아군',
-  enemy: '적을 고른다',
+  enemy: '적을 고른다 — 적 초상화나 전투 화면의 적',
   'area-ally': '기준점을 고른다 — 동료 초상화 또는 전투 화면의 위치',
-  'area-enemy': '기준점을 고른다 — 전투 화면의 위치',
+  'area-enemy': '기준점을 고른다 — 적 초상화 또는 전투 화면의 위치',
 };
 
 // 사거리 밖은 고를 수 있는 대상이 아니다. 눌러 보고 나서야 "사거리 밖"이라고
@@ -985,8 +985,11 @@ function onSkill(skillId) {
   // 마나가 급할 때 손이 늦는다.
   if (def.targeting === 'self') { cast(skillId, {}); return; }
 
+  // 못 쓰는 이유를 적어 준다. 소리만 내고 말면 스킬을 눌러도 조준이 시작되지
+  // 않는 것으로만 보이고, 이어서 초상화를 눌러도 아무 일이 없는 것이 된다.
   const slot = L.skillSlot(state, skillId);
-  if (state.t < slot.readyAt || L.hero(state).mp < def.mp) { sound.play('deny'); return; }
+  if (state.t < slot.readyAt) { sound.play('deny'); note('쿨타임'); return; }
+  if (L.hero(state).mp < def.mp) { sound.play('deny'); note('마나 부족'); return; }
   sound.play('click');
   setAiming(skillId);
 }
@@ -999,8 +1002,11 @@ function onPotion(potionId) {
   if (!result.ok) note(result.reason);
 }
 
+// 초상화는 아군을 살리는 자리이자 적을 치는 자리다. 스킬을 고르지 않은 채
+// 누르면 아무 일도 일어나지 않는데, 그것이 초상화를 누를 수 없는 것으로 읽힌다.
 function onPortrait(uid) {
-  if (!app.battle || !app.aiming) { sound.play('click'); return; }
+  if (!app.battle) return;
+  if (!app.aiming) { sound.play('click'); note('스킬을 먼저 고른다'); return; }
   cast(app.aiming, { uid });
 }
 
