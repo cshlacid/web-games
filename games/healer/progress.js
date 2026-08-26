@@ -158,7 +158,7 @@ function buyPotion(progress, potionId) {
   if ((progress.potions[potionId] || 0) >= D.POTION_MAX) {
     return { ok: false, reason: `${D.POTION_MAX}개까지만 들고 간다` };
   }
-  const paid = spend(progress, potion.price);
+  const paid = spend(progress, D.potionPrice(potionId, progress.charLevel));
   if (!paid.ok) return paid;
   progress.potions[potionId] = (progress.potions[potionId] || 0) + 1;
   return { ok: true, cost: paid.cost };

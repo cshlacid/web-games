@@ -189,8 +189,10 @@ function price(item) {
   const base = def(item);
   if (!base) return 0;
   if (!isGear(item)) return base.gold * (1 + item.tier);
-  const affixWorth = quality(item) * 70 * (1 + item.tier * 0.5);
-  return Math.round((70 + item.tier * 130) * (1 + item.tier * 0.4) + affixWorth);
+  // 기준값이 낮으면 첫 의뢰의 보상만으로 진열대를 통째로 살 수 있고, 그러면
+  // 전리품이 나올 이유가 없어진다. 등급 하나가 의뢰 반 판에서 한 판쯤 되게 잡았다.
+  const affixWorth = quality(item) * 140 * (1 + item.tier * 0.5);
+  return Math.round((160 + item.tier * 260) * (1 + item.tier * 0.4) + affixWorth);
 }
 
 const sellPrice = (item) => Math.max(1, Math.round(price(item) * SELL_RATE));

@@ -289,6 +289,15 @@ const POTIONS = {
   health: { id: 'health', name: '체력 물약', icon: '🧪', restore: 'hp', ratio: 0.25, cd: 12, price: 110 },
 };
 
+// 물약 값은 주인공 레벨을 따라간다. 정액으로 두었더니 초반에는 의뢰 하나로 다섯
+// 개를 사고 후반에는 값이 없는 것이나 마찬가지였다 — 회복량이 최대치의 비율이라
+// 값도 그렇게 따라가야 한다.
+function potionPrice(potionId, charLevel) {
+  const potion = POTIONS[potionId];
+  if (!potion) return Infinity;
+  return Math.round(potion.price * (1 + (Math.max(1, charLevel) - 1) * 0.35));
+}
+
 // 직업에 따라 자동으로 들고 들어간다. 탱커는 맞는 쪽이라 체력, 마나를 쓰는
 // 직업은 마나 위주다. 하나씩은 반대쪽도 들려 보낸다 — 탱커도 도발할 마나는 있어야 한다.
 const JOB_POTIONS = {
@@ -376,6 +385,7 @@ const api = {
   SLOTS, GEAR, MATERIALS, REGIONS, NAMES,
   HERO, COMPANIONS, UNIT_SKILLS, PLAYER_SKILLS, POTIONS, JOB_POTIONS, POTION_MAX, ENEMIES,
   PARTY_MAX, SKILL_MAX,
+  potionPrice,
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = api;

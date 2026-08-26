@@ -445,7 +445,7 @@ function renderShop() {
 }
 
 $('shop-refresh').addEventListener('click', () => {
-  const paid = P.spend(app.progress, Shop.REFRESH_COST);
+  const paid = P.spend(app.progress, Shop.refreshCost(app.progress.charLevel));
   sound.play(paid.ok ? 'click' : 'deny');
   if (!paid.ok) return;
   app.progress.shopSeed = (Math.random() * 1e9) | 0;
@@ -1144,11 +1144,11 @@ function openResult(state) {
     const awards = $('awards');
     awards.textContent = '';
     for (const award of result.awards) {
-      const def = D.itemDef(award.item.defId);
+      const def = Items.def(award.item);
       const owner = members.find((m) => m.id === award.toId);
       const row = el('li');
       row.append(text('span', null, def.icon));
-      row.append(text('span', null, D.itemName(award.item)));
+      row.append(text('span', null, Items.name(award.item)));
       row.append(text('span', 'why', award.reason));
       row.append(text('span', 'to', owner.name));
       if (award.rolls) {

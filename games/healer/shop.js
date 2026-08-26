@@ -56,8 +56,9 @@ function stock(level, seed) {
 
   return {
     gear,
-    potions: Object.values(D.POTIONS).map((potion) => ({ id: potion.id, price: potion.price })),
-    refreshCost: REFRESH_COST,
+    potions: Object.values(D.POTIONS)
+      .map((potion) => ({ id: potion.id, price: D.potionPrice(potion.id, level) })),
+    refreshCost: refreshCost(level),
   };
 }
 
@@ -71,11 +72,17 @@ function canBuy(gold, cost) {
   return gold >= cost ? { ok: true } : { ok: false, reason: '골드가 모자란다' };
 }
 
-const buyGear = (gold, item) => canBuy(gold, Items.price(item));
-const buyPotion = (gold, potionId) => canBuy(gold, (D.POTIONS[potionId] || {}).price || Infinity);
-const refresh = (gold) => canBuy(gold, REFRESH_COST);
+// 갱신 값도 레벨을 따라간다. 정액이면 후반에는 원하는 옵션이 나올 때까지
+// 누르는 것이 아무 대가 없는 일이 된다.
+const refreshCost = (charLevel) =>
+  Math.round(REFRESH_COST * (1 + (Math.max(1, charLevel) - 1) * 0.35));
 
-const api = { GEAR_COUNT, REFRESH_COST, stock, canBuy, buyGear, buyPotion, refresh, tierFor };
+const buyGear = (gold, item) => canBuy(gold, Items.price(item));
+const buyPotion = (gold, potionId, charLevel) =>
+  canBuy(gold, D.potionPrice(potionId, charLevel || 1));
+const refresh = (gold, charLevel) => canBuy(gold, refreshCost(charLevel || 1));
+
+const api = { GEAR_COUNT, REFRESH_COST, refreshCost, stock, canBuy, buyGear, buyPotion, refresh, tierFor };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 root.HealerShop = api;

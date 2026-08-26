@@ -44,6 +44,7 @@ node games/healer/roster.test.js
 node games/healer/progress.test.js
 node games/healer/quests.test.js
 node games/healer/shop.test.js
+node games/healer/flow.test.js
 node games/healer/loot.test.js
 node games/healer/art.test.js
 ```

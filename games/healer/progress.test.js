@@ -196,13 +196,15 @@ const gear = (defId, tier) => Items.make(defId, tier || 0, 3);
 // --- 상점 --------------------------------------------------------------
 {
   const progress = P.create();
-  progress.gold = 1000;
   const item = gear('staff', 2);
+  // 값이 아니라 규칙을 보는 자리다. 값이 오르내려도 테스트가 흔들리지 않게
+  // 물건 값에서 지갑을 정한다.
+  progress.gold = Items.price(item) + 500;
 
   check('골드가 모자라면 못 산다', P.buyGear(P.create(), item).ok, false);
   const bought = P.buyGear(progress, item);
   check('사면 인벤토리로', [bought.ok, progress.inventory.length], [true, 1]);
-  check('골드가 준다', progress.gold, 1000 - Items.price(item));
+  check('골드가 준다', progress.gold, 500);
 
   // 사서 되파는 것이 이득이면 골드가 뜻을 잃는다.
   const goldBefore = progress.gold;

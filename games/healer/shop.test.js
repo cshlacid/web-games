@@ -88,11 +88,17 @@ const LEVELS = [1, 4, 9, 16, 25, 30];
   check('한 골드 모자라면 못 산다', Shop.buyGear(price - 1, item).ok, false);
   check('이유를 알려 준다', Shop.buyGear(0, item).reason, '골드가 모자란다');
 
-  check('물약도 값이 있다', Shop.buyPotion(D.POTIONS.mana.price, 'mana').ok, true);
-  check('모르는 물약은 못 산다', Shop.buyPotion(1e9, '엘릭서').ok, false);
+  check('물약도 값이 있다', Shop.buyPotion(D.potionPrice('mana', 1), 'mana', 1).ok, true);
+  check('모르는 물약은 못 산다', Shop.buyPotion(1e9, '엘릭서', 1).ok, false);
 
-  check('갱신에도 값이 든다', Shop.refresh(Shop.REFRESH_COST).ok, true);
-  check('공짜가 아니다', Shop.refresh(Shop.REFRESH_COST - 1).ok, false);
+  check('갱신에도 값이 든다', Shop.refresh(Shop.refreshCost(1), 1).ok, true);
+  check('공짜가 아니다', Shop.refresh(Shop.refreshCost(1) - 1, 1).ok, false);
+
+  // 값이 정액이면 초반에는 의뢰 하나로 진열대를 통째로 사고 후반에는 값이 없는
+  // 것이나 마찬가지가 된다. 물약도 갱신도 레벨을 따라가야 한다.
+  check('물약 값이 레벨을 따라간다', D.potionPrice('mana', 20) > D.potionPrice('mana', 1), true);
+  check('갱신 값도 레벨을 따라간다', Shop.refreshCost(20) > Shop.refreshCost(1), true);
+  check('1레벨에서는 기준값 그대로', D.potionPrice('mana', 1), D.POTIONS.mana.price);
 }
 
 // --- 진행 상태와 함께 굴려 보기 -----------------------------------------
@@ -112,12 +118,30 @@ const LEVELS = [1, 4, 9, 16, 25, 30];
 
   // 진열대를 갱신하면 값이 나가고 목록이 바뀐다.
   const goldBefore = progress.gold;
-  const paid = P.spend(progress, Shop.REFRESH_COST);
-  check('갱신 값이 나간다', [paid.ok, goldBefore - progress.gold], [true, Shop.REFRESH_COST]);
+  const cost = Shop.refreshCost(progress.charLevel);
+  const paid = P.spend(progress, cost);
+  check('갱신 값이 나간다', [paid.ok, goldBefore - progress.gold], [true, cost]);
 
   // 사서 되파는 것이 이득이면 골드가 뜻을 잃는다.
   const sold = P.sell(progress, item.uid);
   check('되팔면 손해다', sold.gold < Items.price(item), true);
+}
+
+// --- 값이 의뢰 보상과 맞물리는가 ----------------------------------------
+{
+  // 장비 하나가 의뢰 반 판에서 두 판 사이여야 한다. 더 싸면 전리품이 나올
+  // 이유가 없고, 더 비싸면 상점을 들를 이유가 없다.
+  const Q = require('./quests.js');
+  const off = [];
+  for (const level of [1, 5, 10, 15, 20, 25]) {
+    const quests = Q.generate(level, 4242);
+    const gold = quests.reduce((sum, q) => sum + q.guildReward.gold, 0) / quests.length;
+    const gear = Shop.stock(level, 4242).gear;
+    const price = gear.reduce((sum, item) => sum + Items.price(item), 0) / gear.length;
+    const ratio = price / gold;
+    if (ratio < 0.2 || ratio > 2) off.push(`Lv${level}: ${ratio.toFixed(2)}판`);
+  }
+  check('장비 값이 의뢰 보상과 맞물린다', off, []);
 }
 
 console.log(`${passed}개 통과, ${failed}개 실패`);
