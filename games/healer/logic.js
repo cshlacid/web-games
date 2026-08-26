@@ -57,25 +57,30 @@ function drainEvents(state) {
 // progress.js가 계산한다), bonus는 장비 몫이다. 장비는 능력치가 아니라 결과
 // 수치에 더한다 — 장비까지 레벨로 곱하면 높은 레벨에서 장비가 전부를 결정한다.
 function makeUnit(def, side, uid, x, y, level, override, bonus, potions, name) {
-  const gear = bonus || {};
   const attrs = (override && override.attrs) || D.attrsAt(def, level, null);
-  const stats = D.derive(def, attrs);
-  const hp = Math.round(stats.hp + (gear.hp || 0));
-  const mp = Math.round(stats.mp + (gear.mp || 0));
+  const base = D.derive(def, attrs);
+  // **주인공은 캐릭터 창이 계산해 둔 최종 수치를 그대로 받는다.** 여기서 다시
+  // 계산하던 동안에는 창에 적힌 장비 몫이 전투에 들어가지 않아, 같은 캐릭터가
+  // 두 화면에서 다른 체력을 가졌다. 동료와 적은 장비를 여기서 얹는다.
+  const stats = override && override.hp != null
+    ? override
+    : D.withGear(base, bonus, def.armor);
 
   return {
     uid, defId: def.id, name: name || def.name, job: def.job, sprite: def.sprite, side, level,
     x, y, attrs,
-    hp, maxHp: hp,
-    mp, maxMp: mp,
-    atk: stats.atk * (1 + (gear.atk || 0)),
+    hp: stats.hp, maxHp: stats.hp,
+    mp: stats.mp, maxMp: stats.mp,
+    atk: stats.atk,
     // 레벨에 따른 공격력 배수. 도트와 장판의 초당 피해가 정액이라 이것을 곱해
     // 준다 — 곱하지 않으면 높은 레벨의 저주가 1레벨 저주와 같은 값을 넣는다.
-    power: stats.atk / (def.atk || 1),
-    armor: Math.max(0.35, ((override && override.armor) || def.armor) + (gear.armor || 0)),
-    healPower: stats.heal + (gear.heal || 0),
+    // 장비 몫을 빼고 능력치만 보는 것은, 무기가 저주의 초당 피해까지 올리면
+    // 도트가 무기에 두 번 곱해지기 때문이다.
+    power: base.atk / (def.atk || 1),
+    armor: stats.armor,
+    healPower: stats.heal,
     spellPower: stats.spell,
-    // 회피·치명타는 능력치에서만 온다. 장비에 붙이면 그것만 쌓는 것이 최선이 된다.
+    // 회피·치명타는 능력치와 장비 옵션에서 온다. 상한은 D.withGear가 건다.
     dodge: stats.dodge,
     crit: stats.crit,
     critDamage: stats.critDamage,
@@ -158,6 +163,9 @@ function createBattle(config) {
     }))
     .filter((entry) => entry.def);
   const skills = (config.skills || []).filter((id) => D.PLAYER_SKILLS[id]).slice(0, D.SKILL_MAX);
+  // 스킬 레벨은 전투가 시작할 때 굳는다. 전투 중에 올릴 수 있는 것이 아니고,
+  // 진행 상태를 전투가 들여다보지 않게 하려는 것이기도 하다.
+  const levels = config.skillLevels || {};
 
   const state = {
     quest, rng: createRng(config.seed == null ? 1 : config.seed),
@@ -165,7 +173,7 @@ function createBattle(config) {
     units: [], zones: [], dots: [],
     // 배경이 지금까지 흘러간 거리. 무리 사이에만 늘고, 화면이 이 값으로 배경을 민다.
     scroll: 0, marching: false,
-    skills: skills.map((id) => ({ id, readyAt: 0 })),
+    skills: skills.map((id) => ({ id, level: D.skillLevelOf(levels[id] || 1), readyAt: 0 })),
     // 주인공이 들고 온 물약. 상점에서 사서 채운 것이 그대로 들어온다.
     potions: Object.assign({ mana: 0, health: 0 }, config.potions),
     potionReadyAt: 0,
@@ -411,7 +419,7 @@ function tickCast(state, unit) {
   if (state.t < cast.endsAt) return;
 
   unit.cast = null;
-  if (cast.player) resolvePlayerSkill(state, D.PLAYER_SKILLS[cast.skillId], cast);
+  if (cast.player) resolvePlayerSkill(state, playerSkill(state, cast.skillId), cast);
   else runUnitSkill(state, unit, { id: cast.skillId, targetUid: cast.targetUid });
 }
 
@@ -533,10 +541,17 @@ function resolvePlayerSkill(state, def, spot) {
   }
 }
 
+// 등록한 스킬의 지금 레벨 정의. 전투 안에서 스킬 수치를 보는 곳은 전부 이걸
+// 거친다 — 정의를 직접 보면 레벨 1의 값이 나온다.
+function playerSkill(state, skillId) {
+  const slot = skillSlot(state, skillId);
+  return slot ? D.skillAt(D.PLAYER_SKILLS[skillId], slot.level) : null;
+}
+
 function castSkill(state, skillId, target) {
   if (state.status !== 'fighting') return { ok: false, reason: '전투가 끝났다' };
-  const def = D.PLAYER_SKILLS[skillId];
   const slot = skillSlot(state, skillId);
+  const def = playerSkill(state, skillId);
   if (!def || !slot) return { ok: false, reason: '등록되지 않은 스킬' };
 
   const caster = hero(state);
@@ -735,7 +750,7 @@ function battleReport(state) {
 const api = {
   HERO_UID, TICK, WAVE_GAP, MARCH_SPEED, rewardOf, battleReport,
   createRng, createBattle, advance, step, drainEvents,
-  castSkill, usePotion, drink, magicPowerOf, rollCrit, applyDamage, applyHeal, addDot, addZone,
+  castSkill, playerSkill, usePotion, drink, magicPowerOf, rollCrit, applyDamage, applyHeal, addDot, addZone,
   hero, skillSlot, resolveTarget, moveToward,
   startCast, tickCast, cancelCast, runUnitSkill, resolvePlayerSkill,
 };

@@ -183,12 +183,18 @@ function levelRow(label, level, exp, toNext) {
   return row;
 }
 
+// 어느 능력치가 올리는지를 이름 옆에 적는다. 물리와 마법을 한 줄로 묶어 두었을
+// 때에는 지능을 올린 것이 무엇을 올렸는지가 화면에 없었다.
+//
+// **회복력과 마법 공격력은 둘 다 지능에서 나오고 계수가 다르다**(회복 쪽이
+// 가파르다). 한 줄로 적으면 그 차이가 보이지 않는다.
 const STAT_LABELS = {
   hp: '최대 체력',
   mp: '최대 마나',
   // 주인공도 마나가 떨어지면 기본 공격을 한다. 쓰지 않는 수치가 아니므로 적는다.
-  atk: '공격력',
-  heal: '회복력',
+  atk: '물리 공격력 (힘)',
+  spell: '마법 공격력 (지능)',
+  heal: '회복력 (지능)',
   crit: '치명타 확률',
   critDamage: '치명타 피해',
   dodge: '회피',
@@ -196,7 +202,9 @@ const STAT_LABELS = {
 };
 
 function statText(key, value) {
-  if (key === 'heal' || key === 'armor' || key === 'critDamage') return `×${value.toFixed(2)}`;
+  if (key === 'heal' || key === 'armor' || key === 'critDamage' || key === 'spell') {
+    return `×${value.toFixed(2)}`;
+  }
   if (key === 'dodge' || key === 'crit') return `${(value * 100).toFixed(1)}%`;
   return String(Math.round(value));
 }
@@ -297,21 +305,51 @@ function renderCharacter() {
   const skills = $('char-skills');
   skills.textContent = '';
   const open = new Set(P.unlockedSkills(progress).map((def) => def.id));
-  for (const def of Object.values(D.PLAYER_SKILLS)) {
-    const row = el('li', open.has(def.id) ? 'skill-row' : 'skill-row locked');
-    row.append(text('span', 'icon', open.has(def.id) ? def.icon : '🔒'));
+  const points = P.freeSkillPoints(progress);
+  for (const base of Object.values(D.PLAYER_SKILLS)) {
+    const isOpen = open.has(base.id);
+    const level = P.skillLevel(progress, base.id);
+    const def = P.skillDef(progress, base.id);
+
+    const row = el('li', isOpen ? 'skill-row' : 'skill-row locked');
+    row.append(text('span', 'icon', isOpen ? base.icon : '🔒'));
     const body = el('div', 'pick-body');
     const name = el('div', 'pick-name');
-    name.append(document.createTextNode(def.name));
-    name.append(text('span', 'job', def.type));
+    name.append(document.createTextNode(base.name));
+    name.append(text('span', 'job', base.type));
+    // 레벨을 이름 옆에 적는다. 효과 줄에만 두면 어느 스킬에 점수를 넣었는지
+    // 목록을 훑어서는 알 수 없다.
+    if (isOpen) name.append(text('span', 'job', `Lv ${level} / ${D.SKILL.max}`));
     body.append(name);
-    body.append(text('div', 'pick-sub', open.has(def.id) ? def.desc : `힐러 Lv ${def.unlock}에 열린다`));
-    // 시전 시간과 사거리는 등록 화면에서 고르는 근거다. 캐스팅 스킬은 외우는
-    // 동안 아무것도 못 하고 움직이면 취소되므로, 회복량만 보고 고르면 안 된다.
-    if (open.has(def.id)) body.append(text('div', 'pick-sub dim', castLine(def)));
+    body.append(text('div', 'pick-sub', isOpen ? base.desc : `힐러 Lv ${base.unlock}에 열린다`));
+    if (isOpen) {
+      // 지금 레벨에서 실제로 얼마를 하는지. 정의에 적힌 문장만으로는 점수를
+      // 넣은 것이 화면에 보이지 않는다.
+      body.append(text('div', 'pick-sub', `${D.skillEffect(def)} · 마나 ${def.mp || 0}`));
+      // 시전 시간과 사거리는 등록 화면에서 고르는 근거다. 캐스팅 스킬은 외우는
+      // 동안 아무것도 못 하고 움직이면 취소되므로, 회복량만 보고 고르면 안 된다.
+      body.append(text('div', 'pick-sub dim', castLine(base)));
+    }
     row.append(body);
+
+    if (isOpen) {
+      const add = el('button', 'attr-add');
+      add.type = 'button';
+      add.textContent = '＋';
+      add.disabled = points <= 0 || level >= D.SKILL.max;
+      add.setAttribute('aria-label', `${base.name} 레벨 올리기`);
+      add.addEventListener('click', () => {
+        const raised = P.raiseSkill(progress, base.id);
+        sound.play(raised.ok ? 'click' : 'deny');
+        if (!raised.ok) return;
+        persist();
+        renderCharacter();
+      });
+      row.append(add);
+    }
     skills.append(row);
   }
+  $('skill-points').textContent = points ? `남은 점수 ${points}` : '남은 점수 없음';
   $('skill-open').textContent = `${open.size} / ${Object.keys(D.PLAYER_SKILLS).length}`;
 }
 
@@ -624,7 +662,11 @@ function renderSkillPicks() {
   const list = $('skill-picks');
   list.textContent = '';
 
-  for (const def of P.unlockedSkills(app.progress)) {
+  for (const base of P.unlockedSkills(app.progress)) {
+    // 등록 화면에도 지금 레벨의 수치가 떠야 한다. 정의를 그대로 보면 레벨을
+    // 올린 스킬이 1레벨의 마나를 먹는 것으로 보인다.
+    const def = P.skillDef(app.progress, base.id);
+    const level = P.skillLevel(app.progress, base.id);
     const picked = app.skills.includes(def.id);
     const full = app.skills.length >= D.SKILL_MAX;
 
@@ -638,8 +680,10 @@ function renderSkillPicks() {
     const name = el('div', 'pick-name');
     name.append(document.createTextNode(def.name));
     name.append(text('span', 'job', def.type));
+    if (level > 1) name.append(text('span', 'job', `Lv ${level}`));
     body.append(name);
-    body.append(text('div', 'pick-sub', def.desc));
+    body.append(text('div', 'pick-sub', D.skillEffect(def)));
+    body.append(text('div', 'pick-sub dim', def.desc));
     button.append(body);
 
     const cost = text('span', 'pick-cost', `${def.mp ? `마나 ${def.mp}` : '마나 없음'}\n쿨 ${def.cd}초`);
@@ -881,12 +925,17 @@ function popPortrait(uid, label, cls) {
   node.addEventListener('animationend', () => node.remove());
 }
 
+// 전투 화면이 보는 스킬은 전부 지금 레벨의 것이다. 정의를 직접 보면 마나와
+// 회복량이 1레벨의 값으로 뜬다. 전투 중에는 레벨이 바뀌지 않으므로 진행
+// 상태에서 읽어도 전투가 굳혀 둔 값과 같다.
+const heroSkill = (id) => P.skillDef(app.progress, id);
+
 function renderSkillbar() {
   const bar = $('skillbar');
   bar.textContent = '';
 
   for (const id of app.skills) {
-    const def = D.PLAYER_SKILLS[id];
+    const def = heroSkill(id);
     const button = el('button', 'slot');
     button.type = 'button';
     button.dataset.skill = id;
@@ -932,7 +981,7 @@ function syncSkillbar(state) {
       button.classList.toggle('short', held === 0);
       continue;
     }
-    const def = D.PLAYER_SKILLS[button.dataset.skill];
+    const def = heroSkill(button.dataset.skill);
     const slot = L.skillSlot(state, button.dataset.skill);
     const left = Math.max(0, slot.readyAt - state.t);
     cool.style.transform = `scaleY(${left / def.cd})`;
@@ -948,16 +997,16 @@ function syncSkillbar(state) {
 
 const AIM_HINT = {
   ally: '회복할 대상을 고른다 — 초상화나 전투 화면의 아군',
-  enemy: '적을 고른다',
+  enemy: '적을 고른다 — 적 초상화나 전투 화면의 적',
   'area-ally': '기준점을 고른다 — 동료 초상화 또는 전투 화면의 위치',
-  'area-enemy': '기준점을 고른다 — 전투 화면의 위치',
+  'area-enemy': '기준점을 고른다 — 적 초상화 또는 전투 화면의 위치',
 };
 
 // 사거리 밖은 고를 수 있는 대상이 아니다. 눌러 보고 나서야 "사거리 밖"이라고
 // 알려 주면, 그동안 쿨타임이 도는 다른 스킬을 놓친다.
 function isValidUnitTarget(state, unit) {
   if (!app.aiming || unit.dead) return false;
-  const def = D.PLAYER_SKILLS[app.aiming];
+  const def = heroSkill(app.aiming);
   const side = (def.targeting === 'ally' || def.targeting === 'area-ally') ? 'ally'
     : (def.targeting === 'enemy' || def.targeting === 'area-enemy') ? 'enemy' : null;
   if (unit.side !== side) return false;
@@ -966,7 +1015,7 @@ function isValidUnitTarget(state, unit) {
 
 function setAiming(skillId) {
   app.aiming = skillId;
-  const def = skillId ? D.PLAYER_SKILLS[skillId] : null;
+  const def = skillId ? heroSkill(skillId) : null;
   field.classList.toggle('aiming', Boolean(skillId));
   document.body.classList.toggle('aiming-mode', Boolean(skillId));
   $('aim-hint').hidden = !def;
@@ -977,7 +1026,7 @@ function setAiming(skillId) {
 function onSkill(skillId) {
   const state = app.battle;
   if (!state || state.status !== 'fighting') return;
-  const def = D.PLAYER_SKILLS[skillId];
+  const def = heroSkill(skillId);
 
   if (app.aiming === skillId) { sound.play('click'); setAiming(null); return; }
 
@@ -985,8 +1034,11 @@ function onSkill(skillId) {
   // 마나가 급할 때 손이 늦는다.
   if (def.targeting === 'self') { cast(skillId, {}); return; }
 
+  // 못 쓰는 이유를 적어 준다. 소리만 내고 말면 스킬을 눌러도 조준이 시작되지
+  // 않는 것으로만 보이고, 이어서 초상화를 눌러도 아무 일이 없는 것이 된다.
   const slot = L.skillSlot(state, skillId);
-  if (state.t < slot.readyAt || L.hero(state).mp < def.mp) { sound.play('deny'); return; }
+  if (state.t < slot.readyAt) { sound.play('deny'); note('쿨타임'); return; }
+  if (L.hero(state).mp < def.mp) { sound.play('deny'); note('마나 부족'); return; }
   sound.play('click');
   setAiming(skillId);
 }
@@ -999,13 +1051,16 @@ function onPotion(potionId) {
   if (!result.ok) note(result.reason);
 }
 
+// 초상화는 아군을 살리는 자리이자 적을 치는 자리다. 스킬을 고르지 않은 채
+// 누르면 아무 일도 일어나지 않는데, 그것이 초상화를 누를 수 없는 것으로 읽힌다.
 function onPortrait(uid) {
-  if (!app.battle || !app.aiming) { sound.play('click'); return; }
+  if (!app.battle) return;
+  if (!app.aiming) { sound.play('click'); note('스킬을 먼저 고른다'); return; }
   cast(app.aiming, { uid });
 }
 
 function cast(skillId, target) {
-  const def = D.PLAYER_SKILLS[skillId];
+  const def = heroSkill(skillId);
   const result = L.castSkill(app.battle, skillId, target);
   if (!result.ok) {
     sound.play('deny');
@@ -1032,7 +1087,7 @@ field.addEventListener('pointerdown', (event) => {
   const rect = field.getBoundingClientRect();
   const x = ((event.clientX - rect.left) / rect.width) * D.FIELD.w;
   const y = ((event.clientY - rect.top) / rect.height) * D.FIELD.h;
-  const def = D.PLAYER_SKILLS[app.aiming];
+  const def = heroSkill(app.aiming);
 
   if (def.targeting === 'area-ally' || def.targeting === 'area-enemy') {
     cast(app.aiming, { x, y });
@@ -1053,7 +1108,7 @@ field.addEventListener('pointerdown', (event) => {
 // 손가락은 누르는 순간이 곧 발동이라 미리 보기가 없다.
 field.addEventListener('pointermove', (event) => {
   if (event.pointerType === 'touch') return;
-  const def = app.aiming ? D.PLAYER_SKILLS[app.aiming] : null;
+  const def = app.aiming ? heroSkill(app.aiming) : null;
   const aim = $('aim');
   if (!def || !def.radius) { aim.hidden = true; return; }
   const rect = field.getBoundingClientRect();
@@ -1078,7 +1133,7 @@ function syncScene(state) {
 // 매 프레임 따라다녀야 한다.
 function syncReach(state) {
   const reach = $('reach');
-  const def = app.aiming ? D.PLAYER_SKILLS[app.aiming] : null;
+  const def = app.aiming ? heroSkill(app.aiming) : null;
   if (!def || !def.range) { reach.hidden = true; return; }
   const hero = L.hero(state);
   reach.hidden = false;
@@ -1190,6 +1245,7 @@ function startBattle() {
     party: app.party.map(Roster.toParty),
     skills: app.skills,
     heroStats: P.stats(app.progress),
+    skillLevels: P.skillLevels(app.progress),
     heroLevel: app.progress.charLevel,
     // 상점에서 사서 채운 것이 그대로 들어간다. 전투에서 쓴 만큼은 돌아오지 않는다.
     potions: Object.assign({}, app.progress.potions),

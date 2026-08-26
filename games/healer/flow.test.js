@@ -100,6 +100,9 @@ function runQuest(progress, seed, autoHeal, questOver) {
     party: party.map(R.toParty),
     skills: P.validSkills(progress, P.unlockedSkills(progress).map((def) => def.id)),
     heroStats: P.stats(progress),
+    // 화면이 넘기는 것과 같은 표. 빠뜨리면 캐릭터 창에서 올린 스킬이 전투에서
+    // 1레벨로 나간다.
+    skillLevels: P.skillLevels(progress),
     heroLevel: progress.charLevel,
     potions: Object.assign({}, progress.potions),
     seed,
@@ -150,6 +153,23 @@ function runQuest(progress, seed, autoHeal, questOver) {
   check('의뢰를 깬 것으로 센다', progress.cleared, 1);
   check('경험치가 오른다', out.reward.charExp > 0, true);
   check('명부 전원이 보고에 들어간다', out.roster.length, progress.roster.length);
+
+  // 캐릭터 창에서 올린 스킬이 전투에 그대로 들어간다. 창과 전투가 다른 값을
+  // 보면 점수를 넣은 것이 화면의 글자로만 남는다.
+  {
+    const raised = seededProgress(99);
+    raised.jobLevel = 6;
+    check('스킬을 올린다', P.raiseSkill(raised, 'touch').ok, true);
+    const battle = L.createBattle({
+      quest, party: [], skills: ['touch'],
+      heroStats: P.stats(raised), skillLevels: P.skillLevels(raised),
+      heroLevel: raised.charLevel, seed: 3,
+    });
+    check('전투가 올린 레벨을 본다',
+      L.playerSkill(battle, 'touch').heal, P.skillDef(raised, 'touch').heal);
+    check('1레벨보다 많이 회복한다',
+      L.playerSkill(battle, 'touch').heal > D.PLAYER_SKILLS.touch.heal, true);
+  }
 
   // 결과 화면이 그리는 캐릭터별 리포트. 화면 코드를 직접 돌릴 수 없으니 화면이
   // 부르는 것을 여기서도 부른다.

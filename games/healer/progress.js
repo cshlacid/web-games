@@ -16,8 +16,9 @@ const Roster = node ? require('./roster.js') : root.HealerRoster;
 
 const STORAGE_KEY = 'web-games.healer.progress';
 // 판이 바뀌면 저장본을 통째로 버린다. 어중간하게 읽으면 더 이상한 상태가 된다.
-// 2에서 바뀐 것: 아이템에 uid와 무작위 옵션, 동료 명부, 물약 보유량.
-const VERSION = 2;
+// 3에서 바뀐 것: 스킬 레벨. 2에서 바뀐 것: 아이템에 uid와 무작위 옵션, 동료
+// 명부, 물약 보유량.
+const VERSION = 3;
 
 function create() {
   return {
@@ -35,6 +36,10 @@ function create() {
     // 주인공이 들고 갈 물약. 동료는 직업에 따라 자동으로 들고 가지만(roster.js),
     // 주인공 것은 사서 채운다.
     potions: { mana: 3, health: 1 },
+    // 스킬마다의 레벨. 직업 레벨이 오를 때마다 받는 점수로 올린다. 안 적힌
+    // 스킬은 1레벨이다 — 새 스킬이 열릴 때마다 여기 자리를 만들어 두면,
+    // 자료가 바뀌었을 때 저장본에 없는 스킬과 있는 스킬이 갈린다.
+    skillLevels: {},
     roster: Roster.create(),
     questSeed: (Math.random() * 1e9) | 0,
     shopSeed: (Math.random() * 1e9) | 0,
@@ -106,25 +111,14 @@ function spendPoint(progress, attr) {
   return { ok: true, left: freePoints(progress) };
 }
 
+// 최종 수치는 D.withGear가 만든다. 전투도 같은 함수를 보므로 캐릭터 창에 적힌
+// 것이 곧 전투에서 쓰이는 값이다 — 여기서 따로 더하던 동안에는 주인공의 장비가
+// 창에만 반영되고 전투에는 들어가지 않았다.
 function stats(progress) {
   const own = attrs(progress);
-  const derived = D.derive(D.HERO, own);
   const bonus = Items.sum(equippedItems(progress));
-
-  return {
-    attrs: own,
-    hp: Math.round(derived.hp + (bonus.hp || 0)),
-    mp: Math.round(derived.mp + (bonus.mp || 0)),
-    // 주인공도 마나가 떨어지면 기본 공격을 하므로 공격력이 화면에 있어야 한다.
-    atk: derived.atk * (1 + (bonus.atk || 0)),
-    heal: derived.heal + (bonus.heal || 0),
-    dodge: derived.dodge,
-    crit: derived.crit,
-    critDamage: derived.critDamage,
-    // 방어 계수가 0 아래로 내려가면 피해가 회복이 된다. 장비를 아무리 겹쳐도
-    // 넘지 못하는 바닥을 둔다.
-    armor: Math.max(0.35, D.HERO.armor + (bonus.armor || 0)),
-  };
+  return Object.assign({ attrs: own },
+    D.withGear(D.derive(D.HERO, own), bonus, D.HERO.armor));
 }
 
 function equippedItems(progress) {
@@ -237,6 +231,47 @@ function validSkills(progress, skills) {
   return skills.filter((id) => open.has(id)).slice(0, D.SKILL_MAX);
 }
 
+// --- 스킬 레벨 ----------------------------------------------------------
+
+// 능력치 점수와 같은 셈법이다: 받은 것에서 쓴 것을 뺀다. 따로 세어 두면
+// 저장본이 어긋났을 때 점수가 늘거나 줄어든다.
+const skillLevel = (progress, id) =>
+  D.skillLevelOf((progress.skillLevels || {})[id] || 1);
+
+// 레벨을 반영한 스킬 정의. 화면과 전투가 같은 함수를 봐야 캐릭터 창에 적힌
+// 수치와 실제로 나가는 스킬이 어긋나지 않는다.
+const skillDef = (progress, id) =>
+  D.skillAt(D.PLAYER_SKILLS[id], skillLevel(progress, id));
+
+// 전투에 넘길 표. 전투는 진행 상태를 모르므로 필요한 것만 뽑아 넘긴다.
+function skillLevels(progress) {
+  const out = {};
+  for (const id of Object.keys(D.PLAYER_SKILLS)) out[id] = skillLevel(progress, id);
+  return out;
+}
+
+const earnedSkillPoints = (progress) => (progress.jobLevel - 1) * D.SKILL.pointsPerLevel;
+
+function spentSkillPoints(progress) {
+  return Object.keys(D.PLAYER_SKILLS)
+    .reduce((sum, id) => sum + (skillLevel(progress, id) - 1), 0);
+}
+
+const freeSkillPoints = (progress) =>
+  Math.max(0, earnedSkillPoints(progress) - spentSkillPoints(progress));
+
+// 아직 열리지 않은 스킬은 올릴 수 없다. 열리기 전에 올려 두면 직업 레벨이
+// 새 스킬을 여는 뜻이 옅어진다.
+function raiseSkill(progress, id) {
+  const def = D.PLAYER_SKILLS[id];
+  if (!def) return { ok: false, reason: '없는 스킬' };
+  if (def.unlock > progress.jobLevel) return { ok: false, reason: '아직 열리지 않았다' };
+  if (skillLevel(progress, id) >= D.SKILL.max) return { ok: false, reason: '더 올릴 수 없다' };
+  if (freeSkillPoints(progress) <= 0) return { ok: false, reason: '남은 점수가 없다' };
+  progress.skillLevels[id] = skillLevel(progress, id) + 1;
+  return { ok: true, level: progress.skillLevels[id], left: freeSkillPoints(progress) };
+}
+
 // --- 저장 ---------------------------------------------------------------
 
 function save(progress) {
@@ -290,6 +325,18 @@ function load() {
     budget -= give;
   }
 
+  // 스킬 레벨도 받은 점수를 넘을 수 없다. 능력치 점수와 같은 이유로 예산을
+  // 정해 앞에서부터 나눠 준다.
+  progress.skillLevels = {};
+  let skillBudget = (Math.max(1, Math.min(D.LEVEL.maxLevel, saved.jobLevel | 0 || 1)) - 1)
+    * D.SKILL.pointsPerLevel;
+  for (const id of Object.keys(D.PLAYER_SKILLS)) {
+    const want = D.skillLevelOf((saved.skillLevels || {})[id] || 1) - 1;
+    const give = Math.min(want, skillBudget);
+    if (give > 0) progress.skillLevels[id] = give + 1;
+    skillBudget -= give;
+  }
+
   progress.roster = Roster.adopt(saved.roster);
   progress.charLevel = Math.max(1, Math.min(D.LEVEL.maxLevel, progress.charLevel | 0));
   progress.jobLevel = Math.max(1, Math.min(D.LEVEL.maxLevel, progress.jobLevel | 0));
@@ -309,6 +356,8 @@ const api = {
   addItem, findItem, equip, unequip, compare,
   spend, buyGear, buyPotion, sell,
   unlockedSkills, validSkills,
+  skillLevel, skillDef, skillLevels, raiseSkill,
+  earnedSkillPoints, spentSkillPoints, freeSkillPoints,
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
