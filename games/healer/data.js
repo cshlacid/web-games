@@ -398,32 +398,32 @@ const COMPANIONS = {
            attrs: { str: 16, agi: 6, int: 10, vit: 94 },
            armor: 0.48, spec: 'tank',
            note: '더 단단하지만 더 느리다' },
-  lyle:  { id: 'lyle',  name: '검사 라일',   job: 'dealer', sprite: 'melee',
+  lyle:  { id: 'lyle',  name: '검사 라일',   job: 'dealer', sprite: 'warrior',
            hp: 644, mp: 80,  atk: 46, attackCd: 1.2, range: 7,  speed: 21,
            attrs: { str: 35, agi: 14, int: 10, vit: 46 },
            armor: 0.82, spec: 'warrior',
            note: '근접. 강타로 한 번에 크게 넣는다' },
-  sera:  { id: 'sera',  name: '도적 세라',   job: 'dealer', sprite: 'melee',
+  sera:  { id: 'sera',  name: '도적 세라',   job: 'dealer', sprite: 'rogue',
            hp: 560, mp: 88,  atk: 38, attackCd: 0.9, range: 7,  speed: 24,
            attrs: { str: 29, agi: 22, int: 11, vit: 40 },
            armor: 0.86, spec: 'rogue',
            note: '근접. 빠르게 여러 번 때린다' },
-  mira:  { id: 'mira',  name: '궁수 미라',   job: 'dealer', sprite: 'ranged',
+  mira:  { id: 'mira',  name: '궁수 미라',   job: 'dealer', sprite: 'archer',
            hp: 518, mp: 104, atk: 42, attackCd: 1.4, range: 34, speed: 17,
            attrs: { str: 32, agi: 18, int: 13, vit: 37 },
            armor: 0.9, spec: 'archer',
            note: '원거리. 화살비로 적 여럿을 친다' },
-  yuri:  { id: 'yuri',  name: '마법사 유리', job: 'dealer', sprite: 'ranged',
+  yuri:  { id: 'yuri',  name: '마법사 유리', job: 'dealer', sprite: 'mage',
            hp: 476, mp: 112, atk: 52, attackCd: 1.9, range: 36, speed: 15,
            attrs: { str: 14, agi: 12, int: 14, vit: 34 }, attackType: 'magic',
            armor: 0.92, spec: 'mage',
            note: '원거리. 느리지만 한 방이 무겁다' },
-  noa:   { id: 'noa',   name: '사제 노아',   job: 'healer', sprite: 'healer',
+  noa:   { id: 'noa',   name: '사제 노아',   job: 'healer', sprite: 'priest',
            hp: 560, mp: 104, atk: 18, attackCd: 2.0, range: 30, speed: 16,
            attrs: { str: 12, agi: 10, int: 13, vit: 40 }, attackType: 'magic',
            armor: 0.9, spec: 'priest',
            note: '마나가 많아 오래 버틴다' },
-  dean:  { id: 'dean',  name: '수도사 딘',   job: 'healer', sprite: 'healer',
+  dean:  { id: 'dean',  name: '수도사 딘',   job: 'healer', sprite: 'priest',
            hp: 616, mp: 88,  atk: 24, attackCd: 1.7, range: 26, speed: 18,
            attrs: { str: 14, agi: 12, int: 11, vit: 44 }, attackType: 'magic',
            armor: 0.86, spec: 'priest',
@@ -447,132 +447,132 @@ const UNIT_SKILLS = {
   // --- 탱커 ---
   // 광역 도발. 탱커 하나로는 여러 적의 어그로를 다 잡을 수 없어 후방이 무너지는데,
   // 이 스킬이 그것을 푼다. 대신 쿨타임이 길어 아무 때나 쓸 수는 없다.
-  roar:   { id: 'roar', name: '전투 함성', spec: 'tank', cd: 14, mp: 26, kind: 'taunt-area',
+  roar:   { id: 'roar', icon: '📣', name: '전투 함성', spec: 'tank', cd: 14, mp: 26, kind: 'taunt-area',
             duration: 8, range: 34, cast: 0, radius: 34, minLevel: 3,
             desc: '주변 적 전부의 어그로를 한 번에 가져온다' },
-  sweep:  { id: 'sweep', name: '휩쓸기', spec: 'tank', cd: 10, mp: 20, kind: 'damage-area',
+  sweep:  { id: 'sweep', icon: '🌪', name: '휩쓸기', spec: 'tank', cd: 10, mp: 20, kind: 'damage-area',
             mul: 1.3, radius: 13, range: 9, cast: 0, minLevel: 5,
             desc: '주변 적 여럿을 한 번에 친다' },
-  slam:   { id: 'slam', name: '내려찍기', spec: 'tank', cd: 9, mp: 18, kind: 'damage',
+  slam:   { id: 'slam', icon: '🔨', name: '내려찍기', spec: 'tank', cd: 9, mp: 18, kind: 'damage',
             mul: 3.0, range: 9, cast: 1.0, minLevel: 4,
             desc: '방패를 들어 올렸다 내려찍는다' },
   // 쿨타임이 지속 시간보다 짧다. 이것이 탱커가 하나를 계속 붙들 수 있는 근거다 —
   // 위협도 표를 없앤 뒤로 어그로를 유지하는 수단이 도발뿐이라, 끊기면 그 순간
   // 적이 곧장 후열로 간다.
-  taunt:  { id: 'taunt', name: '도발', spec: 'tank', cd: 5, mp: 10, kind: 'taunt',
+  taunt:  { id: 'taunt', icon: '💢', name: '도발', spec: 'tank', cd: 5, mp: 10, kind: 'taunt',
             duration: 6, range: 30, cast: 0, minLevel: 1,
             desc: '적 하나의 어그로를 가져온다' },
-  crush:  { id: 'crush', name: '짓밟기', spec: 'tank', cd: 8, mp: 12, kind: 'dot',
+  crush:  { id: 'crush', icon: '🦶', name: '짓밟기', spec: 'tank', cd: 8, mp: 12, kind: 'dot',
             tick: 13, interval: 1, duration: 6, range: 9, cast: 0, minLevel: 2,
             desc: '밟아 뭉갠 자리가 계속 아프다' },
-  bash:   { id: 'bash', name: '방패 강타', spec: 'tank', cd: 6, mp: 12, kind: 'damage',
+  bash:   { id: 'bash', icon: '🛡', name: '방패 강타', spec: 'tank', cd: 6, mp: 12, kind: 'damage',
             mul: 1.9, range: 9, cast: 0, minLevel: 1,
             desc: '방패로 밀어붙인다' },
 
   // --- 전사 ---
-  whirl:  { id: 'whirl', name: '회전 베기', spec: 'warrior', cd: 11, mp: 24, kind: 'damage-area',
+  whirl:  { id: 'whirl', icon: '🌀', name: '회전 베기', spec: 'warrior', cd: 11, mp: 24, kind: 'damage-area',
             mul: 1.6, radius: 12, range: 8, cast: 0, minLevel: 3,
             desc: '몸을 돌려 붙어 있는 적을 모두 벤다' },
-  execute:{ id: 'execute', name: '마무리', spec: 'warrior', cd: 13, mp: 22, kind: 'damage',
+  execute:{ id: 'execute', icon: '☠', name: '마무리', spec: 'warrior', cd: 13, mp: 22, kind: 'damage',
             mul: 4.2, range: 8, cast: 1.2, minLevel: 6,
             desc: '크게 준비해 한 방을 꽂는다' },
-  rend:   { id: 'rend', name: '가르기', spec: 'warrior', cd: 9, mp: 14, kind: 'dot',
+  rend:   { id: 'rend', icon: '🔻', name: '가르기', spec: 'warrior', cd: 9, mp: 14, kind: 'dot',
             tick: 16, interval: 1, duration: 6, range: 8, cast: 0, minLevel: 2,
             desc: '상처를 남겨 계속 피가 흐르게 한다' },
   // 사거리가 다른 근접기. 붙기 전에 한 번 넣을 수 있어 전사가 먼저 들이닥친다.
-  charge: { id: 'charge', name: '돌진', spec: 'warrior', cd: 12, mp: 16, kind: 'damage',
+  charge: { id: 'charge', icon: '🐗', name: '돌진', spec: 'warrior', cd: 12, mp: 16, kind: 'damage',
             mul: 2.4, range: 18, cast: 0, minLevel: 4,
             desc: '거리를 좁히며 부딪친다' },
-  cleave: { id: 'cleave', name: '강타', spec: 'warrior', cd: 7, mp: 16, kind: 'damage',
+  cleave: { id: 'cleave', icon: '⚔', name: '강타', spec: 'warrior', cd: 7, mp: 16, kind: 'damage',
             mul: 2.6, range: 8, cast: 0, minLevel: 1,
             desc: '한 번에 크게 넣는다' },
-  overpower: { id: 'overpower', name: '힘으로 누르기', spec: 'warrior', cd: 4, mp: 8,
+  overpower: { id: 'overpower', icon: '👊', name: '힘으로 누르기', spec: 'warrior', cd: 4, mp: 8,
             kind: 'damage', mul: 1.4, range: 8, cast: 0, minLevel: 1,
             desc: '싸게 계속 때린다' },
 
   // --- 도적 ---
   // 전사와 같은 자리에서 싸우지만 한 방이 아니라 잦음과 독으로 넣는다. 역할이
   // 같아도 손에 잡히는 감각이 달라야 둘 중 누구를 데려갈지가 고민이 된다.
-  smoke:  { id: 'smoke', name: '연막', spec: 'rogue', cd: 16, mp: 18, kind: 'damage-area',
+  smoke:  { id: 'smoke', icon: '💨', name: '연막', spec: 'rogue', cd: 16, mp: 18, kind: 'damage-area',
             mul: 1.1, radius: 14, range: 12, cast: 0, minLevel: 6,
             desc: '연기를 터뜨려 주변을 흔든다' },
-  backstab:{ id: 'backstab', name: '등 찌르기', spec: 'rogue', cd: 12, mp: 20, kind: 'damage',
+  backstab:{ id: 'backstab', icon: '🗡', name: '등 찌르기', spec: 'rogue', cd: 12, mp: 20, kind: 'damage',
             mul: 3.6, range: 8, cast: 0.8, minLevel: 5,
             desc: '빈틈을 노려 깊게 찌른다' },
-  flurry: { id: 'flurry', name: '연격', spec: 'rogue', cd: 10, mp: 20, kind: 'damage',
+  flurry: { id: 'flurry', icon: '✳', name: '연격', spec: 'rogue', cd: 10, mp: 20, kind: 'damage',
             mul: 3.0, range: 8, cast: 0.6, minLevel: 3,
             desc: '몰아친다' },
-  venom:  { id: 'venom', name: '독칼', spec: 'rogue', cd: 8, mp: 16, kind: 'dot',
+  venom:  { id: 'venom', icon: '🧪', name: '독칼', spec: 'rogue', cd: 8, mp: 16, kind: 'dot',
             tick: 20, interval: 1, duration: 6, range: 8, cast: 0, minLevel: 2,
             desc: '칼에 독을 발라 오래 깎는다' },
-  stab:   { id: 'stab', name: '기습', spec: 'rogue', cd: 4, mp: 10, kind: 'damage',
+  stab:   { id: 'stab', icon: '🔪', name: '기습', spec: 'rogue', cd: 4, mp: 10, kind: 'damage',
             mul: 1.8, range: 8, cast: 0, minLevel: 1,
             desc: '짧은 쿨타임으로 계속 찌른다' },
-  quickCut:{ id: 'quickCut', name: '속공', spec: 'rogue', cd: 2.5, mp: 6, kind: 'damage',
+  quickCut:{ id: 'quickCut', icon: '✂', name: '속공', spec: 'rogue', cd: 2.5, mp: 6, kind: 'damage',
             mul: 1.1, range: 8, cast: 0, minLevel: 1,
             desc: '거의 쉬지 않고 벤다' },
 
   // --- 궁수 ---
-  volley: { id: 'volley', name: '화살비', spec: 'archer', cd: 9, mp: 26, kind: 'damage-area',
+  volley: { id: 'volley', icon: '🌧', name: '화살비', spec: 'archer', cd: 9, mp: 26, kind: 'damage-area',
             mul: 1.5, radius: 15, range: 34, cast: 1.2, minLevel: 3,
             desc: '겹쳐 있는 적 여럿을 친다' },
-  pierce: { id: 'pierce', name: '관통 사격', spec: 'archer', cd: 11, mp: 20, kind: 'damage',
+  pierce: { id: 'pierce', icon: '🎯', name: '관통 사격', spec: 'archer', cd: 11, mp: 20, kind: 'damage',
             mul: 3.4, range: 40, cast: 1.6, minLevel: 5,
             desc: '멀리서 꿰뚫는다. 오래 겨눠야 한다' },
-  poisonCloud: { id: 'poisonCloud', name: '독 구름', spec: 'archer', cd: 18, mp: 24,
+  poisonCloud: { id: 'poisonCloud', icon: '☁', name: '독 구름', spec: 'archer', cd: 18, mp: 24,
             kind: 'zone', tick: 15, interval: 1, duration: 7, radius: 14, range: 34,
             cast: 1.4, minLevel: 6, desc: '남아 있는 독 구름을 쏘아 올린다' },
-  barbed: { id: 'barbed', name: '갈고리 화살', spec: 'archer', cd: 8, mp: 14, kind: 'dot',
+  barbed: { id: 'barbed', icon: '🎣', name: '갈고리 화살', spec: 'archer', cd: 8, mp: 14, kind: 'dot',
             tick: 15, interval: 1, duration: 6, range: 34, cast: 0, minLevel: 2,
             desc: '박힌 채로 남아 계속 깎는다' },
-  aimed:  { id: 'aimed', name: '조준 사격', spec: 'archer', cd: 6, mp: 14, kind: 'damage',
+  aimed:  { id: 'aimed', icon: '🏹', name: '조준 사격', spec: 'archer', cd: 6, mp: 14, kind: 'damage',
             mul: 2.2, range: 34, cast: 1.0, minLevel: 1,
             desc: '한 발을 겨눠 크게 넣는다' },
-  quickShot: { id: 'quickShot', name: '속사', spec: 'archer', cd: 3, mp: 8, kind: 'damage',
+  quickShot: { id: 'quickShot', icon: '💫', name: '속사', spec: 'archer', cd: 3, mp: 8, kind: 'damage',
             mul: 1.2, range: 34, cast: 0, minLevel: 1,
             desc: '겨누지 않고 빠르게 쏜다' },
 
   // --- 마법사 ---
   // 마나 순환이 있어 마법사는 물약 없이도 한 번은 되살아난다. 마나를 다 쓴
   // 시전자가 남은 전투 내내 서 있는 것을 막는 것이 이 스킬의 목적이다.
-  frost:  { id: 'frost', name: '서리 폭발', spec: 'mage', cd: 10, mp: 26, kind: 'damage-area',
+  frost:  { id: 'frost', icon: '❄', name: '서리 폭발', spec: 'mage', cd: 10, mp: 26, kind: 'damage-area',
             mul: 1.7, radius: 16, range: 36, cast: 1.4, minLevel: 3,
             desc: '터뜨려 여럿을 얼린다' },
-  inferno:{ id: 'inferno', name: '불바다', spec: 'mage', cd: 20, mp: 30, kind: 'zone',
+  inferno:{ id: 'inferno', icon: '🔥', name: '불바다', spec: 'mage', cd: 20, mp: 30, kind: 'zone',
             tick: 18, interval: 1, duration: 7, radius: 15, range: 36, cast: 1.8,
             minLevel: 5, desc: '바닥을 태워 그 자리에 남긴다' },
-  ember:  { id: 'ember', name: '불씨', spec: 'mage', cd: 9, mp: 16, kind: 'dot',
+  ember:  { id: 'ember', icon: '🕯', name: '불씨', spec: 'mage', cd: 9, mp: 16, kind: 'dot',
             tick: 18, interval: 1, duration: 6, range: 36, cast: 0.8, minLevel: 2,
             desc: '불이 옮겨붙어 계속 탄다' },
-  channel:{ id: 'channel', name: '마나 순환', spec: 'mage', cd: 26, mp: 0, kind: 'mana',
+  channel:{ id: 'channel', icon: '🔮', name: '마나 순환', spec: 'mage', cd: 26, mp: 0, kind: 'mana',
             mana: 60, range: 0, cast: 2.0, minLevel: 4,
             desc: '자기 마나를 되찾는다' },
-  bolt:   { id: 'bolt', name: '화염구', spec: 'mage', cd: 5, mp: 14, kind: 'damage',
+  bolt:   { id: 'bolt', icon: '☄', name: '화염구', spec: 'mage', cd: 5, mp: 14, kind: 'damage',
             mul: 2.0, range: 36, cast: 1.0, minLevel: 1,
             desc: '불덩이를 던진다' },
-  spark:  { id: 'spark', name: '불티', spec: 'mage', cd: 2.8, mp: 7, kind: 'damage',
+  spark:  { id: 'spark', icon: '✨', name: '불티', spec: 'mage', cd: 2.8, mp: 7, kind: 'damage',
             mul: 1.0, range: 36, cast: 0, minLevel: 1,
             desc: '싸게 계속 흘려보낸다' },
 
   // --- 사제 ---
   // 동료 힐러는 보조다. 물약까지 들고 나면서 주인공이 손을 놓아도 파티가 버티기
   // 시작했고, 그러면 이 게임이 성립하지 않는다 — 힐량과 마나를 함께 줄였다.
-  wave:   { id: 'wave', name: '치유의 물결', spec: 'priest', cd: 12, mp: 34, kind: 'heal-area',
+  wave:   { id: 'wave', icon: '🌊', name: '치유의 물결', spec: 'priest', cd: 12, mp: 34, kind: 'heal-area',
             heal: 90, radius: 18, range: 30, cast: 2.0, minLevel: 4,
             desc: '기준점 주변 아군을 한 번에 회복시킨다' },
-  greaterMend: { id: 'greaterMend', name: '대치유술', spec: 'priest', cd: 6, mp: 40,
+  greaterMend: { id: 'greaterMend', icon: '💗', name: '대치유술', spec: 'priest', cd: 6, mp: 40,
             kind: 'heal', heal: 290, range: 30, cast: 2.5, minLevel: 5,
             desc: '크게 회복시킨다. 마나를 많이 먹는다' },
-  renew:  { id: 'renew', name: '재생', spec: 'priest', cd: 10, mp: 20, kind: 'heal-dot',
+  renew:  { id: 'renew', icon: '🌱', name: '재생', spec: 'priest', cd: 10, mp: 20, kind: 'heal-dot',
             tick: 22, interval: 1, duration: 7, range: 30, cast: 0, minLevel: 2,
             desc: '천천히 오래 채운다' },
-  mend:   { id: 'mend', name: '치유술', spec: 'priest', cd: 3.0, mp: 24, kind: 'heal',
+  mend:   { id: 'mend', icon: '💚', name: '치유술', spec: 'priest', cd: 3.0, mp: 24, kind: 'heal',
             heal: 145, range: 30, cast: 1.5, minLevel: 1,
             desc: '탱커 체력을 본다' },
-  meditate:{ id: 'meditate', name: '명상', spec: 'priest', cd: 30, mp: 0, kind: 'mana',
+  meditate:{ id: 'meditate', icon: '🧘', name: '명상', spec: 'priest', cd: 30, mp: 0, kind: 'mana',
             mana: 50, range: 0, cast: 2.2, minLevel: 3,
             desc: '자기 마나를 되찾는다' },
-  smite:  { id: 'smite', name: '심판', spec: 'priest', cd: 7, mp: 12, kind: 'damage',
+  smite:  { id: 'smite', icon: '⚡', name: '심판', spec: 'priest', cd: 7, mp: 12, kind: 'damage',
             mul: 1.6, range: 30, cast: 1.0, minLevel: 1,
             desc: '힐할 곳이 없으면 때린다' },
 
@@ -580,13 +580,13 @@ const UNIT_SKILLS = {
   // 고블린에게 도적의 기술을 그대로 주었더니 등 찌르기·연격을 쓰는 잡졸이 되어,
   // 무리로 몰려오는 상대가 아니라 하나하나가 위험한 상대가 됐다. 계열을 따로
   // 두는 것이 "약한 여럿"이라는 자리를 지키는 방법이다.
-  pounce: { id: 'pounce', name: '덮치기', spec: 'grunt', cd: 7, mp: 12, kind: 'damage',
+  pounce: { id: 'pounce', icon: '💥', name: '덮치기', spec: 'grunt', cd: 7, mp: 12, kind: 'damage',
             mul: 1.9, range: 8, cast: 0, minLevel: 1,
             desc: '몸으로 부딪친다' },
-  gash:   { id: 'gash', name: '할퀴기', spec: 'grunt', cd: 9, mp: 12, kind: 'dot',
+  gash:   { id: 'gash', icon: '🐾', name: '할퀴기', spec: 'grunt', cd: 9, mp: 12, kind: 'dot',
             tick: 11, interval: 1, duration: 5, range: 8, cast: 0, minLevel: 3,
             desc: '할퀸 자리가 계속 쓰라리다' },
-  jab:    { id: 'jab', name: '찌르기', spec: 'grunt', cd: 5, mp: 8, kind: 'damage',
+  jab:    { id: 'jab', icon: '🔸', name: '찌르기', spec: 'grunt', cd: 5, mp: 8, kind: 'damage',
             mul: 1.3, range: 8, cast: 0, minLevel: 1,
             desc: '짧게 찌른다' },
 
@@ -596,22 +596,43 @@ const UNIT_SKILLS = {
   // 파티 전체를 한 번에 때리는 유일한 적 스킬이다. 반경과 배수를 넉넉히 잡았더니
   // 뭉쳐 선 파티가 쓸릴 때마다 힐이 따라가지 못했다 — 아군에게는 흩어지는 규칙이
   // 없으므로 이 스킬만 세면 그냥 못 막는 피해가 된다.
-  curse:  { id: 'curse', name: '역병', spec: 'shaman', cd: 18, mp: 28, kind: 'damage-area',
+  curse:  { id: 'curse', icon: '🦠', name: '역병', spec: 'shaman', cd: 18, mp: 28, kind: 'damage-area',
             mul: 1.0, radius: 12, range: 30, cast: 1.6, minLevel: 3,
             desc: '퍼뜨려 여럿을 앓게 한다' },
-  mendEnemy: { id: 'mendEnemy', name: '주술 치유', spec: 'shaman', cd: 4.5, mp: 20,
+  mendEnemy: { id: 'mendEnemy', icon: '💜', name: '주술 치유', spec: 'shaman', cd: 4.5, mp: 20,
             kind: 'heal', heal: 140, range: 30, cast: 1.5, minLevel: 1,
             desc: '같은 편을 회복시킨다' },
-  hex:    { id: 'hex', name: '저주', spec: 'shaman', cd: 8, mp: 18, kind: 'dot',
+  hex:    { id: 'hex', icon: '👁', name: '저주', spec: 'shaman', cd: 8, mp: 18, kind: 'dot',
             tick: 14, interval: 1, duration: 5, range: 30, cast: 1.0, minLevel: 1,
             desc: '지속 피해' },
-  drain:  { id: 'drain', name: '마력 흡수', spec: 'shaman', cd: 24, mp: 0, kind: 'mana',
+  drain:  { id: 'drain', icon: '🕳', name: '마력 흡수', spec: 'shaman', cd: 24, mp: 0, kind: 'mana',
             mana: 55, range: 0, cast: 2.0, minLevel: 2,
             desc: '자기 마나를 되찾는다' },
-  spirit: { id: 'spirit', name: '정령 화살', spec: 'shaman', cd: 5, mp: 12, kind: 'damage',
+  spirit: { id: 'spirit', icon: '👻', name: '정령 화살', spec: 'shaman', cd: 5, mp: 12, kind: 'damage',
             mul: 1.7, range: 30, cast: 1.0, minLevel: 1,
             desc: '정령을 날려 보낸다' },
 };
+
+// 스킬이 하는 일. **아이콘이 "어떤 스킬인가"를, 색이 "무엇을 하는가"를 알린다.**
+// 둘 중 하나만으로는 서른 몇 개를 훑을 수 없다 — 아이콘만 있으면 처음 보는
+// 스킬이 공격인지 회복인지 알 수 없고, 색만 있으면 같은 색이 대여섯씩 겹친다.
+//
+// 실제 색은 style.css가 정한다. 밝은 테마와 어두운 테마에서 읽히는 색이 다른데
+// 그것은 화면 쪽 사정이다.
+const SKILL_KINDS = {
+  'damage':      { name: '공격', css: 'harm' },
+  'damage-area': { name: '광역 공격', css: 'harm' },
+  'dot':         { name: '지속 피해', css: 'bane' },
+  'zone':        { name: '장판', css: 'bane' },
+  'heal':        { name: '회복', css: 'mend' },
+  'heal-area':   { name: '광역 회복', css: 'mend' },
+  'heal-dot':    { name: '지속 회복', css: 'mend' },
+  'taunt':       { name: '도발', css: 'pull' },
+  'taunt-area':  { name: '광역 도발', css: 'pull' },
+  'mana':        { name: '마나 회복', css: 'mana' },
+};
+
+const skillKind = (def) => SKILL_KINDS[def && def.kind] || SKILL_KINDS.damage;
 
 // 계열의 이름. 화면에 "딜러 · 궁수"처럼 역할과 함께 적는다 — 역할만 적으면
 // 궁수와 마법사가 같은 줄로 보이고, 계열만 적으면 누가 앞에 서는지 알 수 없다.
@@ -660,6 +681,9 @@ function skillsFor(spec, level) {
 
 // 기획서에 나온 다섯 유형을 모두 쓴다: 개별 대상 / 범위 / 장판 / 도트 / 마나 회복.
 //
+// **kind는 색을 정하는 데만 쓴다**(SKILL_KINDS). 무엇이 나가는지는 targeting과
+// heal/tick/mana가 정한다 — 동료 스킬과 같은 잣대로 색을 입히려고 두었다.
+//
 // **쿨타임은 시전 시간만큼 덜어 두었다.** 시전의 대가는 그동안 서 있어야 한다는
 // 것이지 힐을 덜 넣는 것이 아니다 — 둘을 겹쳐 물리면 캐스팅 스킬이 그냥 나쁜
 // 스킬이 되고, 즉시 시전만 고르게 된다.
@@ -679,42 +703,42 @@ function skillsFor(spec, level) {
 // 숫자를 적지 않는 것은 그 때문이다 — 숫자는 skillEffect가 레벨에서 만든다.
 const PLAYER_SKILLS = {
   touch: {
-    id: 'touch', unlock: 1, range: 40, cast: 1.0, name: '치유의 손길', type: '개별 대상', targeting: 'ally',
+    id: 'touch', unlock: 1, kind: 'heal', range: 40, cast: 1.0, name: '치유의 손길', type: '개별 대상', targeting: 'ally',
     mp: 14, cd: 1.4, heal: 130, icon: '✚',
     desc: '동료 하나의 체력을 한 번에 크게 회복한다.',
   },
   quick: {
-    id: 'quick', unlock: 1, range: 36, cast: 0, name: '신속한 치유', type: '개별 대상', targeting: 'ally',
+    id: 'quick', unlock: 1, kind: 'heal', range: 36, cast: 0, name: '신속한 치유', type: '개별 대상', targeting: 'ally',
     mp: 9, cd: 1.2, heal: 62, icon: '✦',
     desc: '싸고 빠르지만 회복량이 작다.',
   },
   regen: {
-    id: 'regen', unlock: 2, range: 40, cast: 1.0, name: '재생의 축복', type: '도트', targeting: 'ally',
+    id: 'regen', unlock: 2, kind: 'heal-dot', range: 40, cast: 1.0, name: '재생의 축복', type: '도트', targeting: 'ally',
     mp: 20, cd: 8, tick: 26, interval: 1, duration: 8, icon: '❃',
     desc: '동료 하나에게 걸어 두면 시간을 두고 회복된다.',
   },
   ripple: {
-    id: 'ripple', unlock: 4, range: 44, cast: 1.5, name: '빛의 파문', type: '범위', targeting: 'area-ally',
+    id: 'ripple', unlock: 4, kind: 'heal-area', range: 44, cast: 1.5, name: '빛의 파문', type: '범위', targeting: 'area-ally',
     mp: 30, cd: 7.5, heal: 76, radius: 20, icon: '◎',
     desc: '기준점 주변의 아군을 한 번에 회복한다.',
   },
   sanctuary: {
-    id: 'sanctuary', unlock: 6, range: 48, cast: 2.0, name: '생명의 성역', type: '장판', targeting: 'area-ally',
+    id: 'sanctuary', unlock: 6, kind: 'heal-area', range: 48, cast: 2.0, name: '생명의 성역', type: '장판', targeting: 'area-ally',
     mp: 38, cd: 20, tick: 22, interval: 1, duration: 10, radius: 21, icon: '⬡',
     desc: '바닥에 남는 장판. 안에 서 있는 아군이 계속 회복된다.',
   },
   focus: {
-    id: 'focus', unlock: 3, range: 0, cast: 2.0, name: '정신 집중', type: '마나 회복', targeting: 'self',
+    id: 'focus', unlock: 3, kind: 'mana', range: 0, cast: 2.0, name: '정신 집중', type: '마나 회복', targeting: 'self',
     mp: 0, cd: 28, mana: 70, icon: '☾',
     desc: '서서 외워 자신의 마나를 되찾는다.',
   },
   flame: {
-    id: 'flame', unlock: 5, range: 40, cast: 1.0, name: '심판의 불꽃', type: '도트', targeting: 'enemy',
+    id: 'flame', unlock: 5, kind: 'dot', range: 40, cast: 1.0, name: '심판의 불꽃', type: '도트', targeting: 'enemy',
     mp: 16, cd: 9, tick: 22, interval: 1, duration: 6, icon: '✹',
     desc: '적 하나를 태운다. 어그로를 끌 수 있다.',
   },
   pyre: {
-    id: 'pyre', unlock: 8, range: 44, cast: 1.8, name: '성스러운 불길', type: '장판', targeting: 'area-enemy',
+    id: 'pyre', unlock: 8, kind: 'zone', range: 44, cast: 1.8, name: '성스러운 불길', type: '장판', targeting: 'area-enemy',
     mp: 34, cd: 18, tick: 26, interval: 1, duration: 8, radius: 18, icon: '⌘',
     desc: '바닥에 남는 장판. 안에 선 적이 계속 탄다.',
   },
@@ -948,7 +972,7 @@ const api = {
   RANKS, rankOf,
   SLOTS, GEAR, MATERIALS, REGIONS, NAMES, SPECIAL_POOL, SPECIAL_CHANCE,
   withGear, attrsWithGear, WHOLE_AFFIX,
-  HERO, COMPANIONS, UNIT_SKILLS, SPEC_SKILLS, UNIT_SKILL_MAX, skillsFor,
+  HERO, COMPANIONS, UNIT_SKILLS, SKILL_KINDS, skillKind, SPEC_SKILLS, UNIT_SKILL_MAX, skillsFor,
   PLAYER_SKILLS, SKILL, skillAt, skillEffect, skillLevelOf,
   POTIONS, JOB_POTIONS, POTION_MAX, ENEMIES,
   PARTY_MAX, SKILL_MAX,

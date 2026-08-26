@@ -52,7 +52,26 @@ function check(name, actual, expected) {
       Sprites.size(kind), { w: sprite.w + 2, h: sprite.h + 2 });
   }
 
-  check('그림 아홉 개', Object.keys(Sprites.SPRITES).length, 9);
+  check('그림 열하나', Object.keys(Sprites.SPRITES).length, 11);
+
+  // **계열마다 제 그림이 있어야 한다.** 궁수와 마법사가 같은 그림을 쓰던 때에는
+  // 편성 화면에서 이름을 읽어야 어느 쪽인지 알 수 있었고, 전장에서는 아예
+  // 구별할 수 없었다.
+  const specs = new Set(Object.values(D.COMPANIONS).map((def) => def.spec));
+  const shared = [];
+  for (const spec of specs) {
+    const pics = new Set(Object.values(D.COMPANIONS)
+      .filter((def) => def.spec === spec).map((def) => def.sprite));
+    if (pics.size !== 1) shared.push(`${spec}: ${[...pics].join('/')}`);
+  }
+  check('한 계열은 한 그림을 쓴다', shared, []);
+
+  const byPic = {};
+  for (const def of Object.values(D.COMPANIONS)) {
+    (byPic[def.sprite] = byPic[def.sprite] || new Set()).add(def.spec);
+  }
+  check('한 그림을 두 계열이 나눠 쓰지 않는다',
+    Object.entries(byPic).filter(([, set]) => set.size > 1).map(([pic]) => pic), []);
 
   // 우두머리는 상자가 넓다. 화면 크기를 이 폭으로 정하므로 이것이 곧 "크다"이다.
   check('우두머리가 가장 크다',
@@ -92,8 +111,42 @@ function check(name, actual, expected) {
   check('안에 들어가는 도형은 테두리가 없다', inner.length > 0, true);
 
   // 활은 채우지 않는다 — 채우면 방패로 보인다.
-  const bow = Sprites.SPRITES.ranged.parts.find((part) => part.arc);
+  const bow = Sprites.SPRITES.archer.parts.find((part) => part.arc);
   check('활은 선으로만 긋는다', Sprites.shape(bow).includes('fill="none"'), true);
+}
+
+// --- 스킬도 눈으로 갈린다 -----------------------------------------------
+//
+// 아이콘이 "어떤 스킬인가"를, 색이 "무엇을 하는가"를 알린다. 둘 중 하나만으로는
+// 서른 몇 개를 훑을 수 없다.
+{
+  const all = Object.values(D.UNIT_SKILLS);
+  check('모든 스킬에 아이콘이 있다',
+    all.filter((def) => !def.icon).map((def) => def.id), []);
+  check('주인공 스킬도 마찬가지',
+    Object.values(D.PLAYER_SKILLS).filter((def) => !def.icon).map((def) => def.id), []);
+
+  // 한 계열 안에서 아이콘이 겹치면 넷을 훑는 뜻이 없다.
+  const clash = [];
+  for (const [spec, list] of Object.entries(D.SPEC_SKILLS)) {
+    const icons = list.map((id) => D.UNIT_SKILLS[id].icon);
+    if (new Set(icons).size !== icons.length) clash.push(spec);
+  }
+  check('한 계열 안에서 아이콘이 겹치지 않는다', clash, []);
+
+  // 계열끼리도 겹치지 않아야 "마법사가 쓴 것"과 "궁수가 쓴 것"이 갈린다.
+  const icons = all.map((def) => def.icon);
+  const dupes = icons.filter((icon, i) => icons.indexOf(icon) !== i);
+  check('스킬끼리 아이콘이 겹치지 않는다', [...new Set(dupes)], []);
+
+  // 색은 종류에서 온다. 적어 두지 않은 종류가 있으면 그 스킬만 공격 색이 된다.
+  const kinds = new Set(all.concat(Object.values(D.PLAYER_SKILLS)).map((def) => def.kind));
+  check('모든 종류에 색이 정해져 있다',
+    [...kinds].filter((kind) => !D.SKILL_KINDS[kind]), []);
+  check('회복과 공격의 색이 다르다',
+    D.skillKind({ kind: 'heal' }).css === D.skillKind({ kind: 'damage' }).css, false);
+  check('도발은 또 다른 색이다',
+    new Set(['heal', 'damage', 'taunt', 'mana'].map((k) => D.skillKind({ kind: k }).css)).size, 4);
 }
 
 // --- 배경 --------------------------------------------------------------

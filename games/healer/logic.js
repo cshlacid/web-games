@@ -344,7 +344,9 @@ function runUnitSkill(state, unit, choice) {
   const target = byUid(state, choice.targetUid);
   if (!def || !target || target.dead) return;
 
+  const kind = D.skillKind(def);
   emit(state, { type: 'cast', uid: unit.uid, name: def.name,
+    icon: def.icon, css: kind.css,
     text: `${unit.name}: ${def.name}` });
 
   if (def.kind === 'taunt' || def.kind === 'taunt-area') {
@@ -523,6 +525,7 @@ function resolvePlayerSkill(state, def, spot) {
   const point = { x: unit ? unit.x : spot.x, y: unit ? unit.y : spot.y };
 
   emit(state, { type: 'cast', uid: caster.uid, skillId: def.id, name: def.name,
+    icon: def.icon, css: D.skillKind(def).css,
     x: point.x, y: point.y, radius: def.radius || 0, text: `${def.name}` });
 
   // 회복량은 회복력 배수를, 피해는 마법 공격력 배수를 탄다. 지능이 둘 다
