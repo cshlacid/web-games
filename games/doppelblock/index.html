@@ -6,7 +6,7 @@
 <title>더블블록</title>
 <meta name="description" content="줄마다 검은 칸 두 개. 그 사이 숫자의 합을 맞히는 퍼즐">
 <meta name="color-scheme" content="light dark">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>⬛</text></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%235f6d87'><rect x='2' y='7' width='7.5' height='10' rx='1.5'/><rect x='14.5' y='7' width='7.5' height='10' rx='1.5'/></svg>">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -43,19 +43,19 @@
     <div class="digits" id="digits"></div>
     <div class="tools">
       <button class="tool" id="pencil" type="button" aria-pressed="false">
-        <span class="tool-icon">✎</span><span class="tool-label">연필</span>
+        <span class="tool-icon" data-icon="pencil"></span><span class="tool-label">연필</span>
       </button>
       <button class="tool" id="erase" type="button">
-        <span class="tool-icon">⌫</span><span class="tool-label">지우기</span>
+        <span class="tool-icon" data-icon="backspace"></span><span class="tool-label">지우기</span>
       </button>
       <button class="tool" id="undo" type="button">
-        <span class="tool-icon">↶</span><span class="tool-label">되돌리기</span>
+        <span class="tool-icon" data-icon="undo"></span><span class="tool-label">되돌리기</span>
       </button>
       <button class="tool" id="hint" type="button">
-        <span class="tool-icon">?</span><span class="tool-label">힌트</span>
+        <span class="tool-icon" data-icon="hint"></span><span class="tool-label">힌트</span>
       </button>
       <button class="tool" id="new-game" type="button">
-        <span class="tool-icon">＋</span><span class="tool-label">새 판</span>
+        <span class="tool-icon" data-icon="plus"></span><span class="tool-label">새 판</span>
       </button>
     </div>
   </div>
@@ -112,6 +112,7 @@
 <script src="solver.js"></script>
 <script src="puzzles.js"></script>
 <script src="generator.js"></script>
+<script src="../../shared/icons.js"></script>
 <script src="../../shared/audio.js"></script>
 <script src="audio.js"></script>
 <script src="main.js"></script>

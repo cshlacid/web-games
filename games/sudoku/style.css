@@ -265,7 +265,10 @@ h1 {
   cursor: pointer;
 }
 
-.tool-icon { font-size: 17px; line-height: 1; }
+/* 도구 아이콘은 글자가 아니라 도형이다(`shared/icons.js`). 기호 문자로 두었더니
+   글꼴마다 크기와 두께가 달랐고, 아예 안 그리는 글꼴도 있었다. */
+.tool-icon { display: inline-flex; line-height: 0; }
+.tool-icon svg { width: 19px; height: 19px; }
 .tool-label { font-size: 11px; font-weight: 600; opacity: 0.8; }
 .tool:disabled { opacity: 0.35; cursor: default; }
 

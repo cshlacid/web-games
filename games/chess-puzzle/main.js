@@ -4,6 +4,7 @@
 // 최상위에 같은 이름을 선언하면 다른 파일과 충돌하므로 IIFE로 가둔다.
 (function () {
   const L = window.ChessPuzzleLogic;
+  const Icons = window.SharedIcons;
   const Data = window.ChessPuzzleData;
   const Sound = window.ChessSound;
   const SAVE_KEY = 'web-games.chess-puzzle.progress';
@@ -556,4 +557,7 @@
 
   buildLevels();
   loadPuzzle(restore());
+
+  // 도구 단추의 아이콘은 HTML에 이름만 적혀 있다. 여기서 한 번 그린다.
+  Icons.paint();
 })();

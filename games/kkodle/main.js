@@ -2,6 +2,7 @@
 
 (function () {
   const H = window.KkodleHangul;
+  const Icons = window.SharedIcons;
   const L = window.KkodleLogic;
   const WORDS = window.KkodleWords;
   const Sound = window.KkodleSound;
@@ -130,11 +131,13 @@
         button.type = 'button';
         button.className = 'key';
         if (key === 'shift') {
-          button.textContent = '⇧';
+          // 기호 문자(⇧⌫)로 두었더니 글꼴마다 크기와 두께가 달랐고, 아예 안
+          // 그리는 글꼴도 있었다. 자모 사이에 섞여 서는 자리라 그것이 잘 보인다.
+          button.innerHTML = Icons.svg('shift');
           button.dataset.action = 'shift';
           button.setAttribute('aria-pressed', 'false');
         } else if (key === 'back') {
-          button.textContent = '⌫';
+          button.innerHTML = Icons.svg('backspace');
           button.dataset.action = 'back';
         } else if (key === 'enter') {
           button.textContent = '입력';
