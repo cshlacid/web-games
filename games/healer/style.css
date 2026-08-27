@@ -223,7 +223,13 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
    더 많은 동료를 한 화면에서 훑는다. */
 .roster {
   list-style: none; margin: 0; padding: 0;
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 6px;
+  /* **한 줄에 둘씩 고정이다.** auto-fill로 두었더니 폭이 좁은 기기에서 한 칸으로
+     접혀, 격자로 바꾼 뜻이 그 화면에서만 사라졌다. */
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px;
+}
+/* 화면이 넓으면 더 담는다. 둘로 고정해 두면 넓은 창에서 카드가 지나치게 길어진다. */
+@media (min-width: 620px) {
+  .roster { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 /* 주인공 줄은 고를 수 있는 것이 아니므로 한 줄을 통째로 쓴다. */
 .roster > li.wide { grid-column: 1 / -1; }
@@ -257,6 +263,17 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .sheet-head { cursor: default; }
 #member-head { margin-bottom: 10px; }
 #member-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+/* 칩은 눌러서 설명을 여는 단추다. 손가락으로는 title이 보이지 않는다. */
+#member-chips .chip { cursor: pointer; font: inherit; }
+#member-chips .chip[aria-pressed="true"] { background: var(--sel); }
+
+.chip-detail {
+  margin-top: 10px; padding: 10px 12px;
+  border: 1px solid var(--line); border-radius: 12px; background: var(--card-bg);
+}
+.detail-title { margin: 0 0 4px; font-size: 14px; font-weight: 700; }
+.detail-line { margin: 0; font-size: 13px; line-height: 1.5; }
+.detail-note { margin: 6px 0 0; font-size: 12px; color: var(--muted); }
 
 .pick {
   width: 100%; text-align: left;
