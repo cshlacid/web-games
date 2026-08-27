@@ -328,11 +328,15 @@ const AFFIX_RANGE = [
 // **능력치도 옵션으로 붙는다.** 능력치가 오르면 거기서 나오는 수치가 함께 오르므로
 // (체력 하나가 최대 체력을, 지능 하나가 최대 마나와 회복량을 같이 올린다) 값이
 // 작아도 무게가 있다. 최대 체력 옵션 하나와 엇비슷해지도록 잡았다 —
-// 체력 1 = 최대 체력 14이므로 1.6이면 22~25쯤이다.
+// 체력 1 = 최대 체력 14이므로 2.4면 33~34쯤이다.
+//
+// **한 번 통째로 1.4배 올렸다.** 그전에는 희귀 한 자리를 끼워도 캐릭터 창의
+// 숫자가 거의 그대로라, 장비를 바꾸는 것이 화면에서 아무 일도 아니었다.
+// 올린 만큼은 적을 세게 만들어 되돌렸다(아래 난이도 절).
 const AFFIX_BASE = {
-  str: 2, agi: 2, int: 1.6, vit: 1.6,
-  hp: 14, mp: 7, atk: 0.05, heal: 0.04, armor: -0.02,
-  crit: 0.02, critDamage: 0.06, dodge: 0.015,
+  str: 3, agi: 3, int: 2.4, vit: 2.4,
+  hp: 20, mp: 10, atk: 0.07, heal: 0.055, armor: -0.028,
+  crit: 0.028, critDamage: 0.085, dodge: 0.021,
 };
 
 // 능력치 옵션은 정수로 붙는다. 화면에 '체력 +2'라고 적어 놓고 속으로 1.7을
@@ -779,6 +783,15 @@ const UNIT_SKILLS = {
             mul: 3.2, range: 32, cast: 1.6, minLevel: 8,
             desc: '길게 끌었다가 한 번에 끝낸다' },
 
+  // --- 우두머리 (적) ---
+  // **우두머리만 장판을 깐다.** 정예가 광역기를 하나씩 갖게 되면서 우두머리가
+  // "정예와 같은 것을 더 세게"뿐이었는데, 그러면 등급이 수치 차이로만 남는다.
+  // 발밑에 남아 계속 타는 것이라 후열이 자리를 옮겨야 하고, 그때 대열이 흐트러진다.
+  rupture: { id: 'rupture', icon: 'rupture', name: '대지 가르기', spec: 'chieftain', cd: 16, mp: 30,
+            kind: 'zone', tick: 26, interval: 1, duration: 8, radius: 18, range: 30,
+            cast: 1.4, minLevel: 1,
+            desc: '땅을 갈라 그 자리를 계속 태운다' },
+
   // --- 잡졸 (적) ---
   // 고블린에게 도적의 기술을 그대로 주었더니 등 찌르기·연격을 쓰는 잡졸이 되어,
   // 무리로 몰려오는 상대가 아니라 하나하나가 위험한 상대가 됐다. 계열을 따로
@@ -913,7 +926,7 @@ const SPEC_SKILLS = {
   grunt:   ['gash', 'pounce', 'jab'],
   // 우두머리 전용. 새 스킬을 만들지 않고 수호와 전사의 무거운 것만 골라 묶었다 —
   // 이 계열이 하는 일은 "이미 있는 것 중 가장 아픈 것"이지 새로운 수단이 아니다.
-  chieftain: ['sweep', 'roar', 'slam', 'crush', 'bash'],
+  chieftain: ['rupture', 'sweep', 'roar', 'slam', 'crush', 'bash'],
 };
 
 // 그 유닛이 이 레벨에서 전투에 들고 가는 스킬. 편성 화면과 전투가 같은 것을
@@ -951,15 +964,20 @@ function taste(seed, id) {
 //
 // 고른 뒤에는 목록 순서로 되돌린다. **`SPEC_SKILLS`의 순서가 곧 AI의 우선순위라**
 // 뽑힌 순서대로 두면 싸구려 스킬이 광역기보다 먼저 나간다.
-function skillsFor(spec, level, seed) {
+// always는 **그 유닛이 반드시 들고 오는 것**이다. `core`가 계열의 정체라면
+// 이쪽은 그 개체의 정체다 — 등급이 무엇을 들고 오는가를 정하는 자리라, 같은
+// 수호자 계열이라도 정예 오크만 휩쓸기를 확실히 들고 온다. 취향에 맡겨 두면
+// "광역기를 든 정예"가 우연에 걸리고, 등급을 올린 뜻이 사라진다.
+function skillsFor(spec, level, seed, always) {
   const list = SPEC_SKILLS[spec] || [];
   const open = list.filter((id) => level >= UNIT_SKILLS[id].minLevel);
   if (seed == null) return open.slice(0, UNIT_SKILL_MAX);
 
-  const core = open.filter((id) => UNIT_SKILLS[id].core);
-  const rest = open.filter((id) => !UNIT_SKILLS[id].core)
+  const forced = (always || []).filter((id) => open.indexOf(id) >= 0);
+  const core = open.filter((id) => UNIT_SKILLS[id].core && forced.indexOf(id) < 0);
+  const rest = open.filter((id) => !UNIT_SKILLS[id].core && forced.indexOf(id) < 0)
     .sort((a, b) => taste(seed, a) - taste(seed, b));
-  const picked = new Set(core.concat(rest).slice(0, UNIT_SKILL_MAX));
+  const picked = new Set(forced.concat(core, rest).slice(0, UNIT_SKILL_MAX));
   return list.filter((id) => picked.has(id));
 }
 
@@ -1144,28 +1162,28 @@ const POTION_MAX = 5;
 // 적 힐러가 아무에게도 보호받지 못하고, 후열을 먼저 치는 규칙이 한쪽에서만 돈다.
 const ENEMIES = {
   scout:  { id: 'scout', race: 'goblin', rank: 'trash', exp: 10,  name: '고블린 척후병', job: 'dealer', sprite: 'goblin',
-            hp: 686, mp: 64,  atk: 22, attackCd: 1.5, range: 7,  speed: 21,
-           attrs: { str: 40, agi: 16, int: 8, vit: 54 }, growth: 'enemy',
+            hp: 742, mp: 64,  atk: 25, attackCd: 1.5, range: 7,  speed: 21,
+           attrs: { str: 40, agi: 16, int: 8, vit: 59 }, growth: 'enemy',
             armor: 0.95, spec: 'grunt' },
   shaman: { id: 'shaman', race: 'goblin', rank: 'trash', exp: 13, name: '고블린 주술사', job: 'healer', sprite: 'shaman',
-            hp: 588, mp: 120, atk: 21, attackCd: 2.2, range: 30, speed: 15,
-           attrs: { str: 12, agi: 10, int: 16, vit: 47 }, growth: 'enemy', attackType: 'magic',
+            hp: 658, mp: 120, atk: 24, attackCd: 2.2, range: 30, speed: 15,
+           attrs: { str: 12, agi: 10, int: 16, vit: 52 }, growth: 'enemy', attackType: 'magic',
             armor: 1, spec: 'shaman' },
   orc:    { id: 'orc', race: 'orc', rank: 'elite', exp: 46,    name: '오크 전사',     job: 'tank',   sprite: 'orc',
-            hp: 2254, mp: 72,  atk: 57, attackCd: 1.8, range: 7,  speed: 16,
+            hp: 2254, mp: 72,  atk: 51, attackCd: 1.8, range: 7,  speed: 16,
            attrs: { str: 58, agi: 8, int: 10, vit: 134 }, growth: 'enemy',
-            armor: 0.7,  spec: 'tank' },
+            armor: 0.7,  spec: 'tank', always: ['sweep'] },
   hexer:  { id: 'hexer', race: 'orc', rank: 'elite', exp: 42,  name: '오크 주술사',   job: 'healer', sprite: 'shaman',
-            hp: 1372, mp: 128, atk: 42, attackCd: 2.4, range: 30, speed: 14,
+            hp: 1372, mp: 128, atk: 38, attackCd: 2.4, range: 30, speed: 14,
            attrs: { str: 16, agi: 8, int: 19, vit: 82 }, growth: 'enemy', attackType: 'magic',
-            armor: 0.9, spec: 'shaman' },
+            armor: 0.9, spec: 'shaman', always: ['curse'] },
   // **우두머리는 제 계열을 쓴다.** 오크 전사와 같은 수호 계열을 들고 있던 동안에는
   // 덩치만 큰 오크였다 — 잡는 데 오래 걸릴 뿐 무섭지는 않았다. 지금은 휩쓸기로
   // 파티 전체를 긁고 마무리로 한 명을 끊는다.
   chief:  { id: 'chief', race: 'orc', rank: 'boss', exp: 210,  name: '오크 우두머리', job: 'tank',   sprite: 'boss',
-            hp: 4858, mp: 136, atk: 74, attackCd: 2.0, range: 8,  speed: 14,
+            hp: 4858, mp: 136, atk: 67, attackCd: 2.0, range: 8,  speed: 14,
            attrs: { str: 89, agi: 6, int: 20, vit: 289 }, growth: 'enemy',
-            armor: 0.62, spec: 'chieftain' },
+            armor: 0.62, spec: 'chieftain', always: ['rupture', 'sweep'] },
 };
 
 // 동료 이름 조각. 명부에 새 동료가 들어올 때 조합해 쓴다 — 이름이 곧 신원이고,

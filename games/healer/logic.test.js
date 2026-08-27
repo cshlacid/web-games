@@ -378,6 +378,36 @@ function cast(state, skillId, target) {
   check('쓰러진 아군은 채우지 않는다', down.mp, 0);
 }
 
+// --- 화면에 뜨는 숫자는 정수다 ------------------------------------------
+//
+// 체력과 마나는 자연 회복과 무리 사이 회복 때문에 소수를 갖는다. 남은 자리를
+// 그대로 회복량으로 삼으면 그 소수가 "+106.99999999999864"처럼 화면으로 샌다.
+{
+  const state = battle();
+  const tank = unit(state, '강철의 브란');
+  // 소수 자리가 남아 있는 체력을 만든다.
+  tank.hp = tank.maxHp - 106.99999999999864;
+  const healed = L.applyHeal(state, L.hero(state), tank, 99999);
+  check('회복량이 정수다', healed % 1, 0);
+  check('넘치지 않는다', tank.hp <= tank.maxHp, true);
+
+  // 피해도 마찬가지다. 이쪽은 예전부터 정수였지만 같은 잣대로 본다.
+  tank.hp = tank.maxHp;
+  const took = L.applyDamage(state, AI.alive(state, 'enemy')[0], tank, 123.456);
+  check('피해도 정수다', took % 1, 0);
+
+  // 실제 전투를 굴려도 소수가 새지 않는다 — 무리 사이를 넘겨야 회복이 소수를 만든다.
+  const run2 = battle({ quest: quest({ waves: [['scout'], ['scout', 'shaman']] }) });
+  const bad = [];
+  for (let i = 0; i < 160 / L.TICK && run2.status === 'fighting'; i++) {
+    L.step(run2, L.TICK);
+    for (const event of L.drainEvents(run2)) {
+      if ((event.type === 'damage' || event.type === 'heal') && event.amount % 1 !== 0) bad.push(event.amount);
+    }
+  }
+  check('전투 내내 소수가 안 뜬다', bad, []);
+}
+
 // --- 강화와 약화 --------------------------------------------------------
 //
 // 곱으로만 걸리고, 같은 스킬은 겹쳐 쌓이지 않는다. 피해와 회복을 계산하는
@@ -465,17 +495,26 @@ function cast(state, skillId, target) {
   const state = battle();
   const foe = AI.alive(state, 'enemy').find((u) => u.maxMp > 0);
   const down = AI.alive(state, 'ally').find((u) => u.uid !== L.HERO_UID);
-  L.hero(state).mp = 0;
+  // 전부 비우고 시작한다. 남아 있는 마나가 제각각이면 "지능이 높은 쪽이 더
+  // 돈다"를 잴 수 없다.
+  for (const u of AI.alive(state, 'ally')) u.mp = 0;
   foe.mp = 0;
   down.mp = 0;
   L.applyDamage(state, null, down, 99999);
 
   run(state, 10);
-  const share = (u) => u.mp / u.maxMp;
-  const near = (a, b) => Math.abs(a - b) < 0.005;
-  check('주인공의 마나가 초당 정해진 몫만큼 돈다',
-    near(share(L.hero(state)), L.MANA_REGEN * 10), true);
-  check('적도 같은 규칙을 쓴다', near(share(foe), L.MANA_REGEN * 10), true);
+  // **지능에 비례한다.** 최대 마나의 비율로 두면 장비로 최대 마나만 올린
+  // 캐릭터가 회복 속도까지 덤으로 얻는다.
+  const gained = (u) => u.mp;
+  const near = (a, b) => Math.abs(a - b) < 0.5;
+  const perTen = (u) => u.attrs.int * L.MANA_REGEN_PER_INT * 10;
+  check('주인공의 마나가 지능에 비례해 돈다',
+    near(gained(L.hero(state)), perTen(L.hero(state))), true);
+  check('적도 같은 규칙을 쓴다', near(gained(foe), perTen(foe)), true);
+  // 지능이 높은 쪽이 더 빨리 돈다 — 비율이었다면 둘의 **비율**이 같았을 것이다.
+  const smart = AI.alive(state, 'ally').slice().sort((a, b) => b.attrs.int - a.attrs.int)[0];
+  const dull = AI.alive(state, 'ally').slice().sort((a, b) => a.attrs.int - b.attrs.int)[0];
+  check('지능이 높으면 더 돈다', smart.attrs.int === dull.attrs.int || smart.mp > dull.mp, true);
   check('쓰러진 유닛은 돌지 않는다', down.mp, 0);
 
   const full = battle();
@@ -618,6 +657,45 @@ function cast(state, skillId, target) {
     check(`${D.SPECS[spec]}는 레벨 1부터 마나를 되찾는다`, has(1), true);
     check(`${D.SPECS[spec]}는 높은 레벨에서도 마나를 되찾는다`, has(12), true);
   }
+}
+
+// --- 등급이 무엇을 들고 오는지도 정한다 ---------------------------------
+//
+// 수치와 보상만 등급을 따르던 동안에는 정예가 "잡졸을 더 세게 만든 것"이었다.
+// 광역기를 확실히 들고 오게 하면서 정예가 파티 전체를 긁는 상대가 됐다.
+{
+  const AREA = ['damage-area', 'zone'];
+  const kit = (id, level) => {
+    const def = D.ENEMIES[id];
+    return D.skillsFor(def.spec, level, D.skillSeed(`${id}:e0_0`), def.always)
+      .map((s) => D.UNIT_SKILLS[s]);
+  };
+  const hasArea = (id, level) => kit(id, level).some((s) => AREA.indexOf(s.kind) >= 0);
+  const hasZone = (id, level) => kit(id, level).some((s) => s.kind === 'zone');
+
+  // 잡졸에게는 없다. 있으면 "약한 여럿"이라는 자리가 사라진다.
+  check('잡졸은 광역기가 없다', [hasArea('scout', 12), hasArea('shaman', 12)], [false, false]);
+  // 정예는 확실히 든다. 취향에 맡기면 우연에 걸리고, 등급을 올린 뜻이 사라진다.
+  check('정예는 광역기를 든다', [hasArea('orc', 12), hasArea('hexer', 12)], [true, true]);
+  // 우두머리만 장판을 깐다. 정예와 같은 것을 더 세게 쓰는 것뿐이면 등급이
+  // 수치 차이로만 남는다.
+  check('우두머리는 장판을 깐다', hasZone('chief', 12), true);
+  check('정예는 장판까지는 없다', [hasZone('orc', 12), hasZone('hexer', 12)], [false, false]);
+  // 정예의 광역기는 한 번 긁고 끝나지만 우두머리의 장판은 그 자리에 남는다.
+  // 반경도 넓어서, 후열이 자리를 옮기지 않으면 계속 탄다.
+  check('우두머리의 장판이 더 넓다',
+    D.UNIT_SKILLS.rupture.radius > D.UNIT_SKILLS.sweep.radius, true);
+  check('우두머리는 광역기도 함께 든다', hasArea('chief', 12), true);
+
+  // 씨앗이 달라도 흔들리지 않는다 — 그것이 `always`를 둔 이유다.
+  const shaky = [];
+  for (let i = 0; i < 12; i++) {
+    const def = D.ENEMIES.orc;
+    const kinds = D.skillsFor(def.spec, 12, D.skillSeed(`orc:e${i}_0`), def.always)
+      .map((id) => D.UNIT_SKILLS[id].kind);
+    if (!kinds.some((k) => AREA.indexOf(k) >= 0)) shaky.push(i);
+  }
+  check('어떤 씨앗에서도 정예는 광역기를 든다', shaky, []);
 }
 
 // --- 계열마다 본업과 보조가 있다 ----------------------------------------
@@ -863,10 +941,14 @@ function cast(state, skillId, target) {
   const near = (a, b) => Math.abs(a - b) < 0.01;
   check('체력이 최대치의 25%만큼 늘었다',
     AI.alive(state, 'ally').every((u, i) => near(u.hp / u.maxHp - before[i].hp, L.MARCH_RECOVER)), true);
-  // 마나는 걸어가는 동안에도 저절로 도는 몫(MANA_REGEN)이 함께 붙는다.
-  const walked = L.MARCH_RECOVER + L.MANA_REGEN * L.WAVE_GAP;
-  check('마나도 같은 몫만큼 늘었다',
-    AI.alive(state, 'ally').every((u, i) => near(u.mp / u.maxMp - before[i].mp, walked)), true);
+  // **마나는 체력보다 덜 돌려준다**(20% 대 25%). 걸어가는 동안에도 저절로 도는
+  // 몫이 함께 붙는데, 그것은 지능 비례라 유닛마다 다르다.
+  check('마나는 그보다 덜 늘었다',
+    AI.alive(state, 'ally').every((u, i) => {
+      const walked = L.MARCH_RECOVER_MP + (u.attrs.int * L.MANA_REGEN_PER_INT * L.WAVE_GAP) / u.maxMp;
+      return near(u.mp / u.maxMp - before[i].mp, walked);
+    }), true);
+  check('마나를 체력보다 덜 돌려준다', L.MARCH_RECOVER_MP < L.MARCH_RECOVER, true);
   check('쓰러진 동료는 일어나지 않는다', AI.byUid(state, down.uid).hp, 0);
 }
 

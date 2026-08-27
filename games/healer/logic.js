@@ -29,12 +29,18 @@ const MARCH_SPEED = 26;
 // 뒤쪽 무리는 사람이 무엇을 하든 이기기 어려운 판이 된다. 쓰러진 동료는 일어나지
 // 않는다 — 걸어서 회복하는 것은 살아 있는 몸이 쉬는 것이지 부활이 아니다.
 const MARCH_RECOVER = 0.25;
-// 초당 되찾는 마나(최대 마나의 비율). **아주 느리다** — 힐 한 번 값을 벌기까지
-// 십수 초가 걸리므로 "흘린 힐량이 그대로 손해"라는 힐 판단의 전제는 그대로다.
+// 마나는 체력보다 덜 돌려준다. 같은 값으로 두었을 때에는 무리가 여럿인 의뢰가
+// "짧은 의뢰 여러 개"가 되어, 마나를 아껴 쓸 이유가 무리 안에서만 있었다.
+const MARCH_RECOVER_MP = 0.20;
+// 초당 되찾는 마나 = **지능 × 이만큼**. 최대 마나의 비율로 두었을 때와 값은
+// 비슷해 보이지만(최대 마나가 지능 ×8이라) 뜻이 다르다 — 지능이 마나를 쓰는
+// 능력치이므로, 되찾는 속도도 거기서 나와야 장비로 최대 마나만 올린 캐릭터가
+// 회복까지 덤으로 얻지 않는다. **예전(최대 마나의 0.4% = 지능 ×0.032)보다 낮다.**
+//
 // 이것이 없을 때에는 전투가 3분인데 마나가 1분 만에 말라, 남은 시간에는 힐도
 // 도발도 나가지 않고 파티가 서서히 깎이기만 했다. 아군과 적이 같은 규칙을
 // 쓰므로 여기서도 편을 가르지 않는다.
-const MANA_REGEN = 0.004;
+const MANA_REGEN_PER_INT = 0.02;
 const EVENT_CAP = 400;        // 화면이 안 가져가도 무한히 쌓이지 않게
 
 function createRng(seed) {
@@ -116,7 +122,8 @@ function makeUnit(def, side, uid, x, y, level, override, bonus, potions, name) {
     // **캐릭터마다 다른 넷을 든다.** 아군은 이름이 씨앗이라 편성 화면에서 본 것과
     // 같고, 적은 이름에 uid를 섞어 같은 무리의 고블린 셋이 서로 다른 것을 들게
     // 한다 — uid는 무리와 자리에서 나오므로 같은 씨앗의 전투는 그대로 재현된다.
-    skills: D.skillsFor(def.spec, level, D.skillSeed(side === 'ally' ? (name || def.name) : `${def.id}:${uid}`))
+    skills: D.skillsFor(def.spec, level,
+      D.skillSeed(side === 'ally' ? (name || def.name) : `${def.id}:${uid}`), def.always)
       .map((id) => ({ id, readyAt: 0 })),
     targetUid: null, tauntUid: null, tauntUntil: 0,
     // 걸려 있는 강화·약화. 스킬 하나당 하나라, 다시 걸면 시간이 겹치지 않고
@@ -315,8 +322,11 @@ function applyHeal(state, source, target, raw) {
   // 회복도 터진다. 다만 받는 쪽이 아군이라 회피가 끼어들지 않는다.
   const crit = rollCrit(state, source, null);
   const healed = Math.round(raw * auraMul(state, source, 'heal') * crit);
-  const amount = Math.min(healed, target.maxHp - target.hp);
-  target.hp += amount;
+  // **화면에 뜨는 숫자는 정수여야 한다.** 체력은 자연 회복과 무리 사이 회복
+  // 때문에 소수를 갖는데, 남은 자리를 그대로 회복량으로 삼으면 그 소수가
+  // "+106.99999999999864"처럼 그대로 새어 나온다.
+  const amount = Math.round(Math.min(healed, target.maxHp - target.hp));
+  target.hp = Math.min(target.maxHp, target.hp + amount);
   if (source && source.uid === HERO_UID) {
     state.stats.healed += amount;
     state.stats.overheal += healed - amount;
@@ -789,9 +799,9 @@ function march(state, dt) {
     // 걸어가는 시간에 나눠 담는다. 한꺼번에 채우면 막대가 순간이동하는데, 무리
     // 사이는 사람이 힐을 넣는 자리라 회복이 차오르는 것이 보여야 한다. 외우는
     // 중이어도 몸은 쉬므로 아래 continue보다 앞에 둔다.
-    const rate = MARCH_RECOVER / WAVE_GAP * dt;
-    unit.hp = Math.min(unit.maxHp, unit.hp + unit.maxHp * rate);
-    unit.mp = Math.min(unit.maxMp, unit.mp + unit.maxMp * rate);
+    const share = dt / WAVE_GAP;
+    unit.hp = Math.min(unit.maxHp, unit.hp + unit.maxHp * MARCH_RECOVER * share);
+    unit.mp = Math.min(unit.maxMp, unit.mp + unit.maxMp * MARCH_RECOVER_MP * share);
     // **외우는 중이면 걸음을 멈춘다.** 대열을 다시 짜자고 끌고 가면 그 순간
     // 시전이 취소되는데, 무리 사이는 사람이 힐을 넣는 자리라 누른 스킬이
     // 그냥 사라지는 것으로 보인다. 늦게 출발해도 다음 무리 전에 따라잡는다.
@@ -806,7 +816,8 @@ function march(state, dt) {
 function regenMana(state, dt) {
   for (const unit of state.units) {
     if (unit.dead || !unit.maxMp) continue;
-    unit.mp = Math.min(unit.maxMp, unit.mp + unit.maxMp * MANA_REGEN * dt);
+    const int = (unit.attrs && unit.attrs.int) || 0;
+    unit.mp = Math.min(unit.maxMp, unit.mp + int * MANA_REGEN_PER_INT * dt);
   }
 }
 
@@ -937,7 +948,8 @@ function battleReport(state) {
 }
 
 const api = {
-  HERO_UID, TICK, WAVE_GAP, MARCH_SPEED, MARCH_RECOVER, MANA_REGEN, rewardOf, dropsOf, battleReport,
+  HERO_UID, TICK, WAVE_GAP, MARCH_SPEED, MARCH_RECOVER, MARCH_RECOVER_MP, MANA_REGEN_PER_INT,
+  rewardOf, dropsOf, battleReport,
   createRng, createBattle, advance, step, drainEvents,
   castSkill, playerSkill, usePotion, drink, magicPowerOf, rollCrit, applyDamage, applyHeal, addDot, addZone,
   hero, skillSlot, resolveTarget, moveToward, giveMana,

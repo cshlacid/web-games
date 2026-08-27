@@ -288,6 +288,15 @@ const SEEDS = [1, 7, 42, 999, 20260825];
   const attrIds = Object.keys(D.ATTRS);
   check('능력치가 옵션 표에 있다',
     attrIds.every((id) => Number.isFinite(D.AFFIX_BASE[id])), true);
+
+  // **장비를 바꾸는 것이 화면에서 일이어야 한다.** 값을 올리기 전에는 희귀
+  // 한 자리를 끼워도 캐릭터 창의 숫자가 거의 그대로였다. 능력치 옵션 하나가
+  // 최대 체력 옵션 하나와 엇비슷해야 둘 중 무엇을 고를지가 생긴다.
+  check('능력치 하나가 최대 체력 하나와 엇비슷하다',
+    Math.abs(D.AFFIX_BASE.vit * D.ATTR.hpPerVit - D.AFFIX_BASE.hp) <= D.AFFIX_BASE.hp * 0.75, true);
+  // 희귀 하나가 최대 체력을 눈에 띄게 올려야 한다 — 기준값 × 등급 구간이다.
+  check('희귀 최대 체력 옵션이 20을 넘는다',
+    D.AFFIX_BASE.hp * D.AFFIX_RANGE[2][0] > 20, true);
   check('능력치마다 어느 표에든 들어 있다',
     attrIds.filter((id) => !Object.values(D.AFFIX_POOL).some((pool) => pool.includes(id))), []);
   check('이름이 적혀 있다', attrIds.every((id) => D.STATS[id]), true);
