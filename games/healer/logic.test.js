@@ -525,6 +525,39 @@ function cast(state, skillId, target) {
     (() => { const at = state.scroll; run(state, 1); return state.scroll === at; })(), true);
 }
 
+// --- 무리 사이의 회복 ---------------------------------------------------
+//
+// 걸어가는 동안 살아 있는 아군이 체력과 마나를 최대치의 25%만큼 되찾는다.
+{
+  const state = battle();
+  const hurt = AI.alive(state, 'ally');
+  hurt.forEach((u) => { u.hp = Math.round(u.maxHp * 0.3); u.mp = 0; });
+  // 한 명은 쓰러진 채로 둔다. 걸어서 회복하는 것은 쉬는 것이지 부활이 아니다.
+  const down = unit(state, '강철의 브란');
+  L.applyDamage(state, null, down, 99999);
+
+  AI.alive(state, 'enemy').forEach((u) => L.applyDamage(state, null, u, 99999));
+  // 이동이 시작된 뒤에 기준을 잡는다. 그 앞의 한 틱은 아직 전투라 자동 물약이
+  // 들어가고, 그것까지 세면 회복량이 이동 몫보다 커진다.
+  L.step(state, L.TICK);
+  check('이동이 시작된다', state.marching, true);
+  const before = AI.alive(state, 'ally').map((u) => ({ hp: u.hp / u.maxHp, mp: u.mp / u.maxMp }));
+
+  L.step(state, L.TICK);
+  check('걸어가는 동안 조금씩 차오른다',
+    AI.alive(state, 'ally').every((u, i) => u.hp / u.maxHp > before[i].hp), true);
+
+  // 다음 무리가 솟기 전까지만 굴린다. 무리가 나오면 앞줄이 다시 맞기 시작해
+  // 회복량이 아니라 전투 결과를 보게 된다.
+  while (state.marching) L.step(state, L.TICK);
+  const near = (a, b) => Math.abs(a - b) < 0.01;
+  check('체력이 최대치의 25%만큼 늘었다',
+    AI.alive(state, 'ally').every((u, i) => near(u.hp / u.maxHp - before[i].hp, L.MARCH_RECOVER)), true);
+  check('마나도 같은 몫만큼 늘었다',
+    AI.alive(state, 'ally').every((u, i) => near(u.mp / u.maxMp - before[i].mp, L.MARCH_RECOVER)), true);
+  check('쓰러진 동료는 일어나지 않는다', AI.byUid(state, down.uid).hp, 0);
+}
+
 // --- 웨이브와 승패 -----------------------------------------------------
 {
   const state = battle();

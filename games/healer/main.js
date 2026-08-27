@@ -1520,15 +1520,16 @@ function renderRosterReport(report, joined) {
   const list = $('roster-report');
   list.textContent = '';
 
-  // 데려간 쪽을 위에 둔다. 명부가 길어지면 아래쪽은 훑어보게 되는데, 이번
-  // 전투에 나간 동료가 어떻게 됐는지가 먼저 보여야 한다.
-  const rows = report.slice().sort((a, b) => Number(b.joined) - Number(a.joined));
+  // **데려간 동료만 적는다.** 남은 동료도 다른 파티에서 일한 몫을 받지만, 이
+  // 화면은 방금 끝난 전투의 결과를 읽는 자리다. 명부 전체를 적으면 나가지도
+  // 않은 이름이 목록의 대부분을 차지해 정작 데려간 넷이 묻힌다. 그쪽의 성장은
+  // 편성 화면의 레벨로 확인한다.
+  const rows = report.filter((entry) => entry.joined);
   for (const entry of rows) {
     const member = app.progress.roster.find((m) => m.name === entry.name);
     const row = el('li');
     const name = el('span');
     name.append(document.createTextNode(entry.name));
-    if (!entry.joined) name.append(text('span', 'why', ' 다른 파티'));
     row.append(name);
     const value = `+${entry.exp} exp${entry.levels ? ` · Lv ${member.level}` : ''}`;
     row.append(text('b', `stat-value${entry.levels ? ' up' : ''}`, value));
