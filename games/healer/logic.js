@@ -24,6 +24,11 @@ const WAVE_GAP = 3.2;         // 웨이브 사이 간격(초)
 // 무리와 무리 사이에 배경이 흘러가는 속도(전장 격자/초). 그 사이 아군은 대열을
 // 다시 짜고, 화면은 배경을 왼쪽으로 흘려 "걸어서 다음 무리를 만나러 간다"로 읽힌다.
 const MARCH_SPEED = 26;
+// 무리 하나를 넘길 때마다 걸어가는 동안 최대치의 이만큼을 되찾는다. 다음 무리는
+// 앞 무리가 남긴 상처와 빈 마나 위로 오는데, 그것을 물약과 힐로만 메우게 하면
+// 뒤쪽 무리는 사람이 무엇을 하든 이기기 어려운 판이 된다. 쓰러진 동료는 일어나지
+// 않는다 — 걸어서 회복하는 것은 살아 있는 몸이 쉬는 것이지 부활이 아니다.
+const MARCH_RECOVER = 0.25;
 const EVENT_CAP = 400;        // 화면이 안 가져가도 무한히 쌓이지 않게
 
 function createRng(seed) {
@@ -661,6 +666,12 @@ function checkEnd(state) {
 function march(state, dt) {
   state.scroll += MARCH_SPEED * dt;
   for (const unit of alive(state, 'ally')) {
+    // 걸어가는 시간에 나눠 담는다. 한꺼번에 채우면 막대가 순간이동하는데, 무리
+    // 사이는 사람이 힐을 넣는 자리라 회복이 차오르는 것이 보여야 한다. 외우는
+    // 중이어도 몸은 쉬므로 아래 continue보다 앞에 둔다.
+    const rate = MARCH_RECOVER / WAVE_GAP * dt;
+    unit.hp = Math.min(unit.maxHp, unit.hp + unit.maxHp * rate);
+    unit.mp = Math.min(unit.maxMp, unit.mp + unit.maxMp * rate);
     // **외우는 중이면 걸음을 멈춘다.** 대열을 다시 짜자고 끌고 가면 그 순간
     // 시전이 취소되는데, 무리 사이는 사람이 힐을 넣는 자리라 누른 스킬이
     // 그냥 사라지는 것으로 보인다. 늦게 출발해도 다음 무리 전에 따라잡는다.
@@ -792,7 +803,7 @@ function battleReport(state) {
 }
 
 const api = {
-  HERO_UID, TICK, WAVE_GAP, MARCH_SPEED, rewardOf, dropsOf, battleReport,
+  HERO_UID, TICK, WAVE_GAP, MARCH_SPEED, MARCH_RECOVER, rewardOf, dropsOf, battleReport,
   createRng, createBattle, advance, step, drainEvents,
   castSkill, playerSkill, usePotion, drink, magicPowerOf, rollCrit, applyDamage, applyHeal, addDot, addZone,
   hero, skillSlot, resolveTarget, moveToward,
