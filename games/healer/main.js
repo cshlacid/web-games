@@ -600,13 +600,16 @@ function itemName(item, cls) {
   return node;
 }
 
-function jobTag(job, spec, race) {
+function jobTag(job, spec, race, tight) {
   const parts = [D.JOBS[job].name];
   if (spec) parts.push(D.SPECS[spec]);
   // 종족은 능력치와 물약 사용 여부를 함께 정하므로 편성할 때 보여야 한다.
   if (race) parts.push(D.RACES[race].name);
   // 계열마다 색이 다르다. 역할 색만으로는 궁수와 마법사가 같은 줄로 보인다.
-  return text('span', `job ${job}${spec ? ` spec-${spec}` : ''}`, parts.join(' · '));
+  // **좁은 칸에서는 가운뎃점 양옆의 공백을 뺀다**(tight). 그 두 칸 때문에
+  // "딜러 · 음유시인"이 카드 폭을 넘어 잘렸다.
+  return text('span', `job ${job}${spec ? ` spec-${spec}` : ''}`,
+    parts.join(tight ? '·' : ' · '));
 }
 
 function renderBrief() {
@@ -671,15 +674,18 @@ function renderRoster() {
     const open = el('button', 'pick-open');
     open.type = 'button';
     open.setAttribute('aria-pressed', String(picked));
-    open.append(avatar(def.sprite));
+
+    // **레벨은 그림 아래에 둔다.** 직업 앞에 붙여 두었더니 좁은 칸에서 직업·계열이
+    // 두 줄로 감겼다. 여기로 옮기면 글자 줄은 이름과 직업 둘뿐이다.
+    const face = el('span', 'pick-face');
+    face.append(avatar(def.sprite));
+    face.append(text('span', 'lv', `Lv ${member.level}`));
+    open.append(face);
+
     const body = el('div', 'pick-body');
     body.append(text('div', 'pick-name', member.name));
-    // 카드에는 종족을 적지 않는다. 셋을 다 적으면 좁은 칸에서 세 줄로 감겨,
-    // 한 칸에 한 명을 담으려던 것이 무너진다. 종족은 상세에 있다.
-    const tag = el('div', 'pick-sub');
-    tag.append(document.createTextNode(`Lv ${member.level} · `));
-    tag.append(jobTag(def.job, def.spec));
-    body.append(tag);
+    // 카드에는 종족을 적지 않는다. 셋을 다 적으면 좁은 칸에서 줄이 늘어난다.
+    body.append(jobTag(def.job, def.spec, null, true));
     open.append(body);
     open.addEventListener('click', () => openMember(member));
     row.append(open);
@@ -877,6 +883,7 @@ function renderSkillPicks() {
       sound.play('click');
       if (picked) app.skills = app.skills.filter((id) => id !== def.id);
       else if (!full) app.skills.push(def.id);
+      rememberSkills();
       renderSkillPicks();
       updateStart();
     });
@@ -909,6 +916,13 @@ function renderMethods() {
   }
 }
 
+// 등록해 둔 스킬을 저장본에 남긴다. 전투가 끝나야 저장하던 때에는 편성만 하고
+// 나가면 다음에 다시 골라야 했다.
+function rememberSkills() {
+  app.progress.skills = app.skills.slice();
+  persist();
+}
+
 function updateStart() {
   $('start').disabled = app.skills.length === 0;
 }
@@ -917,9 +931,13 @@ function openParty(quest) {
   app.quest = quest;
   app.candidates = Q.companionsFor(quest, app.progress.roster, app.progress.questSeed + quest.level);
   app.party = [];
-  app.skills = P.validSkills(app.progress, app.skills.length
-    ? app.skills
+  // 지난번에 등록해 둔 것이 저장본에 남아 있다. 처음이면 열린 것을 앞에서부터
+  // 채워 준다 — 빈 채로 두면 "전투 시작"이 꺼져 있는 이유를 알 수 없다.
+  const remembered = app.skills.length ? app.skills : app.progress.skills;
+  app.skills = P.validSkills(app.progress, remembered.length
+    ? remembered
     : P.unlockedSkills(app.progress).map((def) => def.id));
+  rememberSkills();
 
   renderBrief();
   renderRoster();
