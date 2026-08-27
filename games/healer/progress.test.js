@@ -175,6 +175,7 @@ const gear = (defId, tier) => Items.make(defId, tier || 0, 3);
   saved.skillLevels = { touch: 3, quick: 3, regen: 9 };
   // 등록해 둔 스킬. 아직 안 열린 것과 없는 것이 섞여 있어도 열린 것만 남아야 한다.
   saved.skills = ['quick', 'pyre', '없는스킬', 'touch'];
+  saved.lootMethod = 'dice';
   check('저장된다', P.save(saved), true);
 
   const loaded = P.load();
@@ -192,12 +193,20 @@ const gear = (defId, tier) => Items.make(defId, tier || 0, 3);
   // 등록해 둔 스킬이 남는다. 없으면 새로고침할 때마다 다섯을 다시 골라야 한다.
   check('등록한 스킬이 남는다', loaded.skills, ['quick', 'touch']);
   check('처음에는 비어 있다', P.create().skills, []);
+  // 분배 방식도 남는다. 파티가 미리 합의한다는 뜻이 "매번 고르는 칸"이 되면 사라진다.
+  check('분배 방식이 남는다', loaded.lootMethod, 'dice');
 
   check('스킬 레벨이 남는다', P.skillLevel(loaded, 'touch'), 3);
   check('받은 점수를 넘지 않는다', P.spentSkillPoints(loaded), P.earnedSkillPoints(loaded));
   check('남은 점수는 0', P.freeSkillPoints(loaded), 0);
 
   // 판이 바뀌면 저장본을 통째로 버린다. 어중간하게 읽으면 더 이상한 상태가 된다.
+  // 모르는 방식이 적혀 있으면 기본값으로 돌린다. 저장본을 손대도 전투로
+  // 넘어가서는 안 된다.
+  saved.lootMethod = '없는방식';
+  P.save(saved);
+  check('모르는 분배 방식은 기본값으로', P.load().lootMethod, 'even');
+
   global.localStorage.setItem('x', JSON.stringify({ version: 999, charLevel: 20 }));
   check('판이 다르면 새로 시작', P.load().charLevel, 1);
 

@@ -13,6 +13,9 @@ const node = typeof module !== 'undefined' && module.exports;
 const D = node ? require('./data.js') : root.HealerData;
 const Items = node ? require('./items.js') : root.HealerItems;
 const Roster = node ? require('./roster.js') : root.HealerRoster;
+// 분배 방식이 여기 저장되므로, 아는 방식인지도 여기서 본다 — 화면이 걸러 주기를
+// 기다리면 저장본을 손댄 값이 그대로 전투로 넘어간다.
+const Loot = node ? require('./loot.js') : root.HealerLoot;
 
 const STORAGE_KEY = 'web-games.healer.progress';
 // 판이 바뀌면 저장본을 통째로 버린다. 어중간하게 읽으면 더 이상한 상태가 된다.
@@ -43,6 +46,9 @@ function create() {
     // 전투에 등록해 둔 스킬. **새로고침해도 남아야 한다** — 매번 다시 고르게 하면
     // 게시판에서 의뢰 하나 고르는 데 스킬 다섯을 다시 누르는 일이 된다.
     skills: [],
+    // 보상 분배 방식도 같은 이유로 남는다. 파티가 미리 합의한다는 이 시스템의
+    // 뜻이 "매번 고르는 칸"이 되면 사라진다.
+    lootMethod: 'even',
     roster: Roster.create(),
     questSeed: (Math.random() * 1e9) | 0,
     shopSeed: (Math.random() * 1e9) | 0,
@@ -354,6 +360,8 @@ function load() {
   // 등록해 둔 스킬은 저장본에서 그대로 믿지 않는다. 자료가 바뀌어 없어진 스킬이나
   // 아직 안 열린 스킬이 섞여 있을 수 있다.
   progress.skills = validSkills(progress, Array.isArray(saved.skills) ? saved.skills : []);
+
+  progress.lootMethod = Loot.METHODS[saved.lootMethod] ? saved.lootMethod : 'even';
 
   progress.roster = Roster.adopt(saved.roster);
   progress.charLevel = Math.max(1, Math.min(D.LEVEL.maxLevel, progress.charLevel | 0));

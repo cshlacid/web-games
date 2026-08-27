@@ -600,16 +600,20 @@ function itemName(item, cls) {
   return node;
 }
 
-function jobTag(job, spec, race, tight) {
+function jobTag(job, spec, race) {
   const parts = [D.JOBS[job].name];
   if (spec) parts.push(D.SPECS[spec]);
   // 종족은 능력치와 물약 사용 여부를 함께 정하므로 편성할 때 보여야 한다.
   if (race) parts.push(D.RACES[race].name);
   // 계열마다 색이 다르다. 역할 색만으로는 궁수와 마법사가 같은 줄로 보인다.
-  // **좁은 칸에서는 가운뎃점 양옆의 공백을 뺀다**(tight). 그 두 칸 때문에
-  // "딜러 · 음유시인"이 카드 폭을 넘어 잘렸다.
-  return text('span', `job ${job}${spec ? ` spec-${spec}` : ''}`,
-    parts.join(tight ? '·' : ' · '));
+  return text('span', `job ${job}${spec ? ` spec-${spec}` : ''}`, parts.join(' · '));
+}
+
+// **동료 카드에는 계열만 적는다.** 역할까지 적으면 좁은 칸에서 "딜러 · 음유시인"이
+// 잘렸고, 잘린 계열 이름은 역할보다 잃는 것이 크다 — 무엇을 들고 오는지는 계열이
+// 정하고, 역할은 카드 순서(탱커 → 딜러 → 힐러)와 상세에 있다.
+function specTag(def) {
+  return text('span', `job ${def.job} spec-${def.spec}`, D.SPECS[def.spec]);
 }
 
 function renderBrief() {
@@ -685,7 +689,7 @@ function renderRoster() {
     const body = el('div', 'pick-body');
     body.append(text('div', 'pick-name', member.name));
     // 카드에는 종족을 적지 않는다. 셋을 다 적으면 좁은 칸에서 줄이 늘어난다.
-    body.append(jobTag(def.job, def.spec, null, true));
+    body.append(specTag(def));
     open.append(body);
     open.addEventListener('click', () => openMember(member));
     row.append(open);
@@ -910,6 +914,9 @@ function renderMethods() {
     button.addEventListener('click', () => {
       sound.play('click');
       app.lootMethod = method.id;
+      // 스킬 등록과 같다 — 고르는 순간 저장한다.
+      app.progress.lootMethod = method.id;
+      persist();
       renderMethods();
     });
     box.append(button);
@@ -933,6 +940,7 @@ function openParty(quest) {
   app.party = [];
   // 지난번에 등록해 둔 것이 저장본에 남아 있다. 처음이면 열린 것을 앞에서부터
   // 채워 준다 — 빈 채로 두면 "전투 시작"이 꺼져 있는 이유를 알 수 없다.
+  app.lootMethod = Loot.METHODS[app.progress.lootMethod] ? app.progress.lootMethod : 'even';
   const remembered = app.skills.length ? app.skills : app.progress.skills;
   app.skills = P.validSkills(app.progress, remembered.length
     ? remembered
