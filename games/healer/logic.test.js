@@ -361,11 +361,11 @@ function cast(state, skillId, target) {
   check('최대치를 넘지 않는다', tank.mp, tank.maxMp);
 
   // 광역은 기준점 주변 아군 전부. 반경 밖은 그대로다.
-  const anthem = D.UNIT_SKILLS.anthem;
+  const anthem = D.UNIT_SKILLS.echo;
   for (const mate of AI.alive(state, 'ally')) { mate.mp = 0; mate.x = tank.x; mate.y = tank.y; }
   const far = unit(state, '검사 라일');
   far.x = tank.x + anthem.radius + 10;
-  L.runUnitSkill(state, bard, { id: 'anthem', targetUid: tank.uid });
+  L.runUnitSkill(state, bard, { id: 'echo', targetUid: tank.uid });
   check('반경 안 아군이 함께 찬다',
     [Math.round(tank.mp), Math.round(healer.mp)], [anthem.mana, anthem.mana]);
   check('반경 밖은 그대로다', far.mp, 0);
@@ -376,6 +376,85 @@ function cast(state, skillId, target) {
   down.mp = 0;
   L.runUnitSkill(state, bard, { id: 'refrain', targetUid: down.uid });
   check('쓰러진 아군은 채우지 않는다', down.mp, 0);
+}
+
+// --- 강화와 약화 --------------------------------------------------------
+//
+// 곱으로만 걸리고, 같은 스킬은 겹쳐 쌓이지 않는다. 피해와 회복을 계산하는
+// 자리가 두 곳뿐이라 기본 공격·스킬·도트·장판이 모두 같은 규칙을 탄다.
+{
+  const fresh = () => battle({ party: [{ defId: 'bran', level: 9 }, { defId: 'finn', level: 9 },
+    { defId: 'lyle', level: 9 }, { defId: 'noa', level: 9 }] });
+  // 죽이지 않고 한 대만 재 본다. 쓰러뜨리면 그 뒤의 측정이 0으로 나온다.
+  const hit = (state, from, to) => {
+    to.hp = to.maxHp;
+    L.applyDamage(state, from, to, 100);
+    return to.maxHp - to.hp;
+  };
+
+  {
+    const state = fresh();
+    const bard = unit(state, '음유시인 핀');
+    const tank = unit(state, '강철의 브란');
+    const foe = AI.alive(state, 'enemy')[0];
+
+    const bare = hit(state, foe, tank);
+    L.runUnitSkill(state, bard, { id: 'harmony', targetUid: tank.uid });
+    check('강화가 걸린다', tank.auras.map((a) => a.skillId), ['harmony']);
+    const warded = hit(state, foe, tank);
+    check('받는 피해가 줄어든다', warded < bare, true);
+
+    // **같은 스킬은 겹쳐 쌓이지 않는다.** 곱이 두 번 걸리면 음유시인 둘이 붙은
+    // 파티가 전혀 다른 게임이 된다.
+    L.runUnitSkill(state, bard, { id: 'harmony', targetUid: tank.uid });
+    check('다시 걸어도 하나뿐', tank.auras.length, 1);
+    check('다시 걸어도 더 줄지 않는다', hit(state, foe, tank), warded);
+
+    // 시간이 지나면 풀린다. 화면이 이 목록을 그대로 그리므로 남겨 두면 끝난
+    // 표시가 초상화에 붙어 있는다.
+    state.t += D.UNIT_SKILLS.harmony.duration + 0.1;
+    L.step(state, L.TICK);
+    check('시간이 지나면 풀린다', tank.auras.length, 0);
+    check('풀리면 원래대로 맞는다', hit(state, foe, tank), bare);
+  }
+
+  {
+    // 약화는 반대쪽이다 — 적이 받는 피해가 는다.
+    const state = fresh();
+    const bard = unit(state, '음유시인 핀');
+    const melee = unit(state, '검사 라일');
+    const foe = AI.alive(state, 'enemy')[0];
+    const plain = hit(state, melee, foe);
+    L.runUnitSkill(state, bard, { id: 'lament', targetUid: foe.uid });
+    check('약화가 걸린 적은 더 아프다', hit(state, melee, foe) > plain, true);
+  }
+
+  {
+    // 공격력 강화는 때리는 쪽에 걸린다. 맞는 쪽에 건 것과 곱해지는 자리가 다르다.
+    const state = fresh();
+    const bard = unit(state, '음유시인 핀');
+    const melee = unit(state, '검사 라일');
+    const foe = AI.alive(state, 'enemy')[0];
+    const swing = hit(state, melee, foe);
+    L.runUnitSkill(state, bard, { id: 'anthem', targetUid: melee.uid });
+    check('광역 강화는 반경 안 아군 모두에게',
+      [melee.auras.length, bard.auras.length], [1, 1]);
+    check('공격력 강화가 피해를 올린다', hit(state, melee, foe) > swing, true);
+
+    // 반경 밖은 그대로다.
+    const far = unit(state, '사제 노아');
+    check('반경 밖은 안 걸린다',
+      AI.dist(far, melee) > D.UNIT_SKILLS.anthem.radius ? far.auras.length : 0, 0);
+  }
+
+  {
+    // 회복 경로도 같은 곱을 본다. 걸린 것이 없으면 1이어야 한다.
+    const state = fresh();
+    const bard = unit(state, '음유시인 핀');
+    const tank = unit(state, '강철의 브란');
+    tank.hp = tank.maxHp - 500;
+    check('강화가 없으면 회복은 그대로', L.applyHeal(state, bard, tank, 200) > 0, true);
+  }
 }
 
 // --- 마나 자연 회복 -----------------------------------------------------
@@ -539,6 +618,59 @@ function cast(state, skillId, target) {
     check(`${D.SPECS[spec]}는 레벨 1부터 마나를 되찾는다`, has(1), true);
     check(`${D.SPECS[spec]}는 높은 레벨에서도 마나를 되찾는다`, has(12), true);
   }
+}
+
+// --- 계열마다 본업과 보조가 있다 ----------------------------------------
+//
+// 넷을 자르는 순서가 곧 그 계열이 무엇을 하는 캐릭터인가다. 목록 앞이 본업이고
+// 뒤가 보조라, 여기가 뒤집히면 편성 화면에서 궁수와 마법사를 고를 이유가 없어진다.
+{
+  const kindsOf = (spec, level) => D.skillsFor(spec, level).map((id) => D.UNIT_SKILLS[id].kind);
+  const count = (list, want) => list.filter((k) => want.indexOf(k) >= 0).length;
+  const SINGLE = ['damage', 'dot'];
+  const AREA = ['damage-area', 'zone'];
+  const SUPPORT = ['buff', 'buff-area', 'debuff', 'debuff-area'];
+  const HEAL = ['heal', 'heal-area', 'heal-dot'];
+
+  // 궁수는 단일이 본업, 광역이 보조.
+  const archer = kindsOf('archer', 12);
+  check('궁수는 단일이 광역보다 많다', count(archer, SINGLE) > count(archer, AREA), true);
+  check('궁수도 광역을 하나는 든다', count(archer, AREA) >= 1, true);
+
+  // 마법사는 그 반대다.
+  const mage = kindsOf('mage', 12);
+  check('마법사는 광역이 단일보다 많다', count(mage, AREA) > count(mage, SINGLE), true);
+  check('마법사도 단일을 하나는 든다', count(mage, SINGLE) >= 1, true);
+
+  // **순서만 뒤집은 것이 아니라 수치도 갈라 두었다.** 순서만 바꾸면 둘 다
+  // "아무거나 잘 쏘는 원거리"로 남는다.
+  check('궁수의 한 발이 마법사의 한 발보다 세다',
+    D.UNIT_SKILLS.snipe.mul > D.UNIT_SKILLS.arcane.mul, true);
+  check('마법사의 장판이 궁수의 장판보다 세다',
+    D.UNIT_SKILLS.blizzard.tick > D.UNIT_SKILLS.arrowStorm.tick, true);
+
+  // 전사는 딜이 본업, 탱이 보조 — 도발이 때리는 것보다 뒤에 온다.
+  const warrior = D.SPEC_SKILLS.warrior;
+  const firstTaunt = warrior.findIndex((id) => D.UNIT_SKILLS[id].kind === 'taunt');
+  const firstHit = warrior.findIndex((id) => SINGLE.concat(AREA).indexOf(D.UNIT_SKILLS[id].kind) >= 0);
+  check('전사는 때리는 것이 도발보다 앞', firstHit < firstTaunt, true);
+  check('전사도 도발을 든다', firstTaunt >= 0, true);
+  check('전사는 버티는 강화를 든다',
+    warrior.some((id) => D.UNIT_SKILLS[id].kind === 'buff'), true);
+  // 수호자는 정반대다. 이 둘이 같으면 탱커를 따로 데려갈 이유가 없다.
+  const tank = D.SPEC_SKILLS.tank;
+  check('수호자는 도발이 때리는 것보다 앞',
+    tank.findIndex((id) => /^taunt/.test(D.UNIT_SKILLS[id].kind))
+      < tank.findIndex((id) => SINGLE.concat(AREA).indexOf(D.UNIT_SKILLS[id].kind) >= 0), true);
+
+  // 음유시인은 강화·약화가 본업, 회복이 보조.
+  const bard = kindsOf('bard', 12);
+  check('음유시인은 강화·약화가 회복보다 많다',
+    count(bard, SUPPORT) > count(bard, HEAL), true);
+  check('음유시인은 힐러 역할이다', D.COMPANIONS.finn.job, 'healer');
+  // 회복량이 사제보다 작아야 "노래도 부르는 사제"가 되지 않는다.
+  check('음유시인의 회복이 사제보다 작다',
+    D.UNIT_SKILLS.chord.heal < D.UNIT_SKILLS.mend.heal, true);
 }
 
 // --- 비인간형은 물약을 못 마신다 ----------------------------------------

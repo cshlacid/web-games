@@ -177,6 +177,32 @@ const POTION_HP = 0.35;   // 이 아래로 내려가면 체력 물약
 const POTION_MP = 1.15;   // 가장 싼 스킬도 못 쓸 지경(비용의 이만큼)이면 마나 물약
 
 const isTaunt = (def) => def.kind === 'taunt' || def.kind === 'taunt-area';
+const isBuff = (def) => def.kind === 'buff' || def.kind === 'buff-area';
+const isDebuff = (def) => def.kind === 'debuff' || def.kind === 'debuff-area';
+
+// 이 스킬이 이미 걸려 있는가. **걸려 있는 대상에게 다시 걸지 않는다** — 곱이
+// 겹치지 않으므로 다시 걸어 봐야 시간만 새로 시작하고 쿨타임을 버린다.
+const hasAura = (unit, skillId) =>
+  !!(unit.auras && unit.auras.some((aura) => aura.skillId === skillId));
+
+// 강화·약화를 걸 아군. 무엇을 올리는가에 따라 누가 먼저인지가 다르다.
+//   armor(받는 피해 감소) — 맞는 사람부터. 회복 순서(탱커 먼저)를 그대로 쓴다.
+//   heal(회복량)          — 회복을 맡는 사람부터.
+//   atk(공격력)           — 가장 세게 때리는 사람부터.
+// 계열을 보지 않고 무엇을 올리는지만 보므로, 스킬을 늘려도 여기가 안 바뀐다.
+function buffTarget(unit, state, def) {
+  const pool = alive(state, unit.side).filter((mate) => !hasAura(mate, def.id));
+  if (!pool.length) return null;
+  if (def.stat === 'atk') {
+    return pool.slice().sort((a, b) => b.atk - a.atk)[0];
+  }
+  if (def.stat === 'heal') {
+    const healers = pool.filter((mate) => mate.job === 'healer');
+    return healers.length ? healers[0] : pool[0];
+  }
+  return pool.slice().sort((a, b) =>
+    rankOf(D.HEAL_ORDER, a) - rankOf(D.HEAL_ORDER, b))[0];
+}
 
 // **도발에 쓸 마나는 남겨 둔다.** 탱커가 때리는 스킬로 마나를 다 쓰고 나면,
 // 정작 적이 힐러에게 붙었을 때 끌어올 수단이 없다 — 위협도 표를 없앤 뒤로
@@ -311,6 +337,44 @@ function chooseSkill(unit, state, target) {
       return { id: def.id, targetUid: pick.uid };
     }
 
+    // **급한 사람이 있으면 노래보다 힐이 먼저다.** 강화·약화는 지금 당장 죽는
+    // 것을 막지 못하는데, 목록 앞에 있다는 이유로 쓰러져 가는 탱커를 두고
+    // 노래를 불렀다. 힐을 안 들고 온 유닛에게는 걸리지 않는다 — 그런 유닛이
+    // 여기서 멈추면 아무것도 하지 않고 서 있게 된다.
+    if ((isBuff(def) || isDebuff(def)) && carriesHeal(unit)
+      && alive(state, unit.side).some((mate) => mate.hp / mate.maxHp <= EMERGENCY)) continue;
+
+    if (isBuff(def)) {
+      // 사거리 0은 자기에게 거는 것이다(전사의 굳히기).
+      if (!def.range) {
+        if (hasAura(unit, def.id)) continue;
+        return { id: def.id, targetUid: unit.uid };
+      }
+      const mate = buffTarget(unit, state, def);
+      if (!mate || dist(unit, mate) > reach) continue;
+      if (def.kind === 'buff') return { id: def.id, targetUid: mate.uid };
+      // 광역은 쿨타임이 길다. 둘 이상에게 새로 걸릴 때만 쓴다 — 하나에게 쓰면
+      // 단일 강화보다 비싸고 오래 기다리는 스킬이 된다.
+      const covered = alive(state, unit.side)
+        .filter((u) => dist(u, mate) <= def.radius && !hasAura(u, def.id));
+      if (covered.length >= 2) return { id: def.id, targetUid: mate.uid };
+      continue;
+    }
+
+    if (isDebuff(def)) {
+      // 때릴 상대를 그대로 쓴다. 약화는 그 뒤에 때리기 위한 것이라, 딜러가 고른
+      // 상대와 다른 적에게 걸면 걸어 놓고 안 때리는 일이 난다.
+      const pool = foesOf(unit, state)
+        .filter((foe) => dist(unit, foe) <= reach && !hasAura(foe, def.id));
+      if (!pool.length) continue;
+      const pick = (target && pool.indexOf(target) >= 0) ? target : nearest(unit, pool);
+      if (def.kind === 'debuff') return { id: def.id, targetUid: pick.uid };
+      const covered = foesOf(unit, state)
+        .filter((foe) => dist(foe, pick) <= def.radius && !hasAura(foe, def.id));
+      if (covered.length >= 2) return { id: def.id, targetUid: pick.uid };
+      continue;
+    }
+
     if (def.kind === 'damage' || def.kind === 'dot') {
       if (target && dist(unit, target) <= reach) return { id: def.id, targetUid: target.uid };
       continue;
@@ -329,6 +393,10 @@ function chooseSkill(unit, state, target) {
 
 // 회복을 맡는 종류. 어디에 설지 정할 때와 마나를 아낄지 정할 때 같은 목록을 본다.
 const HEAL_KINDS = ['heal', 'heal-area', 'heal-dot'];
+
+// 이 유닛이 회복 스킬을 들고 왔는가. 강화·약화를 급할 때 미룰지 정하는 데 쓴다.
+const carriesHeal = (unit) => unit.skills.some((slot) =>
+  HEAL_KINDS.indexOf((D.UNIT_SKILLS[slot.id] || {}).kind) >= 0);
 
 // **마나를 채워 줄 아군.** 체력의 healTarget과 같은 잣대다 — 채워 줄 양의 몫만큼
 // 비어 있어야 쓴다. 조금 빈 사람에게 부어 넘치면 긴 쿨타임만 버리는 셈이다.
@@ -463,6 +531,7 @@ const api = {
   attackersOf, endangered, healReach,
   chooseTarget, healTarget, chooseSkill, choosePotion, chooseMove, decide,
   POTION_HP, POTION_MP, STICK, RETREAT, SPREAD,
+  hasAura, buffTarget, carriesHeal,
   EFFICIENT, EMERGENCY,
 };
 

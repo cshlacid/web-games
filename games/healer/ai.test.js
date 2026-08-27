@@ -268,9 +268,10 @@ function gather(state) {
   const melee = named(state, '검사 라일');
   // 계열의 열 개 중 넷을 캐릭터마다 다르게 들고 오므로, 여기서 보려는 둘은
   // 손으로 쥐여 준다.
-  bard.skills = ['anthem', 'refrain', 'chord'].map((id) => ({ id, readyAt: 0 }));
+  // 여기서 보려는 것은 마나를 누구에게 채우는가뿐이라, 강화·약화는 빼고 쥐여
+  // 준다 — 목록 앞이 노래라 그냥 두면 늘 그쪽이 먼저 걸린다.
+  bard.skills = ['echo', 'refrain', 'chord'].map((id) => ({ id, readyAt: 0 }));
   const refrain = D.UNIT_SKILLS.refrain;
-  const anthem = D.UNIT_SKILLS.anthem;
 
   check('아군 마나가 넉넉하면 채워 줄 대상이 없다',
     AI.manaTarget(bard, state, refrain.mana), null);
@@ -303,9 +304,66 @@ function gather(state) {
   melee.mp = 0;
   tank.mp = 0;
   const many = AI.chooseSkill(bard, state, enemies(state)[0]);
-  check('여럿이 마르면 전투가', many && many.id, 'anthem');
-  check('전투가가 광역 마나다', D.UNIT_SKILLS[many.id].kind, 'mana-area');
-  check('반경 안 아군을 본다', anthem.radius > 0, true);
+  check('여럿이 마르면 메아리', many && many.id, 'echo');
+  check('메아리가 광역 마나다', D.UNIT_SKILLS[many.id].kind, 'mana-area');
+  check('반경 안 아군을 본다', D.UNIT_SKILLS.echo.radius > 0, true);
+}
+
+// --- 강화와 약화를 언제 거는가 ------------------------------------------
+{
+  const state = battle({ party: [{ defId: 'bran', level: 9 }, { defId: 'finn', level: 9 },
+    { defId: 'lyle', level: 9 }, { defId: 'noa', level: 9 }] });
+  gather(state);
+  const bard = named(state, '음유시인 핀');
+  const tank = named(state, '강철의 브란');
+  const melee = named(state, '검사 라일');
+  const foe = enemies(state)[0];
+
+  bard.skills = ['harmony', 'lament', 'chord'].map((id) => ({ id, readyAt: 0 }));
+
+  // 받는 피해를 줄이는 강화는 회복 순서를 그대로 쓴다 — 맞는 사람부터다.
+  check('받는 피해 강화는 탱커부터',
+    AI.buffTarget(bard, state, D.UNIT_SKILLS.harmony).uid, tank.uid);
+
+  const first = AI.chooseSkill(bard, state, foe);
+  check('걸린 것이 없으면 먼저 건다', first && first.id, 'harmony');
+
+  // **걸려 있으면 다시 걸지 않는다.** 곱이 겹치지 않으므로 쿨타임만 버린다.
+  tank.auras = [{ skillId: 'harmony', stat: 'armor', mul: 0.78, endsAt: state.t + 9 }];
+  check('걸린 대상은 건너뛴다', AI.hasAura(tank, 'harmony'), true);
+  const next = AI.buffTarget(bard, state, D.UNIT_SKILLS.harmony);
+  check('안 걸린 아군에게 넘어간다', next.uid !== tank.uid, true);
+
+  // 공격력 강화는 가장 세게 때리는 아군부터다. 계열을 보지 않고 무엇을 올리는지만 본다.
+  const punchy = AI.buffTarget(bard, state, D.UNIT_SKILLS.anthem);
+  check('공격력 강화는 센 아군부터',
+    AI.alive(state, 'ally').every((mate) => mate.atk <= punchy.atk), true);
+
+  // 약화는 딜러가 고른 상대에게 건다. 다른 적에게 걸면 걸어 놓고 안 때린다.
+  tank.auras = [];
+  bard.skills = ['lament'].map((id) => ({ id, readyAt: 0 }));
+  const hex = AI.chooseSkill(bard, state, foe);
+  check('약화는 때릴 상대에게', hex && hex.targetUid, foe.uid);
+  foe.auras = [{ skillId: 'lament', stat: 'armor', mul: 1.3, endsAt: state.t + 9 }];
+  const other = AI.chooseSkill(bard, state, foe);
+  check('이미 걸린 적에게는 안 건다', other && other.targetUid !== foe.uid, true);
+
+  // **급한 사람이 있으면 노래보다 힐이 먼저다.** 강화는 지금 당장 죽는 것을
+  // 막지 못하는데, 목록 앞이라는 이유로 쓰러져 가는 탱커를 두고 노래를 불렀다.
+  for (const f of enemies(state)) f.auras = [{ skillId: 'lament', stat: 'armor', mul: 1.3, endsAt: state.t + 9 }];
+  bard.skills = ['harmony', 'lament', 'chord'].map((id) => ({ id, readyAt: 0 }));
+  tank.hp = Math.floor(tank.maxHp * 0.2);
+  const urgent = AI.chooseSkill(bard, state, foe);
+  check('급하면 힐이 먼저', urgent && urgent.id, 'chord');
+
+  // 힐을 안 들고 온 유닛에게는 이 규칙이 걸리지 않는다 — 그러면 아무것도 안 하고 선다.
+  const warrior = named(state, '검사 라일');
+  warrior.skills = [{ id: 'bracing', readyAt: 0 }];
+  warrior.mp = warrior.maxMp;
+  const brace = AI.chooseSkill(warrior, state, foe);
+  check('힐이 없으면 급해도 건다', brace && brace.id, 'bracing');
+  check('사거리 0은 자기에게', brace && brace.targetUid, warrior.uid);
+  void melee;
 }
 
 // --- 적도 같은 논리로 움직인다 -----------------------------------------

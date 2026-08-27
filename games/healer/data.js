@@ -491,16 +491,16 @@ const COMPANIONS = {
   // 음유시인은 딜러로 둔다. 힐러로 두면 편성이 "힐러 둘"이 되어 적 딜러의
   // 힐러 우선 규칙이 이쪽으로 몰리는데, 이 계열이 하는 일은 살리는 것이 아니라
   // 남을 계속 쓰게 하는 것이다.
-  finn:  { id: 'finn', race: 'human',  name: '음유시인 핀', job: 'dealer', sprite: 'bard',
+  finn:  { id: 'finn', race: 'human',  name: '음유시인 핀', job: 'healer', sprite: 'bard',
            hp: 490, mp: 160, atk: 36, attackCd: 1.6, range: 32, speed: 18,
            attrs: { str: 13, agi: 16, int: 20, vit: 35 }, attackType: 'magic',
            armor: 0.9, spec: 'bard',
-           note: '원거리. 아군의 마나를 채운다' },
-  elin:  { id: 'elin', race: 'elf',  name: '악사 엘린',   job: 'dealer', sprite: 'bard',
+           note: '원거리. 아군을 강화하고 적을 약화시킨다' },
+  elin:  { id: 'elin', race: 'elf',  name: '악사 엘린',   job: 'healer', sprite: 'bard',
            hp: 406, mp: 168, atk: 40, attackCd: 1.5, range: 32, speed: 20,
            attrs: { str: 12, agi: 21, int: 17, vit: 34 }, attackType: 'magic',
            armor: 0.92, spec: 'bard',
-           note: '원거리. 마나는 덜 채우고 더 때린다' },
+           note: '원거리. 강화는 덜하고 회복을 더 한다' },
 };
 
 // 동료와 적이 쓰는 스킬. 플레이어 스킬(PLAYER_SKILLS)과 표를 나눈 이유는
@@ -581,12 +581,17 @@ const UNIT_SKILLS = {
   stagger: { id: 'stagger', icon: 'stagger', name: '어깨치기', spec: 'warrior', cd: 15, mp: 20, kind: 'stun',
             duration: 1.8, range: 8, cast: 0, minLevel: 3,
             desc: '어깨로 들이받아 잠시 멈춰 세운다' },
-  hurl:   { id: 'hurl', icon: 'hurl', name: '도끼 던지기', spec: 'warrior', cd: 8, mp: 14, kind: 'damage',
-            mul: 2.2, range: 22, cast: 0, minLevel: 2,
-            desc: '멀리 있는 적에게 도끼를 던진다' },
-  sunder: { id: 'sunder', icon: 'sunder', name: '방어 부수기', spec: 'warrior', cd: 10, mp: 16, kind: 'dot',
-            tick: 20, interval: 1, duration: 5, range: 8, cast: 0, minLevel: 5,
-            desc: '갑옷 틈을 벌려 계속 아프게 한다' },
+  // **보조 탱커의 두 손이 여기다.** 딜이 본업이라 목록 앞은 때리는 것이고,
+  // 도발과 굳히기는 그 뒤에 온다 — 탱커가 놓친 것을 받아 주는 자리다.
+  challenge: { id: 'challenge', icon: 'challenge', name: '도전', spec: 'warrior', cd: 8, mp: 14,
+            kind: 'taunt', duration: 5, range: 12, cast: 0, minLevel: 4,
+            desc: '적 하나를 자기 쪽으로 끌어온다' },
+  bracing: { id: 'bracing', icon: 'bracing', name: '굳히기', spec: 'warrior', cd: 20, mp: 16,
+            kind: 'buff', stat: 'armor', mul: 0.8, duration: 10, range: 0, cast: 0, minLevel: 5,
+            desc: '버티는 자세로 받는 피해를 줄인다' },
+  sunder: { id: 'sunder', icon: 'sunder', name: '방어 부수기', spec: 'warrior', cd: 14, mp: 16,
+            kind: 'debuff', stat: 'armor', mul: 1.22, duration: 10, range: 8, cast: 0, minLevel: 5,
+            desc: '갑옷 틈을 벌려 받는 피해를 늘린다' },
   breather: { id: 'breather', icon: 'breather', name: '숨 고르기', spec: 'warrior', cd: 30, mp: 0, kind: 'mana',
             mana: 36, range: 0, cast: 2.0, minLevel: 4, core: 1,
             desc: '자기 마나를 되찾는다' },
@@ -627,25 +632,25 @@ const UNIT_SKILLS = {
 
   // --- 궁수 ---
   volley: { id: 'volley', icon: 'volley', name: '화살비', spec: 'archer', cd: 9, mp: 26, kind: 'damage-area',
-            mul: 1.5, radius: 15, range: 34, cast: 1.2, minLevel: 3,
+            mul: 1.2, radius: 15, range: 34, cast: 1.2, minLevel: 3,
             desc: '겹쳐 있는 적 여럿을 친다' },
   pierce: { id: 'pierce', icon: 'pierce', name: '관통 사격', spec: 'archer', cd: 11, mp: 20, kind: 'damage',
-            mul: 3.4, range: 40, cast: 1.6, minLevel: 5,
+            mul: 3.7, range: 40, cast: 1.6, minLevel: 5,
             desc: '멀리서 꿰뚫는다. 오래 겨눠야 한다' },
   poisonCloud: { id: 'poisonCloud', icon: 'poisonCloud', name: '독 구름', spec: 'archer', cd: 18, mp: 24,
-            kind: 'zone', tick: 15, interval: 1, duration: 7, radius: 14, range: 34,
+            kind: 'zone', tick: 12, interval: 1, duration: 7, radius: 14, range: 34,
             cast: 1.4, minLevel: 6, desc: '남아 있는 독 구름을 쏘아 올린다' },
   barbed: { id: 'barbed', icon: 'barbed', name: '갈고리 화살', spec: 'archer', cd: 8, mp: 14, kind: 'dot',
             tick: 15, interval: 1, duration: 6, range: 34, cast: 0, minLevel: 2,
             desc: '박힌 채로 남아 계속 깎는다' },
   aimed:  { id: 'aimed', icon: 'aimed', name: '조준 사격', spec: 'archer', cd: 6, mp: 14, kind: 'damage',
-            mul: 2.2, range: 34, cast: 1.0, minLevel: 1,
+            mul: 2.5, range: 34, cast: 1.0, minLevel: 1,
             desc: '한 발을 겨눠 크게 넣는다' },
   snipe:  { id: 'snipe', icon: 'snipe', name: '저격', spec: 'archer', cd: 14, mp: 22, kind: 'damage',
-            mul: 3.4, range: 44, cast: 1.6, minLevel: 7,
+            mul: 3.9, range: 44, cast: 1.6, minLevel: 7,
             desc: '멀리서 한 발에 크게 넣는다' },
   arrowStorm: { id: 'arrowStorm', icon: 'arrowStorm', name: '화살 폭풍', spec: 'archer', cd: 20, mp: 28,
-            kind: 'zone', tick: 14, interval: 1, duration: 7, radius: 16, range: 36, cast: 1.2, minLevel: 8,
+            kind: 'zone', tick: 11, interval: 1, duration: 7, radius: 16, range: 36, cast: 1.2, minLevel: 8,
             desc: '한 자리에 화살을 계속 퍼붓는다' },
   cripple: { id: 'cripple', icon: 'cripple', name: '발목 쏘기', spec: 'archer', cd: 9, mp: 12, kind: 'dot',
             tick: 13, interval: 1, duration: 6, range: 34, cast: 0, minLevel: 4,
@@ -654,17 +659,17 @@ const UNIT_SKILLS = {
             kind: 'mana', mana: 34, range: 0, cast: 1.8, minLevel: 2, core: 1,
             desc: '자기 마나를 되찾는다' },
   quickShot: { id: 'quickShot', icon: 'quickShot', name: '속사', spec: 'archer', cd: 3, mp: 8, kind: 'damage',
-            mul: 1.2, range: 34, cast: 0, minLevel: 1,
+            mul: 1.4, range: 34, cast: 0, minLevel: 1,
             desc: '겨누지 않고 빠르게 쏜다' },
 
   // --- 마법사 ---
   // 마나 순환이 있어 마법사는 물약 없이도 한 번은 되살아난다. 마나를 다 쓴
   // 시전자가 남은 전투 내내 서 있는 것을 막는 것이 이 스킬의 목적이다.
   frost:  { id: 'frost', icon: 'frost', name: '서리 폭발', spec: 'mage', cd: 10, mp: 26, kind: 'damage-area',
-            mul: 1.7, radius: 16, range: 36, cast: 1.4, minLevel: 3,
+            mul: 2.1, radius: 16, range: 36, cast: 1.4, minLevel: 3,
             desc: '터뜨려 여럿을 얼린다' },
   inferno:{ id: 'inferno', icon: 'inferno', name: '불바다', spec: 'mage', cd: 20, mp: 30, kind: 'zone',
-            tick: 18, interval: 1, duration: 7, radius: 15, range: 36, cast: 1.8,
+            tick: 22, interval: 1, duration: 7, radius: 15, range: 36, cast: 1.8,
             minLevel: 5, desc: '바닥을 태워 그 자리에 남긴다' },
   ember:  { id: 'ember', icon: 'ember', name: '불씨', spec: 'mage', cd: 9, mp: 16, kind: 'dot',
             tick: 18, interval: 1, duration: 6, range: 36, cast: 0.8, minLevel: 2,
@@ -673,22 +678,22 @@ const UNIT_SKILLS = {
             mana: 60, range: 0, cast: 2.0, minLevel: 1, core: 1,
             desc: '자기 마나를 되찾는다' },
   bolt:   { id: 'bolt', icon: 'bolt', name: '화염구', spec: 'mage', cd: 5, mp: 14, kind: 'damage',
-            mul: 2.0, range: 36, cast: 1.0, minLevel: 1,
+            mul: 1.7, range: 36, cast: 1.0, minLevel: 1,
             desc: '불덩이를 던진다' },
   blizzard: { id: 'blizzard', icon: 'blizzard', name: '눈보라', spec: 'mage', cd: 22, mp: 30, kind: 'zone',
-            tick: 16, interval: 1, duration: 7, radius: 18, range: 36, cast: 1.6, minLevel: 8,
+            tick: 20, interval: 1, duration: 7, radius: 18, range: 36, cast: 1.6, minLevel: 8,
             desc: '한 자리에 눈보라를 묶어 둔다' },
   arcane: { id: 'arcane', icon: 'arcane', name: '비전 폭발', spec: 'mage', cd: 12, mp: 26, kind: 'damage',
-            mul: 3.6, range: 36, cast: 1.8, minLevel: 6,
+            mul: 2.9, range: 36, cast: 1.8, minLevel: 6,
             desc: '모아 두었다가 한 번에 터뜨린다' },
   flare:  { id: 'flare', icon: 'flare', name: '섬광', spec: 'mage', cd: 9, mp: 20, kind: 'damage-area',
-            mul: 1.2, radius: 14, range: 36, cast: 0.8, minLevel: 4,
+            mul: 1.5, radius: 14, range: 36, cast: 0.8, minLevel: 4,
             desc: '터뜨려 주변을 함께 태운다' },
   chill:  { id: 'chill', icon: 'chill', name: '서리 손길', spec: 'mage', cd: 8, mp: 14, kind: 'dot',
             tick: 14, interval: 1, duration: 6, range: 36, cast: 0, minLevel: 3,
             desc: '얼어붙은 자리가 계속 아프다' },
   spark:  { id: 'spark', icon: 'spark', name: '불티', spec: 'mage', cd: 2.8, mp: 7, kind: 'damage',
-            mul: 1.0, range: 36, cast: 0, minLevel: 1,
+            mul: 0.85, range: 36, cast: 0, minLevel: 1,
             desc: '싸게 계속 흘려보낸다' },
 
   // --- 사제 ---
@@ -733,37 +738,46 @@ const UNIT_SKILLS = {
   // 주는 마나가 제 마나값보다 크다. 남의 마나를 대신 내주는 것이 아니라 노래로
   // 채운다는 뜻이고, 이것이 아니면 파티 전체의 마나 총량이 늘지 않아 이 계열을
   // 넣은 뜻이 사라진다. 대신 쿨타임으로 막는다.
-  anthem: { id: 'anthem', icon: 'anthem', name: '전투가', spec: 'bard', cd: 24, mp: 12, kind: 'mana-area',
-            mana: 46, radius: 22, range: 30, cast: 1.8, minLevel: 3,
-            desc: '주변 아군 모두의 마나를 채운다' },
-  refrain:{ id: 'refrain', icon: 'refrain', name: '후렴', spec: 'bard', cd: 12, mp: 8, kind: 'mana-ally',
-            mana: 60, range: 30, cast: 1.0, minLevel: 1, core: 1,
-            desc: '아군 하나의 마나를 채운다' },
-  dissonance: { id: 'dissonance', icon: 'dissonance', name: '불협화음', spec: 'bard', cd: 12, mp: 26,
-            kind: 'damage-area', mul: 1.5, radius: 16, range: 32, cast: 1.4, minLevel: 5,
-            desc: '귀를 찢는 소리로 여럿을 친다' },
-  serenade: { id: 'serenade', icon: 'serenade', name: '자장가', spec: 'bard', cd: 14, mp: 18, kind: 'heal-dot',
-            tick: 15, interval: 1, duration: 7, range: 30, cast: 0, minLevel: 2,
-            desc: '천천히 아물게 한다' },
-  chord:  { id: 'chord', icon: 'chord', name: '화음', spec: 'bard', cd: 5, mp: 10, kind: 'damage',
-            mul: 1.7, range: 32, cast: 0.9, minLevel: 1,
-            desc: '음을 겹쳐 쏜다' },
-  echo:   { id: 'echo', icon: 'echo', name: '메아리', spec: 'bard', cd: 20, mp: 14, kind: 'mana-ally',
-            mana: 90, range: 30, cast: 1.4, minLevel: 5,
-            desc: '한 사람의 마나를 크게 채운다' },
-  harmony: { id: 'harmony', icon: 'harmony', name: '화성', spec: 'bard', cd: 14, mp: 26, kind: 'heal-area',
-            heal: 60, radius: 20, range: 30, cast: 1.4, minLevel: 6,
-            desc: '주변 아군을 함께 아물게 한다' },
-  finale: { id: 'finale', icon: 'finale', name: '종막', spec: 'bard', cd: 14, mp: 24, kind: 'damage',
-            mul: 3.2, range: 32, cast: 1.6, minLevel: 7,
-            desc: '길게 끌었다가 한 번에 끝낸다' },
-  lament: { id: 'lament', icon: 'lament', name: '만가', spec: 'bard', cd: 9, mp: 14, kind: 'dot',
-            tick: 14, interval: 1, duration: 6, range: 32, cast: 0, minLevel: 3,
-            desc: '듣는 동안 계속 아프다' },
-  // 자기 마나가 마르면 남의 것도 못 채운다. 계열의 정체가 걸린 자리라 늘 들고 간다.
+  // 여럿에게 한 번에 건다. 강화·약화가 이 계열의 본업이라 목록 앞이 전부
+  // 노래고, 회복은 그 뒤에 온다.
+  anthem: { id: 'anthem', icon: 'anthem', name: '전투가', spec: 'bard', cd: 26, mp: 24,
+            kind: 'buff-area', stat: 'atk', mul: 1.28, duration: 14, radius: 22,
+            range: 30, cast: 1.8, minLevel: 6,
+            desc: '주변 아군의 공격이 매서워진다' },
+  dissonance: { id: 'dissonance', icon: 'dissonance', name: '불협화음', spec: 'bard', cd: 22, mp: 26,
+            kind: 'debuff-area', stat: 'atk', mul: 0.74, duration: 12, radius: 16,
+            range: 32, cast: 1.6, minLevel: 5,
+            desc: '귀를 찢는 소리에 적의 손이 무뎌진다' },
+  harmony: { id: 'harmony', icon: 'harmony', name: '화성', spec: 'bard', cd: 16, mp: 18,
+            kind: 'buff', stat: 'armor', mul: 0.78, duration: 12, range: 30, cast: 1.2,
+            minLevel: 3, core: 1,
+            desc: '아군 하나가 받는 피해를 줄인다' },
+  lament: { id: 'lament', icon: 'lament', name: '만가', spec: 'bard', cd: 14, mp: 16,
+            kind: 'debuff', stat: 'armor', mul: 1.3, duration: 12, range: 32, cast: 1.0,
+            minLevel: 2,
+            desc: '적 하나가 받는 피해를 늘린다' },
+  // 자기 마나가 마르면 노래도 못 부른다. 계열의 정체가 걸린 자리라 늘 들고 간다.
   tune:   { id: 'tune', icon: 'tune', name: '조율', spec: 'bard', cd: 26, mp: 0, kind: 'mana',
             mana: 40, range: 0, cast: 1.8, minLevel: 2, core: 1,
             desc: '자기 마나를 되찾는다' },
+  // 파티 전체의 마나 총량이 느는 유일한 수단이라, 강화·약화로 중심을 옮긴 뒤에도
+  // 남겨 두었다. 마나가 마른 탱커와 힐러를 밖에서 도울 수 있는 것이 이것뿐이다.
+  refrain:{ id: 'refrain', icon: 'refrain', name: '후렴', spec: 'bard', cd: 12, mp: 8, kind: 'mana-ally',
+            mana: 60, range: 30, cast: 1.0, minLevel: 1,
+            desc: '아군 하나의 마나를 채운다' },
+  echo:   { id: 'echo', icon: 'echo', name: '메아리', spec: 'bard', cd: 24, mp: 12, kind: 'mana-area',
+            mana: 46, radius: 22, range: 30, cast: 1.8, minLevel: 7,
+            desc: '주변 아군 모두의 마나를 채운다' },
+  // --- 여기부터가 보조 힐. 사제보다 회복량이 작고 종류도 적다 ---
+  serenade: { id: 'serenade', icon: 'serenade', name: '자장가', spec: 'bard', cd: 14, mp: 18, kind: 'heal-dot',
+            tick: 15, interval: 1, duration: 7, range: 30, cast: 0, minLevel: 2,
+            desc: '천천히 아물게 한다' },
+  chord:  { id: 'chord', icon: 'chord', name: '화음', spec: 'bard', cd: 5, mp: 14, kind: 'heal',
+            heal: 74, range: 30, cast: 0.9, minLevel: 1,
+            desc: '음을 겹쳐 아물게 한다' },
+  finale: { id: 'finale', icon: 'finale', name: '종막', spec: 'bard', cd: 14, mp: 24, kind: 'damage',
+            mul: 3.2, range: 32, cast: 1.6, minLevel: 8,
+            desc: '길게 끌었다가 한 번에 끝낸다' },
 
   // --- 잡졸 (적) ---
   // 고블린에게 도적의 기술을 그대로 주었더니 등 찌르기·연격을 쓰는 잡졸이 되어,
@@ -822,6 +836,21 @@ const SKILL_KINDS = {
   'mana-ally':   { name: '마나 나눔', css: 'mana' },
   'mana-area':   { name: '광역 마나', css: 'mana' },
   'stun':        { name: '기절', css: 'stun' },
+  'buff':        { name: '강화', css: 'boon' },
+  'buff-area':   { name: '광역 강화', css: 'boon' },
+  'debuff':      { name: '약화', css: 'wilt' },
+  'debuff-area': { name: '광역 약화', css: 'wilt' },
+};
+
+// 강화와 약화가 건드리는 수치. **곱으로만 걸린다** — 더하기로 두면 같은 스킬이
+// 낮은 레벨에서는 판을 뒤집고 높은 레벨에서는 아무것도 아니게 된다.
+//
+// 셋뿐인 것은 이것들이 이미 화면에 있는 수치이기 때문이다. 새 수치를 만들면
+// 캐릭터 창에 없는 것이 전투에서만 움직인다.
+const AURA_STATS = {
+  atk:   '공격력',
+  armor: '받는 피해',
+  heal:  '회복량',
 };
 
 const skillKind = (def) => SKILL_KINDS[def && def.kind] || SKILL_KINDS.damage;
@@ -829,7 +858,7 @@ const skillKind = (def) => SKILL_KINDS[def && def.kind] || SKILL_KINDS.damage;
 // 계열의 이름. 화면에 "딜러 · 궁수"처럼 역할과 함께 적는다 — 역할만 적으면
 // 궁수와 마법사가 같은 줄로 보이고, 계열만 적으면 누가 앞에 서는지 알 수 없다.
 const SPECS = {
-  tank:    '수호',
+  tank:    '수호자',
   warrior: '전사',
   rogue:   '도적',
   archer:  '궁수',
@@ -853,9 +882,16 @@ const SPEC_SKILLS = {
   // 탱커는 도발이 때리는 것보다 앞이다. 순서를 뒤집어 두었더니 후열이 뚫린
   // 순간에도 휩쓸기가 먼저 나갔다 — 어그로를 끄는 것이 이 직업의 첫 일이다.
   tank:    ['roar', 'taunt', 'secondWind', 'shieldSlam', 'quake', 'sweep', 'slam', 'thorns', 'crush', 'bash'],
-  warrior: ['whirl', 'execute', 'breather', 'stagger', 'sunder', 'rend', 'charge', 'hurl', 'cleave', 'overpower'],
+  // **전사는 딜이 본업이고 탱은 보조다.** 그래서 도발이 때리는 것보다 뒤에
+  // 온다 — 수호자와 정반대다. 앞의 둘이 쿨타임일 때 도발과 굳히기가 나오므로,
+  // 탱커가 놓친 적을 받아 주면서도 딜이 멈추지 않는다.
+  warrior: ['execute', 'whirl', 'breather', 'challenge', 'bracing', 'sunder', 'stagger', 'rend', 'cleave', 'overpower'],
   rogue:   ['smoke', 'backstab', 'catchBreath', 'kidney', 'ambush', 'caltrops', 'flurry', 'venom', 'stab', 'quickCut'],
-  archer:  ['volley', 'arrowStorm', 'steadyBreath', 'snipe', 'pierce', 'poisonCloud', 'cripple', 'barbed', 'aimed', 'quickShot'],
+  // **궁수는 단일이 본업이고 광역이 보조, 마법사는 그 반대다.** 순서만 뒤집은
+  // 것이 아니라 수치도 갈라 두었다 — 궁수의 한 발이 마법사의 한 발보다 세고,
+  // 마법사의 장판이 궁수의 장판보다 세다. 순서만 바꾸면 둘 다 "아무거나 잘 쏘는
+  // 원거리"로 남는다.
+  archer:  ['snipe', 'pierce', 'steadyBreath', 'volley', 'arrowStorm', 'cripple', 'barbed', 'poisonCloud', 'aimed', 'quickShot'],
   // 마나 회복 스킬(마나 순환·명상·마력 흡수)을 앞쪽에 두고 1레벨부터 열어 둔다.
   // 뒤에 두었더니 레벨이 오르면서 강한 스킬에 밀려 나갔고, 마나를 다 쓴 시전자가
   // 남은 전투 내내 기본 공격만 하는 상태가 레벨이 오를수록 잦아졌다.
@@ -863,13 +899,17 @@ const SPEC_SKILLS = {
   // **비인간형은 물약을 못 마시므로 이것이 유일한 길이다.** 고블린 주술사에게
   // 마력 흡수가 2레벨부터였을 때에는, 1레벨 주술사가 마나를 다 쓰고 나면 남은
   // 전투 내내 아무것도 못 했다.
-  mage:    ['frost', 'blizzard', 'channel', 'inferno', 'arcane', 'flare', 'ember', 'chill', 'bolt', 'spark'],
+  mage:    ['blizzard', 'frost', 'channel', 'arcane', 'inferno', 'flare', 'ember', 'chill', 'bolt', 'spark'],
   priest:  ['wave', 'greaterMend', 'meditate', 'blessing', 'purify', 'judgement', 'mend', 'renew', 'chastise', 'smite'],
   shaman:  ['curse', 'mendEnemy', 'drain', 'hex', 'spirit'],
   // 음유시인은 **아군의 마나를 채우는 유일한 계열이다.** 마나 회복 스킬은 지금까지
   // 전부 자기 것만 채웠고(마나 순환·명상·마력 흡수), 그래서 마나가 마른 탱커와
   // 힐러를 밖에서 도울 방법이 없었다. 광역이 단일보다 앞인 것은 쿨타임이 길어서다.
-  bard:    ['anthem', 'echo', 'refrain', 'tune', 'harmony', 'dissonance', 'serenade', 'finale', 'lament', 'chord'],
+  // **음유시인은 강화·약화가 본업이고 회복이 보조다.** 목록 앞이 전부 노래고,
+  // 회복은 마나 나눔 뒤에 온다 — 사제와 같은 힐러 역할이지만 하는 일이 다르다.
+  // 회복량도 사제보다 작게 잡았다: 여기서 같은 값을 주면 "노래도 부르는 사제"가
+  // 되어 둘 중 하나를 고를 이유가 사라진다.
+  bard:    ['anthem', 'dissonance', 'harmony', 'lament', 'tune', 'echo', 'refrain', 'serenade', 'chord', 'finale'],
   grunt:   ['gash', 'pounce', 'jab'],
   // 우두머리 전용. 새 스킬을 만들지 않고 수호와 전사의 무거운 것만 골라 묶었다 —
   // 이 계열이 하는 일은 "이미 있는 것 중 가장 아픈 것"이지 새로운 수단이 아니다.
@@ -1232,7 +1272,7 @@ const api = {
   RANKS, rankOf,
   SLOTS, GEAR, MATERIALS, REGIONS, NAMES, SPECIAL_POOL, SPECIAL_CHANCE,
   withGear, attrsWithGear, WHOLE_AFFIX,
-  HERO, COMPANIONS, UNIT_SKILLS, SKILL_KINDS, skillKind, SPEC_SKILLS, UNIT_SKILL_MAX, skillsFor, skillSeed,
+  HERO, COMPANIONS, UNIT_SKILLS, SKILL_KINDS, skillKind, AURA_STATS, SPEC_SKILLS, UNIT_SKILL_MAX, skillsFor, skillSeed,
   PLAYER_SKILLS, SKILL, skillAt, skillEffect, skillLevelOf,
   POTIONS, JOB_POTIONS, POTION_MAX, ENEMIES,
   PARTY_MAX, SKILL_MAX,
