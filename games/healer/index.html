@@ -318,13 +318,15 @@
 <script src="icons.js"></script>
 <script src="scenes.js"></script>
 <script src="items.js"></script>
+<!-- 분배 방식이 저장본에 남으므로 progress.js가 loot.js를 본다. 클래식 스크립트라
+     순서가 곧 의존이고, 뒤에 두면 읽는 시점에 window.HealerLoot이 없다. -->
+<script src="loot.js"></script>
 <script src="roster.js"></script>
 <script src="progress.js"></script>
 <script src="shop.js"></script>
 <script src="quests.js"></script>
 <script src="ai.js"></script>
 <script src="logic.js"></script>
-<script src="loot.js"></script>
 <script src="audio.js"></script>
 <script src="main.js"></script>
 </body>
