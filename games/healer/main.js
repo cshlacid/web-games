@@ -51,6 +51,10 @@ const app = {
   battle: null,
   aiming: null,
   paused: false,
+  // 주인공 위험 경고를 이미 울렸는지. 매 프레임 다시 울리지 않게 한다.
+  danger: false,
+  // 상세를 열어 둔 동료. 열어 둔 채로 데려가기를 눌렀을 때 단추 글씨를 고친다.
+  member: null,
   result: null,
 };
 
@@ -69,6 +73,8 @@ const SCREENS = {
 
 function show(name, note) {
   app.screen = name;
+  // 동료 상세는 편성 화면의 것이다. 화면을 옮기면서 닫지 않으면 전투 위에 떠 있다.
+  if (name !== 'party') closeMember();
   for (const [key, screen] of Object.entries(SCREENS)) $(screen.node).hidden = key !== name;
   const screen = SCREENS[name];
   $('step-name').textContent = screen.name;
@@ -627,11 +633,20 @@ function memberSummary(member) {
   return parts.join(' · ');
 }
 
+// **목록에는 그림·이름·직업만 둔다.** 스킬과 장비까지 한 줄에 늘어놓았을 때에는
+// 한 줄이 네 줄 높이가 되어 여섯 명이 화면을 다 먹었고, 그래서 여섯만 보여 줄 수
+// 있었다. 지금은 한 명이 한 칸이라 명부 대부분을 한 화면에서 훑는다 — 무엇을
+// 들고 오는지는 눌러서 본다(openMember).
+//
+// **누르는 곳을 둘로 나눈다.** 카드는 상세를 열고, 오른쪽 체크 단추가 데려간다.
+// 카드를 누르는 것이 곧 선택이면 상세를 볼 방법이 없고, 반대로 하면 넷을 고르는
+// 데 매번 상세를 거쳐야 한다.
 function renderRoster() {
   const list = $('roster');
   list.textContent = '';
 
-  // 주인공은 빼거나 바꿀 수 없으므로 고정된 줄로 먼저 보여 준다.
+  // 주인공은 빼거나 바꿀 수 없으므로 고정된 줄로 먼저 보여 준다. 한 줄을 통째로
+  // 쓰는 것은, 격자 안에 끼워 두면 고를 수 있는 것처럼 보이기 때문이다.
   const heroRow = el('div', 'pick locked');
   heroRow.append(avatar('hero'));
   const heroBody = el('div', 'pick-body');
@@ -643,7 +658,7 @@ function renderRoster() {
   heroBody.append(text('div', 'pick-sub',
     `체력 ${stats.hp} · 마나 ${stats.mp} · 회복력 ×${stats.heal.toFixed(2)}`));
   heroRow.append(heroBody);
-  const heroItem = el('li');
+  const heroItem = el('li', 'wide');
   heroItem.append(heroRow);
   list.append(heroItem);
 
@@ -652,64 +667,109 @@ function renderRoster() {
     const picked = app.party.includes(member);
     const full = app.party.length >= D.PARTY_MAX - 1;
 
-    const button = el('button', 'pick');
-    button.type = 'button';
-    button.setAttribute('aria-pressed', String(picked));
-    button.disabled = !picked && full;
-    button.append(avatar(def.sprite));
-
+    const row = el('div', 'pick card');
+    const open = el('button', 'pick-open');
+    open.type = 'button';
+    open.setAttribute('aria-pressed', String(picked));
+    open.append(avatar(def.sprite));
     const body = el('div', 'pick-body');
-    const name = el('div', 'pick-name');
-    name.append(document.createTextNode(`${member.name} Lv ${member.level}`));
-    name.append(jobTag(def.job, def.spec, def.race));
-    body.append(name);
-    body.append(text('div', 'pick-sub', memberSummary(member)));
+    body.append(text('div', 'pick-name', member.name));
+    // 카드에는 종족을 적지 않는다. 셋을 다 적으면 좁은 칸에서 세 줄로 감겨,
+    // 한 칸에 한 명을 담으려던 것이 무너진다. 종족은 상세에 있다.
+    const tag = el('div', 'pick-sub');
+    tag.append(document.createTextNode(`Lv ${member.level} · `));
+    tag.append(jobTag(def.job, def.spec));
+    body.append(tag);
+    open.append(body);
+    open.addEventListener('click', () => openMember(member));
+    row.append(open);
 
-    // 무엇을 들고 오는지 보여 준다. 같은 동료라도 레벨에 따라 스킬이 다르므로
-    // 이것을 보지 않으면 편성이 이름 고르기가 된다. 물약도 함께 보여야
-    // 마나가 떨어졌을 때 이 동료가 버틸 수 있는지 알 수 있다.
-    const chips = el('div', 'skill-chips');
-    for (const id of Roster.skillsOf(member)) {
-      const skill = D.UNIT_SKILLS[id];
-      const kind = D.skillKind(skill);
-      // 아이콘이 "어떤 스킬인가"를, 색이 "무엇을 하는가"를 알린다. 이름만
-      // 늘어놓았을 때에는 넷을 훑는 데 넷을 다 읽어야 했다.
-      const chip = el('span', `chip skill ${kind.css}`);
-      chip.append(icon(skill.icon));
-      chip.append(document.createTextNode(`${skill.name} ${skill.mp}`));
-      chip.title = `${kind.name} · ${skill.desc} · 마나 ${skill.mp} · ${castLine(skill)}`;
-      chips.append(chip);
-    }
-    for (const [id, count] of Object.entries(Roster.potionsOf(member))) {
-      if (count > 0) {
-        const chip = el('span', 'chip dim');
-        chip.append(icon(D.POTIONS[id].icon));
-        chip.append(document.createTextNode(String(count)));
-        chips.append(chip);
-      }
-    }
-    for (const item of Roster.gearOf(member)) {
-      const chip = el('span', `chip gear tier-${Items.tier(item).css}`);
-      chip.append(icon(D.GEAR[item.defId].icon));
-      chip.append(document.createTextNode(Items.name(item)));
-      chips.append(chip);
-    }
-    body.append(chips);
-    button.append(body);
-
-    button.addEventListener('click', () => {
-      sound.play('click');
-      if (picked) app.party = app.party.filter((entry) => entry !== member);
-      else if (!full) app.party.push(member);
-      renderRoster();
-      updateStart();
-    });
+    const take = el('button', 'pick-take');
+    take.type = 'button';
+    take.setAttribute('aria-pressed', String(picked));
+    take.setAttribute('aria-label', `${member.name} ${picked ? '빼기' : '데려가기'}`);
+    take.disabled = !picked && full;
+    take.append(icon('check'));
+    take.addEventListener('click', () => toggleMember(member));
+    row.append(take);
 
     const item = el('li');
-    item.append(button);
+    item.append(row);
     list.append(item);
   }
   $('party-count').textContent = `${app.party.length + 1} / ${D.PARTY_MAX}`;
+}
+
+function toggleMember(member) {
+  const picked = app.party.includes(member);
+  if (!picked && app.party.length >= D.PARTY_MAX - 1) { sound.play('deny'); return; }
+  sound.play('click');
+  if (picked) app.party = app.party.filter((entry) => entry !== member);
+  else app.party.push(member);
+  renderRoster();
+  updateStart();
+  // 상세를 열어 둔 채로 눌렀을 수도 있다. 열려 있으면 단추 글씨가 따라가야 한다.
+  if (app.member === member) openMember(member);
+}
+
+// 동료 하나의 상세. 같은 동료라도 레벨에 따라 들고 오는 스킬이 다르므로, 이것을
+// 보지 않으면 편성이 이름 고르기가 된다. 물약과 장비도 함께 보여야 이 동료가
+// 마나가 떨어진 뒤에도 버티는지 알 수 있다.
+function openMember(member) {
+  app.member = member;
+  const def = Roster.defOf(member);
+  const sheet = $('member-sheet');
+
+  const head = $('member-head');
+  head.textContent = '';
+  head.append(avatar(def.sprite));
+  const body = el('div', 'pick-body');
+  body.append(text('div', 'pick-name', `${member.name} Lv ${member.level}`));
+  const tag = el('div', 'pick-sub');
+  tag.append(jobTag(def.job, def.spec, def.race));
+  body.append(tag);
+  body.append(text('div', 'pick-sub', memberSummary(member)));
+  head.append(body);
+
+  const chips = $('member-chips');
+  chips.textContent = '';
+  for (const id of Roster.skillsOf(member)) {
+    const skill = D.UNIT_SKILLS[id];
+    const kind = D.skillKind(skill);
+    // 아이콘이 "어떤 스킬인가"를, 색이 "무엇을 하는가"를 알린다. 이름만
+    // 늘어놓았을 때에는 넷을 훑는 데 넷을 다 읽어야 했다.
+    const chip = el('span', `chip skill ${kind.css}`);
+    chip.append(icon(skill.icon));
+    chip.append(document.createTextNode(`${skill.name} ${skill.mp}`));
+    chip.title = `${kind.name} · ${skill.desc} · 마나 ${skill.mp} · ${castLine(skill)}`;
+    chips.append(chip);
+  }
+  for (const [id, count] of Object.entries(Roster.potionsOf(member))) {
+    if (count > 0) {
+      const chip = el('span', 'chip dim');
+      chip.append(icon(D.POTIONS[id].icon));
+      chip.append(document.createTextNode(String(count)));
+      chips.append(chip);
+    }
+  }
+  for (const item of Roster.gearOf(member)) {
+    const chip = el('span', `chip gear tier-${Items.tier(item).css}`);
+    chip.append(icon(D.GEAR[item.defId].icon));
+    chip.append(document.createTextNode(Items.name(item)));
+    chips.append(chip);
+  }
+  if (!chips.children.length) chips.append(text('span', 'pick-sub', '들고 오는 것이 없다'));
+
+  const picked = app.party.includes(member);
+  const take = $('member-take');
+  take.textContent = picked ? '파티에서 뺀다' : '데려간다';
+  take.disabled = !picked && app.party.length >= D.PARTY_MAX - 1;
+  sheet.hidden = false;
+}
+
+function closeMember() {
+  app.member = null;
+  $('member-sheet').hidden = true;
 }
 
 function renderSkillPicks() {
@@ -1058,8 +1118,30 @@ function syncSkillbar(state) {
   // 고장 난 것으로 보인다.
   $('skillbar').classList.toggle('down', hero.dead);
 
+  const share = hero.hp / hero.maxHp;
+  $('hero-hp-fill').style.width = `${Math.max(0, share) * 100}%`;
+  $('hero-hp-text').textContent = `체력 ${Math.max(0, Math.round(hero.hp))} / ${hero.maxHp}`;
+  $('hero-hp-fill').parentNode.classList.toggle('low', share <= DANGER.on);
   $('hero-mp-fill').style.width = `${(hero.mp / hero.maxMp) * 100}%`;
   $('hero-mp-text').textContent = `마나 ${Math.round(hero.mp)} / ${hero.maxMp}`;
+
+  syncDanger(hero, share);
+}
+
+// **주인공이 위험하다는 것을 화면이 알린다.** 주인공은 힐이 끊긴 채로 몇 초에
+// 걸쳐 죽는데, 눈은 전장과 스킬바에 있어서 그 몇 초가 통째로 보이지 않았다.
+// 켜는 선과 끄는 선을 다르게 둔 것은, 한 선만 쓰면 그 언저리에서 경고가
+// 깜빡이며 켜졌다 꺼졌다 하기 때문이다.
+const DANGER = { on: 0.35, off: 0.5 };
+
+function syncDanger(hero, share) {
+  const danger = !hero.dead && share <= DANGER.on;
+  // 소리는 들어올 때 한 번뿐이고, 끄는 선 위로 되짚어 올라와야 다시 무장한다.
+  if (danger && !app.danger) { sound.play('danger'); app.danger = true; }
+  if (hero.dead || share > DANGER.off) app.danger = false;
+
+  $('hero-bars').classList.toggle('danger', danger);
+  $('field').classList.toggle('danger', danger);
 }
 
 // --- 조준과 조작 -------------------------------------------------------
@@ -1327,6 +1409,9 @@ function startBattle() {
   app.lootSeed = (Math.random() * 1e9) | 0;
 
   setAiming(null);
+  app.danger = false;
+  $('hero-bars').classList.remove('danger');
+  $('field').classList.remove('danger');
   renderPortraits(app.battle);
   renderSkillbar();
   $('wave').textContent = `1 / ${app.quest.waves.length}`;
@@ -1597,6 +1682,9 @@ function bindToggle(id, key, setter) {
 
 bindToggle('toggle-bgm', 'bgm', (on) => sound.setBgm(on));
 bindToggle('toggle-sfx', 'sfx', (on) => sound.setSfx(on));
+
+$('member-close').addEventListener('click', () => { sound.play('click'); closeMember(); });
+$('member-take').addEventListener('click', () => { if (app.member) toggleMember(app.member); });
 
 $('help-open').addEventListener('click', () => {
   sound.unlock();

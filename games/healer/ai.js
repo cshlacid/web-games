@@ -141,7 +141,8 @@ function chooseTarget(unit, state) {
 // --- 힐 판단 -----------------------------------------------------------
 
 // 기획서 13장: 조금 깎였다고 바로 힐하지 않고, 한 번의 힐로 거의 다 채울 수
-// 있을 만큼 깎였을 때 쓴다. 마나가 자연 회복되지 않으므로 흘린 힐량이 그대로 손해다.
+// 있을 만큼 깎였을 때 쓴다. 마나는 아주 느리게만 돌아오므로(logic.js의
+// MANA_REGEN) 흘린 힐량은 사실상 그대로 손해다.
 //
 // 두 값 모두 임시다. 기획서는 정확한 임계값을 정하지 않았다.
 const EFFICIENT = 0.85;  // 힐량의 이만큼은 깎여 있어야 쓴다
@@ -261,6 +262,25 @@ function chooseSkill(unit, state, target) {
       return { id: def.id, targetUid: unit.uid };
     }
 
+    // 아군의 마나를 채운다. 자기 것을 채우는 'mana'와 달리 아낄 이유가 없다 —
+    // 쓸 곳이 있으면 바로 쓰는 것이 낫고, 쓸 곳이 없으면 아래 조건에서 걸린다.
+    if (def.kind === 'mana-ally') {
+      const dry = manaTarget(unit, state, def.mana);
+      if (dry && dist(unit, dry) <= reach) return { id: def.id, targetUid: dry.uid };
+      continue;
+    }
+
+    // 광역은 쿨타임이 길다. 둘 이상이 함께 말랐을 때만 쓴다 — 하나에게 쓰면
+    // 후렴보다 덜 채우고 더 오래 기다리는 스킬이 된다.
+    if (def.kind === 'mana-area') {
+      const dry = manaTarget(unit, state, def.mana);
+      if (!dry || dist(unit, dry) > reach) continue;
+      const covered = mates(unit, state).filter((mate) => mate.maxMp > 0
+        && dist(mate, dry) <= def.radius && mate.maxMp - mate.mp >= def.mana * EFFICIENT);
+      if (covered.length >= 2) return { id: def.id, targetUid: dry.uid };
+      continue;
+    }
+
     if (def.kind === 'heal' || def.kind === 'heal-dot') {
       // 도트 힐은 한 번에 채우는 것이 아니라 지속 시간 동안 다 채운다.
       const worth = def.kind === 'heal-dot' ? def.tick * def.duration : def.heal;
@@ -298,6 +318,19 @@ function chooseSkill(unit, state, target) {
 
 // 회복을 맡는 종류. 어디에 설지 정할 때와 마나를 아낄지 정할 때 같은 목록을 본다.
 const HEAL_KINDS = ['heal', 'heal-area', 'heal-dot'];
+
+// **마나를 채워 줄 아군.** 체력의 healTarget과 같은 잣대다 — 채워 줄 양의 몫만큼
+// 비어 있어야 쓴다. 조금 빈 사람에게 부어 넘치면 긴 쿨타임만 버리는 셈이다.
+//
+// 누구부터인가는 HEAL_ORDER를 그대로 쓴다. 마나가 마르면 탱커는 도발을, 힐러는
+// 힐을 못 하므로 급한 순서가 체력과 다르지 않다. 스킬을 쓰지 않는 유닛(최대
+// 마나가 0)은 애초에 대상이 아니다.
+function manaTarget(unit, state, worth) {
+  const dry = mates(unit, state).filter((mate) =>
+    mate.maxMp > 0 && mate.maxMp - mate.mp >= worth * EFFICIENT);
+  if (!dry.length) return null;
+  return bestBy(unit, dry, D.HEAL_ORDER);
+}
 
 // 지금 사거리 안에 들어가야 하는 회복 대상. 쿨타임과 마나는 보지 않는다 —
 // 쿨타임이 도는 동안 자리를 잡아 두어야 돌아오자마자 힐이 나간다.
@@ -415,7 +448,7 @@ function decide(unit, state) {
 
 const api = {
   dist, alive, byUid, opposite, nearest, roleOf, rankOf, frontTank, anchorOf, behind,
-  tauntReserve,
+  tauntReserve, manaTarget,
   attackersOf, endangered, healReach,
   chooseTarget, healTarget, chooseSkill, choosePotion, chooseMove, decide,
   POTION_HP, POTION_MP, STICK, RETREAT, SPREAD,

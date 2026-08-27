@@ -201,10 +201,16 @@ function cast(state, skillId, target) {
   const hero = L.hero(state);
   hero.mp = 40;
   run(state, 12);
-  check('마나는 저절로 차지 않는다', hero.mp, 40);
+  // **저절로 돌아오기는 하지만 아주 느리다.** 12초에 최대 마나의 5%가 안 된다 —
+  // 힐 한 번 값을 벌기까지 십수 초라, 흘린 힐량이 그대로 손해라는 힐 판단의
+  // 전제는 그대로다.
+  const idle = hero.mp - 40;
+  check('마나가 저절로 조금 돌아온다',
+    idle > 0 && idle < hero.maxMp * 0.06, true);
 
+  const beforeFocus = hero.mp;
   cast(state, 'focus', {});
-  check('마나 회복 스킬로 찬다', hero.mp, 40 + D.PLAYER_SKILLS.focus.mana);
+  check('마나 회복 스킬로 찬다', hero.mp, beforeFocus + D.PLAYER_SKILLS.focus.mana);
 
   hero.mp = 10;
   check('마나 물약으로도 찬다', L.usePotion(state, 'mana').ok, true);
@@ -230,6 +236,69 @@ function cast(state, skillId, target) {
   check('체력 물약도 있다', L.usePotion(both, 'health').ok, true);
   check('체력이 찬다', L.hero(both).hp > 100, true);
   check('쿨타임은 둘이 함께 쓴다', L.usePotion(both, 'mana').ok, false);
+}
+
+// --- 아군의 마나를 채운다 (음유시인) ------------------------------------
+{
+  const state = battle({ party: [{ defId: 'bran', level: 9 }, { defId: 'finn', level: 9 },
+    { defId: 'lyle', level: 9 }, { defId: 'noa', level: 9 }] });
+  const bard = unit(state, '음유시인 핀');
+  const tank = unit(state, '강철의 브란');
+  const healer = unit(state, '사제 노아');
+  const refrain = D.UNIT_SKILLS.refrain;
+
+  tank.mp = 0;
+  L.runUnitSkill(state, bard, { id: 'refrain', targetUid: tank.uid });
+  check('아군 하나의 마나가 찬다', Math.round(tank.mp), refrain.mana);
+
+  // 최대치를 넘겨 채워지지 않아야 "누구를 채울지"가 판단이 된다.
+  tank.mp = tank.maxMp - 5;
+  L.runUnitSkill(state, bard, { id: 'refrain', targetUid: tank.uid });
+  check('최대치를 넘지 않는다', tank.mp, tank.maxMp);
+
+  // 광역은 기준점 주변 아군 전부. 반경 밖은 그대로다.
+  const anthem = D.UNIT_SKILLS.anthem;
+  for (const mate of AI.alive(state, 'ally')) { mate.mp = 0; mate.x = tank.x; mate.y = tank.y; }
+  const far = unit(state, '검사 라일');
+  far.x = tank.x + anthem.radius + 10;
+  L.runUnitSkill(state, bard, { id: 'anthem', targetUid: tank.uid });
+  check('반경 안 아군이 함께 찬다',
+    [Math.round(tank.mp), Math.round(healer.mp)], [anthem.mana, anthem.mana]);
+  check('반경 밖은 그대로다', far.mp, 0);
+
+  // 쓰러진 아군에게는 들어가지 않는다. 마나가 차도 일어나지 않으므로 버리는 것이다.
+  const down = unit(state, '사제 노아');
+  L.applyDamage(state, null, down, 99999);
+  down.mp = 0;
+  L.runUnitSkill(state, bard, { id: 'refrain', targetUid: down.uid });
+  check('쓰러진 아군은 채우지 않는다', down.mp, 0);
+}
+
+// --- 마나 자연 회복 -----------------------------------------------------
+//
+// 아군과 적이 같은 규칙을 쓴다. 마나가 마르면 힐도 도발도 멈추는데, 그 상태로
+// 남은 전투를 보내면 파티가 손 쓸 것 없이 깎이기만 한다.
+{
+  const state = battle();
+  const foe = AI.alive(state, 'enemy').find((u) => u.maxMp > 0);
+  const down = AI.alive(state, 'ally').find((u) => u.uid !== L.HERO_UID);
+  L.hero(state).mp = 0;
+  foe.mp = 0;
+  down.mp = 0;
+  L.applyDamage(state, null, down, 99999);
+
+  run(state, 10);
+  const share = (u) => u.mp / u.maxMp;
+  const near = (a, b) => Math.abs(a - b) < 0.005;
+  check('주인공의 마나가 초당 정해진 몫만큼 돈다',
+    near(share(L.hero(state)), L.MANA_REGEN * 10), true);
+  check('적도 같은 규칙을 쓴다', near(share(foe), L.MANA_REGEN * 10), true);
+  check('쓰러진 유닛은 돌지 않는다', down.mp, 0);
+
+  const full = battle();
+  L.hero(full).mp = L.hero(full).maxMp;
+  run(full, 5);
+  check('최대치를 넘지 않는다', L.hero(full).mp, L.hero(full).maxMp);
 }
 
 // --- 피해 ---------------------------------------------------------------
@@ -287,14 +356,16 @@ function cast(state, skillId, target) {
   const bran = unit(moved, '강철의 브란');
   bran.hp = 400;
   L.castSkill(moved, 'touch', { uid: bran.uid });
+  const paid = moving.mp;
   L.moveToward(moved, moving, { x: moving.x + 20, y: moving.y }, L.TICK);
   check('움직이면 취소된다', moving.cast, null);
   run(moved, D.PLAYER_SKILLS.touch.cast + 0.1);
   check('취소된 스킬은 터지지 않는다', moved.stats.healed, 0);
   // 자원은 시작할 때 냈고 취소해도 돌아오지 않는다. 그래야 캐스팅 스킬을
   // 고르는 것이 판단이 된다.
+  // 저절로 도는 몫이 있으므로 "줄어든 채로"가 아니라 "돌려받지 않았다"로 본다.
   check('낸 마나는 돌아오지 않는다',
-    moving.mp <= moving.maxMp - D.PLAYER_SKILLS.touch.mp, true);
+    moving.mp < paid + D.PLAYER_SKILLS.touch.mp, true);
   check('쿨타임도 돈다', L.skillSlot(moved, 'touch').readyAt > moved.t, true);
 
   // 대열을 벌리는 힘은 이동이 아니다. 그것까지 취소로 치면 캐스팅 스킬이 아예
@@ -454,8 +525,11 @@ function cast(state, skillId, target) {
   const before = total();
   run(dry, 12);
   check('마나가 없어도 적을 깎는다', total() < before, true);
+  // 마나가 저절로 조금 돌아오므로 0인지로는 볼 수 없다. 들고 있는 스킬 중 가장
+  // 싼 것에도 못 미치는지를 본다 — 하나라도 나갔으면 여기서 걸린다.
   check('스킬은 한 번도 나가지 않았다',
-    AI.alive(dry, 'ally').every((u) => u.mp === 0), true);
+    AI.alive(dry, 'ally').every((u) =>
+      u.mp < Math.min(...u.skills.map((slot) => D.UNIT_SKILLS[slot.id].mp))), true);
 }
 
 // --- 전장의 위아래 여백 -------------------------------------------------
@@ -553,8 +627,10 @@ function cast(state, skillId, target) {
   const near = (a, b) => Math.abs(a - b) < 0.01;
   check('체력이 최대치의 25%만큼 늘었다',
     AI.alive(state, 'ally').every((u, i) => near(u.hp / u.maxHp - before[i].hp, L.MARCH_RECOVER)), true);
+  // 마나는 걸어가는 동안에도 저절로 도는 몫(MANA_REGEN)이 함께 붙는다.
+  const walked = L.MARCH_RECOVER + L.MANA_REGEN * L.WAVE_GAP;
   check('마나도 같은 몫만큼 늘었다',
-    AI.alive(state, 'ally').every((u, i) => near(u.mp / u.maxMp - before[i].mp, L.MARCH_RECOVER)), true);
+    AI.alive(state, 'ally').every((u, i) => near(u.mp / u.maxMp - before[i].mp, walked)), true);
   check('쓰러진 동료는 일어나지 않는다', AI.byUid(state, down.uid).hp, 0);
 }
 
@@ -921,6 +997,43 @@ function cast(state, skillId, target) {
   };
   check('같은 씨앗이면 같은 전투', digest(11), digest(11));
   check('다른 씨앗이면 달라진다', digest(11) === digest(12), false);
+}
+
+// --- 등급이 위협과 보상을 함께 정한다 -----------------------------------
+//
+// 잡졸 여럿이 정예 하나보다 위험하던 때가 있었다. 등급을 나눈 뜻이 살려면 위쪽
+// 등급이 하나하나 더 아프고 더 많이 줘야 한다.
+{
+  const rank = (id) => D.rankOf(D.ENEMIES[id]).id;
+  const trash = Object.values(D.ENEMIES).filter((def) => rank(def.id) === 'trash');
+  const elite = Object.values(D.ENEMIES).filter((def) => rank(def.id) === 'elite');
+  const boss = D.ENEMIES.chief;
+
+  const most = (list, key) => Math.max(...list.map((def) => def[key]));
+  check('정예가 잡졸보다 세다',
+    Math.min(...elite.map((d) => d.atk)) > most(trash, 'atk'), true);
+  check('정예가 잡졸보다 단단하다',
+    Math.min(...elite.map((d) => d.hp)) > most(trash, 'hp'), true);
+  check('우두머리가 정예보다 세다', boss.atk > most(elite, 'atk'), true);
+  check('우두머리가 정예보다 단단하다', boss.hp > most(elite, 'hp'), true);
+
+  // 보상도 같은 순서다. 값이 같으면 무리를 골라 싸울 이유가 없다.
+  check('정예가 잡졸보다 많이 준다',
+    Math.min(...elite.map((d) => d.exp)) > most(trash, 'exp') * 2, true);
+  check('우두머리가 정예보다 많이 준다', boss.exp > most(elite, 'exp') * 3, true);
+  check('전리품도 등급 순으로 잘 나온다',
+    D.RANKS.trash.drop < D.RANKS.elite.drop && D.RANKS.elite.drop < D.RANKS.boss.drop, true);
+  check('좋은 등급이 나올 확률도 그렇다',
+    D.RANKS.trash.luck < D.RANKS.elite.luck && D.RANKS.elite.luck < D.RANKS.boss.luck, true);
+
+  // 우두머리는 제 계열을 쓴다. 오크 전사와 같은 것을 들고 있으면 덩치만 큰
+  // 오크가 된다 — 잡는 데 오래 걸릴 뿐 무섭지는 않았다.
+  check('우두머리 계열이 따로 있다', boss.spec, 'chieftain');
+  const kit = D.skillsFor(boss.spec, 10);
+  check('광역기를 들고 온다',
+    kit.some((id) => D.UNIT_SKILLS[id].kind === 'damage-area'), true);
+  check('어그로도 가져간다',
+    kit.some((id) => D.UNIT_SKILLS[id].kind.startsWith('taunt')), true);
 }
 
 // --- 난이도 확인 --------------------------------------------------------

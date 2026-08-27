@@ -41,7 +41,9 @@
   --spec-mage: #8a4fd0;
   --spec-priest: #2f8a8a;
   --spec-shaman: #9a5fb8;
+  --spec-bard: #c07a2f;
   --spec-grunt: #7a8a4a;
+  --spec-chieftain: #a83b2c;
   /* 전투 화면이 가로로 길어 다른 게임(440px)보다 넓게 잡았다. 좁히면 아군과 적
      사이가 붙어 버려 거리와 장판 반경이 눈에 들어오지 않는다. */
   --app-max: 860px;
@@ -85,7 +87,9 @@
     --spec-mage: #b587ea;
     --spec-priest: #5fc4c4;
     --spec-shaman: #c79ae0;
+    --spec-bard: #e8a95f;
     --spec-grunt: #b3c47a;
+    --spec-chieftain: #e2705c;
   }
 }
 
@@ -210,7 +214,47 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .count { color: var(--muted); font-size: 13px; font-weight: 600; }
 .panel-note { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
 
-.roster, .skill-picks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.skill-picks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+
+/* **동료 목록은 격자다.** 한 줄에 스킬과 장비까지 늘어놓던 때에는 한 명이 네 줄
+   높이라 여섯이 화면을 다 먹었다. 이름과 직업만 남기면 한 명이 한 칸이고, 그만큼
+   더 많은 동료를 한 화면에서 훑는다. */
+.roster {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 6px;
+}
+/* 주인공 줄은 고를 수 있는 것이 아니므로 한 줄을 통째로 쓴다. */
+.roster > li.wide { grid-column: 1 / -1; }
+
+.pick.card { padding: 0; gap: 0; overflow: hidden; }
+.pick-open {
+  flex: 1; min-width: 0;
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border: 0; background: none; color: inherit; font: inherit;
+  text-align: left; cursor: pointer;
+}
+.pick-open[aria-pressed="true"] { background: var(--sel); }
+/* 좁은 칸이라 이름이 두 줄로 감기면 카드 높이가 들쭉날쭉해진다. */
+.pick.card .pick-name { font-size: 14px; line-height: 1.25; }
+.pick.card .pick-sub { font-size: 11px; }
+.pick.card .avatar { width: 22px; height: 29px; }
+/* 데려가기. 표만 있는 단추라 눌린 상태가 색으로 보여야 한다. */
+.pick-take {
+  flex: none; width: 40px; align-self: stretch;
+  display: flex; align-items: center; justify-content: center;
+  border: 0; border-left: 1px solid var(--line);
+  background: none; color: var(--muted); cursor: pointer;
+}
+.pick-take[aria-pressed="false"] { opacity: 0.35; }
+.pick-take[aria-pressed="true"] { background: var(--btn-bg); color: var(--btn-fg); opacity: 1; }
+.pick-take:disabled { opacity: 0.35; cursor: default; }
+.pick-take svg { width: 18px; height: 18px; }
+
+/* 상세의 머리줄은 고를 수 있는 것이 아니라 읽는 것이다. 목록의 잠긴 줄(.locked)을
+   그대로 쓰면 흐려져서 정작 상세가 안 읽힌다. */
+.sheet-head { cursor: default; }
+#member-head { margin-bottom: 10px; }
+#member-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 
 .pick {
   width: 100%; text-align: left;
@@ -251,7 +295,9 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .job.spec-mage { color: var(--spec-mage); }
 .job.spec-priest { color: var(--spec-priest); }
 .job.spec-shaman { color: var(--spec-shaman); }
+.job.spec-bard { color: var(--spec-bard); }
 .job.spec-grunt { color: var(--spec-grunt); }
+.job.spec-chieftain { color: var(--spec-chieftain); }
 
 /* 스킬 이름표. 색이 무엇을 하는 스킬인지를 알린다. */
 .chip { display: inline-flex; align-items: center; gap: 4px; }
@@ -485,12 +531,36 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .bar.mp span { background: var(--mp); }
 
 .bars { display: flex; gap: 8px; }
-.bars .bar.mp { flex: 1; height: 18px; border-radius: 9px; }
-.bars .bar.mp b {
+.bars .bar { flex: 1; height: 18px; border-radius: 9px; }
+.bars .bar b {
   position: absolute; inset: 0;
   display: flex; align-items: center; justify-content: center;
   font-size: 11px; font-weight: 700; color: var(--btn-fg);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+
+/* 주인공이 위험할 때. 막대와 전장 테두리가 함께 맥박치는 것은, 눈이 둘 중
+   어디에 있든 걸리게 하려는 것이다. 소리는 main.js가 한 번만 낸다 — 매 프레임
+   울리면 경고가 아니라 소음이 된다. */
+/* 맥박은 채워진 부분에만 준다. 막대째 흐려지면 그 위의 숫자까지 함께 사라져
+   정작 얼마나 남았는지를 못 읽는다. */
+.bars.danger .bar.hp { box-shadow: 0 0 0 2px var(--hp-low); }
+.bars.danger .bar.hp span { animation: danger-pulse 0.9s ease-in-out infinite; }
+.field.danger::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 3px var(--hp-low);
+  animation: danger-pulse 0.9s ease-in-out infinite;
+}
+
+@keyframes danger-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+/* 움직임을 줄여 달라고 한 기기에서는 맥박 대신 계속 켜 둔다. */
+@media (prefers-reduced-motion: reduce) {
+  .bars.danger .bar.hp span, .field.danger::after { animation: none; }
 }
 
 .skillbar { display: flex; gap: 6px; }

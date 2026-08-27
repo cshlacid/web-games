@@ -11,8 +11,10 @@ const node = typeof module !== 'undefined' && module.exports;
 const D = node ? require('./data.js') : root.HealerData;
 const Items = node ? require('./items.js') : root.HealerItems;
 
-const START_SIZE = 6;   // 처음 명부에 있는 동료 수
-const MAX_SIZE = 12;    // 이 이상은 새로 들어오지 않는다 — 편성 화면이 목록 훑기가 된다
+// 처음 명부에 있는 동료 수. 여섯이던 것을 늘렸다 — 편성 목록이 격자가 되면서
+// 한 화면에 더 담을 수 있게 됐고, 여섯일 때에는 고를 것이 사실상 정해져 있었다.
+const START_SIZE = 9;
+const MAX_SIZE = 14;    // 이 이상은 새로 들어오지 않는다 — 편성 화면이 목록 훑기가 된다
 
 function createRng(seed) {
   let a = (seed >>> 0) || 1;
@@ -58,7 +60,7 @@ function makeMember(rng, taken, level, defId) {
 function create(seed) {
   const rng = createRng(seed == null ? (Math.random() * 1e9) | 0 : seed);
   const taken = new Set();
-  const jobs = ['tank', 'tank', 'healer', 'healer', 'dealer', 'dealer'];
+  const jobs = ['tank', 'tank', 'healer', 'healer', 'dealer', 'dealer'];   // 나머지는 딜러
   const members = [];
 
   for (let i = 0; i < START_SIZE; i++) {
