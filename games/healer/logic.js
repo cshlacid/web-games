@@ -119,6 +119,9 @@ function makeUnit(def, side, uid, x, y, level, override, bonus, potions, name) {
     skills: D.skillsFor(def.spec, level, D.skillSeed(side === 'ally' ? (name || def.name) : `${def.id}:${uid}`))
       .map((id) => ({ id, readyAt: 0 })),
     targetUid: null, tauntUid: null, tauntUntil: 0,
+    // 걸려 있는 강화·약화. 스킬 하나당 하나라, 다시 걸면 시간이 겹치지 않고
+    // 새로 시작한다 — 겹쳐 쌓게 두면 음유시인 둘이 붙은 파티가 전혀 다른 게임이 된다.
+    auras: [],
     // 전투가 끝난 뒤 캐릭터별로 무엇을 했는지 보여 주기 위한 집계. 이벤트를
     // 모아 두었다가 세지 않는 것은, 이벤트가 화면을 위해 지워지기 때문이다.
     tally: { dealt: 0, taken: 0, healed: 0, overheal: 0 },
@@ -246,6 +249,44 @@ function rollCrit(state, source, defender) {
 // 모든 것을 무르는 능력치가 되고, 어디에 장판을 깔지 고르는 뜻도 사라진다.
 // 다만 **치명타는 무엇으로 맞든 회피가 끼어든다** — 그쪽은 피하는 것이 아니라
 // 급소를 내주지 않는 것이라 장판이든 도트든 같이 걸린다.
+// **강화·약화는 곱으로만 걸린다.** 같은 스킬이 두 번 걸리지 않으므로 곱은
+// 서로 다른 스킬 수만큼만 겹친다. 만료를 여기서도 보는 것은, 쓸어 내기 전에
+// 계산이 먼저 도는 틱이 있기 때문이다.
+function auraMul(state, unit, stat) {
+  if (!unit || !unit.auras || !unit.auras.length) return 1;
+  let mul = 1;
+  for (const aura of unit.auras) {
+    if (aura.stat === stat && aura.endsAt > state.t) mul *= aura.mul;
+  }
+  return mul;
+}
+
+// 같은 스킬은 덮어쓴다. 남은 시간이 긴 쪽을 남기지 않는 것은, 강화는 기절과
+// 달리 다시 거는 것이 곧 연장이기 때문이다.
+function addAura(state, source, target, def) {
+  if (!target || target.dead) return;
+  const found = target.auras.find((aura) => aura.skillId === def.id);
+  const aura = found || { skillId: def.id, stat: def.stat, mul: def.mul };
+  aura.stat = def.stat;
+  aura.mul = def.mul;
+  aura.endsAt = state.t + def.duration;
+  aura.sourceUid = source ? source.uid : null;
+  aura.buff = def.kind === 'buff' || def.kind === 'buff-area';
+  if (!found) target.auras.push(aura);
+  emit(state, { type: 'aura', uid: target.uid, skillId: def.id, icon: def.icon,
+    buff: aura.buff, endsAt: aura.endsAt,
+    text: `${target.name}: ${def.name}` });
+}
+
+// 끝난 것을 치운다. 화면이 이 목록을 그대로 그리므로 남겨 두면 끝난 표시가
+// 초상화에 붙어 있는다.
+function updateAuras(state) {
+  for (const unit of state.units) {
+    if (!unit.auras.length) continue;
+    unit.auras = unit.auras.filter((aura) => aura.endsAt > state.t);
+  }
+}
+
 function applyDamage(state, source, target, raw, dodgeable) {
   if (target.dead) return 0;
 
@@ -255,7 +296,11 @@ function applyDamage(state, source, target, raw, dodgeable) {
   }
 
   const crit = rollCrit(state, source, target);
-  const amount = Math.max(1, Math.round(raw * crit * target.armor));
+  // 때리는 쪽의 공격력 강화·약화와 맞는 쪽의 피해 강화·약화가 여기서 함께 걸린다.
+  // 스킬마다 곱하지 않고 이 한 곳에 둔 것은, 기본 공격과 도트와 장판까지 같은
+  // 규칙을 타야 하기 때문이다.
+  const boost = auraMul(state, source, 'atk') * auraMul(state, target, 'armor');
+  const amount = Math.max(1, Math.round(raw * boost * crit * target.armor));
   target.hp = Math.max(0, target.hp - amount);
   state.stats.damage += source && source.side === 'ally' ? amount : 0;
   if (source) source.tally.dealt += amount;
@@ -269,7 +314,7 @@ function applyHeal(state, source, target, raw) {
   if (target.dead) return 0;
   // 회복도 터진다. 다만 받는 쪽이 아군이라 회피가 끼어들지 않는다.
   const crit = rollCrit(state, source, null);
-  const healed = Math.round(raw * crit);
+  const healed = Math.round(raw * auraMul(state, source, 'heal') * crit);
   const amount = Math.min(healed, target.maxHp - target.hp);
   target.hp += amount;
   if (source && source.uid === HERO_UID) {
@@ -402,6 +447,23 @@ function runUnitSkill(state, unit, choice) {
   // 그대로 스킬을 마쳐, 화면에서는 기절이 아무 일도 하지 않은 것으로 보인다.
   if (def.kind === 'stun') {
     stun(state, unit, target, def.duration);
+    return;
+  }
+  // 강화와 약화. 거는 쪽만 다르고 나머지는 같아, 대상 목록을 고르는 데서 갈린다.
+  if (def.kind === 'buff' || def.kind === 'buff-area') {
+    // 사거리 0은 자기에게 거는 것이다(전사의 굳히기). 대상 고르기를 따로 두지
+    // 않으려고 AI가 자기 uid를 넘긴다.
+    const on = def.kind === 'buff-area'
+      ? alive(state, unit.side).filter((mate) => dist(mate, target) <= def.radius)
+      : [target];
+    for (const mate of on) addAura(state, unit, mate, def);
+    return;
+  }
+  if (def.kind === 'debuff' || def.kind === 'debuff-area') {
+    const on = def.kind === 'debuff-area'
+      ? alive(state, AI.opposite(unit.side)).filter((foe) => dist(foe, target) <= def.radius)
+      : [target];
+    for (const foe of on) addAura(state, unit, foe, def);
     return;
   }
   if (def.kind === 'mana-ally') { giveMana(state, unit, target, def.mana); return; }
@@ -752,6 +814,7 @@ function step(state, dt) {
   state.t += dt;
   updateZones(state);
   updateDots(state);
+  updateAuras(state);
   regenMana(state, dt);
 
   if (state.marching) {

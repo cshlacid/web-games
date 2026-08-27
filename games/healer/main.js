@@ -1097,6 +1097,10 @@ function makePortrait(unit) {
   mp.hidden = unit.maxMp <= 0;
   button.append(mp);
 
+  // 걸려 있는 강화·약화. 아이콘까지 늘어놓으면 다섯 칸짜리 줄이 그것으로
+  // 덮이므로 점으로만 둔다 — 색이 좋은 쪽인지 나쁜 쪽인지를 알린다.
+  button.append(el('div', 'auras'));
+
   // 피해와 회복이 뜨는 자리. 전장에서 유닛이 뭉쳐 있으면 누가 맞았는지 숫자가
   // 겹쳐 읽히지 않아서, 초상화 위에도 같은 숫자를 띄운다.
   button.append(el('div', 'pops'));
@@ -1130,6 +1134,20 @@ function syncPortraitList(state, id) {
     button.classList.toggle('dead', unit.dead);
     button.classList.toggle('casting', Boolean(unit.cast));
     button.classList.toggle('valid', Boolean(app.aiming) && isValidUnitTarget(state, unit));
+    syncAuras(button, unit);
+  }
+}
+
+// 걸린 것과 그려진 것이 다를 때만 다시 그린다. 매 틱 통째로 갈아 끼우면
+// 초상화 다섯 개가 초당 30번 새로 만들어진다.
+function syncAuras(button, unit) {
+  const box = button.querySelector('.auras');
+  const now = (unit.auras || []).map((aura) => (aura.buff ? 'boon' : 'wilt')).join(' ');
+  if (box.dataset.on === now) return;
+  box.dataset.on = now;
+  box.textContent = '';
+  for (const aura of unit.auras || []) {
+    box.append(el('span', `aura-dot ${aura.buff ? 'boon' : 'wilt'}`));
   }
 }
 
@@ -1440,6 +1458,13 @@ function handleEvents(state, events) {
       const target = AI.byUid(state, event.uid);
       if (target) floatText(target, '기절', 'miss');
       note(event.text);
+      continue;
+    }
+    // 강화·약화가 걸린 순간. 지속 상태는 초상화의 점이 알리지만, 걸린 순간이
+    // 화면에 없으면 점이 언제 왜 생겼는지 알 수 없다.
+    if (event.type === 'aura') {
+      const target = AI.byUid(state, event.uid);
+      if (target) floatIcon(target, event.icon, `skill ${event.buff ? 'boon' : 'wilt'}`);
       continue;
     }
     if (event.type === 'death') {
