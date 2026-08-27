@@ -731,6 +731,8 @@ function openMember(member) {
   body.append(text('div', 'pick-sub', memberSummary(member)));
   head.append(body);
 
+  // **칩은 누를 수 있다.** 이름과 숫자만으로는 그 스킬이 무엇을 하는지, 그 장비에
+  // 무슨 옵션이 붙었는지 알 수 없었고, `title`은 손가락으로는 볼 방법이 없다.
   const chips = $('member-chips');
   chips.textContent = '';
   for (const id of Roster.skillsOf(member)) {
@@ -738,33 +740,100 @@ function openMember(member) {
     const kind = D.skillKind(skill);
     // 아이콘이 "어떤 스킬인가"를, 색이 "무엇을 하는가"를 알린다. 이름만
     // 늘어놓았을 때에는 넷을 훑는 데 넷을 다 읽어야 했다.
-    const chip = el('span', `chip skill ${kind.css}`);
-    chip.append(icon(skill.icon));
-    chip.append(document.createTextNode(`${skill.name} ${skill.mp}`));
-    chip.title = `${kind.name} · ${skill.desc} · 마나 ${skill.mp} · ${castLine(skill)}`;
+    const chip = chipButton(`chip skill ${kind.css}`, skill.icon, `${skill.name} ${skill.mp}`,
+      // 종류 이름이 스킬 이름과 같으면(도발) 두 번 적지 않는다.
+      () => showChip(chip, skill.name === kind.name ? skill.name : `${skill.name} · ${kind.name}`,
+        skillLines(skill), skill.desc));
     chips.append(chip);
   }
   for (const [id, count] of Object.entries(Roster.potionsOf(member))) {
     if (count > 0) {
-      const chip = el('span', 'chip dim');
-      chip.append(icon(D.POTIONS[id].icon));
-      chip.append(document.createTextNode(String(count)));
+      const potion = D.POTIONS[id];
+      const chip = chipButton('chip dim', potion.icon, String(count),
+        () => showChip(chip, `${potion.name} ×${count}`, potionLines(potion),
+          '동료는 직업에 따라 알아서 챙겨 오고, 위급할 때 알아서 마신다.'));
       chips.append(chip);
     }
   }
   for (const item of Roster.gearOf(member)) {
-    const chip = el('span', `chip gear tier-${Items.tier(item).css}`);
-    chip.append(icon(D.GEAR[item.defId].icon));
-    chip.append(document.createTextNode(Items.name(item)));
+    const gear = D.GEAR[item.defId];
+    const chip = chipButton(`chip gear tier-${Items.tier(item).css}`, gear.icon, Items.name(item),
+      () => showChip(chip, `${Items.name(item)} · ${D.SLOTS[gear.slot].name}`, gearLines(item),
+        '분배로 받은 장비는 그 동료가 계속 쓴다.'));
     chips.append(chip);
   }
   if (!chips.children.length) chips.append(text('span', 'pick-sub', '들고 오는 것이 없다'));
+  hideChip();
 
   const picked = app.party.includes(member);
   const take = $('member-take');
   take.textContent = picked ? '파티에서 뺀다' : '데려간다';
   take.disabled = !picked && app.party.length >= D.PARTY_MAX - 1;
   sheet.hidden = false;
+}
+
+function chipButton(cls, iconName, label, run) {
+  const chip = el('button', cls);
+  chip.type = 'button';
+  chip.setAttribute('aria-pressed', 'false');
+  chip.append(icon(iconName));
+  chip.append(document.createTextNode(label));
+  chip.addEventListener('click', () => { sound.play('click'); run(); });
+  return chip;
+}
+
+// 누른 칩 하나의 설명. 칩 아래 한 자리에만 띄우는 것은, 칩마다 설명을 펼치면
+// 목록이 다시 길어져 칩으로 접어 둔 뜻이 사라지기 때문이다.
+function showChip(chip, title, lines, note) {
+  const panel = $('member-detail');
+  const open = chip.getAttribute('aria-pressed') === 'true';
+  for (const other of $('member-chips').children) {
+    if (other.setAttribute) other.setAttribute('aria-pressed', 'false');
+  }
+  if (open) { hideChip(); return; }
+
+  chip.setAttribute('aria-pressed', 'true');
+  panel.textContent = '';
+  panel.append(text('p', 'detail-title', title));
+  for (const line of lines) panel.append(text('p', 'detail-line', line));
+  if (note) panel.append(text('p', 'detail-note', note));
+  panel.hidden = false;
+}
+
+function hideChip() {
+  const panel = $('member-detail');
+  panel.textContent = '';
+  panel.hidden = true;
+}
+
+// 스킬의 수치. 종류마다 보여야 하는 것이 다르다 — 회복 스킬에 "피해 배수"를
+// 적을 수 없고, 도트에 한 번의 값을 적으면 실제로 들어가는 양이 가려진다.
+function skillLines(def) {
+  const lines = [];
+  if (def.heal) lines.push(`한 번에 ${def.heal} 회복`);
+  if (def.mul) lines.push(`공격력의 ×${def.mul}`);
+  if (def.tick) {
+    const total = Math.round(def.tick * (def.duration / (def.interval || 1)));
+    const what = def.kind === 'heal-dot' ? '회복' : '피해';
+    lines.push(`${def.interval || 1}초마다 ${def.tick} ${what} · ${def.duration}초 (합계 ${total})`);
+  }
+  if (def.mana) lines.push(def.kind === 'mana' ? `자기 마나 ${def.mana} 회복` : `아군 마나 ${def.mana} 회복`);
+  if (def.kind === 'stun') lines.push(`${def.duration}초 동안 굳힌다 · 외우던 스킬도 끊긴다`);
+  if (def.kind === 'taunt' || def.kind === 'taunt-area') lines.push(`${def.duration}초 동안 어그로를 붙든다`);
+  if (def.radius) lines.push(`반경 ${def.radius} 안을 함께 친다`);
+  lines.push(`마나 ${def.mp} · 쿨타임 ${def.cd}초 · ${castLine(def)}`);
+  return lines;
+}
+
+function potionLines(potion) {
+  return [`최대 ${potion.restore === 'hp' ? '체력' : '마나'}의 ${Math.round(potion.ratio * 100)}%를 채운다`,
+    `쿨타임 ${potion.cd}초`];
+}
+
+// 등급은 이름에 이미 붙어 있고 색으로도 읽히므로 다시 적지 않는다.
+function gearLines(item) {
+  const options = Items.summary(item);
+  return [options || '붙은 옵션이 없다'];
 }
 
 function closeMember() {
