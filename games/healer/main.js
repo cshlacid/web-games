@@ -73,6 +73,9 @@ const SCREENS = {
 
 function show(name, note) {
   app.screen = name;
+  // 곡은 화면을 따라간다. 결과 화면을 길드 쪽에 붙인 것은, 전투가 끝났는데도
+  // 몰아치는 곡이 계속 도는 것이 이긴 판에서든 진 판에서든 어색하기 때문이다.
+  sound.setTrack(name === 'battle' ? 'battle' : 'lobby');
   // 동료 상세는 편성 화면의 것이다. 화면을 옮기면서 닫지 않으면 전투 위에 떠 있다.
   if (name !== 'party') closeMember();
   for (const [key, screen] of Object.entries(SCREENS)) $(screen.node).hidden = key !== name;
