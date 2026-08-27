@@ -238,17 +238,32 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .pick-open {
   flex: 1; min-width: 0;
   display: flex; align-items: center; gap: 8px;
-  padding: 8px 10px; border: 0; background: none; color: inherit; font: inherit;
+  padding: 8px; border: 0; background: none; color: inherit; font: inherit;
   text-align: left; cursor: pointer;
 }
 .pick-open[aria-pressed="true"] { background: var(--sel); }
 /* 좁은 칸이라 이름이 두 줄로 감기면 카드 높이가 들쭉날쭉해진다. */
 .pick.card .pick-name { font-size: 14px; line-height: 1.25; }
 .pick.card .pick-sub { font-size: 11px; }
-.pick.card .avatar { width: 22px; height: 29px; }
+.pick.card .avatar { width: 24px; height: 31px; }
+/* 그림과 레벨을 한 칸에 세로로 쌓는다. 레벨이 글자 줄에서 빠져야 직업·계열이
+   한 줄에 들어간다. */
+.pick-face { display: flex; flex-direction: column; align-items: center; gap: 1px; flex: none; }
+.pick-face .lv { font-size: 10px; font-weight: 700; color: var(--muted); }
+/* 직업·계열은 한 줄로 둔다. 감기면 카드 높이가 서로 달라진다. */
+.pick.card .job { display: block; font-size: 10.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 좁은 기기에서는 그림과 표 단추를 줄여 글자 줄에 자리를 준다 — "딜러·음유시인"이
+   들어가지 못하면 그 동료만 계열이 잘려 나간다. */
+@media (max-width: 389px) {
+  .pick.card .job { font-size: 9.5px; }
+  .pick.card .avatar { width: 20px; height: 26px; }
+  .pick-face .lv { font-size: 9px; }
+  .pick-take { width: 28px; }
+  .pick-open { padding: 7px 6px; }
+}
 /* 데려가기. 표만 있는 단추라 눌린 상태가 색으로 보여야 한다. */
 .pick-take {
-  flex: none; width: 40px; align-self: stretch;
+  flex: none; width: 34px; align-self: stretch;
   display: flex; align-items: center; justify-content: center;
   border: 0; border-left: 1px solid var(--line);
   background: none; color: var(--muted); cursor: pointer;

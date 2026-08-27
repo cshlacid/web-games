@@ -40,6 +40,9 @@ function create() {
     // 스킬은 1레벨이다 — 새 스킬이 열릴 때마다 여기 자리를 만들어 두면,
     // 자료가 바뀌었을 때 저장본에 없는 스킬과 있는 스킬이 갈린다.
     skillLevels: {},
+    // 전투에 등록해 둔 스킬. **새로고침해도 남아야 한다** — 매번 다시 고르게 하면
+    // 게시판에서 의뢰 하나 고르는 데 스킬 다섯을 다시 누르는 일이 된다.
+    skills: [],
     roster: Roster.create(),
     questSeed: (Math.random() * 1e9) | 0,
     shopSeed: (Math.random() * 1e9) | 0,
@@ -347,6 +350,10 @@ function load() {
     if (give > 0) progress.skillLevels[id] = give + 1;
     skillBudget -= give;
   }
+
+  // 등록해 둔 스킬은 저장본에서 그대로 믿지 않는다. 자료가 바뀌어 없어진 스킬이나
+  // 아직 안 열린 스킬이 섞여 있을 수 있다.
+  progress.skills = validSkills(progress, Array.isArray(saved.skills) ? saved.skills : []);
 
   progress.roster = Roster.adopt(saved.roster);
   progress.charLevel = Math.max(1, Math.min(D.LEVEL.maxLevel, progress.charLevel | 0));

@@ -173,6 +173,8 @@ const gear = (defId, tier) => Items.make(defId, tier || 0, 3);
   saved.jobLevel = 3;
   // 받은 점수는 둘뿐인데 넷을 쓴 저장본. 손으로 고쳐도 점수가 늘지 않아야 한다.
   saved.skillLevels = { touch: 3, quick: 3, regen: 9 };
+  // 등록해 둔 스킬. 아직 안 열린 것과 없는 것이 섞여 있어도 열린 것만 남아야 한다.
+  saved.skills = ['quick', 'pyre', '없는스킬', 'touch'];
   check('저장된다', P.save(saved), true);
 
   const loaded = P.load();
@@ -186,6 +188,10 @@ const gear = (defId, tier) => Items.make(defId, tier || 0, 3);
   // 하나가 사라진다.
   check('아이템 uid를 다시 붙인다',
     new Set(loaded.inventory.map((item) => item.uid)).size, loaded.inventory.length);
+
+  // 등록해 둔 스킬이 남는다. 없으면 새로고침할 때마다 다섯을 다시 골라야 한다.
+  check('등록한 스킬이 남는다', loaded.skills, ['quick', 'touch']);
+  check('처음에는 비어 있다', P.create().skills, []);
 
   check('스킬 레벨이 남는다', P.skillLevel(loaded, 'touch'), 3);
   check('받은 점수를 넘지 않는다', P.spentSkillPoints(loaded), P.earnedSkillPoints(loaded));
