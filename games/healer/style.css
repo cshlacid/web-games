@@ -33,6 +33,7 @@
   --kind-mend: #2f8a4c;
   --kind-pull: #b8860b;
   --kind-mana: #2f6fd0;
+  --kind-stun: #8a6a2f;
   /* 계열. 역할 색만으로는 궁수와 마법사가 같은 줄로 보인다. */
   --spec-tank: #4a72b8;
   --spec-warrior: #b4453c;
@@ -80,6 +81,7 @@
     --kind-mend: #5fc47f;
     --kind-pull: #e8c352;
     --kind-mana: #6b9ee8;
+    --kind-stun: #d8b45f;
     --spec-tank: #7fa6e8;
     --spec-warrior: #e08a80;
     --spec-rogue: #a9b3c4;
@@ -308,6 +310,7 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .chip.skill.mend { color: var(--kind-mend); }
 .chip.skill.pull { color: var(--kind-pull); }
 .chip.skill.mana { color: var(--kind-mana); }
+.chip.skill.stun { color: var(--kind-stun); }
 .pick-sub { font-size: 12px; color: var(--muted); line-height: 1.45; }
 .pick-cost { font-size: 12px; color: var(--muted); flex: none; text-align: right; }
 
@@ -422,6 +425,11 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 }
 .unit.dead .castbar { display: none; }
 .unit.low .hpbar span { background: var(--hp-low); }
+
+/* 기절. 굳어 있는 동안 그림이 살짝 기울고 노란 테가 돈다 — 화면에서 "지금 저것은
+   아무것도 못 한다"가 보여야 기절이 있다는 것을 알 수 있다. */
+.unit.stunned svg { filter: drop-shadow(0 0 3px var(--kind-stun)); }
+.unit.stunned .mark { box-shadow: 0 0 0 2px var(--kind-stun); }
 /* 유닛 이름표는 없다. 아홉 그림이 실루엣만으로 갈리도록 그렸고, 아군의 이름은
    아래 초상화 줄에 있다. 뭉쳐 싸울 때 이름표가 서로 겹쳐 읽히지도 않으면서
    화면만 덮었다 — 그림을 구분되게 그린 것이 이름표를 없애기 위해서였다. */

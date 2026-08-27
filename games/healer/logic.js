@@ -108,10 +108,16 @@ function makeUnit(def, side, uid, x, y, level, override, bonus, potions, name) {
     attackCd: def.attackCd, nextAttackAt: 0,
     // 시전 중인 스킬. 서서 외우는 동안 여기 들어 있고, 움직이면 지워진다.
     cast: null,
+    // 기절이 풀리는 시각. 이 시각까지는 판단도 이동도 기본 공격도 없다.
+    stunUntil: 0,
     exp: Math.round((def.exp || 0) * (1 + 0.25 * (level - 1))),
     // 계열의 목록 중 레벨이 되는 것을 앞에서부터 넷. 편성 화면이 보여 준 것과
     // 전투에서 실제로 쓰는 것이 같아야 하므로 같은 함수를 쓴다.
-    skills: D.skillsFor(def.spec, level).map((id) => ({ id, readyAt: 0 })),
+    // **캐릭터마다 다른 넷을 든다.** 아군은 이름이 씨앗이라 편성 화면에서 본 것과
+    // 같고, 적은 이름에 uid를 섞어 같은 무리의 고블린 셋이 서로 다른 것을 들게
+    // 한다 — uid는 무리와 자리에서 나오므로 같은 씨앗의 전투는 그대로 재현된다.
+    skills: D.skillsFor(def.spec, level, D.skillSeed(side === 'ally' ? (name || def.name) : `${def.id}:${uid}`))
+      .map((id) => ({ id, readyAt: 0 })),
     targetUid: null, tauntUid: null, tauntUntil: 0,
     // 전투가 끝난 뒤 캐릭터별로 무엇을 했는지 보여 주기 위한 집계. 이벤트를
     // 모아 두었다가 세지 않는 것은, 이벤트가 화면을 위해 지워지기 때문이다.
@@ -392,6 +398,12 @@ function runUnitSkill(state, unit, choice) {
   // 남의 마나를 채운다(음유시인). 자기 것만 채우는 위와 달리 파티 전체의 마나
   // 총량이 늘어나는 유일한 수단이라, 마나가 마른 탱커와 힐러를 밖에서 도울 수
   // 있는 것도 이것뿐이다.
+  // 기절. **거는 순간 외우던 것이 끊긴다** — 끊지 않으면 기절이 걸린 시전자가
+  // 그대로 스킬을 마쳐, 화면에서는 기절이 아무 일도 하지 않은 것으로 보인다.
+  if (def.kind === 'stun') {
+    stun(state, unit, target, def.duration);
+    return;
+  }
   if (def.kind === 'mana-ally') { giveMana(state, unit, target, def.mana); return; }
   if (def.kind === 'mana-area') {
     for (const mate of alive(state, unit.side)) {
@@ -411,6 +423,21 @@ function runUnitSkill(state, unit, choice) {
     }
   }
 }
+
+// 기절시킨다. 이미 걸려 있으면 남은 시간이 긴 쪽을 남긴다 — 짧은 것으로 덮으면
+// 두 번째 기절이 오히려 상대를 풀어 준다.
+function stun(state, caster, target, duration) {
+  if (!target || target.dead) return 0;
+  const until = state.t + duration;
+  if (until <= target.stunUntil) return 0;
+  target.stunUntil = until;
+  if (target.cast) cancelCast(state, target);
+  emit(state, { type: 'stun', uid: target.uid, until,
+    text: `${caster.name} → ${target.name}: 기절` });
+  return duration;
+}
+
+const stunned = (state, unit) => state.t < (unit.stunUntil || 0);
 
 // 마나를 채우고 화면에 알린다. 회복과 달리 넘치는 몫을 따로 세지 않는 것은,
 // 마나에는 "흘린 힐"에 해당하는 판단(EFFICIENT)이 시전 전에 이미 걸리기 때문이다.
@@ -599,6 +626,7 @@ function castSkill(state, skillId, target) {
 
   const caster = hero(state);
   if (caster.dead) return { ok: false, reason: '쓰러졌다' };
+  if (stunned(state, caster)) return { ok: false, reason: '기절' };
   // 시전 중인 것이 쿨타임보다 먼저다. 외우는 중에 다른 것을 누르면 화면에
   // 뜨는 이유가 "쿨타임"이면 무엇이 막고 있는지 알 수 없다.
   if (caster.cast) return { ok: false, reason: '시전 중' };
@@ -735,6 +763,9 @@ function step(state, dt) {
 
   for (const unit of state.units) {
     if (unit.dead) continue;
+    // 기절한 동안에는 아무것도 하지 않는다. 대열을 벌리는 힘(separate)은 그대로
+    // 받는다 — 그것은 스스로 움직이는 것이 아니라 서로 밀리는 것이다.
+    if (stunned(state, unit)) continue;
 
     // 시전 중이면 그 틱은 외우는 데만 쓴다. 다시 판단하지 않는 것은, 매 틱 새로
     // 고르면 이동이 걸려 캐스팅이 시작하자마자 취소되기 때문이다.
@@ -847,7 +878,7 @@ const api = {
   createRng, createBattle, advance, step, drainEvents,
   castSkill, playerSkill, usePotion, drink, magicPowerOf, rollCrit, applyDamage, applyHeal, addDot, addZone,
   hero, skillSlot, resolveTarget, moveToward, giveMana,
-  startCast, tickCast, cancelCast, runUnitSkill, resolvePlayerSkill,
+  startCast, tickCast, cancelCast, runUnitSkill, resolvePlayerSkill, stun, stunned,
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = api;

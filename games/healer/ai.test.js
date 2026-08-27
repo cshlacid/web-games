@@ -162,8 +162,11 @@ function gather(state) {
     { defId: 'mira', level: 1 }, { defId: 'noa', level: 1 }] });
   gather(state);
   const tank = named(state, '강철의 브란');
-  check('레벨이 되면 광역 도발을 들고 온다',
-    tank.skills.some((s) => s.id === 'roar'), true);
+  // 계열의 열 개 중 넷을 캐릭터마다 다르게 들고 오므로, 여기서 보려는 스킬은
+  // 손으로 쥐여 준다. 무엇을 들고 오는가는 data.js의 skillsFor가 볼 일이다.
+  tank.skills = ['roar', 'taunt', 'bash'].map((id) => ({ id, readyAt: 0 }));
+  check('광역 도발과 단일 도발을 함께 든 탱커',
+    tank.skills.map((s) => s.id).includes('roar'), true);
 
   enemies(state).forEach((u) => { u.targetUid = tank.uid; });
   enemyOf(state, 'dealer').targetUid = named(state, '궁수 미라').uid;
@@ -220,6 +223,37 @@ function gather(state) {
     AI.chooseSkill(healer, state, enemies(state)[0]), null);
 }
 
+// --- 기절 (근접 세 계열) ------------------------------------------------
+{
+  const state = battle();
+  gather(state);
+  const tank = named(state, '강철의 브란');
+  tank.skills = ['shieldSlam', 'bash'].map((id) => ({ id, readyAt: 0 }));
+  const foes = enemies(state);
+
+  const pick = AI.chooseSkill(tank, state, foes[0]);
+  check('닿는 적에게 기절을 건다', pick && pick.id, 'shieldSlam');
+
+  // 이미 굳어 있는 적에게 다시 걸면 남은 시간이 겹쳐 사라지고 쿨타임만 버린다.
+  for (const foe of foes) foe.stunUntil = state.t + 2;
+  const again = AI.chooseSkill(tank, state, foes[0]);
+  check('굳어 있는 적에게는 다시 걸지 않는다', again && again.id, 'bash');
+
+  // 외우는 적이 있으면 그쪽이 먼저다 — 끊는 것이 기절의 값이다.
+  for (const foe of foes) foe.stunUntil = 0;
+  const casting = foes[foes.length - 1];
+  casting.cast = { skillId: 'hex', name: '저주', targetUid: tank.uid, startedAt: 0, endsAt: 9 };
+  const cut = AI.chooseSkill(tank, state, foes[0]);
+  check('외우는 적을 먼저 끊는다', cut && cut.targetUid, casting.uid);
+
+  // 원거리 계열에는 기절이 없다. 붙어야 넣을 수 있는 것이 기절이고, 멀리서 거는
+  // 수단까지 있으면 후열이 아무것도 못 하는 판이 나온다.
+  const stunSpecs = Object.entries(D.SPEC_SKILLS)
+    .filter(([, list]) => list.some((id) => D.UNIT_SKILLS[id].kind === 'stun'))
+    .map(([spec]) => spec).sort();
+  check('기절은 근접 계열만 갖는다', stunSpecs, ['rogue', 'tank', 'warrior']);
+}
+
 // --- 음유시인: 아군의 마나를 채운다 -------------------------------------
 //
 // 마나 회복 스킬은 지금까지 전부 자기 것만 채웠다(마나 순환·명상·마력 흡수).
@@ -232,6 +266,9 @@ function gather(state) {
   const tank = named(state, '강철의 브란');
   const healer = named(state, '사제 노아');
   const melee = named(state, '검사 라일');
+  // 계열의 열 개 중 넷을 캐릭터마다 다르게 들고 오므로, 여기서 보려는 둘은
+  // 손으로 쥐여 준다.
+  bard.skills = ['anthem', 'refrain', 'chord'].map((id) => ({ id, readyAt: 0 }));
   const refrain = D.UNIT_SKILLS.refrain;
   const anthem = D.UNIT_SKILLS.anthem;
 
@@ -448,6 +485,10 @@ function gather(state) {
       .reduce((sum, def) => sum + def.mp, 0));
 
   // 도발이 필요 없는 상황에서도 남은 마나가 도발 몫뿐이면 때리지 않는다.
+  // **마나를 되찾는 스킬은 빼고 본다** — 그것은 일부러 예약에 걸리지 않게 두었고
+  // (그것까지 막으면 바닥난 탱커가 영영 도발을 못 한다), 여기서 보려는 것은
+  // 때리는 스킬 쪽이다.
+  tank.skills = tank.skills.filter((slot) => D.UNIT_SKILLS[slot.id].kind !== 'mana');
   enemies(state).forEach((u) => { u.targetUid = tank.uid; });
   tank.mp = reserve + 1;
   check('마나가 도발 몫뿐이면 때리는 스킬을 아낀다',

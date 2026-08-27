@@ -191,13 +191,15 @@ function everyQuest(fn) {
   }
   check('레벨 1에서도 스킬이 하나는 있다', [...new Set(mute)], []);
 
-  // 레벨이 높으면 더 들고 온다 — 광역 도발이 그 예다.
-  // 레벨은 명부가 들고 있다. 낮은 동료는 광역 도발을 못 쓰고, 자라면 쓴다.
+  // 레벨이 높으면 더 들고 온다. **무엇을 드는지는 캐릭터마다 다르므로**(계열의
+  // 열 개 중 넷) 특정 스킬로는 볼 수 없다 — 대신 드는 것들의 최소 레벨이 올라가는지
+  // 본다. 레벨은 명부가 들고 있다.
   const rookies = R.create(5);
   const veterans = R.create(5).map((m) => Object.assign({}, m, { level: 12 }));
-  const roars = (members) => members.some((m) => R.skillsOf(m).includes('roar'));
-  check('낮은 레벨 탱커는 광역 도발을 못 쓴다', roars(rookies), false);
-  check('레벨이 오르면 광역 도발을 들고 온다', roars(veterans), true);
+  const topLevel = (members) => Math.max(...members
+    .flatMap((m) => R.skillsOf(m)).map((id) => D.UNIT_SKILLS[id].minLevel));
+  check('낮은 레벨은 낮은 스킬만 든다', topLevel(rookies), 1);
+  check('레벨이 오르면 늦게 열리는 것도 든다', topLevel(veterans) > 1, true);
 }
 
 // --- 만들어진 의뢰가 실제로 굴러가는가 ----------------------------------

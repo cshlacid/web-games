@@ -915,6 +915,9 @@ function syncUnits(state) {
     node.classList.toggle('low', unit.hp / unit.maxHp <= 0.3);
     node.querySelector('.hpbar span').style.width = `${(unit.hp / unit.maxHp) * 100}%`;
     node.classList.toggle('valid', Boolean(app.aiming) && isValidUnitTarget(state, unit));
+    // 굳은 동안에는 아무것도 하지 않는다. 화면이 그것을 보여 주지 않으면 그 몇
+    // 초가 "왜 가만히 있지"로만 보인다 — 기절이 있다는 것 자체를 알 수 없다.
+    node.classList.toggle('stunned', !unit.dead && L.stunned(state, unit));
 
     const cast = unit.cast;
     const bar = node.querySelector('.castbar');
@@ -1115,8 +1118,8 @@ function syncSkillbar(state) {
   }
 
   // 주인공이 쓰러져도 전투는 이어진다. 스킬이 왜 안 나가는지가 화면에 없으면
-  // 고장 난 것으로 보인다.
-  $('skillbar').classList.toggle('down', hero.dead);
+  // 고장 난 것으로 보인다. **굳은 동안에도 마찬가지다.**
+  $('skillbar').classList.toggle('down', hero.dead || L.stunned(state, hero));
 
   const share = hero.hp / hero.maxHp;
   $('hero-hp-fill').style.width = `${Math.max(0, share) * 100}%`;
@@ -1334,6 +1337,14 @@ function handleEvents(state, events) {
         // 동료가 쓴 스킬은 글자로만 알린다. 소리까지 겹치면 내 조작음이 묻힌다.
         note(event.text);
       }
+      continue;
+    }
+    // 기절은 지속 상태라 유닛에 테가 돌지만(syncUnits), 걸린 순간은 글자로도
+    // 알린다 — 굳는 것이 몇 초뿐이라 놓치면 무엇이 일어났는지 알 수 없다.
+    if (event.type === 'stun') {
+      const target = AI.byUid(state, event.uid);
+      if (target) floatText(target, '기절', 'miss');
+      note(event.text);
       continue;
     }
     if (event.type === 'death') {
