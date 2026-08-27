@@ -488,6 +488,19 @@ const COMPANIONS = {
            attrs: { str: 14, agi: 12, int: 11, vit: 35 }, attackType: 'magic',
            armor: 0.86, spec: 'priest',
            note: '힐량이 작은 대신 때리기도 한다' },
+  // 음유시인은 딜러로 둔다. 힐러로 두면 편성이 "힐러 둘"이 되어 적 딜러의
+  // 힐러 우선 규칙이 이쪽으로 몰리는데, 이 계열이 하는 일은 살리는 것이 아니라
+  // 남을 계속 쓰게 하는 것이다.
+  finn:  { id: 'finn', race: 'human',  name: '음유시인 핀', job: 'dealer', sprite: 'bard',
+           hp: 490, mp: 160, atk: 36, attackCd: 1.6, range: 32, speed: 18,
+           attrs: { str: 13, agi: 16, int: 20, vit: 35 }, attackType: 'magic',
+           armor: 0.9, spec: 'bard',
+           note: '원거리. 아군의 마나를 채운다' },
+  elin:  { id: 'elin', race: 'elf',  name: '악사 엘린',   job: 'dealer', sprite: 'bard',
+           hp: 406, mp: 168, atk: 40, attackCd: 1.5, range: 32, speed: 20,
+           attrs: { str: 12, agi: 21, int: 17, vit: 34 }, attackType: 'magic',
+           armor: 0.92, spec: 'bard',
+           note: '원거리. 마나는 덜 채우고 더 때린다' },
 };
 
 // 동료와 적이 쓰는 스킬. 플레이어 스킬(PLAYER_SKILLS)과 표를 나눈 이유는
@@ -636,6 +649,30 @@ const UNIT_SKILLS = {
             mul: 1.6, range: 30, cast: 1.0, minLevel: 1,
             desc: '힐할 곳이 없으면 때린다' },
 
+  // --- 음유시인 ---
+  // **아군의 마나를 채우는 유일한 계열.** 자기 마나만 채우는 것(kind 'mana')과
+  // 달라서 종류를 둘 더 두었다 — 'mana-ally'는 하나에게, 'mana-area'는 기준점
+  // 주변 아군 모두에게 준다.
+  //
+  // 주는 마나가 제 마나값보다 크다. 남의 마나를 대신 내주는 것이 아니라 노래로
+  // 채운다는 뜻이고, 이것이 아니면 파티 전체의 마나 총량이 늘지 않아 이 계열을
+  // 넣은 뜻이 사라진다. 대신 쿨타임으로 막는다.
+  anthem: { id: 'anthem', icon: 'anthem', name: '전투가', spec: 'bard', cd: 24, mp: 12, kind: 'mana-area',
+            mana: 46, radius: 22, range: 30, cast: 1.8, minLevel: 3,
+            desc: '주변 아군 모두의 마나를 채운다' },
+  refrain:{ id: 'refrain', icon: 'refrain', name: '후렴', spec: 'bard', cd: 12, mp: 8, kind: 'mana-ally',
+            mana: 60, range: 30, cast: 1.0, minLevel: 1,
+            desc: '아군 하나의 마나를 채운다' },
+  dissonance: { id: 'dissonance', icon: 'dissonance', name: '불협화음', spec: 'bard', cd: 12, mp: 26,
+            kind: 'damage-area', mul: 1.5, radius: 16, range: 32, cast: 1.4, minLevel: 5,
+            desc: '귀를 찢는 소리로 여럿을 친다' },
+  serenade: { id: 'serenade', icon: 'serenade', name: '자장가', spec: 'bard', cd: 14, mp: 18, kind: 'heal-dot',
+            tick: 15, interval: 1, duration: 7, range: 30, cast: 0, minLevel: 2,
+            desc: '천천히 아물게 한다' },
+  chord:  { id: 'chord', icon: 'chord', name: '화음', spec: 'bard', cd: 5, mp: 10, kind: 'damage',
+            mul: 1.7, range: 32, cast: 0.9, minLevel: 1,
+            desc: '음을 겹쳐 쏜다' },
+
   // --- 잡졸 (적) ---
   // 고블린에게 도적의 기술을 그대로 주었더니 등 찌르기·연격을 쓰는 잡졸이 되어,
   // 무리로 몰려오는 상대가 아니라 하나하나가 위험한 상대가 됐다. 계열을 따로
@@ -690,6 +727,8 @@ const SKILL_KINDS = {
   'taunt':       { name: '도발', css: 'pull' },
   'taunt-area':  { name: '광역 도발', css: 'pull' },
   'mana':        { name: '마나 회복', css: 'mana' },
+  'mana-ally':   { name: '마나 나눔', css: 'mana' },
+  'mana-area':   { name: '광역 마나', css: 'mana' },
 };
 
 const skillKind = (def) => SKILL_KINDS[def && def.kind] || SKILL_KINDS.damage;
@@ -704,7 +743,9 @@ const SPECS = {
   mage:    '마법사',
   priest:  '사제',
   shaman:  '주술사',
+  bard:    '음유시인',
   grunt:   '잡졸',
+  chieftain: '우두머리',
 };
 
 // **한 유닛이 전투에 들고 들어가는 스킬 수.** 계열의 목록 중 레벨이 되는 것을
@@ -732,7 +773,14 @@ const SPEC_SKILLS = {
   mage:    ['frost', 'inferno', 'channel', 'ember', 'bolt', 'spark'],
   priest:  ['wave', 'greaterMend', 'meditate', 'mend', 'renew', 'smite'],
   shaman:  ['curse', 'mendEnemy', 'drain', 'hex', 'spirit'],
+  // 음유시인은 **아군의 마나를 채우는 유일한 계열이다.** 마나 회복 스킬은 지금까지
+  // 전부 자기 것만 채웠고(마나 순환·명상·마력 흡수), 그래서 마나가 마른 탱커와
+  // 힐러를 밖에서 도울 방법이 없었다. 광역이 단일보다 앞인 것은 쿨타임이 길어서다.
+  bard:    ['anthem', 'refrain', 'dissonance', 'serenade', 'chord'],
   grunt:   ['gash', 'pounce', 'jab'],
+  // 우두머리 전용. 새 스킬을 만들지 않고 수호와 전사의 무거운 것만 골라 묶었다 —
+  // 이 계열이 하는 일은 "이미 있는 것 중 가장 아픈 것"이지 새로운 수단이 아니다.
+  chieftain: ['sweep', 'roar', 'slam', 'crush', 'bash'],
 };
 
 // 그 유닛이 이 레벨에서 전투에 들고 가는 스킬. 편성 화면과 전투가 같은 것을
@@ -923,26 +971,29 @@ const POTION_MAX = 5;
 // 본다는 뜻만이 아니라 같은 수단을 갖는다는 뜻이다 — 도발이 이쪽에만 있으면
 // 적 힐러가 아무에게도 보호받지 못하고, 후열을 먼저 치는 규칙이 한쪽에서만 돈다.
 const ENEMIES = {
-  scout:  { id: 'scout', race: 'goblin', rank: 'trash', exp: 14,  name: '고블린 척후병', job: 'dealer', sprite: 'goblin',
-            hp: 812, mp: 64,  atk: 29, attackCd: 1.5, range: 7,  speed: 21,
-           attrs: { str: 40, agi: 16, int: 8, vit: 64 }, growth: 'enemy',
+  scout:  { id: 'scout', race: 'goblin', rank: 'trash', exp: 10,  name: '고블린 척후병', job: 'dealer', sprite: 'goblin',
+            hp: 686, mp: 64,  atk: 22, attackCd: 1.5, range: 7,  speed: 21,
+           attrs: { str: 40, agi: 16, int: 8, vit: 54 }, growth: 'enemy',
             armor: 0.95, spec: 'grunt' },
-  shaman: { id: 'shaman', race: 'goblin', rank: 'trash', exp: 18, name: '고블린 주술사', job: 'healer', sprite: 'shaman',
-            hp: 700, mp: 120, atk: 28, attackCd: 2.2, range: 30, speed: 15,
-           attrs: { str: 12, agi: 10, int: 16, vit: 55 }, growth: 'enemy', attackType: 'magic',
+  shaman: { id: 'shaman', race: 'goblin', rank: 'trash', exp: 13, name: '고블린 주술사', job: 'healer', sprite: 'shaman',
+            hp: 588, mp: 120, atk: 21, attackCd: 2.2, range: 30, speed: 15,
+           attrs: { str: 12, agi: 10, int: 16, vit: 47 }, growth: 'enemy', attackType: 'magic',
             armor: 1, spec: 'shaman' },
-  orc:    { id: 'orc', race: 'orc', rank: 'elite', exp: 32,    name: '오크 전사',     job: 'tank',   sprite: 'orc',
-            hp: 1862, mp: 72,  atk: 45, attackCd: 1.8, range: 7,  speed: 16,
-           attrs: { str: 58, agi: 8, int: 10, vit: 111 }, growth: 'enemy',
+  orc:    { id: 'orc', race: 'orc', rank: 'elite', exp: 46,    name: '오크 전사',     job: 'tank',   sprite: 'orc',
+            hp: 2254, mp: 72,  atk: 57, attackCd: 1.8, range: 7,  speed: 16,
+           attrs: { str: 58, agi: 8, int: 10, vit: 134 }, growth: 'enemy',
             armor: 0.7,  spec: 'tank' },
-  hexer:  { id: 'hexer', race: 'orc', rank: 'elite', exp: 30,  name: '오크 주술사',   job: 'healer', sprite: 'shaman',
-            hp: 1148, mp: 128, atk: 33, attackCd: 2.4, range: 30, speed: 14,
-           attrs: { str: 16, agi: 8, int: 19, vit: 68 }, growth: 'enemy', attackType: 'magic',
+  hexer:  { id: 'hexer', race: 'orc', rank: 'elite', exp: 42,  name: '오크 주술사',   job: 'healer', sprite: 'shaman',
+            hp: 1372, mp: 128, atk: 42, attackCd: 2.4, range: 30, speed: 14,
+           attrs: { str: 16, agi: 8, int: 19, vit: 82 }, growth: 'enemy', attackType: 'magic',
             armor: 0.9, spec: 'shaman' },
-  chief:  { id: 'chief', race: 'orc', rank: 'boss', exp: 90,  name: '오크 우두머리', job: 'tank',   sprite: 'boss',
-            hp: 4522, mp: 136, atk: 70, attackCd: 2.0, range: 8,  speed: 14,
-           attrs: { str: 89, agi: 6, int: 20, vit: 269 }, growth: 'enemy',
-            armor: 0.62, spec: 'tank' },
+  // **우두머리는 제 계열을 쓴다.** 오크 전사와 같은 수호 계열을 들고 있던 동안에는
+  // 덩치만 큰 오크였다 — 잡는 데 오래 걸릴 뿐 무섭지는 않았다. 지금은 휩쓸기로
+  // 파티 전체를 긁고 마무리로 한 명을 끊는다.
+  chief:  { id: 'chief', race: 'orc', rank: 'boss', exp: 210,  name: '오크 우두머리', job: 'tank',   sprite: 'boss',
+            hp: 4858, mp: 136, atk: 74, attackCd: 2.0, range: 8,  speed: 14,
+           attrs: { str: 89, agi: 6, int: 20, vit: 289 }, growth: 'enemy',
+            armor: 0.62, spec: 'chieftain' },
 };
 
 // 동료 이름 조각. 명부에 새 동료가 들어올 때 조합해 쓴다 — 이름이 곧 신원이고,
@@ -962,6 +1013,7 @@ const NAMES = {
     archer: ['궁수', '사냥꾼', '매의', '멀리 보는', '숲의', '조준하는', '깃털'],
     mage: ['마법사', '불꽃의', '서리의', '주문사', '푸른 불', '늙은', '별을 읽는'],
     priest: ['사제', '수도사', '고요한', '푸른', '치유사', '기도하는', '견습'],
+    bard: ['음유시인', '악사', '노래하는', '떠도는', '거리의', '흥겨운', '금빛'],
   },
   given: ['브란', '코린', '라일', '세라', '미라', '유리', '노아', '딘',
           '카엘', '테오', '린', '하나', '오릭', '베라', '단', '이샤',
@@ -1003,10 +1055,13 @@ const REGIONS = {
 };
 
 // 적의 등급. 전리품이 나올 확률과 등급이 여기서 갈린다.
+// **등급이 곧 보상이다.** 잡졸을 여럿 베는 것과 정예 하나를 잡는 것이 같은 값이면
+// 무리를 골라 싸울 이유가 없다. 경험치(정의의 exp)도 같은 기울기로 벌려 두었다 —
+// 잡졸 10, 정예 42~46, 우두머리 210이라 우두머리 하나가 잡졸 스물한 마리다.
 const RANKS = {
-  trash: { id: 'trash', name: '잡졸', drop: 0.22, luck: 0.09 },
-  elite: { id: 'elite', name: '정예', drop: 0.55, luck: 0.20 },
-  boss:  { id: 'boss',  name: '우두머리', drop: 1, luck: 0.40 },
+  trash: { id: 'trash', name: '잡졸', drop: 0.14, luck: 0.05 },
+  elite: { id: 'elite', name: '정예', drop: 0.68, luck: 0.28 },
+  boss:  { id: 'boss',  name: '우두머리', drop: 1, luck: 0.60 },
 };
 
 const rankOf = (def) => RANKS[(def && def.rank) || 'trash'] || RANKS.trash;

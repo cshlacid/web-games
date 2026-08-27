@@ -238,6 +238,42 @@ function cast(state, skillId, target) {
   check('쿨타임은 둘이 함께 쓴다', L.usePotion(both, 'mana').ok, false);
 }
 
+// --- 아군의 마나를 채운다 (음유시인) ------------------------------------
+{
+  const state = battle({ party: [{ defId: 'bran', level: 9 }, { defId: 'finn', level: 9 },
+    { defId: 'lyle', level: 9 }, { defId: 'noa', level: 9 }] });
+  const bard = unit(state, '음유시인 핀');
+  const tank = unit(state, '강철의 브란');
+  const healer = unit(state, '사제 노아');
+  const refrain = D.UNIT_SKILLS.refrain;
+
+  tank.mp = 0;
+  L.runUnitSkill(state, bard, { id: 'refrain', targetUid: tank.uid });
+  check('아군 하나의 마나가 찬다', Math.round(tank.mp), refrain.mana);
+
+  // 최대치를 넘겨 채워지지 않아야 "누구를 채울지"가 판단이 된다.
+  tank.mp = tank.maxMp - 5;
+  L.runUnitSkill(state, bard, { id: 'refrain', targetUid: tank.uid });
+  check('최대치를 넘지 않는다', tank.mp, tank.maxMp);
+
+  // 광역은 기준점 주변 아군 전부. 반경 밖은 그대로다.
+  const anthem = D.UNIT_SKILLS.anthem;
+  for (const mate of AI.alive(state, 'ally')) { mate.mp = 0; mate.x = tank.x; mate.y = tank.y; }
+  const far = unit(state, '검사 라일');
+  far.x = tank.x + anthem.radius + 10;
+  L.runUnitSkill(state, bard, { id: 'anthem', targetUid: tank.uid });
+  check('반경 안 아군이 함께 찬다',
+    [Math.round(tank.mp), Math.round(healer.mp)], [anthem.mana, anthem.mana]);
+  check('반경 밖은 그대로다', far.mp, 0);
+
+  // 쓰러진 아군에게는 들어가지 않는다. 마나가 차도 일어나지 않으므로 버리는 것이다.
+  const down = unit(state, '사제 노아');
+  L.applyDamage(state, null, down, 99999);
+  down.mp = 0;
+  L.runUnitSkill(state, bard, { id: 'refrain', targetUid: down.uid });
+  check('쓰러진 아군은 채우지 않는다', down.mp, 0);
+}
+
 // --- 마나 자연 회복 -----------------------------------------------------
 //
 // 아군과 적이 같은 규칙을 쓴다. 마나가 마르면 힐도 도발도 멈추는데, 그 상태로
@@ -961,6 +997,43 @@ function cast(state, skillId, target) {
   };
   check('같은 씨앗이면 같은 전투', digest(11), digest(11));
   check('다른 씨앗이면 달라진다', digest(11) === digest(12), false);
+}
+
+// --- 등급이 위협과 보상을 함께 정한다 -----------------------------------
+//
+// 잡졸 여럿이 정예 하나보다 위험하던 때가 있었다. 등급을 나눈 뜻이 살려면 위쪽
+// 등급이 하나하나 더 아프고 더 많이 줘야 한다.
+{
+  const rank = (id) => D.rankOf(D.ENEMIES[id]).id;
+  const trash = Object.values(D.ENEMIES).filter((def) => rank(def.id) === 'trash');
+  const elite = Object.values(D.ENEMIES).filter((def) => rank(def.id) === 'elite');
+  const boss = D.ENEMIES.chief;
+
+  const most = (list, key) => Math.max(...list.map((def) => def[key]));
+  check('정예가 잡졸보다 세다',
+    Math.min(...elite.map((d) => d.atk)) > most(trash, 'atk'), true);
+  check('정예가 잡졸보다 단단하다',
+    Math.min(...elite.map((d) => d.hp)) > most(trash, 'hp'), true);
+  check('우두머리가 정예보다 세다', boss.atk > most(elite, 'atk'), true);
+  check('우두머리가 정예보다 단단하다', boss.hp > most(elite, 'hp'), true);
+
+  // 보상도 같은 순서다. 값이 같으면 무리를 골라 싸울 이유가 없다.
+  check('정예가 잡졸보다 많이 준다',
+    Math.min(...elite.map((d) => d.exp)) > most(trash, 'exp') * 2, true);
+  check('우두머리가 정예보다 많이 준다', boss.exp > most(elite, 'exp') * 3, true);
+  check('전리품도 등급 순으로 잘 나온다',
+    D.RANKS.trash.drop < D.RANKS.elite.drop && D.RANKS.elite.drop < D.RANKS.boss.drop, true);
+  check('좋은 등급이 나올 확률도 그렇다',
+    D.RANKS.trash.luck < D.RANKS.elite.luck && D.RANKS.elite.luck < D.RANKS.boss.luck, true);
+
+  // 우두머리는 제 계열을 쓴다. 오크 전사와 같은 것을 들고 있으면 덩치만 큰
+  // 오크가 된다 — 잡는 데 오래 걸릴 뿐 무섭지는 않았다.
+  check('우두머리 계열이 따로 있다', boss.spec, 'chieftain');
+  const kit = D.skillsFor(boss.spec, 10);
+  check('광역기를 들고 온다',
+    kit.some((id) => D.UNIT_SKILLS[id].kind === 'damage-area'), true);
+  check('어그로도 가져간다',
+    kit.some((id) => D.UNIT_SKILLS[id].kind.startsWith('taunt')), true);
 }
 
 // --- 난이도 확인 --------------------------------------------------------

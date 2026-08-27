@@ -25,7 +25,9 @@ const pick = (rng, list) => list[(rng() * list.length) | 0];
 const range = (rng, lo, hi) => lo + ((rng() * (hi - lo + 1)) | 0);
 
 const QUEST_COUNT = 4;
-const COMPANION_COUNT = 6;
+// 명부에서 한 번에 보여 주는 동료 수. 목록이 그림·이름·직업만 남기고 격자로
+// 바뀌면서 여섯에서 늘렸다 — 여섯일 때에는 한 번 정한 넷을 계속 쓰게 됐다.
+const COMPANION_COUNT = 10;
 
 // 적정 레벨이 주인공 레벨보다 조금 위아래로 흩어져야 고를 이유가 생긴다.
 // 아래쪽이 좁은 것은, 쉬운 퀘스트만 반복하는 것이 최선이 되면 곤란해서다.
@@ -52,20 +54,37 @@ function regionsFor(level) {
   return open.length ? open : [D.REGIONS.mine];
 }
 
+// **머릿수가 아니라 위협의 몫으로 무리를 짠다.** 등급을 가리지 않고 세던 때에는
+// 정예가 섞인 무리가 잡졸 무리보다 그냥 머릿수만큼 더 셌고, 그래서 "잡졸 넷"이
+// "정예 둘"보다 위험했다. 지금은 정예 하나가 잡졸 둘 몫을 차지하므로, 정예가
+// 나오면 머릿수가 줄고 하나하나가 아프다.
+const THREAT = { trash: 1, elite: 2.2, boss: 6 };
+// 무리 하나에 담기는 위협의 총량은 이 배수만큼이다. 잡졸 하나가 1이므로 곧
+// "잡졸 몇 마리 몫"이고, 예전의 머릿수(3~5)에 곱해 쓴다. 등급을 세기 시작하자
+// 정예가 든 무리의 머릿수가 줄어 전체가 헐거워졌고, 이 배수로 되돌렸다 —
+// 난이도 확인의 세 승률이 등급을 나누기 전 수치로 돌아오는 자리다.
+const threatOf = (id) => THREAT[D.rankOf(D.ENEMIES[id]).id] || 1;
+
 function buildWaves(region, level, rng) {
   const count = level < 3 ? 2 : range(rng, 2, 3);
   const waves = [];
   for (let i = 0; i < count; i++) {
-    // 뒤 웨이브가 더 크다. 같은 크기로 두면 첫 웨이브에서 마나를 어떻게 쓰든
+    // 뒤 웨이브가 더 무겁다. 같은 크기로 두면 첫 웨이브에서 마나를 어떻게 쓰든
     // 결과가 같아진다.
-    const size = Math.min(5, 3 + i + (rng() < 0.35 ? 1 : 0));
+    const budget = (3 + i + (rng() < 0.35 ? 1 : 0)) * 1.6;
     const healer = region.enemies.find((id) => D.ENEMIES[id].job === 'healer');
     const others = region.enemies.filter((id) => D.ENEMIES[id].job !== 'healer');
 
     // 힐러는 한 웨이브에 하나까지. 여럿이 서로를 살리면 파티의 화력으로는
     // 아무도 죽일 수 없는 웨이브가 나온다.
     const wave = [];
-    for (let j = 0; j < size; j++) wave.push(pick(rng, others.length ? others : region.enemies));
+    let spent = 0;
+    // 다섯을 넘기지 않는 것은 전장의 세로 줄 수다(laneY). 예산이 남아도 여기서 멈춘다.
+    while (spent < budget && wave.length < 5) {
+      const id = pick(rng, others.length ? others : region.enemies);
+      wave.push(id);
+      spent += threatOf(id);
+    }
     // 대신 하나쯤은 있어야 딜러 AI의 우선순위(적 힐러부터)가 뜻을 가진다.
     if (healer && rng() < 0.75) wave[wave.length - 1] = healer;
     waves.push(wave);

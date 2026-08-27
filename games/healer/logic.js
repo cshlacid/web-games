@@ -389,6 +389,16 @@ function runUnitSkill(state, unit, choice) {
   // 자기 마나를 되찾는다. 마나를 다 쓴 시전자가 남은 전투 내내 기본 공격만
   // 하는 것을 막는 것이 이 종류의 목적이다.
   if (def.kind === 'mana') { unit.mp = Math.min(unit.maxMp, unit.mp + def.mana); return; }
+  // 남의 마나를 채운다(음유시인). 자기 것만 채우는 위와 달리 파티 전체의 마나
+  // 총량이 늘어나는 유일한 수단이라, 마나가 마른 탱커와 힐러를 밖에서 도울 수
+  // 있는 것도 이것뿐이다.
+  if (def.kind === 'mana-ally') { giveMana(state, unit, target, def.mana); return; }
+  if (def.kind === 'mana-area') {
+    for (const mate of alive(state, unit.side)) {
+      if (dist(mate, target) <= def.radius) giveMana(state, unit, mate, def.mana);
+    }
+    return;
+  }
   if (def.kind === 'dot') { addDot(state, unit, target, def, 'damage', over(def.tick)); return; }
   if (def.kind === 'zone') {
     addZone(state, unit, def, target.x, target.y, 'damage', over(def.tick));
@@ -400,6 +410,20 @@ function runUnitSkill(state, unit, choice) {
       if (dist(foe, target) <= def.radius) applyDamage(state, unit, foe, unit.atk * def.mul);
     }
   }
+}
+
+// 마나를 채우고 화면에 알린다. 회복과 달리 넘치는 몫을 따로 세지 않는 것은,
+// 마나에는 "흘린 힐"에 해당하는 판단(EFFICIENT)이 시전 전에 이미 걸리기 때문이다.
+function giveMana(state, caster, target, amount) {
+  if (!target || target.dead || !target.maxMp) return 0;
+  const before = target.mp;
+  target.mp = Math.min(target.maxMp, target.mp + amount);
+  const gained = Math.round(target.mp - before);
+  if (gained > 0) {
+    emit(state, { type: 'mana', uid: target.uid, amount: gained,
+      text: `${caster.name} → ${target.name}: 마나 ${gained}` });
+  }
+  return gained;
 }
 
 // --- 시전 -------------------------------------------------------------
@@ -822,7 +846,7 @@ const api = {
   HERO_UID, TICK, WAVE_GAP, MARCH_SPEED, MARCH_RECOVER, MANA_REGEN, rewardOf, dropsOf, battleReport,
   createRng, createBattle, advance, step, drainEvents,
   castSkill, playerSkill, usePotion, drink, magicPowerOf, rollCrit, applyDamage, applyHeal, addDot, addZone,
-  hero, skillSlot, resolveTarget, moveToward,
+  hero, skillSlot, resolveTarget, moveToward, giveMana,
   startCast, tickCast, cancelCast, runUnitSkill, resolvePlayerSkill,
 };
 

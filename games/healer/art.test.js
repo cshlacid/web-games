@@ -53,7 +53,7 @@ function check(name, actual, expected) {
       Sprites.size(kind), { w: sprite.w + 2, h: sprite.h + 2 });
   }
 
-  check('그림 열하나', Object.keys(Sprites.SPRITES).length, 11);
+  check('그림 열둘', Object.keys(Sprites.SPRITES).length, 12);
 
   // **계열마다 제 그림이 있어야 한다.** 궁수와 마법사가 같은 그림을 쓰던 때에는
   // 편성 화면에서 이름을 읽어야 어느 쪽인지 알 수 있었고, 전장에서는 아예

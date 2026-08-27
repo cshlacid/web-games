@@ -220,6 +220,57 @@ function gather(state) {
     AI.chooseSkill(healer, state, enemies(state)[0]), null);
 }
 
+// --- 음유시인: 아군의 마나를 채운다 -------------------------------------
+//
+// 마나 회복 스킬은 지금까지 전부 자기 것만 채웠다(마나 순환·명상·마력 흡수).
+// 밖에서 남을 채우는 것은 이 계열뿐이라 판단 규칙도 따로다.
+{
+  const state = battle({ party: [{ defId: 'bran', level: 9 }, { defId: 'finn', level: 9 },
+    { defId: 'lyle', level: 9 }, { defId: 'noa', level: 9 }] });
+  gather(state);
+  const bard = named(state, '음유시인 핀');
+  const tank = named(state, '강철의 브란');
+  const healer = named(state, '사제 노아');
+  const melee = named(state, '검사 라일');
+  const refrain = D.UNIT_SKILLS.refrain;
+  const anthem = D.UNIT_SKILLS.anthem;
+
+  check('아군 마나가 넉넉하면 채워 줄 대상이 없다',
+    AI.manaTarget(bard, state, refrain.mana), null);
+
+  // 조금 빈 정도로는 쓰지 않는다. 부어서 넘치면 긴 쿨타임만 버리는 셈이다.
+  tank.mp = tank.maxMp - Math.floor(refrain.mana * 0.5);
+  check('조금 빈 정도로는 채우지 않는다', AI.manaTarget(bard, state, refrain.mana), null);
+
+  tank.mp = 0;
+  check('마른 아군을 채운다', AI.manaTarget(bard, state, refrain.mana).uid, tank.uid);
+
+  // 누구부터인가는 회복 순서(HEAL_ORDER)를 그대로 쓴다 — 마나가 마르면 탱커는
+  // 도발을, 힐러는 힐을 못 한다.
+  healer.mp = 0;
+  check('탱커가 힐러보다 먼저', AI.manaTarget(bard, state, refrain.mana).uid, tank.uid);
+  tank.mp = tank.maxMp;
+  check('그다음이 힐러', AI.manaTarget(bard, state, refrain.mana).uid, healer.uid);
+
+  // 스킬을 안 쓰는 유닛(최대 마나 0)은 애초에 대상이 아니다.
+  const noMana = { uid: 'x', side: 'ally', dead: false, mp: 0, maxMp: 0, x: 40, y: 28, job: 'dealer' };
+  state.units.push(noMana);
+  check('마나를 안 쓰는 유닛은 대상이 아니다',
+    AI.manaTarget(bard, state, refrain.mana).uid, healer.uid);
+  state.units.pop();
+
+  // 하나만 말랐으면 광역은 아낀다. 쿨타임이 길어 둘 이상일 때 써야 값을 한다.
+  const one = AI.chooseSkill(bard, state, enemies(state)[0]);
+  check('하나만 마르면 후렴', one && one.id, 'refrain');
+
+  melee.mp = 0;
+  tank.mp = 0;
+  const many = AI.chooseSkill(bard, state, enemies(state)[0]);
+  check('여럿이 마르면 전투가', many && many.id, 'anthem');
+  check('전투가가 광역 마나다', D.UNIT_SKILLS[many.id].kind, 'mana-area');
+  check('반경 안 아군을 본다', anthem.radius > 0, true);
+}
+
 // --- 적도 같은 논리로 움직인다 -----------------------------------------
 {
   const state = battle();

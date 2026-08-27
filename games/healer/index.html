@@ -135,7 +135,8 @@
         <h2>동료</h2>
         <span class="count" id="party-count">1 / 5</span>
       </div>
-      <p class="panel-note">이번 의뢰에 붙일 수 있는 동료다. 레벨에 따라 들고 오는 스킬이 다르다.</p>
+      <p class="panel-note">이번 의뢰에 붙일 수 있는 동료다. 이름을 누르면 무엇을
+        들고 오는지 보이고, 오른쪽 표를 누르면 데려간다.</p>
       <ul class="roster" id="roster"></ul>
     </div>
 
@@ -253,6 +254,17 @@
     </button>
   </nav>
 
+  <!-- 동료 상세. 목록에는 그림·이름·직업만 두고, 스킬·물약·장비는 눌러서 본다 —
+       한 줄에 다 늘어놓으면 여섯 명이 화면을 다 먹는다. -->
+  <div class="sheet" id="member-sheet" hidden>
+    <div class="pick sheet-head" id="member-head"></div>
+    <div class="skill-chips" id="member-chips"></div>
+    <div class="sheet-actions">
+      <button class="btn primary" id="member-take" type="button">데려간다</button>
+      <button class="btn" id="member-close" type="button">닫기</button>
+    </div>
+  </div>
+
   <div class="sheet" id="help" hidden>
     <p class="sheet-title">힐러만 맡는다</p>
     <ul class="help-list">
@@ -261,7 +273,9 @@
         쓴다), 딜러는 탱커가 잡은 적을 먼저 치며, 동료 힐러는 탱커의 체력을 본다.</li>
       <li><b>전투에 가져갈 스킬은 다섯 개까지 전투 전에 등록한다.</b> 전투 중에는
         바꿀 수 없다.</li>
-      <li><b>마나는 저절로 차지 않는다.</b> 마나 회복 스킬과 물약뿐이다. 조금
+      <li><b>마나는 아주 느리게만 돌아온다.</b> 크게 채우는 것은 마나 회복 스킬과
+        물약, 그리고 <b>음유시인</b>뿐이다 — 음유시인은 아군의 마나를 채우는 유일한
+        계열이다. 무리와 무리 사이를 걷는 동안에는 체력과 마나가 함께 조금 찬다. 조금
         깎였다고 큰 힐을 쓰면 남는 힐량이 그대로 사라진다. <b>동료도 마나를
         쓰고 물약을 마신다</b> — 탱커는 체력 물약, 마나를 쓰는 직업은 마나 물약을
         직업에 따라 알아서 챙겨 온다.</li>

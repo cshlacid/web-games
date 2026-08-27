@@ -106,6 +106,53 @@ function everyQuest(fn) {
   const big = Q.generate(20, 11)[3];
   check('레벨이 높으면 보상도 크다', big.guildReward.gold > small.guildReward.gold, true);
   check('레벨이 높으면 경험치도 크다', big.exp > small.exp, true);
+
+  // 우두머리가 나오는 의뢰는 값이 다르다. 위험만 크고 보상이 같으면 우두머리를
+  // 피해 다니는 것이 최선이 된다.
+  const withBoss = [];
+  const without = [];
+  for (const seed of SEEDS) {
+    for (const quest of Q.generate(12, seed)) {
+      const boss = quest.waves.flat().some((id) => D.rankOf(D.ENEMIES[id]).id === 'boss');
+      (boss ? withBoss : without).push(quest);
+    }
+  }
+  const mean = (list, f) => list.reduce((sum, q) => sum + f(q), 0) / (list.length || 1);
+  check('우두머리 의뢰가 실제로 걸린다', withBoss.length > 0, true);
+  check('우두머리 의뢰가 더 준다',
+    mean(withBoss, (q) => q.exp) > mean(without, (q) => q.exp) * 1.5, true);
+}
+
+// --- 무리는 머릿수가 아니라 위협의 몫으로 짠다 --------------------------
+//
+// 등급을 가리지 않고 세던 때에는 "잡졸 넷"이 "정예 둘"보다 위험했다. 정예가 잡졸
+// 둘 몫을 차지해야 정예가 든 무리의 머릿수가 줄고 하나하나가 아프다.
+{
+  const weight = { trash: 1, elite: 2.2, boss: 6 };
+  const threat = (wave) => wave.reduce((sum, id) => sum + weight[D.rankOf(D.ENEMIES[id]).id], 0);
+
+  // 전장의 세로 줄이 다섯이라 그 이상은 세울 자리가 없다.
+  check('한 무리는 다섯을 넘지 않는다',
+    everyQuest((q) => (q.waves.every((w) => w.length <= 5) ? null : '여섯 이상')), []);
+
+  // 정예가 섞인 무리와 잡졸뿐인 무리를 견준다. 같은 예산에서 정예 쪽이 머릿수가
+  // 적어야 등급을 센 것이다.
+  const mixed = [];
+  const trashOnly = [];
+  for (const seed of SEEDS) {
+    for (const quest of Q.generate(12, seed)) {
+      for (const wave of quest.waves) {
+        if (wave.some((id) => D.rankOf(D.ENEMIES[id]).id === 'boss')) continue;
+        (wave.some((id) => D.rankOf(D.ENEMIES[id]).id === 'elite') ? mixed : trashOnly).push(wave);
+      }
+    }
+  }
+  const mean = (list, f) => list.reduce((sum, w) => sum + f(w), 0) / (list.length || 1);
+  check('견줄 무리가 둘 다 있다', mixed.length > 0 && trashOnly.length > 0, true);
+  check('정예가 든 무리는 머릿수가 적다',
+    mean(mixed, (w) => w.length) < mean(trashOnly, (w) => w.length), true);
+  check('대신 위협의 몫은 더 크다',
+    mean(mixed, threat) > mean(trashOnly, threat), true);
 }
 
 // --- 동료 후보 ----------------------------------------------------------
