@@ -80,7 +80,9 @@ const defOf = (member) => D.COMPANIONS[member.defId];
 // 레벨에 맞춰 실제로 들고 나가는 스킬. 편성 화면이 보여 주는 것과 전투가
 // 쓰는 것이 같아야 하므로 규칙을 한 곳에 둔다 — data.js의 skillsFor 하나다.
 function skillsOf(member) {
-  return D.skillsFor(specOf(member), member.level);
+  // **씨앗은 이름이다.** 같은 이름이면 같은 동료이므로, 편성 화면에서 본 넷이
+  // 전투에서도 그대로 나오고 저장본에 스킬을 적어 둘 필요가 없다.
+  return D.skillsFor(specOf(member), member.level, D.skillSeed(member.name));
 }
 
 // --- 성장 ---------------------------------------------------------------

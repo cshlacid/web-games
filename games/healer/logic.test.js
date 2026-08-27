@@ -238,6 +238,110 @@ function cast(state, skillId, target) {
   check('쿨타임은 둘이 함께 쓴다', L.usePotion(both, 'mana').ok, false);
 }
 
+// --- 같은 계열이라도 캐릭터마다 다른 넷을 든다 --------------------------
+//
+// 계열만 같으면 누구나 같은 넷을 들던 때에는 사제 둘을 나란히 놓아도 다를 것이
+// 없었다. 씨앗은 이름이다 — **이름이 곧 신원이라** 같은 동료는 언제 봐도 같은
+// 넷을 들고 오고, 저장본에 스킬 목록을 적어 둘 필요가 없다.
+{
+  const level = 8;
+  const seedOf = (name) => D.skillSeed(name);
+  const hands = ['사제 노아', '수도사 딘', '고요한 레아', '푸른 베라', '기도하는 이샤']
+    .map((name) => D.skillsFor('priest', level, seedOf(name)).join(','));
+
+  check('같은 이름이면 같은 넷',
+    D.skillsFor('priest', level, seedOf('사제 노아')).join(','), hands[0]);
+  check('이름이 다르면 손이 갈린다', new Set(hands).size > 1, true);
+  check('그래도 넷을 넘지 않는다',
+    hands.every((hand) => hand.split(',').length <= D.UNIT_SKILL_MAX), true);
+
+  // 계열의 정체가 걸린 스킬은 늘 들어간다. 도발 없는 탱커나 힐이 없는 사제는
+  // 그 계열이 아니다.
+  const core = (spec) => D.SPEC_SKILLS[spec].filter((id) => D.UNIT_SKILLS[id].core);
+  const missing = [];
+  for (const spec of ['tank', 'warrior', 'rogue', 'archer', 'mage', 'priest', 'bard']) {
+    for (const name of ['가', '나', '다', '라', '마', '바', '사', '아']) {
+      const hand = D.skillsFor(spec, level, seedOf(`${spec}-${name}`));
+      for (const id of core(spec)) {
+        if (D.UNIT_SKILLS[id].minLevel <= level && !hand.includes(id)) missing.push(`${spec}:${id}`);
+      }
+    }
+  }
+  check('계열의 정체가 걸린 스킬은 늘 든다', [...new Set(missing)], []);
+
+  // 레벨이 올라 목록이 길어져도 이미 정해진 취향은 그대로다. 섞은 목록을 잘라
+  // 쓰면 새 스킬이 열릴 때마다 순서가 통째로 달라져, 들던 넷이 이유 없이 바뀐다.
+  const seed = seedOf('궁수 미라');
+  const at = (lv) => D.skillsFor('archer', lv, seed);
+  const kept = at(7).filter((id) => at(8).includes(id));
+  check('레벨이 올라도 손이 통째로 바뀌지는 않는다', kept.length >= 3, true);
+
+  // 씨앗을 주지 않으면 예전처럼 목록 앞에서부터 넷이다. 화면이 "이 계열은 보통
+  // 무엇을 드는가"를 보여 줄 때 쓰는 길이다.
+  check('씨앗이 없으면 앞에서부터',
+    D.skillsFor('tank', level), D.SPEC_SKILLS.tank
+      .filter((id) => D.UNIT_SKILLS[id].minLevel <= level).slice(0, D.UNIT_SKILL_MAX));
+}
+
+// --- 기절 ---------------------------------------------------------------
+//
+// 근접 세 계열만 갖는 수단이다. 굳어 있는 동안에는 판단도 이동도 기본 공격도 없다.
+{
+  const state = battle({ party: [{ defId: 'bran', level: 8 }] });
+  const tank = unit(state, '강철의 브란');
+  const foe = AI.alive(state, 'enemy')[0];
+  const def = D.UNIT_SKILLS.shieldSlam;
+
+  L.runUnitSkill(state, tank, { id: 'shieldSlam', targetUid: foe.uid });
+  check('걸리면 그 시각까지 굳는다', foe.stunUntil, state.t + def.duration);
+  check('굳은 것을 밖에서도 볼 수 있다', L.stunned(state, foe), true);
+
+  // 굳어 있는 동안에는 아무것도 하지 않는다. 붙어 있어도 때리지 않는다.
+  // 적 딜러는 힐러부터 노리므로 주인공이 표적이다. 굳은 적 하나만 남기고, 판이
+  // 도중에 끝나지 않게 양쪽 다 죽지 않을 만큼 체력을 준다 — 여기서 보려는 것은
+  // 승패가 아니라 굳어 있는 동안 무엇을 못 하는가다.
+  for (const other of AI.alive(state, 'enemy')) {
+    if (other.uid !== foe.uid) L.applyDamage(state, null, other, 99999);
+  }
+  // 위에서 쿨타임을 거치지 않고 직접 걸었으므로, 두면 탱커가 매 틱 다시 건다.
+  tank.skills = [];
+  const hero = L.hero(state);
+  foe.hp = 1e6; foe.maxHp = 1e6;
+  hero.hp = 1e6; hero.maxHp = 1e6;
+  foe.x = hero.x + 2; foe.y = hero.y;
+  foe.nextAttackAt = 0;
+  const stood = foe.x;
+  const before = hero.hp;
+  run(state, def.duration - 0.3);
+  check('굳어 있는 동안에는 때리지 못한다', hero.hp, before);
+  check('걸음도 멈춘다', foe.x, stood);
+
+  // 시간이 지나면 풀리고 다시 움직인다.
+  run(state, 2);
+  check('시간이 지나면 풀린다', L.stunned(state, foe), false);
+  check('풀리면 다시 움직인다', foe.x !== stood, true);
+
+  // **거는 순간 외우던 것이 끊긴다.** 끊지 않으면 기절이 아무 일도 하지 않은
+  // 것으로 보인다.
+  const caster = AI.alive(state, 'enemy').find((u) => u.uid !== foe.uid) || foe;
+  caster.stunUntil = 0;
+  L.startCast(state, caster, { id: caster.skills[0].id, targetUid: tank.uid });
+  L.stun(state, tank, caster, 2);
+  check('외우던 것이 끊긴다', caster.cast, null);
+
+  // 짧은 기절로 긴 기절을 덮으면 두 번째가 오히려 상대를 풀어 준다.
+  const long = state.t + 5;
+  caster.stunUntil = long;
+  L.stun(state, tank, caster, 1);
+  check('남은 시간이 긴 쪽이 남는다', caster.stunUntil, long);
+
+  // 주인공이 굳으면 스킬이 나가지 않는다. 화면이 그 사실을 보여야 하므로
+  // 이유를 그대로 돌려준다.
+  hero.stunUntil = state.t + 2;
+  check('주인공도 굳으면 못 쓴다',
+    L.castSkill(state, 'touch', { uid: hero.uid }).reason, '기절');
+}
+
 // --- 아군의 마나를 채운다 (음유시인) ------------------------------------
 {
   const state = battle({ party: [{ defId: 'bran', level: 9 }, { defId: 'finn', level: 9 },
@@ -694,19 +798,20 @@ function cast(state, skillId, target) {
   const veteran = battle({ party: [{ defId: 'bran', level: 8 }] });
   const branOf = (state) => unit(state, '강철의 브란');
   check('동료도 레벨로 세진다', branOf(veteran).maxHp > branOf(rookie).maxHp, true);
-  check('낮은 레벨은 광역 도발을 못 쓴다',
-    branOf(rookie).skills.map((slot) => slot.id), ['taunt', 'bash']);
-  // 순서는 data.js에 적힌 그대로다 — 그 순서가 곧 AI의 우선순위이자 넷을 고르는
-  // 순서다. 레벨이 오르면 앞쪽이 열리면서 뒤쪽의 싸구려 스킬이 밀려난다.
-  check('레벨이 오르면 들고 온다',
-    branOf(veteran).skills.map((slot) => slot.id), ['roar', 'taunt', 'sweep', 'slam']);
-  check('넷을 넘겨 들고 가지 않는다',
-    branOf(veteran).skills.length <= D.UNIT_SKILL_MAX, true);
-  // 동료가 쓰는 계열은 목록이 넷보다 길어야 "그중 넷"이 고르는 일이 된다.
-  // 적 전용 계열(잡졸)은 예외다 — 고블린은 넷을 채울 만큼 배운 것이 없다.
+  const idsOf = (state) => branOf(state).skills.map((slot) => slot.id);
+  check('못 배운 스킬은 들고 오지 않는다',
+    idsOf(rookie).every((id) => D.UNIT_SKILLS[id].minLevel <= 1), true);
+  check('넷을 넘겨 들고 가지 않는다', branOf(veteran).skills.length <= D.UNIT_SKILL_MAX, true);
+  // 순서는 data.js에 적힌 그대로다 — 그 순서가 곧 AI의 우선순위다. 무엇을 뽑든
+  // 든 것을 목록 순서로 되돌려 놓아야, 싸구려 스킬이 광역기보다 먼저 나가지 않는다.
+  check('든 것은 목록 순서대로다', idsOf(veteran),
+    D.SPEC_SKILLS.tank.filter((id) => idsOf(veteran).includes(id)));
+  // 동료가 쓰는 계열은 열 개씩이다. 넷을 고르는 일이 되려면 목록이 훨씬 길어야
+  // 하고, 그래야 같은 계열의 동료 둘이 다른 손을 든다. 적 전용 계열은 예외다 —
+  // 고블린은 넷을 채울 만큼 배운 것이 없다.
   const companionSpecs = new Set(Object.values(D.COMPANIONS).map((def) => def.spec));
-  check('동료 계열은 목록이 넷보다 길다',
-    [...companionSpecs].every((spec) => D.SPEC_SKILLS[spec].length > D.UNIT_SKILL_MAX), true);
+  check('동료 계열은 열 개씩이다',
+    [...companionSpecs].every((spec) => D.SPEC_SKILLS[spec].length === 10), true);
 
   // 주인공의 수치는 성장 상태에서 계산해 넘어온다. 전투가 레벨 규칙을 다시
   // 알지 못하게 하려는 것이라, 넘긴 값이 그대로 쓰여야 한다.
@@ -823,6 +928,11 @@ function cast(state, skillId, target) {
   const mira = unit(state, '궁수 미라');
   const foes = AI.alive(state, 'enemy');
 
+  // **스킬을 손으로 쥐여 준다.** 계열의 열 개 중 넷을 캐릭터마다 다르게 들고
+  // 오므로, 광역 도발을 든 탱커가 걸릴 때까지 기다릴 수는 없다.
+  const hold = (unit, ids) => { unit.skills = ids.map((id) => ({ id, readyAt: 0 })); };
+  hold(bran, ['roar', 'taunt', 'bash']);
+
   // 적을 탱커 주위로 모으고 전부 딴 곳을 보게 한다.
   bran.x = 50; bran.y = 23;
   foes.forEach((foe, i) => { foe.x = 54 + i * 3; foe.y = 23; foe.targetUid = mira.uid; });
@@ -837,6 +947,7 @@ function cast(state, skillId, target) {
   // 하나만 풀렸을 때 긴 쿨타임을 쓰면 정작 여럿이 풀렸을 때 쓸 것이 없다.
   const single = battle({ party: [{ defId: 'bran', level: 8 }, { defId: 'mira', level: 1 }] });
   const tank2 = unit(single, '강철의 브란');
+  tank2.skills = ['roar', 'taunt', 'bash'].map((id) => ({ id, readyAt: 0 }));
   const others = AI.alive(single, 'enemy');
   tank2.x = 50; tank2.y = 23;
   others.forEach((foe, i) => { foe.x = 54 + i * 3; foe.y = 23; foe.targetUid = tank2.uid; });

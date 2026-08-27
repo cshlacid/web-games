@@ -300,6 +300,17 @@ function chooseSkill(unit, state, target) {
       continue;
     }
 
+    // 기절. **이미 굳어 있는 적에게 다시 걸지 않는다** — 남은 시간이 겹쳐 사라지고
+    // 긴 쿨타임만 버린다. 시전 중인 적이 있으면 그쪽이 먼저다: 외우던 것이 끊긴다.
+    if (def.kind === 'stun') {
+      const reachable = foesOf(unit, state)
+        .filter((foe) => dist(unit, foe) <= reach && state.t >= (foe.stunUntil || 0));
+      if (!reachable.length) continue;
+      const casting = reachable.filter((foe) => foe.cast);
+      const pick = nearest(unit, casting.length ? casting : reachable);
+      return { id: def.id, targetUid: pick.uid };
+    }
+
     if (def.kind === 'damage' || def.kind === 'dot') {
       if (target && dist(unit, target) <= reach) return { id: def.id, targetUid: target.uid };
       continue;
