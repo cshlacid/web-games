@@ -83,6 +83,12 @@
           tone({ freq, at: now + i * 0.17, dur: 0.5, type: 'triangle', gain: 0.18, attack: 0.02 });
         });
       },
+      // 주인공이 위험하다. 두 번 두드리는 낮은 음이라 곡에 섞이지 않고, 힐
+      // (올라가는 음)과도 헷갈리지 않는다.
+      danger: (now, tone) => {
+        tone({ freq: 330, at: now, dur: 0.12, type: 'square', gain: 0.1, attack: 0.004, glide: 250 });
+        tone({ freq: 330, at: now + 0.16, dur: 0.12, type: 'square', gain: 0.1, attack: 0.004, glide: 250 });
+      },
       click: (now, tone) => {
         tone({ freq: 480, at: now, dur: 0.05, type: 'sine', gain: 0.12, attack: 0.002 });
       },

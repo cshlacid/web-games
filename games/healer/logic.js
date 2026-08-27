@@ -29,6 +29,12 @@ const MARCH_SPEED = 26;
 // 뒤쪽 무리는 사람이 무엇을 하든 이기기 어려운 판이 된다. 쓰러진 동료는 일어나지
 // 않는다 — 걸어서 회복하는 것은 살아 있는 몸이 쉬는 것이지 부활이 아니다.
 const MARCH_RECOVER = 0.25;
+// 초당 되찾는 마나(최대 마나의 비율). **아주 느리다** — 힐 한 번 값을 벌기까지
+// 십수 초가 걸리므로 "흘린 힐량이 그대로 손해"라는 힐 판단의 전제는 그대로다.
+// 이것이 없을 때에는 전투가 3분인데 마나가 1분 만에 말라, 남은 시간에는 힐도
+// 도발도 나가지 않고 파티가 서서히 깎이기만 했다. 아군과 적이 같은 규칙을
+// 쓰므로 여기서도 편을 가르지 않는다.
+const MANA_REGEN = 0.004;
 const EVENT_CAP = 400;        // 화면이 안 가져가도 무한히 쌓이지 않게
 
 function createRng(seed) {
@@ -681,10 +687,20 @@ function march(state, dt) {
   }
 }
 
+// 마나는 싸우는 동안에도 아주 느리게 돌아온다. 무리 사이의 회복과 달리 여기는
+// 전투 중이라, 이것이 없으면 긴 무리 하나 안에서 마나가 말라 버린다.
+function regenMana(state, dt) {
+  for (const unit of state.units) {
+    if (unit.dead || !unit.maxMp) continue;
+    unit.mp = Math.min(unit.maxMp, unit.mp + unit.maxMp * MANA_REGEN * dt);
+  }
+}
+
 function step(state, dt) {
   state.t += dt;
   updateZones(state);
   updateDots(state);
+  regenMana(state, dt);
 
   if (state.marching) {
     march(state, dt);
@@ -803,7 +819,7 @@ function battleReport(state) {
 }
 
 const api = {
-  HERO_UID, TICK, WAVE_GAP, MARCH_SPEED, MARCH_RECOVER, rewardOf, dropsOf, battleReport,
+  HERO_UID, TICK, WAVE_GAP, MARCH_SPEED, MARCH_RECOVER, MANA_REGEN, rewardOf, dropsOf, battleReport,
   createRng, createBattle, advance, step, drainEvents,
   castSkill, playerSkill, usePotion, drink, magicPowerOf, rollCrit, applyDamage, applyHeal, addDot, addZone,
   hero, skillSlot, resolveTarget, moveToward,

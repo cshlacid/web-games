@@ -201,10 +201,16 @@ function cast(state, skillId, target) {
   const hero = L.hero(state);
   hero.mp = 40;
   run(state, 12);
-  check('마나는 저절로 차지 않는다', hero.mp, 40);
+  // **저절로 돌아오기는 하지만 아주 느리다.** 12초에 최대 마나의 5%가 안 된다 —
+  // 힐 한 번 값을 벌기까지 십수 초라, 흘린 힐량이 그대로 손해라는 힐 판단의
+  // 전제는 그대로다.
+  const idle = hero.mp - 40;
+  check('마나가 저절로 조금 돌아온다',
+    idle > 0 && idle < hero.maxMp * 0.06, true);
 
+  const beforeFocus = hero.mp;
   cast(state, 'focus', {});
-  check('마나 회복 스킬로 찬다', hero.mp, 40 + D.PLAYER_SKILLS.focus.mana);
+  check('마나 회복 스킬로 찬다', hero.mp, beforeFocus + D.PLAYER_SKILLS.focus.mana);
 
   hero.mp = 10;
   check('마나 물약으로도 찬다', L.usePotion(state, 'mana').ok, true);
@@ -230,6 +236,33 @@ function cast(state, skillId, target) {
   check('체력 물약도 있다', L.usePotion(both, 'health').ok, true);
   check('체력이 찬다', L.hero(both).hp > 100, true);
   check('쿨타임은 둘이 함께 쓴다', L.usePotion(both, 'mana').ok, false);
+}
+
+// --- 마나 자연 회복 -----------------------------------------------------
+//
+// 아군과 적이 같은 규칙을 쓴다. 마나가 마르면 힐도 도발도 멈추는데, 그 상태로
+// 남은 전투를 보내면 파티가 손 쓸 것 없이 깎이기만 한다.
+{
+  const state = battle();
+  const foe = AI.alive(state, 'enemy').find((u) => u.maxMp > 0);
+  const down = AI.alive(state, 'ally').find((u) => u.uid !== L.HERO_UID);
+  L.hero(state).mp = 0;
+  foe.mp = 0;
+  down.mp = 0;
+  L.applyDamage(state, null, down, 99999);
+
+  run(state, 10);
+  const share = (u) => u.mp / u.maxMp;
+  const near = (a, b) => Math.abs(a - b) < 0.005;
+  check('주인공의 마나가 초당 정해진 몫만큼 돈다',
+    near(share(L.hero(state)), L.MANA_REGEN * 10), true);
+  check('적도 같은 규칙을 쓴다', near(share(foe), L.MANA_REGEN * 10), true);
+  check('쓰러진 유닛은 돌지 않는다', down.mp, 0);
+
+  const full = battle();
+  L.hero(full).mp = L.hero(full).maxMp;
+  run(full, 5);
+  check('최대치를 넘지 않는다', L.hero(full).mp, L.hero(full).maxMp);
 }
 
 // --- 피해 ---------------------------------------------------------------
@@ -287,14 +320,16 @@ function cast(state, skillId, target) {
   const bran = unit(moved, '강철의 브란');
   bran.hp = 400;
   L.castSkill(moved, 'touch', { uid: bran.uid });
+  const paid = moving.mp;
   L.moveToward(moved, moving, { x: moving.x + 20, y: moving.y }, L.TICK);
   check('움직이면 취소된다', moving.cast, null);
   run(moved, D.PLAYER_SKILLS.touch.cast + 0.1);
   check('취소된 스킬은 터지지 않는다', moved.stats.healed, 0);
   // 자원은 시작할 때 냈고 취소해도 돌아오지 않는다. 그래야 캐스팅 스킬을
   // 고르는 것이 판단이 된다.
+  // 저절로 도는 몫이 있으므로 "줄어든 채로"가 아니라 "돌려받지 않았다"로 본다.
   check('낸 마나는 돌아오지 않는다',
-    moving.mp <= moving.maxMp - D.PLAYER_SKILLS.touch.mp, true);
+    moving.mp < paid + D.PLAYER_SKILLS.touch.mp, true);
   check('쿨타임도 돈다', L.skillSlot(moved, 'touch').readyAt > moved.t, true);
 
   // 대열을 벌리는 힘은 이동이 아니다. 그것까지 취소로 치면 캐스팅 스킬이 아예
@@ -454,8 +489,11 @@ function cast(state, skillId, target) {
   const before = total();
   run(dry, 12);
   check('마나가 없어도 적을 깎는다', total() < before, true);
+  // 마나가 저절로 조금 돌아오므로 0인지로는 볼 수 없다. 들고 있는 스킬 중 가장
+  // 싼 것에도 못 미치는지를 본다 — 하나라도 나갔으면 여기서 걸린다.
   check('스킬은 한 번도 나가지 않았다',
-    AI.alive(dry, 'ally').every((u) => u.mp === 0), true);
+    AI.alive(dry, 'ally').every((u) =>
+      u.mp < Math.min(...u.skills.map((slot) => D.UNIT_SKILLS[slot.id].mp))), true);
 }
 
 // --- 전장의 위아래 여백 -------------------------------------------------
@@ -553,8 +591,10 @@ function cast(state, skillId, target) {
   const near = (a, b) => Math.abs(a - b) < 0.01;
   check('체력이 최대치의 25%만큼 늘었다',
     AI.alive(state, 'ally').every((u, i) => near(u.hp / u.maxHp - before[i].hp, L.MARCH_RECOVER)), true);
+  // 마나는 걸어가는 동안에도 저절로 도는 몫(MANA_REGEN)이 함께 붙는다.
+  const walked = L.MARCH_RECOVER + L.MANA_REGEN * L.WAVE_GAP;
   check('마나도 같은 몫만큼 늘었다',
-    AI.alive(state, 'ally').every((u, i) => near(u.mp / u.maxMp - before[i].mp, L.MARCH_RECOVER)), true);
+    AI.alive(state, 'ally').every((u, i) => near(u.mp / u.maxMp - before[i].mp, walked)), true);
   check('쓰러진 동료는 일어나지 않는다', AI.byUid(state, down.uid).hp, 0);
 }
 

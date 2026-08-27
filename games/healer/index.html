@@ -178,7 +178,10 @@
     <ul class="portraits enemies" id="enemy-portraits"></ul>
     <ul class="portraits" id="portraits"></ul>
 
-    <div class="bars">
+    <!-- 주인공의 체력이 여기 없던 동안에는 자기 체력을 초상화 줄의 작은 막대로만
+         볼 수 있었고, 눈이 전장과 스킬바에 있는 사이에 죽었다. -->
+    <div class="bars" id="hero-bars">
+      <div class="bar hp"><span id="hero-hp-fill"></span><b id="hero-hp-text">0 / 0</b></div>
       <div class="bar mp"><span id="hero-mp-fill"></span><b id="hero-mp-text">200 / 200</b></div>
     </div>
 

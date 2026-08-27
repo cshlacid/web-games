@@ -910,35 +910,38 @@ const POTION_MAX = 5;
 // 혼자서도 절반은 이겼다. **전투가 짧으면 회복이 판을 가르지 못한다** — 적을
 // 단단하게 만들어 전투를 길게 끌어야 힐이 있는 쪽과 없는 쪽이 갈린다.
 //
-// **무리 사이의 회복이 들어오면서 체력을 1.2배, 공격력을 1.15배로 다시 잡았다.**
+// **무리 사이의 회복과 마나 자연 회복이 들어오면서 다시 잡았다** — 회복 때 체력
+// 1.2배·공격력 1.15배, 마나 회복 때 공격력을 한 번 더 1.25배, 체력을 1.05배.
+// 마나가 마르지 않으면 힐도 도발도 후반까지 도므로 그만큼 압박이 있어야 한다.
 // 걸어가는 동안 모두가 최대치의 25%를 되찾게 되자 손을 놓고도 벅찬 의뢰를 절반
 // 넘게 깼다 — 앞 무리가 남긴 상처가 다음 무리로 이어지지 않으면, 무리가 여럿인
-// 의뢰가 짧은 의뢰 여러 개가 된다. 난이도 확인의 승률이 회복을 넣기 전 수치로
-// 돌아오는 자리를 씨앗 스물넷으로 재서 골랐다.
+// 의뢰가 짧은 의뢰 여러 개가 된다. 마나 자연 회복도 같은 자리를 건드린다.
+// 두 번 모두 난이도 확인의 승률이 그 전 수치로 돌아오는 자리를 씨앗 스물넷으로
+// 재서 골랐다.
 //
 // **적 탱커도 도발을 들고 온다.** 아군과 같은 논리로 움직인다는 것은 같은 표를
 // 본다는 뜻만이 아니라 같은 수단을 갖는다는 뜻이다 — 도발이 이쪽에만 있으면
 // 적 힐러가 아무에게도 보호받지 못하고, 후열을 먼저 치는 규칙이 한쪽에서만 돈다.
 const ENEMIES = {
   scout:  { id: 'scout', race: 'goblin', rank: 'trash', exp: 14,  name: '고블린 척후병', job: 'dealer', sprite: 'goblin',
-            hp: 770, mp: 64,  atk: 23, attackCd: 1.5, range: 7,  speed: 21,
-           attrs: { str: 40, agi: 16, int: 8, vit: 61 }, growth: 'enemy',
+            hp: 812, mp: 64,  atk: 29, attackCd: 1.5, range: 7,  speed: 21,
+           attrs: { str: 40, agi: 16, int: 8, vit: 64 }, growth: 'enemy',
             armor: 0.95, spec: 'grunt' },
   shaman: { id: 'shaman', race: 'goblin', rank: 'trash', exp: 18, name: '고블린 주술사', job: 'healer', sprite: 'shaman',
-            hp: 658, mp: 120, atk: 22, attackCd: 2.2, range: 30, speed: 15,
-           attrs: { str: 12, agi: 10, int: 16, vit: 52 }, growth: 'enemy', attackType: 'magic',
+            hp: 700, mp: 120, atk: 28, attackCd: 2.2, range: 30, speed: 15,
+           attrs: { str: 12, agi: 10, int: 16, vit: 55 }, growth: 'enemy', attackType: 'magic',
             armor: 1, spec: 'shaman' },
   orc:    { id: 'orc', race: 'orc', rank: 'elite', exp: 32,    name: '오크 전사',     job: 'tank',   sprite: 'orc',
-            hp: 1778, mp: 72,  atk: 36, attackCd: 1.8, range: 7,  speed: 16,
-           attrs: { str: 58, agi: 8, int: 10, vit: 106 }, growth: 'enemy',
+            hp: 1862, mp: 72,  atk: 45, attackCd: 1.8, range: 7,  speed: 16,
+           attrs: { str: 58, agi: 8, int: 10, vit: 111 }, growth: 'enemy',
             armor: 0.7,  spec: 'tank' },
   hexer:  { id: 'hexer', race: 'orc', rank: 'elite', exp: 30,  name: '오크 주술사',   job: 'healer', sprite: 'shaman',
-            hp: 1092, mp: 128, atk: 26, attackCd: 2.4, range: 30, speed: 14,
-           attrs: { str: 16, agi: 8, int: 19, vit: 65 }, growth: 'enemy', attackType: 'magic',
+            hp: 1148, mp: 128, atk: 33, attackCd: 2.4, range: 30, speed: 14,
+           attrs: { str: 16, agi: 8, int: 19, vit: 68 }, growth: 'enemy', attackType: 'magic',
             armor: 0.9, spec: 'shaman' },
   chief:  { id: 'chief', race: 'orc', rank: 'boss', exp: 90,  name: '오크 우두머리', job: 'tank',   sprite: 'boss',
-            hp: 4298, mp: 136, atk: 56, attackCd: 2.0, range: 8,  speed: 14,
-           attrs: { str: 89, agi: 6, int: 20, vit: 256 }, growth: 'enemy',
+            hp: 4522, mp: 136, atk: 70, attackCd: 2.0, range: 8,  speed: 14,
+           attrs: { str: 89, agi: 6, int: 20, vit: 269 }, growth: 'enemy',
             armor: 0.62, spec: 'tank' },
 };
 

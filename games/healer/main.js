@@ -51,6 +51,8 @@ const app = {
   battle: null,
   aiming: null,
   paused: false,
+  // 주인공 위험 경고를 이미 울렸는지. 매 프레임 다시 울리지 않게 한다.
+  danger: false,
   result: null,
 };
 
@@ -1058,8 +1060,30 @@ function syncSkillbar(state) {
   // 고장 난 것으로 보인다.
   $('skillbar').classList.toggle('down', hero.dead);
 
+  const share = hero.hp / hero.maxHp;
+  $('hero-hp-fill').style.width = `${Math.max(0, share) * 100}%`;
+  $('hero-hp-text').textContent = `체력 ${Math.max(0, Math.round(hero.hp))} / ${hero.maxHp}`;
+  $('hero-hp-fill').parentNode.classList.toggle('low', share <= DANGER.on);
   $('hero-mp-fill').style.width = `${(hero.mp / hero.maxMp) * 100}%`;
   $('hero-mp-text').textContent = `마나 ${Math.round(hero.mp)} / ${hero.maxMp}`;
+
+  syncDanger(hero, share);
+}
+
+// **주인공이 위험하다는 것을 화면이 알린다.** 주인공은 힐이 끊긴 채로 몇 초에
+// 걸쳐 죽는데, 눈은 전장과 스킬바에 있어서 그 몇 초가 통째로 보이지 않았다.
+// 켜는 선과 끄는 선을 다르게 둔 것은, 한 선만 쓰면 그 언저리에서 경고가
+// 깜빡이며 켜졌다 꺼졌다 하기 때문이다.
+const DANGER = { on: 0.35, off: 0.5 };
+
+function syncDanger(hero, share) {
+  const danger = !hero.dead && share <= DANGER.on;
+  // 소리는 들어올 때 한 번뿐이고, 끄는 선 위로 되짚어 올라와야 다시 무장한다.
+  if (danger && !app.danger) { sound.play('danger'); app.danger = true; }
+  if (hero.dead || share > DANGER.off) app.danger = false;
+
+  $('hero-bars').classList.toggle('danger', danger);
+  $('field').classList.toggle('danger', danger);
 }
 
 // --- 조준과 조작 -------------------------------------------------------
@@ -1327,6 +1351,9 @@ function startBattle() {
   app.lootSeed = (Math.random() * 1e9) | 0;
 
   setAiming(null);
+  app.danger = false;
+  $('hero-bars').classList.remove('danger');
+  $('field').classList.remove('danger');
   renderPortraits(app.battle);
   renderSkillbar();
   $('wave').textContent = `1 / ${app.quest.waves.length}`;
