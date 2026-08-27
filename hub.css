@@ -74,7 +74,14 @@ h1 {
   border-color: var(--accent);
 }
 
-.emoji { font-size: 32px; }
+/* 카드 아이콘은 글자가 아니라 도형이다. 이모지는 글꼴이 그리는 그림이라 기기마다
+   모양과 크기가 달랐고 제 색을 들고 왔다 — 여섯 장이 나란히 선 목록에서 그것이
+   가장 잘 보인다. `currentColor`로 그리므로 밝은 테마와 어두운 테마를 함께 탄다. */
+.card-icon {
+  width: 32px;
+  height: 32px;
+  flex: none;
+}
 
 .card-body {
   display: flex;

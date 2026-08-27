@@ -3,6 +3,7 @@
   --fg: #2c3542;
   --muted: #7b8698;
   --line: #cdd5e0;
+  --check: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'><path d='M4 12.5 L9.5 18 L20 6.5'/></svg>");
   --card-bg: #ffffff;
   --btn-bg: #55637a;
   --btn-fg: #f2f5f9;
@@ -149,7 +150,19 @@ h1 {
 }
 /* 이미 푼 문제. 다시 눌러 봐도 되는 곳인지 번호만 보고 알 수 있게 한다. */
 .sub-row .count.solved { color: var(--good); }
-.sub-row .count.solved::after { content: ' ✓'; }
+/* 체크는 글자가 아니라 도형이다. `content`에는 SVG를 넣을 수 없으므로 마스크로
+   찍고 색은 `currentColor`가 준다 — 그래야 위 줄의 색 규칙을 그대로 탄다. */
+.sub-row .count.solved::after {
+  content: '';
+  display: inline-block;
+  width: 0.8em;
+  height: 0.8em;
+  margin-left: 0.25em;
+  vertical-align: -0.05em;
+  background: currentColor;
+  -webkit-mask: var(--check) center / contain no-repeat;
+  mask: var(--check) center / contain no-repeat;
+}
 
 .brief { text-align: center; }
 .brief h2 { margin: 0; font-size: 18px; }
@@ -324,7 +337,10 @@ h1 {
   cursor: pointer;
 }
 .tool:active { background: var(--key-bg); }
-.tool-icon { font-size: 17px; line-height: 1; }
+/* 도구 아이콘은 글자가 아니라 도형이다(`shared/icons.js`). 기호 문자로 두었더니
+   글꼴마다 크기와 두께가 달랐고, 아예 안 그리는 글꼴도 있었다. */
+.tool-icon { display: inline-flex; line-height: 0; }
+.tool-icon svg { width: 19px; height: 19px; }
 .tool-label { font-size: 11px; font-weight: 600; }
 
 .source { margin: 0; text-align: center; font-size: 11px; color: var(--muted); }

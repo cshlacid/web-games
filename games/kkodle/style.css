@@ -227,6 +227,10 @@ h1 {
 }
 
 .key.wide { flex: 1.6 1 auto; font-size: 13px; }
+/* 자모는 글자, 시프트와 지우기는 도형이다. 키 높이 안에서 자모와 비슷한 무게로
+   보이도록 크기를 따로 잡는다. */
+.key svg { width: clamp(18px, 4.4vmin, 22px); height: clamp(18px, 4.4vmin, 22px); }
+.key { display: inline-flex; align-items: center; justify-content: center; }
 .key:active { filter: brightness(0.92); }
 .key[data-state="correct"] { background: var(--correct); color: #fff; }
 .key[data-state="present"] { background: var(--present); color: #fff; }

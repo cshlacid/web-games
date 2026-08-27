@@ -2,6 +2,7 @@
 
 (function () {
   const R = window.DoppelRules;
+  const Icons = window.SharedIcons;
   const S = window.DoppelSolver;
   const G = window.DoppelGenerator;
   const Sound = window.DoppelSound;
@@ -821,4 +822,7 @@
   } else {
     newGame('easy');
   }
+
+  // 도구 단추의 아이콘은 HTML에 이름만 적혀 있다. 여기서 한 번 그린다.
+  Icons.paint();
 })();

@@ -2,6 +2,7 @@
 
 (function () {
   const S = window.SudokuSolver;
+  const Icons = window.SharedIcons;
   const G = window.SudokuGenerator;
   const Sound = window.SudokuSound;
   const SAVE_KEY = 'web-games.sudoku.game';
@@ -447,4 +448,7 @@
   } else {
     newGame('easy');
   }
+
+  // 도구 단추의 아이콘은 HTML에 이름만 적혀 있다. 여기서 한 번 그린다.
+  Icons.paint();
 })();
