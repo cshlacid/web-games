@@ -586,7 +586,49 @@ $('shop-refresh').addEventListener('click', () => {
 
 // --- 편성 --------------------------------------------------------------
 
+// 그림 파일로 그리는 유닛(주인공)의 몸통. 시트를 통째로 넣고 상자로 잘라
+// 보여 준다 — `background-position`을 %로 잡으면 요소 크기에 따라 계산이
+// 달라지지만, 이렇게 하면 칸 하나가 늘 정확히 들어맞는다.
+function sheetBody(kind, cls) {
+  const info = Sprites.sheet(kind);
+  // 클래스 이름이 `sheet`이면 동료 상세 시트(`position: fixed`)와 부딪힌다.
+  const wrap = el('span', `${cls} filmstrip`);
+  wrap.dataset.kind = kind;
+  wrap.style.aspectRatio = `${info.cell.w} / ${info.cell.h}`;
+  const zoom = (cls === 'avatar' && info.portrait) ? info.portrait.zoom : 1;
+  if (zoom !== 1) {
+    wrap.dataset.zoom = zoom;
+    wrap.dataset.lift = info.portrait.lift || 0;
+  }
+  const img = el('img');
+  img.src = info.src;
+  img.alt = '';
+  img.style.width = `${info.cols * 100 * zoom}%`;
+  img.style.height = `${info.rows * 100 * zoom}%`;
+  wrap.append(img);
+  wrap.dataset.clip = '';
+  setFrame(wrap, 0, 0);
+  return wrap;
+}
+
+// 시트의 (열, 줄)을 고른다. 이미지가 상자의 cols×rows 배(초상화는 그 zoom 배)라,
+// 제 크기의 몫만큼 밀면 칸이 딱 떨어진다.
+function setFrame(wrap, col, row) {
+  const info = Sprites.sheet(wrap.dataset.kind);
+  const img = wrap.firstElementChild;
+  if (!img) return;
+  const z = Number(wrap.dataset.zoom || 1);
+  const lift = Number(wrap.dataset.lift || 0);
+  // 당겨 쓸 때에는 칸이 상자보다 크므로, 그 차이의 절반만큼 더 밀어 가운데를 맞춘다.
+  const x = -100 * (col * z + (z - 1) / 2) / (info.cols * z);
+  const y = -100 * (row * z + (z - 1) / 2 + lift) / (info.rows * z);
+  img.style.transform = `translate(${x}%, ${y}%)`;
+}
+
 function avatar(kind) {
+  if (Sprites.sheet(kind)) {
+    return sheetBody(kind, 'avatar');
+  }
   const wrap = el('span', 'avatar');
   wrap.innerHTML = Sprites.svg(kind);
   return wrap;
@@ -984,7 +1026,11 @@ function makeUnitNode(unit) {
   // 도트 그림이 제 색을 가지므로 파랑·빨강으로 물들여 편을 가를 수 없다.
   // 발밑에 색 있는 발판을 깔아 그 일을 대신한다 — 그림자 노릇도 같이 한다.
   node.append(el('div', 'mark'));
-  node.insertAdjacentHTML('beforeend', Sprites.svg(unit.sprite));
+  if (Sprites.sheet(unit.sprite)) {
+    node.append(sheetBody(unit.sprite, 'sprite'));
+  } else {
+    node.insertAdjacentHTML('beforeend', Sprites.svg(unit.sprite));
+  }
   node.style.width = `${(UNIT_WIDTH * Sprites.size(unit.sprite).w) / 18}%`;
 
   const bar = el('div', 'hpbar');
@@ -1002,6 +1048,41 @@ function makeUnitNode(unit) {
   return node;
 }
 
+// 그림 파일 유닛의 프레임 고르기. **로직에 새 이벤트를 만들지 않았다** —
+// 걷는지는 좌표가 움직였는지로, 때리는지는 다음 공격 시각이 밀렸는지로 안다.
+// 전투 규칙은 화면이 몇 프레임짜리 그림을 쓰는지 알 필요가 없다.
+function syncSheet(node, unit, state) {
+  const wrap = node.querySelector('.sprite.filmstrip');
+  if (!wrap) return;
+  const info = Sprites.sheet(wrap.dataset.kind);
+  const d = wrap.dataset;
+
+  const next = unit.nextAttackAt || 0;
+  if (Number(d.next || 0) < next) { d.next = next; d.swing = state.t; }
+  const before = d.px === undefined ? unit.x : Number(d.px);
+  const moved = unit.x - before;
+  d.px = unit.x;
+
+  const atk = info.clips.attack;
+  const swung = state.t - Number(d.swing === undefined ? -99 : d.swing);
+  let name = 'idle';
+  // 외우는 동안은 준비 자세로 선다. 시전 막대만으로는 무엇을 하는지 안 보인다.
+  if (!unit.dead && unit.cast) name = 'attack';
+  else if (!unit.dead && swung < atk.frames / atk.fps) name = 'attack';
+  // **대열을 벌리는 힘(separate)은 걷는 것이 아니다.** 문턱이 없으면 가만히 선
+  // 유닛이 매 프레임 걷는 자세로 떤다.
+  else if (!unit.dead && Math.abs(moved) > 0.12) name = moved > 0 ? 'walkRight' : 'walkLeft';
+
+  const clip = info.clips[name];
+  let frame = 0;
+  if (name === 'attack') {
+    frame = unit.cast ? 0 : Math.min(clip.frames - 1, Math.floor(swung * clip.fps));
+  } else if (clip.fps > 0) {
+    frame = Math.floor(state.t * clip.fps) % clip.frames;
+  }
+  setFrame(wrap, frame, clip.row);
+}
+
 function syncUnits(state) {
   for (const unit of state.units) {
     // 무리 사이에 치운 시체를 다시 만들지 않는다.
@@ -1016,6 +1097,7 @@ function syncUnits(state) {
     // 굳은 동안에는 아무것도 하지 않는다. 화면이 그것을 보여 주지 않으면 그 몇
     // 초가 "왜 가만히 있지"로만 보인다 — 기절이 있다는 것 자체를 알 수 없다.
     node.classList.toggle('stunned', !unit.dead && L.stunned(state, unit));
+    syncSheet(node, unit, state);
 
     const cast = unit.cast;
     const bar = node.querySelector('.castbar');

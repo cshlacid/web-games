@@ -422,6 +422,21 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 
 .sprite { width: 100%; height: auto; display: block; }
 
+/* 그림 파일로 그리는 유닛(주인공). 시트를 통째로 넣고 상자로 잘라 보여 준다 —
+   이미지가 상자의 cols×rows 배라, 제 크기의 1/cols씩 밀면 칸이 딱 떨어진다.
+   `background-position`을 %로 잡으면 요소 크기에 따라 계산이 달라져 이 방법이
+   더 안전하다. 가로세로비는 칸에서 나오므로 main.js가 넣는다. */
+.filmstrip { position: relative; overflow: hidden; display: block; }
+.filmstrip img {
+  position: absolute; left: 0; top: 0;
+  transform-origin: 0 0;
+  image-rendering: auto;
+  pointer-events: none;
+}
+/* 아바타는 높이가 정해져 있다. 폭을 칸의 비율대로 따라오게 두어야 인물이
+   납작해지지 않는다. */
+.avatar.filmstrip { width: auto; }
+
 /* 도트 그림은 제 색을 갖는다. color는 이제 그림이 아니라 발판과 강조 테두리에만
    쓰인다 — 편을 가르는 일을 그것들이 대신한다. */
 .unit.ally { color: var(--ally); }
@@ -455,7 +470,8 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 
 /* 무리와 무리 사이의 걸음. 배경이 흘러가는 동안 유닛도 걷는 티가 나야 이동하는
    것으로 읽힌다 — 배경만 움직이면 화면이 미끄러지는 것처럼 보인다. */
-.field.marching .unit.ally .sprite { animation: trudge 0.42s steps(2, end) infinite; }
+/* 주인공은 걷는 프레임이 따로 있으므로 흔들기에서 뺀다 — 겹치면 두 번 걷는다. */
+.field.marching .unit.ally:not(.is-hero) .sprite { animation: trudge 0.42s steps(2, end) infinite; }
 @keyframes trudge {
   from { transform: translateY(0); }
   50% { transform: translateY(-4%); }
@@ -466,7 +482,7 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 
 /* 기절. 굳어 있는 동안 그림이 살짝 기울고 노란 테가 돈다 — 화면에서 "지금 저것은
    아무것도 못 한다"가 보여야 기절이 있다는 것을 알 수 있다. */
-.unit.stunned svg { filter: drop-shadow(0 0 3px var(--kind-stun)); }
+.unit.stunned .sprite { filter: drop-shadow(0 0 3px var(--kind-stun)); }
 .unit.stunned .mark { box-shadow: 0 0 0 2px var(--kind-stun); }
 /* 유닛 이름표는 없다. 아홉 그림이 실루엣만으로 갈리도록 그렸고, 아군의 이름은
    아래 초상화 줄에 있다. 뭉쳐 싸울 때 이름표가 서로 겹쳐 읽히지도 않으면서

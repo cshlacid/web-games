@@ -53,7 +53,11 @@ function check(name, actual, expected) {
       Sprites.size(kind), { w: sprite.w + 2, h: sprite.h + 2 });
   }
 
-  check('그림 열둘', Object.keys(Sprites.SPRITES).length, 12);
+  // 주인공만 그림 파일이고 나머지 열하나가 도형이다. 시안이 주인공 하나뿐이라
+  // 화풍이 섞이는 것을 감수했다 — 나머지 시안이 오면 여기부터 바뀐다.
+  check('도형 그림 열하나', Object.keys(Sprites.SPRITES).length, 11);
+  check('그림 파일 하나', Object.keys(Sprites.SHEETS).length, 1);
+  check('주인공은 도형이 아니다', Boolean(Sprites.SPRITES.hero), false);
 
   // **계열마다 제 그림이 있어야 한다.** 궁수와 마법사가 같은 그림을 쓰던 때에는
   // 편성 화면에서 이름을 읽어야 어느 쪽인지 알 수 있었고, 전장에서는 아예
@@ -75,14 +79,16 @@ function check(name, actual, expected) {
     Object.entries(byPic).filter(([, set]) => set.size > 1).map(([pic]) => pic), []);
 
   // 우두머리는 상자가 넓다. 화면 크기를 이 폭으로 정하므로 이것이 곧 "크다"이다.
-  check('우두머리가 가장 크다',
+  // **도형 그림끼리만 견준다** — 주인공의 상자가 넓은 것은 인물이 커서가 아니라
+  // 지팡이가 좌우로 흔들려서다.
+  check('우두머리가 도형 중 가장 크다',
     Object.keys(Sprites.SPRITES).every((kind) => kind === 'boss'
       || Sprites.size(kind).w < Sprites.size('boss').w), true);
 }
 
 // --- 자료가 가리키는 그림이 실제로 있는가 -------------------------------
 {
-  const kinds = new Set(Object.keys(Sprites.SPRITES));
+  const kinds = new Set(Object.keys(Sprites.SPRITES).concat(Object.keys(Sprites.SHEETS)));
   const used = [D.HERO, ...Object.values(D.COMPANIONS), ...Object.values(D.ENEMIES)];
   const missing = used.filter((def) => !kinds.has(def.sprite)).map((def) => def.name);
   check('모든 유닛의 그림이 있다', missing, []);
@@ -94,9 +100,9 @@ function check(name, actual, expected) {
 
 // --- 그려 낸 결과 -------------------------------------------------------
 {
-  const markup = Sprites.svg('hero');
+  const markup = Sprites.svg('priest');
   check('여유 한 칸을 두고 그린다', markup.includes('viewBox="-1 -1 18 22"'), true);
-  check('같은 그림을 다시 만들지 않는다', Sprites.svg('hero') === markup, true);
+  check('같은 그림을 다시 만들지 않는다', Sprites.svg('priest') === markup, true);
 
   // **도트를 걷어냈다.** 픽셀을 각지게 그리라는 지시가 남아 있으면 곡선이
   // 계단으로 나온다.
@@ -114,6 +120,41 @@ function check(name, actual, expected) {
   // 활은 채우지 않는다 — 채우면 방패로 보인다.
   const bow = Sprites.SPRITES.archer.parts.find((part) => part.arc);
   check('활은 선으로만 긋는다', Sprites.shape(bow).includes('fill="none"'), true);
+}
+
+// --- 그림 파일로 그리는 유닛 --------------------------------------------
+//
+// 주인공만 시안을 그대로 쓴다. 도형과 달리 자료를 눈으로 훑어 틀린 곳을 찾을 수
+// 없으므로, 격자와 프레임 수가 서로 맞는지를 여기서 본다.
+{
+  const fs = require('fs');
+  for (const [kind, s] of Object.entries(Sprites.SHEETS)) {
+    check(`${kind}: 그림 파일이 있다`, fs.existsSync(`${__dirname}/${s.src}`), true);
+    check(`${kind}: 격자가 적혀 있다`, s.cols > 0 && s.rows > 0 && s.cell.w > 0 && s.cell.h > 0, true);
+
+    // 줄 번호가 격자를 넘으면 엉뚱한 칸이 나온다. 화면에서는 반쯤 잘린 인물로 보인다.
+    const bad = Object.entries(s.clips)
+      .filter(([, c]) => c.row >= s.rows || c.frames > s.cols || c.frames < 1)
+      .map(([name]) => name);
+    check(`${kind}: 모든 동작이 격자 안에 있다`, bad, []);
+
+    // 줄이 겹치면 두 동작이 같은 그림을 쓴다.
+    const rows = Object.values(s.clips).map((c) => c.row);
+    check(`${kind}: 동작마다 제 줄을 쓴다`, new Set(rows).size, rows.length);
+
+    // 서 있는 자세만 한 장이고 나머지는 여러 장이다. 한 장짜리 걷기는 걷지 않는다.
+    check(`${kind}: 걷기는 여러 장이다`,
+      s.clips.walkRight.frames > 1 && s.clips.walkLeft.frames > 1, true);
+    check(`${kind}: 좌우 걷기가 따로 있다`,
+      s.clips.walkRight.row !== s.clips.walkLeft.row, true);
+    // 공격은 한 번만 돈다. 반복하면 때리지 않는 동안에도 계속 휘두른다.
+    check(`${kind}: 공격은 한 번만 돈다`, Boolean(s.clips.attack.once), true);
+
+    // 상자는 칸의 가로세로비에서 나온다. 여기가 어긋나면 인물이 납작해진다.
+    const box = Sprites.size(kind);
+    check(`${kind}: 상자가 칸의 비율이다`,
+      Math.abs(box.w / box.h - s.cell.w / s.cell.h) < 0.01, true);
+  }
 }
 
 // --- 상자 밖으로 나가지 않는다 ------------------------------------------
