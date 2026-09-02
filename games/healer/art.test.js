@@ -150,6 +150,25 @@ function check(name, actual, expected) {
     // 공격은 한 번만 돈다. 반복하면 때리지 않는 동안에도 계속 휘두른다.
     check(`${kind}: 공격은 한 번만 돈다`, Boolean(s.clips.attack.once), true);
 
+    // 잘라 쓰는 자리가 칸 밖으로 나가면 옆 칸이 딸려 들어온다 — 초상화에
+    // 남의 지팡이가 걸린다.
+    const outside = Object.entries(s.crops)
+      .filter(([, c]) => c.w <= 0 || c.h <= 0 || c.x < 0 || c.y < 0
+        || c.x + c.w > 1 || c.y + c.h > 1)
+      .map(([name]) => name);
+    check(`${kind}: 자르는 자리가 칸 안이다`, outside, []);
+
+    // 전장은 칸을 통째로 쓴다. 여기를 좁히면 걷기·공격에서 뻗은 팔이 잘린다.
+    check(`${kind}: 전장은 칸 전체다`,
+      [s.crops.full.x, s.crops.full.y, s.crops.full.w, s.crops.full.h], [0, 0, 1, 1]);
+
+    // 초상화는 머리만 보여 준다. 전신보다 좁고 짧지 않으면 얼굴이 아니라 사람이
+    // 들어가 있는 것이다.
+    check(`${kind}: 초상화가 전신보다 좁다`,
+      s.crops.head.w < s.crops.list.w && s.crops.head.h < s.crops.list.h, true);
+    // 머리는 칸 위쪽에 있다. 아래 절반까지 잡으면 몸통이 따라 들어온다.
+    check(`${kind}: 초상화가 칸 위쪽이다`, s.crops.head.y + s.crops.head.h <= 0.65, true);
+
     // 상자는 칸의 가로세로비에서 나온다. 여기가 어긋나면 인물이 납작해진다.
     const box = Sprites.size(kind);
     check(`${kind}: 상자가 칸의 비율이다`,
