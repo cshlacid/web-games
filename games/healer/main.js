@@ -589,45 +589,47 @@ $('shop-refresh').addEventListener('click', () => {
 // 그림 파일로 그리는 유닛(주인공)의 몸통. 시트를 통째로 넣고 상자로 잘라
 // 보여 준다 — `background-position`을 %로 잡으면 요소 크기에 따라 계산이
 // 달라지지만, 이렇게 하면 칸 하나가 늘 정확히 들어맞는다.
-function sheetBody(kind, cls) {
+function sheetBody(kind, cls, cropName) {
   const info = Sprites.sheet(kind);
   // 클래스 이름이 `sheet`이면 동료 상세 시트(`position: fixed`)와 부딪힌다.
+  const crop = cropOf(info, cropName);
   const wrap = el('span', `${cls} filmstrip`);
   wrap.dataset.kind = kind;
-  wrap.style.aspectRatio = `${info.cell.w} / ${info.cell.h}`;
-  const zoom = (cls === 'avatar' && info.portrait) ? info.portrait.zoom : 1;
-  if (zoom !== 1) {
-    wrap.dataset.zoom = zoom;
-    wrap.dataset.lift = info.portrait.lift || 0;
-  }
+  wrap.dataset.crop = cropName || 'full';
+  // 상자의 가로세로비는 **잘라 낸 자리**의 비율이다. 칸 전체로 두면 머리만
+  // 보여 줄 때 얼굴이 납작해진다.
+  wrap.style.aspectRatio = `${info.cell.w * crop.w} / ${info.cell.h * crop.h}`;
   const img = el('img');
   img.src = info.src;
   img.alt = '';
-  img.style.width = `${info.cols * 100 * zoom}%`;
-  img.style.height = `${info.rows * 100 * zoom}%`;
+  img.style.width = `${(info.cols * 100) / crop.w}%`;
+  img.style.height = `${(info.rows * 100) / crop.h}%`;
   wrap.append(img);
   wrap.dataset.clip = '';
   setFrame(wrap, 0, 0);
   return wrap;
 }
 
-// 시트의 (열, 줄)을 고른다. 이미지가 상자의 cols×rows 배(초상화는 그 zoom 배)라,
-// 제 크기의 몫만큼 밀면 칸이 딱 떨어진다.
+const FULL_CROP = { x: 0, y: 0, w: 1, h: 1 };
+const cropOf = (info, name) => (info.crops && info.crops[name]) || FULL_CROP;
+
+// 시트의 (열, 줄)에서 잘라 낼 자리를 고른다. 이미지를 상자의 cols/w × rows/h 배로
+// 두었으므로, 제 크기의 (col + x)/cols 만큼 밀면 그 자리가 상자에 딱 들어온다.
 function setFrame(wrap, col, row) {
   const info = Sprites.sheet(wrap.dataset.kind);
+  const crop = cropOf(info, wrap.dataset.crop);
   const img = wrap.firstElementChild;
   if (!img) return;
-  const z = Number(wrap.dataset.zoom || 1);
-  const lift = Number(wrap.dataset.lift || 0);
-  // 당겨 쓸 때에는 칸이 상자보다 크므로, 그 차이의 절반만큼 더 밀어 가운데를 맞춘다.
-  const x = -100 * (col * z + (z - 1) / 2) / (info.cols * z);
-  const y = -100 * (row * z + (z - 1) / 2 + lift) / (info.rows * z);
+  const x = (-100 * (col + crop.x)) / info.cols;
+  const y = (-100 * (row + crop.y)) / info.rows;
   img.style.transform = `translate(${x}%, ${y}%)`;
 }
 
-function avatar(kind) {
+// crop은 칸의 어디를 보여 줄지다. 전투 초상화는 머리만('head'), 편성 화면은
+// 서 있기 그림에 맞춰 좁힌 전신('list')이다.
+function avatar(kind, crop) {
   if (Sprites.sheet(kind)) {
-    return sheetBody(kind, 'avatar');
+    return sheetBody(kind, 'avatar', crop || 'list');
   }
   const wrap = el('span', 'avatar');
   wrap.innerHTML = Sprites.svg(kind);
@@ -1167,7 +1169,8 @@ function makePortrait(unit) {
   button.type = 'button';
   button.dataset.uid = unit.uid;
   if (unit.uid === L.HERO_UID) button.classList.add('is-hero');
-  button.append(avatar(unit.sprite));
+  // 초상화는 머리만 보여 준다. 전신을 30px 안에 넣으면 얼굴이 몇 픽셀뿐이다.
+  button.append(avatar(unit.sprite, 'head'));
   button.append(text('span', 'pname', unit.name));
 
   const hp = el('div', 'bar');
