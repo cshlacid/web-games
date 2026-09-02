@@ -1053,6 +1053,11 @@ function makeUnitNode(unit) {
 // 그림 파일 유닛의 프레임 고르기. **로직에 새 이벤트를 만들지 않았다** —
 // 걷는지는 좌표가 움직였는지로, 때리는지는 다음 공격 시각이 밀렸는지로 안다.
 // 전투 규칙은 화면이 몇 프레임짜리 그림을 쓰는지 알 필요가 없다.
+// 걷는다고 볼 속도(격자/초)와 그 뒤로 걷기를 이어 두는 시간. 이어 두지 않으면
+// 걸음을 멈추는 자리마다 한두 프레임씩 서는 자세가 끼어든다.
+const WALK_MIN = 3.6;
+const WALK_HOLD = 0.2;
+
 function syncSheet(node, unit, state) {
   const wrap = node.querySelector('.sprite.filmstrip');
   if (!wrap) return;
@@ -1061,9 +1066,20 @@ function syncSheet(node, unit, state) {
 
   const next = unit.nextAttackAt || 0;
   if (Number(d.next || 0) < next) { d.next = next; d.swing = state.t; }
-  const before = d.px === undefined ? unit.x : Number(d.px);
-  const moved = unit.x - before;
-  d.px = unit.x;
+
+  // **걸음은 프레임이 아니라 전투 시각으로 잰다.** 전투는 초당 30번 돌고 화면은
+  // 그보다 자주 그려서, 좌표가 그대로인 프레임이 사이사이 섞인다. 프레임 사이의
+  // 차이로 재면 그 프레임마다 서 있는 자세가 끼어들어 걷기가 떨렸다. 전투 시각이
+  // 안 움직인 프레임은 아예 재지 않는다.
+  if (d.pt === undefined) { d.pt = state.t; d.px = unit.x; }
+  const span = state.t - Number(d.pt);
+  if (span > 0) {
+    const speed = (unit.x - Number(d.px)) / span;
+    if (Math.abs(speed) > WALK_MIN) { d.walk = state.t; d.dir = speed > 0 ? 1 : -1; }
+    d.px = unit.x;
+    d.pt = state.t;
+  }
+  const walking = state.t - Number(d.walk === undefined ? -99 : d.walk) < WALK_HOLD;
 
   const atk = info.clips.attack;
   const swung = state.t - Number(d.swing === undefined ? -99 : d.swing);
@@ -1071,9 +1087,13 @@ function syncSheet(node, unit, state) {
   // 외우는 동안은 준비 자세로 선다. 시전 막대만으로는 무엇을 하는지 안 보인다.
   if (!unit.dead && unit.cast) name = 'attack';
   else if (!unit.dead && swung < atk.frames / atk.fps) name = 'attack';
+  // **무리 사이에는 좌표가 움직이지 않는데도 걷는 중이다.** 대열은 이미 제자리라
+  // x가 그대로고, 흘러가는 것은 배경이다. 좌표만 보면 다른 동료가 흔들리며 가는
+  // 옆에서 주인공만 선 채로 미끄러진다.
+  else if (!unit.dead && state.marching && unit.side === 'ally') name = 'walkRight';
   // **대열을 벌리는 힘(separate)은 걷는 것이 아니다.** 문턱이 없으면 가만히 선
-  // 유닛이 매 프레임 걷는 자세로 떤다.
-  else if (!unit.dead && Math.abs(moved) > 0.12) name = moved > 0 ? 'walkRight' : 'walkLeft';
+  // 유닛이 걷는 자세로 떤다.
+  else if (!unit.dead && walking) name = Number(d.dir) > 0 ? 'walkRight' : 'walkLeft';
 
   const clip = info.clips[name];
   let frame = 0;
