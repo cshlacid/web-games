@@ -101,7 +101,7 @@ function runQuest(progress, seed, autoHeal, questOver) {
   const state = L.createBattle({
     quest,
     party: party.map(R.toParty),
-    skills: P.validSkills(progress, P.unlockedSkills(progress).map((def) => def.id)),
+    skills: P.validSkills(progress, P.learnedSkills(progress).map((def) => def.id)),
     heroStats: P.stats(progress),
     // 화면이 넘기는 것과 같은 표. 빠뜨리면 캐릭터 창에서 올린 스킬이 전투에서
     // 1레벨로 나간다.

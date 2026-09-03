@@ -681,7 +681,27 @@ function resolvePlayerSkill(state, def, spot) {
   const heal = (base) => Math.round(base * caster.healPower);
   const harm = (base) => Math.round(base * magicPowerOf(caster));
 
+  // **강화·약화와 마나 나눔은 종류를 보고 가른다.** 나머지가 대상(`targeting`)으로
+  // 갈리는 것과 다른 것은, 같은 "아군 하나"에도 회복·마나·강화가 함께 있기
+  // 때문이다 — 대상만 보면 셋을 구별할 수 없다. 동료 스킬과 같은 함수를 부르므로
+  // 규칙도 하나다(같은 스킬은 겹쳐 쌓이지 않고, 곱하는 자리는 두 곳뿐이다).
+  if (def.stat) {
+    const on = def.kind === 'buff-area' ? alive(state, 'ally').filter((a) => dist(a, point) <= def.radius)
+      : def.kind === 'debuff-area' ? alive(state, 'enemy').filter((e) => dist(e, point) <= def.radius)
+        : [unit];
+    for (const target of on) addAura(state, caster, target, def);
+    return;
+  }
+  if (def.kind === 'mana-ally') { giveMana(state, caster, unit, def.mana); return; }
+  if (def.kind === 'mana-area') {
+    for (const mate of alive(state, 'ally')) {
+      if (dist(mate, point) <= def.radius) giveMana(state, caster, mate, def.mana);
+    }
+    return;
+  }
+
   if (def.mana) caster.mp = Math.min(caster.maxMp, caster.mp + def.mana);
+  else if (def.damage) applyDamage(state, caster, unit, harm(def.damage));
   else if (def.targeting === 'ally' && def.heal) applyHeal(state, caster, unit, heal(def.heal));
   else if (def.targeting === 'ally') addDot(state, caster, unit, def, 'heal', heal(def.tick));
   else if (def.targeting === 'enemy') addDot(state, caster, unit, def, 'damage', harm(def.tick));

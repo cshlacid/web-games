@@ -55,6 +55,12 @@
       </div>
 
       <div class="panel">
+        <div class="panel-head"><h2>계열</h2></div>
+        <p class="panel-note">힐러 게임이라 회복을 맡는 계열만 고를 수 있다. 직업 레벨과 스킬 점수는 계열마다 따로 쌓이고, 한번 배운 스킬은 계열을 바꿔도 남는다.</p>
+        <div class="job-cards" id="char-jobs"></div>
+      </div>
+
+      <div class="panel">
         <div class="panel-head">
           <h2>능력치</h2>
           <span class="count" id="attr-points">남은 점수 0</span>
@@ -90,7 +96,7 @@
           <span class="count" id="skill-points">남은 점수 0</span>
           <span class="count" id="skill-open">0 / 8</span>
         </div>
-        <p class="panel-note">직업 레벨이 오르면 새 스킬이 열리고 스킬 점수를 하나 받는다. 점수를 넣으면 효과가 오르고 소비 마나도 조금 오른다. 전투에는 이 중 다섯까지 가져간다. 적힌 회복량은 기준값이고, 여기에 회복력 배수가 곱해진다.</p>
+        <p class="panel-note">스킬은 저절로 열리지 않는다. 직업 레벨이 오르면 스킬 점수를 받고, 배우는 데 1점·한 칸 올리는 데 1점이 든다. 점수를 넣으면 효과가 오르고 소비 마나도 조금 오른다. 전투에는 배운 것 중 다섯까지 가져간다. 적힌 회복량은 기준값이고, 여기에 회복력 배수가 곱해진다.</p>
         <ul class="skill-list" id="char-skills"></ul>
       </div>
     </div>

@@ -284,9 +284,10 @@ function renderCharacter() {
   const stats = P.stats(progress);
   const max = progress.charLevel >= D.LEVEL.maxLevel;
 
+  const job = D.heroJob(progress.job);
   const jobSlot = $('char-job');
   jobSlot.textContent = '';
-  jobSlot.append(jobTag('healer', D.HERO.spec, D.HERO.race));
+  jobSlot.append(jobTag('healer', job.spec, D.HERO.race));
 
   $('char-gold').textContent = `${progress.gold} 골드`;
 
@@ -294,8 +295,12 @@ function renderCharacter() {
   levels.textContent = '';
   levels.append(levelRow('캐릭터', progress.charLevel, progress.charExp,
     max ? 0 : D.LEVEL.charExpTo(progress.charLevel)));
-  levels.append(levelRow('힐러', progress.jobLevel, progress.jobExp,
-    progress.jobLevel >= D.LEVEL.maxLevel ? 0 : D.LEVEL.jobExpTo(progress.jobLevel)));
+  // 직업 레벨은 계열마다 따로 쌓이고 상한도 계열이 정한다. 이름을 '힐러'로
+  // 두면 계열을 바꿔도 같은 줄로 보인다.
+  const jobLv = P.jobLevel(progress);
+  const jobMax = D.jobMaxLevel(progress.job);
+  levels.append(levelRow(`${job.name} (${jobLv}/${jobMax})`, jobLv, P.jobExpOf(progress),
+    jobLv >= jobMax ? 0 : D.LEVEL.jobExpTo(jobLv)));
 
   const statList = $('char-stats');
   statList.textContent = '';
@@ -336,13 +341,16 @@ function renderCharacter() {
   renderPotions();
   renderInventory();
 
+  renderJobs();
+
   const skills = $('char-skills');
   skills.textContent = '';
   const open = new Set(P.unlockedSkills(progress).map((def) => def.id));
   const points = P.freeSkillPoints(progress);
-  for (const base of Object.values(D.PLAYER_SKILLS)) {
+  for (const base of D.heroSkillsOf(progress.job)) {
     const isOpen = open.has(base.id);
     const level = P.skillLevel(progress, base.id);
+    const known = level > 0;
     const def = P.skillDef(progress, base.id);
 
     const row = el('li', isOpen ? 'skill-row' : 'skill-row locked');
@@ -352,10 +360,12 @@ function renderCharacter() {
     name.append(document.createTextNode(base.name));
     name.append(text('span', 'job', base.type));
     // 레벨을 이름 옆에 적는다. 효과 줄에만 두면 어느 스킬에 점수를 넣었는지
-    // 목록을 훑어서는 알 수 없다.
-    if (isOpen) name.append(text('span', 'job', `Lv ${level} / ${D.SKILL.max}`));
+    // 목록을 훑어서는 알 수 없다. **아직 안 배운 것은 레벨이 아니라 그렇게 적는다.**
+    if (known) name.append(text('span', 'job', `Lv ${level} / ${D.SKILL.max}`));
+    else if (isOpen) name.append(text('span', 'job', '안 배움'));
     body.append(name);
-    body.append(text('div', 'pick-sub', isOpen ? base.desc : `힐러 Lv ${base.unlock}에 열린다`));
+    body.append(text('div', 'pick-sub',
+      isOpen ? base.desc : `${job.name} Lv ${base.unlock}에 배울 수 있다`));
     if (isOpen) {
       // 지금 레벨에서 실제로 얼마를 하는지. 정의에 적힌 문장만으로는 점수를
       // 넣은 것이 화면에 보이지 않는다.
@@ -367,15 +377,17 @@ function renderCharacter() {
     row.append(body);
 
     if (isOpen) {
-      const add = el('button', 'attr-add');
+      // **배우는 것과 올리는 것이 같은 점수를 쓴다.** 단추를 하나로 두면 처음
+      // 누르는 것이 무슨 일인지 알 수 없어, 아직 안 배운 스킬에는 이름을 적는다.
+      const add = el('button', known ? 'attr-add' : 'attr-add learn');
       add.type = 'button';
-      add.textContent = '＋';
+      add.textContent = known ? '＋' : '배우기';
       add.disabled = points <= 0 || level >= D.SKILL.max;
-      add.setAttribute('aria-label', `${base.name} 레벨 올리기`);
+      add.setAttribute('aria-label', known ? `${base.name} 레벨 올리기` : `${base.name} 배우기`);
       add.addEventListener('click', () => {
-        const raised = P.raiseSkill(progress, base.id);
-        sound.play(raised.ok ? 'click' : 'deny');
-        if (!raised.ok) return;
+        const spent = known ? P.raiseSkill(progress, base.id) : P.learnSkill(progress, base.id);
+        sound.play(spent.ok ? 'click' : 'deny');
+        if (!spent.ok) return;
         persist();
         renderCharacter();
       });
@@ -384,10 +396,51 @@ function renderCharacter() {
     skills.append(row);
   }
   $('skill-points').textContent = points ? `남은 점수 ${points}` : '남은 점수 없음';
-  $('skill-open').textContent = `${open.size} / ${Object.keys(D.PLAYER_SKILLS).length}`;
+  $('skill-open').textContent = `${P.learnedSkills(progress).length} / ${D.heroSkillsOf(progress.job).length}`;
 }
 
 
+
+// 고를 수 있는 계열. **회복 계열만 있다** — 자료에 그것만 적혀 있고, 화면은
+// 표를 그대로 그린다.
+//
+// 지금 계열도 목록에 남긴다. 빠지면 무엇을 맡고 있는지가 이 자리에서 사라지고,
+// 계열마다 따로 쌓인 레벨을 견줄 수도 없다.
+function renderJobs() {
+  const progress = app.progress;
+  const box = $('char-jobs');
+  box.textContent = '';
+  for (const job of Object.values(D.HERO_JOBS)) {
+    const now = progress.job === job.id;
+    const can = P.canChangeJob(progress, job.id);
+    const level = (progress.jobs || {})[job.id];
+    const button = el('button', 'job-card');
+    button.type = 'button';
+    button.setAttribute('aria-pressed', String(now));
+    button.disabled = now || !can.ok;
+
+    const head = el('div', 'pick-name');
+    head.append(document.createTextNode(job.name));
+    // 겪어 본 계열만 레벨을 적는다. 안 겪은 계열에 "Lv 1"을 적으면 이미 맡아 본
+    // 것으로 보인다.
+    if (level) head.append(text('span', 'job', `Lv ${level.level} / ${job.maxLevel}`));
+    button.append(head);
+    button.append(text('div', 'pick-sub', job.desc));
+    button.append(text('div', 'pick-sub dim',
+      now ? '지금 맡고 있다' : can.ok ? '전직할 수 있다' : can.reason));
+
+    button.addEventListener('click', () => {
+      const moved = P.changeJob(progress, job.id);
+      sound.play(moved.ok ? 'click' : 'deny');
+      if (!moved.ok) return;
+      // 등록해 둔 다섯이 앞 계열의 것이라 걸러졌다. 화면이 들고 있는 것도 맞춘다.
+      app.skills = progress.skills.slice();
+      persist();
+      renderCharacter();
+    });
+    box.append(button);
+  }
+}
 
 // 스킬 하나의 시전 시간과 사거리. 아군·적 스킬과 주인공 스킬이 같은 형태로
 // 적혀 있어 한 함수로 쓴다.
@@ -706,7 +759,7 @@ function renderRoster() {
   const heroBody = el('div', 'pick-body');
   const heroName = el('div', 'pick-name');
   heroName.append(document.createTextNode(`주인공 Lv ${app.progress.charLevel}`));
-  heroName.append(jobTag('healer', D.HERO.spec, D.HERO.race));
+  heroName.append(jobTag('healer', D.heroJob(app.progress.job).spec, D.HERO.race));
   heroBody.append(heroName);
   const stats = P.stats(app.progress);
   heroBody.append(text('div', 'pick-sub',
@@ -902,7 +955,7 @@ function renderSkillPicks() {
   const list = $('skill-picks');
   list.textContent = '';
 
-  for (const base of P.unlockedSkills(app.progress)) {
+  for (const base of P.learnedSkills(app.progress)) {
     // 등록 화면에도 지금 레벨의 수치가 떠야 한다. 정의를 그대로 보면 레벨을
     // 올린 스킬이 1레벨의 마나를 먹는 것으로 보인다.
     const def = P.skillDef(app.progress, base.id);
@@ -942,6 +995,15 @@ function renderSkillPicks() {
     const item = el('li');
     item.append(button);
     list.append(item);
+  }
+  // **배운 것이 하나도 없을 수 있다** — 막 전직한 직후가 그렇다. 빈 목록만 두면
+  // "전투 시작"이 꺼져 있는 이유가 화면에 없다.
+  if (!list.children.length) {
+    const empty = el('li');
+    empty.append(text('div', 'pick-sub',
+      `지금 계열(${D.heroJob(app.progress.job).name})에서 배운 스킬이 없다.`
+      + ' 캐릭터 화면에서 스킬 점수로 배운다.'));
+    list.append(empty);
   }
   $('skill-count').textContent = `${app.skills.length} / ${D.SKILL_MAX}`;
 }
@@ -991,7 +1053,7 @@ function openParty(quest) {
   const remembered = app.skills.length ? app.skills : app.progress.skills;
   app.skills = P.validSkills(app.progress, remembered.length
     ? remembered
-    : P.unlockedSkills(app.progress).map((def) => def.id));
+    : P.learnedSkills(app.progress).map((def) => def.id));
   rememberSkills();
 
   renderBrief();
@@ -1710,7 +1772,8 @@ function openResult(state) {
     + ` · 생존 ${survived}/${members.length}`;
 
   // 경험치를 먼저 넣는다. 레벨이 오른 뒤라야 아래에서 계산하는 스탯이 맞다.
-  const before = { char: app.progress.charLevel, job: app.progress.jobLevel };
+  const before = { char: app.progress.charLevel, job: P.jobLevel(app.progress) };
+  const job = D.heroJob(app.progress.job);
   const gained = P.addExp(app.progress, reward.charExp, reward.jobExp);
   app.progress.gold += reward.gold;
 
@@ -1726,14 +1789,16 @@ function openResult(state) {
   expList.textContent = '';
   expList.append(levelRow(`캐릭터 +${reward.charExp}`, app.progress.charLevel, app.progress.charExp,
     app.progress.charLevel >= D.LEVEL.maxLevel ? 0 : D.LEVEL.charExpTo(app.progress.charLevel)));
-  expList.append(levelRow(`힐러 +${reward.jobExp}`, app.progress.jobLevel, app.progress.jobExp,
-    app.progress.jobLevel >= D.LEVEL.maxLevel ? 0 : D.LEVEL.jobExpTo(app.progress.jobLevel)));
+  const jobLv = P.jobLevel(app.progress);
+  const jobMax = D.jobMaxLevel(app.progress.job);
+  expList.append(levelRow(`${job.name} +${reward.jobExp}`, jobLv, P.jobExpOf(app.progress),
+    jobLv >= jobMax ? 0 : D.LEVEL.jobExpTo(jobLv)));
 
   const lines = [`처치 ${reward.kills} · 모험가 길드 ${reward.guild} · 회복 ${reward.healExp}`];
   if (gained.charLevels) lines.push(`캐릭터 레벨 ${before.char} → ${app.progress.charLevel}`);
-  if (gained.jobLevels) lines.push(`힐러 레벨 ${before.job} → ${app.progress.jobLevel}`);
+  if (gained.jobLevels) lines.push(`${job.name} 레벨 ${before.job} → ${jobLv}`);
   if (gained.unlocked.length) {
-    lines.push(`새 스킬: ${gained.unlocked.map((def) => def.name).join(', ')}`);
+    lines.push(`배울 수 있는 스킬: ${gained.unlocked.map((def) => def.name).join(', ')}`);
   }
   $('exp-note').textContent = lines.join(' · ');
 

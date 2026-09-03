@@ -27,11 +27,14 @@ const gear = (defId, tier) => Items.make(defId, tier || 0, 3);
 // --- 시작 상태 ----------------------------------------------------------
 {
   const progress = P.create();
-  check('레벨 1에서 시작', [progress.charLevel, progress.jobLevel], [1, 1]);
+  check('레벨 1에서 시작', [progress.charLevel, P.jobLevel(progress)], [1, 1]);
+  check('사제로 시작', progress.job, D.HERO_JOB_START);
   check('빈손으로 시작', [progress.inventory.length, progress.gold], [0, 0]);
   check('명부를 들고 시작', progress.roster.length, Roster.START_SIZE);
   check('물약을 조금 들고 시작', progress.potions.mana > 0, true);
-  check('처음 열린 스킬은 둘', P.unlockedSkills(progress).map((def) => def.id), ['touch', 'quick']);
+  check('처음 배울 수 있는 것은 둘', P.unlockedSkills(progress).map((def) => def.id), ['touch', 'quick']);
+  // 아무것도 안 배운 채로 편성 화면에 서면 "전투 시작"이 왜 꺼져 있는지 알 수 없다.
+  check('첫 스킬 하나는 배운 채로 시작', P.learnedSkills(progress).map((def) => def.id), ['touch']);
 
   const stats = P.stats(progress);
   check('기본 체력은 체력 능력치에서 나온다', stats.hp, D.HERO.attrs.vit * D.ATTR.hpPerVit);
@@ -64,28 +67,78 @@ const gear = (defId, tier) => Items.make(defId, tier || 0, 3);
   // 두 레벨은 따로 오른다. 힐만 하다 끝난 전투에서도 직업 레벨은 올라야 한다.
   const healOnly = P.create();
   P.addExp(healOnly, 0, D.LEVEL.jobExpTo(1));
-  check('직업 레벨만 오를 수 있다', [healOnly.charLevel, healOnly.jobLevel], [1, 2]);
+  check('직업 레벨만 오를 수 있다', [healOnly.charLevel, P.jobLevel(healOnly)], [1, 2]);
 
   // 최대 레벨을 넘지 않는다.
   const capped = P.create();
   P.addExp(capped, 1e9, 1e9);
   check('최대 레벨에서 멈춘다', capped.charLevel, D.LEVEL.maxLevel);
   check('최대에서는 경험치를 쌓지 않는다', capped.charExp, 0);
+  // **직업 레벨의 천장은 계열이 정하고 캐릭터 레벨보다 훨씬 낮다.** 여기가
+  // 무너지면 결국 다 배우게 되어 무엇을 배울지 고르는 일이 사라진다.
+  check('직업 레벨은 계열의 상한에서 멈춘다', P.jobLevel(capped), D.jobMaxLevel(capped.job));
+  check('계열 상한이 캐릭터 상한보다 낮다', D.jobMaxLevel('priest') < D.LEVEL.maxLevel, true);
 }
 
-// --- 스킬 해금 ----------------------------------------------------------
+// --- 스킬을 배우고 올린다 ------------------------------------------------
 {
   const progress = P.create();
   const before = P.unlockedSkills(progress).length;
   const gained = P.addExp(progress, 0, D.LEVEL.jobExpTo(1));
-  check('열린 스킬이 늘었다', P.unlockedSkills(progress).length > before, true);
+  check('배울 수 있는 스킬이 늘었다', P.unlockedSkills(progress).length > before, true);
   check('무엇이 열렸는지 알려 준다', gained.unlocked.map((def) => def.id), ['regen']);
 
-  // 열리지 않은 스킬은 등록할 수 없다. 저장본을 손대도 마찬가지여야 한다.
-  check('안 열린 스킬은 걸러진다',
-    P.validSkills(progress, ['touch', 'pyre', 'quick']), ['touch', 'quick']);
-  check('다섯을 넘겨도 다섯까지', P.validSkills(progress, ['touch', 'quick', 'regen', 'touch', 'quick', 'regen']).length,
-    D.SKILL_MAX);
+  // **열린 것과 배운 것은 다르다.** 저절로 열리던 때에는 이 둘이 같았다.
+  check('열렸다고 배운 것은 아니다', P.learnedSkills(progress).map((def) => def.id), ['touch']);
+  check('안 배운 것은 등록할 수 없다',
+    P.validSkills(progress, ['touch', 'pyre', 'quick']), ['touch']);
+
+  P.learnSkill(progress, 'quick');
+  P.learnSkill(progress, 'regen');
+  check('배우면 등록할 수 있다',
+    P.validSkills(progress, ['touch', 'pyre', 'quick', 'regen']), ['touch', 'quick', 'regen']);
+  check('다섯을 넘겨도 다섯까지',
+    P.validSkills(progress, ['touch', 'quick', 'regen', 'touch', 'quick', 'regen', 'touch',
+      'quick', 'regen']).length, D.SKILL_MAX);
+}
+
+// --- 계열을 바꾼다 --------------------------------------------------------
+{
+  const progress = P.create();
+  check('조건을 못 채우면 못 바꾼다', P.canChangeJob(progress, 'bard').ok, false);
+  check('맡고 있는 계열로는 못 바꾼다', P.canChangeJob(progress, progress.job).ok, false);
+  check('없는 계열로는 못 바꾼다', P.canChangeJob(progress, '없는계열').ok, false);
+  check('안 바뀐 채로 남는다', P.changeJob(progress, 'bard').ok, false);
+
+  // 사제로 조금 키워 둔다. 되돌아왔을 때 그대로 있어야 한다.
+  P.addExp(progress, 0, D.LEVEL.jobExpTo(1) + D.LEVEL.jobExpTo(2));
+  P.learnSkill(progress, 'quick');
+  P.learnSkill(progress, 'regen');
+  const priestLevel = P.jobLevel(progress);
+  const priestSkills = P.learnedSkills(progress).map((def) => def.id);
+  progress.skills = ['touch', 'quick'];
+
+  progress.charLevel = D.HERO_JOBS.bard.need.charLevel;
+  check('조건을 채우면 바꿀 수 있다', P.changeJob(progress, 'bard').ok, true);
+  check('계열이 바뀐다', progress.job, 'bard');
+  check('새 계열은 1레벨부터', P.jobLevel(progress), 1);
+  // 앞 계열의 스킬을 든 채로 전투가 시작되면 안 된다.
+  check('등록해 둔 것은 걸러진다', progress.skills, []);
+  check('새 계열에서는 아무것도 안 배운 상태', P.learnedSkills(progress), []);
+
+  // 점수는 계열마다 따로 쌓이고 따로 쓰인다.
+  check('점수도 새 계열 것', P.freeSkillPoints(progress), D.SKILL.start);
+  check('다른 계열 스킬은 못 배운다', P.learnSkill(progress, 'ripple').ok, false);
+  check('제 계열 스킬은 배운다', P.learnSkill(progress, 'chord').ok, true);
+  P.addExp(progress, 0, D.LEVEL.jobExpTo(1));
+  check('음유시인도 레벨이 오른다', P.jobLevel(progress), 2);
+
+  // **되돌아오면 그대로 있다.** 아니면 아무도 다른 계열을 겪어 보지 않는다.
+  check('사제로 되돌아온다', P.changeJob(progress, 'priest').ok, true);
+  check('직업 레벨이 남아 있다', P.jobLevel(progress), priestLevel);
+  check('배운 스킬도 남아 있다', P.learnedSkills(progress).map((def) => def.id), priestSkills);
+  check('음유시인 레벨도 따로 남는다', progress.jobs.bard.level, 2);
+  check('음유시인에서 배운 것도 남는다', progress.learned.chord, 1);
 }
 
 // --- 인벤토리와 장착 ----------------------------------------------------
@@ -170,10 +223,11 @@ const gear = (defId, tier) => Items.make(defId, tier || 0, 3);
   saved.inventory = [gear('staff', 1), { defId: '없는물건', tier: 0 }, null];
   saved.equipped.weapon = gear('robe', 0);   // 슬롯이 맞지 않는 장착
   saved.potions = { mana: 99, health: -3 };  // 범위를 벗어난 값
-  saved.jobLevel = 3;
-  // 받은 점수는 둘뿐인데 넷을 쓴 저장본. 손으로 고쳐도 점수가 늘지 않아야 한다.
-  saved.skillLevels = { touch: 3, quick: 3, regen: 9 };
-  // 등록해 둔 스킬. 아직 안 열린 것과 없는 것이 섞여 있어도 열린 것만 남아야 한다.
+  saved.jobs = { priest: { level: 3, exp: 0 }, bard: { level: 99, exp: 0 } };
+  // 받은 점수는 넷뿐인데 훨씬 많이 쓴 저장본. 손으로 고쳐도 점수가 늘지 않아야
+  // 하고, **계열을 넘어 나눠 주어서도 안 된다.**
+  saved.learned = { touch: 3, quick: 3, regen: 9, chord: 5 };
+  // 등록해 둔 스킬. 아직 안 배운 것과 없는 것이 섞여 있어도 배운 것만 남아야 한다.
   saved.skills = ['quick', 'pyre', '없는스킬', 'touch'];
   saved.lootMethod = 'dice';
   check('저장된다', P.save(saved), true);
@@ -199,6 +253,20 @@ const gear = (defId, tier) => Items.make(defId, tier || 0, 3);
   check('스킬 레벨이 남는다', P.skillLevel(loaded, 'touch'), 3);
   check('받은 점수를 넘지 않는다', P.spentSkillPoints(loaded), P.earnedSkillPoints(loaded));
   check('남은 점수는 0', P.freeSkillPoints(loaded), 0);
+  // 조건을 못 채운 계열이 적혀 있으면 처음 계열로 되돌린다 — 저장본을 손대서
+  // 전직 조건을 건너뛸 수 있으면 조건이 아무것도 아니게 된다.
+  const forged = P.create();
+  forged.job = 'bard';
+  forged.charLevel = 1;
+  P.save(forged);
+  check('조건을 못 채운 계열은 되돌린다', P.load().job, D.HERO_JOB_START);
+  P.save(saved);
+
+  // 계열 상한을 넘겨 적어 두어도 그 계열의 천장에서 잘린다.
+  check('직업 레벨은 계열 상한으로 자른다', loaded.jobs.bard.level, D.jobMaxLevel('bard'));
+  // 사제 예산으로 음유시인 스킬을 배운 것이 되면 계열을 나눈 뜻이 사라진다.
+  check('점수는 계열마다 따로 센다',
+    P.spentSkillPoints(loaded, 'bard') <= P.earnedSkillPoints(loaded, 'bard'), true);
 
   // 판이 바뀌면 저장본을 통째로 버린다. 어중간하게 읽으면 더 이상한 상태가 된다.
   // 모르는 방식이 적혀 있으면 기본값으로 돌린다. 저장본을 손대도 전투로
@@ -215,21 +283,32 @@ const gear = (defId, tier) => Items.make(defId, tier || 0, 3);
   delete global.localStorage;
 }
 
-// --- 스킬 레벨과 점수 ---------------------------------------------------
+// --- 스킬 점수 -----------------------------------------------------------
 {
-  // 직업 레벨이 오르면 점수를 받는다. 능력치 점수와 같은 셈법이다 —
-  // 받은 것에서 쓴 것을 뺀다.
+  // **배우는 데 1, 한 칸 올리는 데 1.** 예전에는 직업 레벨만 되면 저절로 열리고
+  // 점수는 올리는 데만 썼다. 지금은 무엇을 배울지가 곧 점수를 어디에 쓸지다.
   const progress = P.create();
-  check('1레벨에는 점수가 없다', P.freeSkillPoints(progress), 0);
-  check('점수 없이는 못 올린다', P.raiseSkill(progress, 'touch').ok, false);
+  check('처음 점수는 시작 점수에서 배운 하나를 뺀 만큼',
+    P.freeSkillPoints(progress), D.SKILL.start - 1);
 
-  progress.jobLevel = 6;
-  check('레벨마다 하나씩 받는다', P.freeSkillPoints(progress), 5 * D.SKILL.pointsPerLevel);
+  check('배운다', P.learnSkill(progress, 'quick').level, 1);
+  check('배우면 점수가 준다', P.freeSkillPoints(progress), D.SKILL.start - 2);
+  check('점수가 없으면 못 배운다', P.learnSkill(progress, 'regen').ok, false);
+
+  progress.jobs.priest.level = D.jobMaxLevel('priest');
+  const cap = D.SKILL.start + (D.jobMaxLevel('priest') - 1) * D.SKILL.pointsPerLevel;
+  check('레벨마다 하나씩 받는다', P.freeSkillPoints(progress), cap - 2);
+  // **상한이 낮아 다 배울 수는 없다.** 그래야 무엇을 들고 갈지가 선택이 된다.
+  check('점수로 계열의 스킬을 다 배울 수는 없다',
+    cap < D.heroSkillsOf('priest').length + (D.SKILL.max - 1), true);
+
   check('올린다', P.raiseSkill(progress, 'touch').level, 2);
-  check('쓴 만큼 준다', P.freeSkillPoints(progress), 5 * D.SKILL.pointsPerLevel - 1);
-  check('없는 스킬은 못 올린다', P.raiseSkill(progress, '없는스킬').ok, false);
-  // 열리기 전에 올려 두면 직업 레벨이 새 스킬을 여는 뜻이 옅어진다.
-  check('안 열린 스킬은 못 올린다', P.raiseSkill(progress, 'pyre').ok, false);
+  check('쓴 만큼 준다', P.freeSkillPoints(progress), cap - 3);
+  check('없는 스킬은 못 배운다', P.learnSkill(progress, '없는스킬').ok, false);
+  check('이미 배운 것은 다시 못 배운다', P.learnSkill(progress, 'touch').ok, false);
+  check('안 배운 것은 못 올린다', P.raiseSkill(progress, 'ripple').ok, false);
+  // 다른 계열의 스킬은 점수가 남아 있어도 손댈 수 없다.
+  check('다른 계열 스킬은 못 배운다', P.learnSkill(progress, 'chord').ok, false);
 
   // 올린 레벨이 실제 수치로 이어진다. 화면과 전투가 이 함수를 같이 본다.
   const def = P.skillDef(progress, 'touch');
@@ -240,7 +319,7 @@ const gear = (defId, tier) => Items.make(defId, tier || 0, 3);
 
   // 상한까지만 오른다. 남은 점수가 있어도 더 넣을 수 없다.
   const maxed = P.create();
-  maxed.jobLevel = D.LEVEL.maxLevel;
+  maxed.jobs.priest.level = D.jobMaxLevel('priest');
   for (let i = 0; i < D.SKILL.max + 3; i++) P.raiseSkill(maxed, 'touch');
   check('스킬 레벨에 상한이 있다', P.skillLevel(maxed, 'touch'), D.SKILL.max);
   check('상한에서는 못 올린다', P.raiseSkill(maxed, 'touch').ok, false);
