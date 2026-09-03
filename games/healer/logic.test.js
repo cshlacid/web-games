@@ -891,13 +891,15 @@ function cast(state, skillId, target) {
   check('올리는 수치가 적혀 있다', tank.auras[0].stat, 'atk');
   check('적에게는 안 걸린다', foe.auras.length, 0);
 
-  // 약화: 고른 적 하나에게.
-  cast(state, 'dissonance', { uid: foe.uid });
-  check('약화가 적에게 걸린다', foe.auras.map((a) => a.skillId), ['dissonance']);
+  // 약화: 고른 적 하나에게. **만가가 단일, 불협화음이 광역이다** — 동료 음유시인의
+  // 같은 이름이 그렇게 생겼고, 한 이름이 두 모양이면 같은 기술로 보이지 않는다.
+  cast(state, 'lament', { uid: foe.uid });
+  check('약화가 적에게 걸린다', foe.auras.map((a) => a.skillId), ['lament']);
   check('약화는 아군에게 안 걸린다', tank.auras.length, 1);
 
   // 광역 약화: 기준점 주변 적 모두에게.
-  cast(state, 'lament', { x: foe.x, y: foe.y });
+  L.hero(state).mp = L.hero(state).maxMp;
+  cast(state, 'dissonance', { x: foe.x, y: foe.y });
   check('광역 약화가 적에게 걸린다', foe.auras.length, 2);
 
   // 마나 나눔: 제 마나값보다 많이 준다(노래로 채우는 것이지 제 것을 나누는 것이 아니다).
@@ -1077,6 +1079,37 @@ function cast(state, skillId, target) {
     D.heroSkillsOf('priest').some((def) => def.stat), false);
 }
 
+// --- 같은 기술은 한 번만 적는다 --------------------------------------------
+//
+// 주인공과 동료가 같은 기술을 스물여덟 개 나눠 쓴다. 두 벌로 적어 두었을 때에는
+// 정화가 동료는 190, 주인공은 90을 회복했고 만가는 한쪽이 광역이었다.
+{
+  const twins = Object.keys(D.PLAYER_SKILLS).filter((id) => D.UNIT_SKILLS[id]);
+  check('두 표가 나눠 쓰는 기술이 있다', twins.length > 20, true);
+
+  const split = twins.filter((id) => {
+    const h = D.PLAYER_SKILLS[id], u = D.UNIT_SKILLS[id];
+    return h.name !== u.name || h.icon !== u.icon || h.kind !== u.kind;
+  });
+  check('나눠 쓰는 기술은 이름·아이콘·종류가 같다', split, []);
+
+  // 아이콘 하나를 서로 다른 기술이 쓰면 스킬바에서 무엇을 누르는지 알 수 없다.
+  const byIcon = {};
+  for (const def of Object.values(D.PLAYER_SKILLS).concat(Object.values(D.UNIT_SKILLS))) {
+    (byIcon[def.icon] = byIcon[def.icon] || new Set()).add(def.id);
+  }
+  check('아이콘 하나에 기술 하나',
+    Object.entries(byIcon).filter(([, set]) => set.size > 1).map(([icon]) => icon), []);
+
+  // 이름도 마찬가지다. 같은 이름이 서로 다른 기술이면 편람에서 구별되지 않는다.
+  const byName = {};
+  for (const def of Object.values(D.PLAYER_SKILLS).concat(Object.values(D.UNIT_SKILLS))) {
+    (byName[def.name] = byName[def.name] || new Set()).add(def.id);
+  }
+  check('이름 하나에 기술 하나',
+    Object.entries(byName).filter(([, set]) => set.size > 1).map(([name]) => name), []);
+}
+
 // --- 동료의 상위 계열 -----------------------------------------------------
 //
 // **레벨이 오르면 계열이 한 번 올라간다.** 목록을 통째로 새로 짜지 않고 아래
@@ -1125,6 +1158,32 @@ function cast(state, skillId, target) {
   const low = battle({ party: [{ defId: 'bran', level: 1 }] });
   check('낮은 레벨은 아래 계열 그대로',
     low.units.find((u) => u.defId === 'bran').spec, 'tank');
+}
+
+// --- 계열을 바꾼 동료 ------------------------------------------------------
+//
+// 전투는 명부를 들여다보지 않으므로 파티 항목이 바꾼 계열과 배운 것을 함께
+// 넘긴다. 넘기지 않으면 편성 화면에 적힌 계열과 전장의 스킬이 갈린다.
+{
+  const state = battle({ party: [{ defId: 'mira', level: 8, name: '시험용 미라',
+    spec: 'mage', learned: ['snipe', 'volley', 'aimed', 'quickShot'] }] });
+  const mate = unit(state, '시험용 미라');
+  check('전투가 바꾼 계열을 쓴다', mate.spec, 'mage');
+  check('그림도 따라간다', mate.sprite, 'mage');
+  const ids = mate.skills.map((s) => s.id);
+  check('넷을 넘지 않는다', ids.length <= D.UNIT_SKILL_MAX, true);
+  const borrowed = ['snipe', 'volley', 'aimed', 'quickShot'];
+  check('배운 적 없는 계열의 스킬은 안 든다',
+    ids.every((id) => D.SPEC_SKILLS.mage.includes(id) || borrowed.includes(id)), true);
+
+  // **누가 무엇을 드는지는 이름이 정한다**(취향). 그래서 한 캐릭터로는 섞였는지를
+  // 볼 수 없고, 여러 이름을 놓고 "섞이는 사람이 있다"를 본다.
+  const names = ['가', '나', '다', '라', '마', '바', '사', '아'];
+  const mixed = names.filter((name) =>
+    D.skillsFor('mage', 8, D.skillSeed(name), null, borrowed)
+      .some((id) => borrowed.includes(id)));
+  check('배워 온 것을 섞어 드는 사람이 있다', mixed.length > 0, true);
+  check('제 계열만 드는 사람도 있다', mixed.length < names.length, true);
 }
 
 // --- 무리 사이의 이동 ---------------------------------------------------

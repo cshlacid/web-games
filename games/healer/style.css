@@ -971,6 +971,18 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 /* 배우기 단추는 글자라 폭이 넓다. ＋와 같은 칸에 두면 글자가 잘린다. */
 .attr-add.learn { width: auto; padding: 0 10px; font-size: 13px; font-weight: 600; }
 
+/* 동료의 계열 바꾸기. 칩 줄이라 시트 안에서 스킬 칩과 같은 결로 읽힌다. */
+.spec-swap { display: grid; gap: 6px; padding: 10px 0 0; border-top: 1px solid var(--line); }
+.spec-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.spec-pick { cursor: pointer; }
+.spec-pick[aria-pressed="true"] { border-color: currentColor; background: var(--sel); }
+.spec-pick:disabled { cursor: default; opacity: 0.5; }
+.spec-pick[aria-pressed="true"]:disabled { opacity: 1; }
+.spec-tank { color: var(--spec-tank); } .spec-warrior { color: var(--spec-warrior); }
+.spec-rogue { color: var(--spec-rogue); } .spec-archer { color: var(--spec-archer); }
+.spec-mage { color: var(--spec-mage); } .spec-priest { color: var(--spec-priest); }
+.spec-bard { color: var(--spec-bard); }
+
 /* 계열 고르기. 한 줄에 둘로 고정하는 것은 편성 카드와 같은 이유다 — auto-fill로
    두면 좁은 기기에서 한 칸으로 접혀 견주는 화면이 아니게 된다. */
 .job-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }

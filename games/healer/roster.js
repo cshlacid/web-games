@@ -74,18 +74,59 @@ function create(seed) {
 }
 
 const jobOf = (member) => D.COMPANIONS[member.defId].job;
-// **레벨이 오르면 계열이 한 번 올라간다.** 이름 짓기만은 정의에 적힌 계열을 보고
-// 하는데, 이름은 처음 만들 때 정해져 신원이 되기 때문이다 — 상위로 올라갔다고
-// 이름 조각이 바뀌면 같은 동료가 다른 사람이 된다.
-const specOf = (member) => D.specAt(D.COMPANIONS[member.defId].spec, member.level);
 const defOf = (member) => D.COMPANIONS[member.defId];
+
+// **계열은 세 겹으로 정해진다**: 정의에 적힌 것 → 바꾼 것(`member.spec`) → 레벨이
+// 올려 준 상위(`D.specAt`). 이름 짓기만은 정의에 적힌 계열을 보는데, 이름은 처음
+// 만들 때 정해져 신원이 되기 때문이다 — 계열을 바꿨다고 이름 조각이 바뀌면 같은
+// 동료가 다른 사람이 된다.
+const baseSpecOf = (member) => member.spec || D.COMPANIONS[member.defId].spec;
+const specOf = (member) => D.specAt(baseSpecOf(member), member.level);
+// 그림은 계열을 따라간다 — 궁수가 마법사가 되면 손에 든 것이 바뀐다.
+const spriteOf = (member) => D.spriteFor(specOf(member));
 
 // 레벨에 맞춰 실제로 들고 나가는 스킬. 편성 화면이 보여 주는 것과 전투가
 // 쓰는 것이 같아야 하므로 규칙을 한 곳에 둔다 — data.js의 skillsFor 하나다.
 function skillsOf(member) {
   // **씨앗은 이름이다.** 같은 이름이면 같은 동료이므로, 편성 화면에서 본 넷이
   // 전투에서도 그대로 나오고 저장본에 스킬을 적어 둘 필요가 없다.
-  return D.skillsFor(specOf(member), member.level, D.skillSeed(member.name));
+  // **배운 것은 계열을 바꿔도 손에 남는다**(`learned`).
+  return D.skillsFor(specOf(member), member.level, D.skillSeed(member.name),
+    null, member.learned);
+}
+
+// --- 계열 바꾸기 ---------------------------------------------------------
+
+// 그 동료가 고를 수 있는 계열. **역할은 바뀌지 않는다** — 역할이 전투에서 하는
+// 일이고 계열은 그 일을 어떤 손으로 하는가라, 탱커는 탱커인 채로 손만 바꾼다.
+const specChoices = (member) => D.SPEC_CHOICES[jobOf(member)] || [];
+
+function canChangeSpec(member, spec) {
+  if (!specChoices(member).includes(spec)) return { ok: false, reason: '고를 수 없는 계열' };
+  if (spec === baseSpecOf(member)) return { ok: false, reason: '이미 그 계열이다' };
+  if (member.level < D.SPEC_CHANGE_LEVEL) {
+    return { ok: false, reason: `레벨 ${D.SPEC_CHANGE_LEVEL} 필요` };
+  }
+  return { ok: true };
+}
+
+// **지금 들고 다니는 넷은 배운 것으로 남긴다.** 계열을 바꾸면 목록이 통째로
+// 바뀌는데, 그때까지 쓰던 손이 한 번에 사라지면 계열을 바꾸는 것이 곧 잃는
+// 일이 된다. 동료에게 스킬 점수를 따로 두지 않는 것은 관리할 화면이 하나 더
+// 늘기 때문이다 — 그 계열에서 실제로 들고 나가던 것이 곧 배운 것이다.
+function remember(member) {
+  const known = new Set(member.learned || []);
+  for (const id of skillsOf(member)) known.add(id);
+  member.learned = [...known];
+  return member.learned;
+}
+
+function changeSpec(member, spec) {
+  const can = canChangeSpec(member, spec);
+  if (!can.ok) return can;
+  remember(member);
+  member.spec = spec;
+  return { ok: true, spec: specOf(member) };
 }
 
 // --- 성장 ---------------------------------------------------------------
@@ -98,6 +139,8 @@ function gainExp(member, exp) {
     member.level++;
   }
   if (member.level >= D.LEVEL.maxLevel) member.exp = 0;
+  // 레벨이 올라 새로 들게 된 것도 배운 것이다. 계열을 바꾼 뒤에도 남는다.
+  if (member.level !== before) remember(member);
   return member.level - before;
 }
 
@@ -155,6 +198,10 @@ function toParty(member) {
     level: member.level,
     bonus: bonusOf(member),
     potions: potionsOf(member),
+    // 바꾼 계열과 배운 것도 함께 넘긴다. 전투가 명부를 들여다보지 않으므로
+    // 여기서 넘기지 않으면 편성 화면에 적힌 계열과 전장의 스킬이 갈린다.
+    spec: baseSpecOf(member),
+    learned: (member.learned || []).slice(),
   };
 }
 
@@ -194,20 +241,31 @@ function adopt(saved) {
       if (adopted && D.GEAR[adopted.defId] && D.GEAR[adopted.defId].slot === slot) gear[slot] = adopted;
     }
 
-    members.push({
+    const member = {
       name: entry.name,
       defId: entry.defId,
       level: Math.max(1, Math.min(D.LEVEL.maxLevel, entry.level | 0 || 1)),
       exp: Math.max(0, entry.exp | 0),
       gear,
-    });
+      // 배운 것 중 아는 스킬만 남긴다. 자료가 바뀌어 없어진 것이 섞여 있으면
+      // 전투가 시작할 때 빈 스킬을 들고 들어간다.
+      learned: (Array.isArray(entry.learned) ? entry.learned : [])
+        .filter((id) => D.UNIT_SKILLS[id]),
+    };
+    // 바꾼 계열도 그 역할이 고를 수 있는 것인지 다시 본다 — 저장본을 손대서
+    // 탱커가 마법사가 되면 편성 화면의 "탱커 하나"가 뜻을 잃는다.
+    if ((D.SPEC_CHOICES[D.COMPANIONS[entry.defId].job] || []).includes(entry.spec)) {
+      member.spec = entry.spec;
+    }
+    members.push(member);
   }
   return members.length ? members : create();
 }
 
 const api = {
   START_SIZE, MAX_SIZE, JOIN_CHANCE,
-  create, adopt, makeMember, jobOf, specOf, defOf, skillsOf,
+  create, adopt, makeMember, jobOf, specOf, baseSpecOf, spriteOf, defOf, skillsOf,
+  specChoices, canChangeSpec, changeSpec, remember,
   gainExp, awardExp, offerGear, gearOf, bonusOf, potionsOf, toParty, maybeJoin,
 };
 

@@ -75,7 +75,10 @@ function drainEvents(state) {
 // override는 주인공처럼 능력치가 밖에서 정해지는 경우(나눠 준 점수까지 반영해
 // progress.js가 계산한다), bonus는 장비 몫이다. 장비는 능력치가 아니라 결과
 // 수치에 더한다 — 장비까지 레벨로 곱하면 높은 레벨에서 장비가 전부를 결정한다.
-function makeUnit(def, side, uid, x, y, level, override, bonus, potions, name) {
+// hand는 그 캐릭터가 실제로 든 손이다: 바꾼 계열(`spec`)과 다른 계열에서 배워 온
+// 것(`learned`). 정의에 적힌 계열을 그대로 보면 계열을 바꾼 동료가 전장에서만
+// 옛 계열의 스킬을 든다.
+function makeUnit(def, side, uid, x, y, level, override, bonus, potions, name, hand) {
   // 장비가 올린 능력치는 derive 앞에 얹는다 — 그래야 체력 옵션이 최대 체력을,
   // 지능 옵션이 최대 마나와 회복량을 함께 올린다.
   const attrs = (override && override.attrs)
@@ -87,9 +90,12 @@ function makeUnit(def, side, uid, x, y, level, override, bonus, potions, name) {
   const stats = override && override.hp != null
     ? override
     : D.withGear(base, bonus, def.armor);
+  const spec = D.specAt((hand && hand.spec) || def.spec, level);
 
   return {
-    uid, defId: def.id, name: name || def.name, job: def.job, sprite: def.sprite, side, level,
+    uid, defId: def.id, name: name || def.name, job: def.job,
+    // 그림도 계열을 따라간다 — 궁수가 마법사가 되면 손에 든 것이 바뀐다.
+    sprite: D.spriteFor(spec), side, level,
     x, y, attrs,
     hp: stats.hp, maxHp: stats.hp,
     mp: stats.mp, maxMp: stats.mp,
@@ -125,9 +131,10 @@ function makeUnit(def, side, uid, x, y, level, override, bonus, potions, name) {
     // **레벨이 오르면 계열이 한 번 올라간다**(`specAt`). 정의에 적힌 계열을 그대로
     // 보면 12레벨 동료가 상위 스킬을 못 들고 오고, 편성 화면에 적힌 계열과
     // 전투에서 쓰는 것이 갈린다.
-    spec: D.specAt(def.spec, level),
-    skills: D.skillsFor(D.specAt(def.spec, level), level,
-      D.skillSeed(side === 'ally' ? (name || def.name) : `${def.id}:${uid}`), def.always)
+    spec,
+    skills: D.skillsFor(spec, level,
+      D.skillSeed(side === 'ally' ? (name || def.name) : `${def.id}:${uid}`),
+      def.always, hand && hand.learned)
       .map((id) => ({ id, readyAt: 0 })),
     targetUid: null, tauntUid: null, tauntUntil: 0,
     // 걸려 있는 강화·약화. 스킬 하나당 하나라, 다시 걸면 시간이 겹치지 않고
@@ -158,7 +165,8 @@ function placeAllies(state, members) {
     const hero = def.id === D.HERO.id;
     const unit = makeUnit(def, 'ally', hero ? HERO_UID : `a${i}`,
       hero ? 7 : ALLY_LANE[def.job], laneY(i, members.length),
-      member.level, member.stats, member.bonus, member.potions, member.name);
+      member.level, member.stats, member.bonus, member.potions, member.name,
+      { spec: member.spec, learned: member.learned });
     // 웨이브 사이에 되돌아갈 자리. 다음 무리를 만나러 갈 때 대열을 다시 짠다.
     unit.homeX = unit.x;
     unit.homeY = unit.y;
@@ -196,6 +204,8 @@ function createBattle(config) {
       bonus: entry.bonus,
       potions: entry.potions || D.potionsFor(D.COMPANIONS[entry.defId]),
       name: entry.name,
+      spec: entry.spec,
+      learned: entry.learned,
     }))
     .filter((entry) => entry.def);
   const skills = (config.skills || []).filter((id) => D.PLAYER_SKILLS[id]).slice(0, D.SKILL_MAX);

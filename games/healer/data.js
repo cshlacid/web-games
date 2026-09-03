@@ -969,6 +969,31 @@ const SPEC_UP = {
   mage:    { spec: 'archmage',  skills: ['meteor', 'maelstrom'] },
 };
 
+// **동료도 계열을 바꾼다.** 역할(`job`)은 그대로 두고 계열만 바꾸는 것이라,
+// "역할은 전투에서 하는 일, 계열은 그 일을 어떤 손으로 하는가"라는 두 겹 구조를
+// 그대로 쓴다 — 탱커가 마법사가 되면 편성 화면이 보장하는 "탱커 하나, 힐러 하나"가
+// 뜻을 잃는다. 탱커가 전사를 고를 수 있는 것은 전사가 도발과 굳히기를 들고 있어
+// 역할을 바꾸지 않고도 손이 달라지기 때문이다.
+const SPEC_CHOICES = {
+  tank: ['tank', 'warrior'],
+  dealer: ['warrior', 'rogue', 'archer', 'mage'],
+  healer: ['priest', 'bard'],
+};
+
+// 바꿀 수 있게 되는 레벨. 1레벨부터 바꿀 수 있으면 명부를 받자마자 전부 갈아
+// 끼우게 되어, 처음 뽑힌 계열이 아무 뜻도 없어진다.
+const SPEC_CHANGE_LEVEL = 5;
+
+// 그 계열이 쓰는 그림. **상위 계열은 아래 계열의 그림을 그대로 쓴다**(같은 사람이
+// 강해진 것이라). 계열을 바꾸는 것은 다르다 — 궁수가 마법사가 되면 손에 든 것이
+// 바뀌므로 그림도 따라간다.
+function spriteFor(spec) {
+  for (const [base, up] of Object.entries(SPEC_UP)) {
+    if (up.spec === spec) return base;
+  }
+  return spec;
+}
+
 // 상위 계열로 올라가는 레벨. **난이도 검사가 도는 구간(1~10레벨)보다 위에 둔다** —
 // 그 아래에 두면 자동 힐러로 재 둔 승률이 통째로 흔들린다.
 const SPEC_UP_LEVEL = 12;
@@ -1067,9 +1092,16 @@ for (const [base, up] of Object.entries(SPEC_UP)) {
 // 이쪽은 그 개체의 정체다 — 등급이 무엇을 들고 오는가를 정하는 자리라, 같은
 // 수호자 계열이라도 정예 오크만 휩쓸기를 확실히 들고 온다. 취향에 맡겨 두면
 // "광역기를 든 정예"가 우연에 걸리고, 등급을 올린 뜻이 사라진다.
-function skillsFor(spec, level, seed, always) {
+//
+// **learned는 다른 계열에서 배워 온 것이다.** 계열을 바꿔도 손에 남으므로 지금
+// 계열의 목록 뒤에 이어 붙인다. 뒤에 두는 것은 `SPEC_SKILLS`의 순서가 곧 AI의
+// 우선순위이기 때문이다 — 빌려 온 기술이 제 계열의 정체보다 먼저 나가면, 계열을
+// 바꾼 것이 아니라 스킬을 모으는 놀이가 된다.
+function skillsFor(spec, level, seed, always, learned) {
   const list = SPEC_SKILLS[spec] || [];
-  const open = list.filter((id) => level >= UNIT_SKILLS[id].minLevel);
+  const extra = (learned || []).filter((id) => UNIT_SKILLS[id] && list.indexOf(id) < 0);
+  const order = list.concat(extra);
+  const open = order.filter((id) => level >= UNIT_SKILLS[id].minLevel);
   if (seed == null) return open.slice(0, UNIT_SKILL_MAX);
 
   const forced = (always || []).filter((id) => open.indexOf(id) >= 0);
@@ -1077,7 +1109,7 @@ function skillsFor(spec, level, seed, always) {
   const rest = open.filter((id) => !UNIT_SKILLS[id].core && forced.indexOf(id) < 0)
     .sort((a, b) => taste(seed, a) - taste(seed, b));
   const picked = new Set(forced.concat(core, rest).slice(0, UNIT_SKILL_MAX));
-  return list.filter((id) => picked.has(id));
+  return order.filter((id) => picked.has(id));
 }
 
 // 기획서에 나온 다섯 유형을 모두 쓴다: 개별 대상 / 범위 / 장판 / 도트 / 마나 회복.
@@ -1102,6 +1134,20 @@ function skillsFor(spec, level, seed, always) {
 // 적힌 수치는 **스킬 레벨 1의 값**이다. 직업 레벨이 오르면 받는 점수로 스킬
 // 레벨을 올리고, 그때 효과와 소비 마나가 함께 오른다(SKILL, skillAt). desc에
 // 숫자를 적지 않는 것은 그 때문이다 — 숫자는 skillEffect가 레벨에서 만든다.
+// **같은 기술을 두 표에 따로 적지 않는다.** 동료의 후렴과 주인공의 후렴은 같은
+// 것인데 두 벌로 적혀 있었고, 그래서 갈렸다 — 정화가 동료는 190을 회복하고
+// 주인공은 90을 회복했으며, 만가는 한쪽이 광역이고 다른 쪽이 단일이었고,
+// `smite`는 아예 이름까지 달랐다(심판 / 성스러운 일격).
+//
+// **정체(이름·아이콘·종류)는 동료 표가 원본이고 여기서 물려받는다.** 수치는
+// 여전히 따로 잡는다 — 사람이 누르는 쪽은 쿨타임과 마나가 달라야 한다. 두 표에
+// 남는 차이가 이제 "수치뿐"이라, 이름을 고치면 양쪽이 함께 바뀐다.
+function shared(id, over) {
+  const twin = UNIT_SKILLS[id];
+  if (!twin) throw new Error(`동료 표에 없는 스킬: ${id}`);
+  return Object.assign({ id, name: twin.name, icon: twin.icon, kind: twin.kind }, over);
+}
+
 const PLAYER_SKILLS = {
   touch: {
     id: 'touch', job: 'priest', unlock: 1, kind: 'heal', range: 40, cast: 1.0, name: '치유의 손길', type: '개별 대상', targeting: 'ally',
@@ -1142,46 +1188,46 @@ const PLAYER_SKILLS = {
   //
   // **이름과 아이콘은 동료 음유시인의 같은 기술에서 가져왔다.** 주인공의 후렴과
   // 동료의 후렴은 같은 것이라, 다른 그림을 주면 다른 기술로 보인다.
-  chord: {
-    id: 'chord', job: 'bard', unlock: 1, kind: 'heal', range: 38, cast: 0.8, name: '화음', type: '개별 대상', targeting: 'ally',
-    mp: 12, cd: 1.6, heal: 84, icon: 'chord',
+  chord: shared('chord', {
+    job: 'bard', unlock: 1, range: 38, cast: 0.8, type: '개별 대상', targeting: 'ally',
+    mp: 12, cd: 1.6, heal: 84,
     desc: '동료 하나를 회복한다. 사제의 손길보다 작다.',
-  },
-  refrain: {
-    id: 'refrain', job: 'bard', unlock: 1, kind: 'mana-ally', range: 36, cast: 0, name: '후렴', type: '마나 나눔', targeting: 'ally',
-    mp: 10, cd: 10, mana: 34, icon: 'refrain',
+  }),
+  refrain: shared('refrain', {
+    job: 'bard', unlock: 1, range: 36, cast: 0, type: '마나 나눔', targeting: 'ally',
+    mp: 10, cd: 10, mana: 34,
     desc: '동료 하나의 마나를 채운다. 제 마나보다 많이 준다.',
-  },
-  anthem: {
-    id: 'anthem', job: 'bard', unlock: 2, kind: 'buff-area', range: 30, cast: 1.2, name: '전투가', type: '광역 강화', targeting: 'area-ally',
-    mp: 26, cd: 24, stat: 'atk', mul: 1.18, duration: 12, radius: 26, icon: 'anthem',
+  }),
+  anthem: shared('anthem', {
+    job: 'bard', unlock: 2, range: 30, cast: 1.2, type: '광역 강화', targeting: 'area-ally',
+    mp: 26, cd: 24, stat: 'atk', mul: 1.18, duration: 12, radius: 26,
     desc: '기준점 주변 아군의 공격력을 올린다.',
-  },
-  lament: {
-    id: 'lament', job: 'bard', unlock: 3, kind: 'debuff-area', range: 42, cast: 1.4, name: '만가', type: '광역 약화', targeting: 'area-enemy',
-    mp: 24, cd: 20, stat: 'armor', mul: 1.16, duration: 10, radius: 20, icon: 'lament',
-    desc: '기준점 주변의 적이 받는 피해를 늘린다.',
-  },
-  serenade: {
-    id: 'serenade', job: 'bard', unlock: 3, kind: 'heal-dot', range: 38, cast: 0, name: '자장가', type: '도트', targeting: 'ally',
-    mp: 18, cd: 7, tick: 24, interval: 1, duration: 8, icon: 'serenade',
+  }),
+  lament: shared('lament', {
+    job: 'bard', unlock: 3, range: 42, cast: 1.0, type: '약화', targeting: 'enemy',
+    mp: 18, cd: 14, stat: 'armor', mul: 1.16, duration: 10,
+    desc: '적 하나가 받는 피해를 늘린다.',
+  }),
+  serenade: shared('serenade', {
+    job: 'bard', unlock: 3, range: 38, cast: 0, type: '도트', targeting: 'ally',
+    mp: 18, cd: 7, tick: 24, interval: 1, duration: 8,
     desc: '동료 하나에게 걸어 두면 시간을 두고 회복된다.',
-  },
-  dissonance: {
-    id: 'dissonance', job: 'bard', unlock: 4, kind: 'debuff', range: 40, cast: 1.0, name: '불협화음', type: '약화', targeting: 'enemy',
-    mp: 20, cd: 16, stat: 'atk', mul: 0.85, duration: 10, icon: 'dissonance',
-    desc: '적 하나의 공격력을 떨어뜨린다.',
-  },
-  echo: {
-    id: 'echo', job: 'bard', unlock: 5, kind: 'mana-area', range: 30, cast: 1.6, name: '메아리', type: '광역 마나', targeting: 'area-ally',
-    mp: 16, cd: 26, mana: 26, radius: 22, icon: 'echo',
+  }),
+  dissonance: shared('dissonance', {
+    job: 'bard', unlock: 4, range: 40, cast: 1.4, type: '광역 약화', targeting: 'area-enemy',
+    mp: 26, cd: 20, stat: 'atk', mul: 0.85, duration: 10, radius: 18,
+    desc: '기준점 주변 적의 공격력을 함께 떨어뜨린다.',
+  }),
+  echo: shared('echo', {
+    job: 'bard', unlock: 5, range: 30, cast: 1.6, type: '광역 마나', targeting: 'area-ally',
+    mp: 16, cd: 26, mana: 26, radius: 22,
     desc: '기준점 주변 아군의 마나를 함께 채운다.',
-  },
-  finale: {
-    id: 'finale', job: 'bard', unlock: 6, kind: 'damage', range: 40, cast: 1.2, name: '종막', type: '개별 대상', targeting: 'enemy',
-    mp: 22, cd: 12, damage: 96, icon: 'finale',
+  }),
+  finale: shared('finale', {
+    job: 'bard', unlock: 6, range: 40, cast: 1.2, type: '개별 대상', targeting: 'enemy',
+    mp: 22, cd: 12, damage: 96,
     desc: '적 하나를 노래로 내리친다.',
-  },
+  }),
 
   // --- 성기사 -----------------------------------------------------------
   //
@@ -1191,21 +1237,21 @@ const PLAYER_SKILLS = {
   //
   // 근접 계열이라 사거리가 전부 짧다. 뒤에 서서 다 할 수 있으면 "앞에 선다"가
   // 수치에 없는 말이 된다.
-  smite: {
-    id: 'smite', job: 'paladin', unlock: 1, kind: 'damage', range: 14, cast: 0, name: '성스러운 일격', type: '개별 대상', targeting: 'enemy',
-    mp: 14, cd: 3.5, damage: 110, icon: 'smite',
+  smite: shared('smite', {
+    job: 'paladin', unlock: 1, range: 14, cast: 0, type: '개별 대상', targeting: 'enemy',
+    mp: 14, cd: 3.5, damage: 110,
     desc: '붙어서 내리친다. 즉시 나가고 세지만 사거리가 짧다.',
-  },
+  }),
   layHands: {
     id: 'layHands', job: 'paladin', unlock: 1, kind: 'heal', range: 30, cast: 0.6, name: '신성한 손길', type: '개별 대상', targeting: 'ally',
     mp: 14, cd: 2.2, heal: 64, icon: 'layHands',
     desc: '동료 하나를 조금 회복한다. 사제의 손길보다 훨씬 작다.',
   },
-  taunt: {
-    id: 'taunt', job: 'paladin', unlock: 2, kind: 'taunt', range: 28, cast: 0, name: '도발', type: '도발', targeting: 'enemy',
-    mp: 16, cd: 9, duration: 6, icon: 'taunt',
+  taunt: shared('taunt', {
+    job: 'paladin', unlock: 2, range: 28, cast: 0, type: '도발', targeting: 'enemy',
+    mp: 16, cd: 9, duration: 6,
     desc: '적 하나를 자신에게 끌어온다. 주인공이 어그로를 옮기는 유일한 수단이다.',
-  },
+  }),
   holyShield: {
     id: 'holyShield', job: 'paladin', unlock: 3, kind: 'buff', range: 26, cast: 0, name: '성스러운 방패', type: '강화', targeting: 'ally',
     mp: 20, cd: 18, stat: 'armor', mul: 0.84, duration: 12, icon: 'holyShield',
@@ -1254,92 +1300,92 @@ const PLAYER_SKILLS = {
   //
   // 이름과 아이콘은 동료 사제의 기술에서 가져왔다. 같은 전통의 더 높은 기술이라
   // 다른 그림을 주면 다른 계통으로 보인다.
-  mend: {
-    id: 'mend', job: 'bishop', unlock: 1, kind: 'heal', range: 40, cast: 1.0, name: '치유술', type: '개별 대상', targeting: 'ally',
-    mp: 20, cd: 1.6, heal: 150, icon: 'mend',
+  mend: shared('mend', {
+    job: 'bishop', unlock: 1, range: 40, cast: 1.0, type: '개별 대상', targeting: 'ally',
+    mp: 20, cd: 1.6, heal: 150,
     desc: '동료 하나를 크게 회복한다. 사제의 손길보다 세고 마나를 더 먹는다.',
-  },
-  renew: {
-    id: 'renew', job: 'bishop', unlock: 2, kind: 'heal-dot', range: 40, cast: 0.8, name: '재생', type: '도트', targeting: 'ally',
-    mp: 26, cd: 8, tick: 32, interval: 1, duration: 8, icon: 'renew',
+  }),
+  renew: shared('renew', {
+    job: 'bishop', unlock: 2, range: 40, cast: 0.8, type: '도트', targeting: 'ally',
+    mp: 26, cd: 8, tick: 32, interval: 1, duration: 8,
     desc: '동료 하나에게 걸어 두면 시간을 두고 회복된다.',
-  },
-  waveHeal: {
-    id: 'waveHeal', job: 'bishop', unlock: 2, kind: 'heal-area', range: 46, cast: 1.6, name: '치유의 물결', type: '범위', targeting: 'area-ally',
-    mp: 38, cd: 8, heal: 96, radius: 22, icon: 'wave',
+  }),
+  wave: shared('wave', {
+    job: 'bishop', unlock: 2, range: 46, cast: 1.6, type: '범위', targeting: 'area-ally',
+    mp: 38, cd: 8, heal: 96, radius: 22,
     desc: '기준점 주변의 아군을 한 번에 크게 회복한다.',
-  },
-  purify: {
-    id: 'purify', job: 'bishop', unlock: 3, kind: 'heal', range: 40, cast: 0.8, name: '정화', type: '개별 대상', targeting: 'ally',
-    mp: 24, cd: 12, heal: 90, cleanse: 1, icon: 'purify',
+  }),
+  purify: shared('purify', {
+    job: 'bishop', unlock: 3, range: 40, cast: 0.8, type: '개별 대상', targeting: 'ally',
+    mp: 24, cd: 12, heal: 90, cleanse: 1,
     desc: '회복하면서 걸려 있는 약화를 걷어낸다. 이것만 할 수 있는 계열이다.',
-  },
-  meditate: {
-    id: 'meditate', job: 'bishop', unlock: 3, kind: 'mana', range: 0, cast: 2.0, name: '명상', type: '마나 회복', targeting: 'self',
-    mp: 0, cd: 26, mana: 92, icon: 'meditate',
+  }),
+  meditate: shared('meditate', {
+    job: 'bishop', unlock: 3, range: 0, cast: 2.0, type: '마나 회복', targeting: 'self',
+    mp: 0, cd: 26, mana: 92,
     desc: '서서 외워 자신의 마나를 되찾는다. 사제의 정신 집중보다 많이 채운다.',
-  },
-  chastise: {
-    id: 'chastise', job: 'bishop', unlock: 4, kind: 'dot', range: 40, cast: 0.8, name: '응징', type: '도트', targeting: 'enemy',
-    mp: 20, cd: 9, tick: 28, interval: 1, duration: 6, icon: 'chastise',
+  }),
+  chastise: shared('chastise', {
+    job: 'bishop', unlock: 4, range: 40, cast: 0.8, type: '도트', targeting: 'enemy',
+    mp: 20, cd: 9, tick: 28, interval: 1, duration: 6,
     desc: '적 하나를 벌한다. 시간을 두고 깎인다.',
-  },
-  greaterMend: {
-    id: 'greaterMend', job: 'bishop', unlock: 5, kind: 'heal', range: 40, cast: 2.2, name: '대치유술', type: '개별 대상', targeting: 'ally',
-    mp: 48, cd: 6, heal: 280, icon: 'greaterMend',
+  }),
+  greaterMend: shared('greaterMend', {
+    job: 'bishop', unlock: 5, range: 40, cast: 2.2, type: '개별 대상', targeting: 'ally',
+    mp: 48, cd: 6, heal: 280,
     desc: '오래 외워 한 명을 크게 되살린다. 마나를 많이 먹는다.',
-  },
-  judgement: {
-    id: 'judgement', job: 'bishop', unlock: 5, kind: 'damage', range: 42, cast: 1.4, name: '신벌', type: '개별 대상', targeting: 'enemy',
-    mp: 30, cd: 10, damage: 150, icon: 'judgement',
-    desc: '적 하나에게 벌을 내린다.',
-  },
+  }),
+  judgement: shared('judgement', {
+    job: 'bishop', unlock: 5, range: 42, cast: 1.4, type: '광역', targeting: 'area-enemy',
+    mp: 30, cd: 12, damage: 120, radius: 16,
+    desc: '기준점 주변의 적에게 벌을 내린다.',
+  }),
 
   // --- 성전사 (성기사의 상위) --------------------------------------------
   //
   // 앞에 서는 힘이 더 커진 쪽이다. **광역 도발과 기절이 여기서 처음 나온다** —
   // 성기사가 적 하나를 끌어오는 데 그쳤다면, 이쪽은 무리를 통째로 붙든다.
   // 이름과 아이콘은 수호자·전사 계열의 같은 기술에서 그대로 가져왔다.
-  bracing: {
-    id: 'bracing', job: 'crusader', unlock: 1, kind: 'buff', range: 24, cast: 0, name: '굳히기', type: '강화', targeting: 'ally',
-    mp: 22, cd: 18, stat: 'armor', mul: 0.78, duration: 12, icon: 'bracing',
+  bracing: shared('bracing', {
+    job: 'crusader', unlock: 1, range: 24, cast: 0, type: '강화', targeting: 'ally',
+    mp: 22, cd: 18, stat: 'armor', mul: 0.78, duration: 12,
     desc: '받는 피해를 크게 줄인다. 성기사의 방패보다 세다.',
-  },
-  charge: {
-    id: 'charge', job: 'crusader', unlock: 1, kind: 'damage', range: 30, cast: 0, name: '돌진', type: '개별 대상', targeting: 'enemy',
-    mp: 20, cd: 8, damage: 150, icon: 'charge',
+  }),
+  charge: shared('charge', {
+    job: 'crusader', unlock: 1, range: 30, cast: 0, type: '개별 대상', targeting: 'enemy',
+    mp: 20, cd: 8, damage: 150,
     desc: '멀리서 달려들어 내리친다.',
-  },
-  roar: {
-    id: 'roar', job: 'crusader', unlock: 2, kind: 'taunt-area', range: 26, cast: 0, name: '전투 함성', type: '광역 도발', targeting: 'area-enemy',
-    mp: 26, cd: 16, duration: 7, radius: 26, icon: 'roar',
+  }),
+  roar: shared('roar', {
+    job: 'crusader', unlock: 2, range: 26, cast: 0, type: '광역 도발', targeting: 'area-enemy',
+    mp: 26, cd: 16, duration: 7, radius: 26,
     desc: '기준점 주변의 적을 한꺼번에 자신에게 끌어온다.',
-  },
-  secondWind: {
-    id: 'secondWind', job: 'crusader', unlock: 3, kind: 'mana', range: 0, cast: 1.6, name: '재정비', type: '마나 회복', targeting: 'self',
-    mp: 0, cd: 26, mana: 84, icon: 'secondWind',
+  }),
+  secondWind: shared('secondWind', {
+    job: 'crusader', unlock: 3, range: 0, cast: 1.6, type: '마나 회복', targeting: 'self',
+    mp: 0, cd: 26, mana: 84,
     desc: '숨을 고르며 자신의 마나를 되찾는다.',
-  },
-  blessing: {
-    id: 'blessing', job: 'crusader', unlock: 3, kind: 'heal-dot', range: 32, cast: 0.8, name: '축복', type: '도트', targeting: 'ally',
-    mp: 28, cd: 8, tick: 34, interval: 1, duration: 8, icon: 'blessing',
+  }),
+  blessing: shared('blessing', {
+    job: 'crusader', unlock: 3, range: 32, cast: 0.8, type: '도트', targeting: 'ally',
+    mp: 28, cd: 8, tick: 34, interval: 1, duration: 8,
     desc: '동료 하나에게 걸어 두면 시간을 두고 회복된다.',
-  },
-  thorns: {
-    id: 'thorns', job: 'crusader', unlock: 4, kind: 'dot', range: 20, cast: 0, name: '가시 방패', type: '도트', targeting: 'enemy',
-    mp: 22, cd: 9, tick: 32, interval: 1, duration: 6, icon: 'thorns',
+  }),
+  thorns: shared('thorns', {
+    job: 'crusader', unlock: 4, range: 20, cast: 0, type: '도트', targeting: 'enemy',
+    mp: 22, cd: 9, tick: 32, interval: 1, duration: 6,
     desc: '붙은 적을 가시로 계속 찌른다.',
-  },
-  quake: {
-    id: 'quake', job: 'crusader', unlock: 5, kind: 'damage-area', range: 20, cast: 1.0, name: '발구르기', type: '광역', targeting: 'area-enemy',
-    mp: 34, cd: 14, damage: 110, radius: 20, icon: 'quake',
+  }),
+  quake: shared('quake', {
+    job: 'crusader', unlock: 5, range: 20, cast: 1.0, type: '광역', targeting: 'area-enemy',
+    mp: 34, cd: 14, damage: 110, radius: 20,
     desc: '땅을 굴러 주변의 적을 함께 때린다.',
-  },
-  shieldSlam: {
-    id: 'shieldSlam', job: 'crusader', unlock: 5, kind: 'stun', range: 16, cast: 0, name: '방패 밀치기', type: '기절', targeting: 'enemy',
-    mp: 26, cd: 14, damage: 100, duration: 1.6, icon: 'shieldSlam',
+  }),
+  shieldSlam: shared('shieldSlam', {
+    job: 'crusader', unlock: 5, range: 16, cast: 0, type: '기절', targeting: 'enemy',
+    mp: 26, cd: 14, damage: 100, duration: 1.6,
     desc: '방패로 밀쳐 굳힌다. 외우던 것이 끊긴다.',
-  },
+  }),
 
   // --- 서사시인 (음유시인의 상위) ----------------------------------------
   //
@@ -1351,11 +1397,11 @@ const PLAYER_SKILLS = {
     mp: 24, cd: 1.8, heal: 168, icon: 'ballad',
     desc: '동료 하나를 크게 회복한다. 음유시인의 화음보다 훨씬 세다.',
   },
-  harmony: {
-    id: 'harmony', job: 'laureate', unlock: 1, kind: 'buff', range: 32, cast: 1.0, name: '화성', type: '강화', targeting: 'ally',
-    mp: 22, cd: 16, stat: 'armor', mul: 0.8, duration: 12, icon: 'harmony',
+  harmony: shared('harmony', {
+    job: 'laureate', unlock: 1, range: 32, cast: 1.0, type: '강화', targeting: 'ally',
+    mp: 22, cd: 16, stat: 'armor', mul: 0.8, duration: 12,
     desc: '동료 하나가 받는 피해를 줄인다.',
-  },
+  }),
   chorus: {
     id: 'chorus', job: 'laureate', unlock: 2, kind: 'mana-area', range: 32, cast: 1.6, name: '합창', type: '광역 마나', targeting: 'area-ally',
     mp: 20, cd: 22, mana: 40, radius: 24, icon: 'chorus',
@@ -1366,11 +1412,11 @@ const PLAYER_SKILLS = {
     mp: 34, cd: 24, stat: 'atk', mul: 1.3, duration: 12, radius: 30, icon: 'epic',
     desc: '기준점 주변 아군의 공격력을 크게 올린다.',
   },
-  tune: {
-    id: 'tune', job: 'laureate', unlock: 3, kind: 'mana', range: 0, cast: 1.8, name: '조율', type: '마나 회복', targeting: 'self',
-    mp: 0, cd: 24, mana: 84, icon: 'tune',
+  tune: shared('tune', {
+    job: 'laureate', unlock: 3, range: 0, cast: 1.8, type: '마나 회복', targeting: 'self',
+    mp: 0, cd: 24, mana: 84,
     desc: '악기를 고르며 자신의 마나를 되찾는다.',
-  },
+  }),
   requiem: {
     id: 'requiem', job: 'laureate', unlock: 4, kind: 'debuff-area', range: 44, cast: 1.4, name: '진혼곡', type: '광역 약화', targeting: 'area-enemy',
     mp: 30, cd: 20, stat: 'armor', mul: 1.28, duration: 10, radius: 24, icon: 'requiem',
@@ -1718,7 +1764,8 @@ const api = {
   RANKS, rankOf,
   SLOTS, GEAR, MATERIALS, REGIONS, NAMES, SPECIAL_POOL, SPECIAL_CHANCE,
   withGear, attrsWithGear, WHOLE_AFFIX,
-  HERO, COMPANIONS, UNIT_SKILLS, SPEC_UP, SPEC_UP_LEVEL, specAt, SKILL_KINDS, skillKind, AURA_STATS, SPEC_SKILLS, UNIT_SKILL_MAX, skillsFor, skillSeed,
+  HERO, COMPANIONS, UNIT_SKILLS, SPEC_UP, SPEC_UP_LEVEL, specAt,
+  SPEC_CHOICES, SPEC_CHANGE_LEVEL, spriteFor, SKILL_KINDS, skillKind, AURA_STATS, SPEC_SKILLS, UNIT_SKILL_MAX, skillsFor, skillSeed,
   PLAYER_SKILLS, HERO_JOBS, HERO_JOB_START, heroSkillsOf, heroJob, jobMaxLevel,
   SKILL, skillAt, skillEffect, skillLevelOf,
   POTIONS, JOB_POTIONS, POTION_MAX, ENEMIES,
