@@ -148,8 +148,8 @@ function changeJob(progress, jobId) {
   if (!can.ok) return can;
   progress.job = jobId;
   jobEntry(progress);
-  // 등록해 둔 다섯은 앞 계열의 스킬이다. 그대로 두면 쓸 수 없는 것을 든 채로
-  // 전투가 시작된다.
+  // **등록해 둔 다섯은 그대로 둔다.** 앞 계열에서 배운 것도 계속 들고 갈 수 있다 —
+  // 거르는 것은 배우지 않은 것뿐이다.
   progress.skills = validSkills(progress, progress.skills || []);
   return { ok: true, job: D.heroJob(jobId), level: jobLevel(progress) };
 }
@@ -309,13 +309,21 @@ function unlockedSkills(progress) {
   return D.heroSkillsOf(progress.job).filter((def) => def.unlock <= jobLevel(progress));
 }
 
-// 지금 계열에서 **실제로 배운** 스킬. 전투에 등록할 수 있는 것은 이것뿐이다.
+// **한 번 배운 스킬은 계열을 바꿔도 들고 갈 수 있다.** 계열이 정하는 것은 무엇을
+// 배울 수 있고 그 점수가 어디서 나오는가까지고, 배운 것은 몸에 남는다 — 전직할
+// 때마다 손이 빈 채로 나가면 다른 계열을 겪어 보는 것이 그대로 손해가 된다.
 function learnedSkills(progress) {
-  return D.heroSkillsOf(progress.job).filter((def) => skillLevel(progress, def.id) > 0);
+  return Object.values(D.PLAYER_SKILLS).filter((def) => skillLevel(progress, def.id) > 0);
 }
 
-// 등록해 둔 스킬이 배우지 않은 것이거나 다른 계열의 것일 수 있다(계열을 바꿨거나
-// 저장본을 손댔거나). 지금 들 수 있는 것만 남긴다.
+// 지금 계열에서 배운 것. 캐릭터 화면의 목록과 점수 계산이 보는 쪽이다.
+function jobSkills(progress, jobId) {
+  return D.heroSkillsOf(jobId || progress.job)
+    .filter((def) => skillLevel(progress, def.id) > 0);
+}
+
+// 등록해 둔 스킬이 아직 배우지 않은 것일 수 있다(자료가 바뀌었거나 저장본을
+// 손댔거나). 배운 것만 남긴다.
 function validSkills(progress, skills) {
   const mine = new Set(learnedSkills(progress).map((def) => def.id));
   return skills.filter((id) => mine.has(id)).slice(0, D.SKILL_MAX);
@@ -489,7 +497,7 @@ const api = {
   addItem, findItem, equip, unequip, compare,
   spend, buyGear, buyPotion, sell,
   jobEntry, jobLevel, jobExpOf, canChangeJob, changeJob,
-  unlockedSkills, learnedSkills, validSkills,
+  unlockedSkills, learnedSkills, jobSkills, validSkills,
   skillLevel, skillDef, skillLevels, learnSkill, raiseSkill,
   earnedSkillPoints, spentSkillPoints, freeSkillPoints,
 };

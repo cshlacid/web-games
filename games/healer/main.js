@@ -395,6 +395,27 @@ function renderCharacter() {
     }
     skills.append(row);
   }
+  // **다른 계열에서 배운 것도 전투에 들고 갈 수 있다.** 여기에 적지 않으면 편성
+  // 화면에만 나타나, 무엇을 들고 갈 수 있는지 캐릭터 창에서는 알 수 없다.
+  // 올리는 단추는 없다 — 점수는 그 계열 것이라 지금 계열에서는 쓸 수 없다.
+  const others = P.learnedSkills(progress).filter((def) => def.job !== progress.job);
+  const kept = $('char-kept');
+  kept.textContent = '';
+  kept.hidden = !others.length;
+  for (const base of others) {
+    const row = el('li', 'skill-row');
+    row.append(icon(base.icon, 'icon'));
+    const body = el('div', 'pick-body');
+    const name = el('div', 'pick-name');
+    name.append(document.createTextNode(base.name));
+    name.append(text('span', 'job', D.heroJob(base.job).name));
+    name.append(text('span', 'job', `Lv ${P.skillLevel(progress, base.id)}`));
+    body.append(name);
+    body.append(text('div', 'pick-sub', D.skillEffect(P.skillDef(progress, base.id))));
+    row.append(body);
+    kept.append(row);
+  }
+
   $('skill-points').textContent = points ? `남은 점수 ${points}` : '남은 점수 없음';
   $('skill-open').textContent = `${P.learnedSkills(progress).length} / ${D.heroSkillsOf(progress.job).length}`;
 }
@@ -979,6 +1000,11 @@ function renderSkillPicks() {
     name.append(document.createTextNode(def.name));
     name.append(text('span', 'job', def.type));
     if (level > 1) name.append(text('span', 'job', `Lv ${level}`));
+    // **다른 계열에서 배운 것도 들고 갈 수 있다.** 어디서 온 것인지 안 적으면
+    // 지금 계열의 목록에 없는 스킬이 왜 여기 있는지 알 수 없다.
+    if (base.job !== app.progress.job) {
+      name.append(text('span', 'job dim', D.heroJob(base.job).name));
+    }
     body.append(name);
     body.append(text('div', 'pick-sub', D.skillEffect(def)));
     body.append(text('div', 'pick-sub dim', def.desc));
@@ -1006,8 +1032,7 @@ function renderSkillPicks() {
   if (!list.children.length) {
     const empty = el('li');
     empty.append(text('div', 'pick-sub',
-      `지금 계열(${D.heroJob(app.progress.job).name})에서 배운 스킬이 없다.`
-      + ' 캐릭터 화면에서 스킬 점수로 배운다.'));
+      '배운 스킬이 없다. 캐릭터 화면에서 스킬 점수로 배운다.'));
     list.append(empty);
   }
   $('skill-count').textContent = `${app.skills.length} / ${D.SKILL_MAX}`;

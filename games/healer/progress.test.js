@@ -122,9 +122,14 @@ const gear = (defId, tier) => Items.make(defId, tier || 0, 3);
   check('조건을 채우면 바꿀 수 있다', P.changeJob(progress, 'bard').ok, true);
   check('계열이 바뀐다', progress.job, 'bard');
   check('새 계열은 1레벨부터', P.jobLevel(progress), 1);
-  // 앞 계열의 스킬을 든 채로 전투가 시작되면 안 된다.
-  check('등록해 둔 것은 걸러진다', progress.skills, []);
-  check('새 계열에서는 아무것도 안 배운 상태', P.learnedSkills(progress), []);
+  // **배운 것은 계열을 바꿔도 그대로 들고 간다.** 전직할 때마다 손이 빈 채로
+  // 나가면 다른 계열을 겪어 보는 것이 그대로 손해가 된다.
+  check('등록해 둔 것이 남는다', progress.skills, ['touch', 'quick']);
+  check('앞 계열에서 배운 것도 들 수 있다',
+    P.learnedSkills(progress).map((def) => def.id), priestSkills);
+  check('새 계열에서는 아무것도 안 배운 상태', P.jobSkills(progress), []);
+  // 배우지 않은 것은 여전히 걸러진다.
+  check('안 배운 것은 못 든다', P.validSkills(progress, ['touch', 'chord']), ['touch']);
 
   // 점수는 계열마다 따로 쌓이고 따로 쓰인다.
   check('점수도 새 계열 것', P.freeSkillPoints(progress), D.SKILL.start);
@@ -136,7 +141,11 @@ const gear = (defId, tier) => Items.make(defId, tier || 0, 3);
   // **되돌아오면 그대로 있다.** 아니면 아무도 다른 계열을 겪어 보지 않는다.
   check('사제로 되돌아온다', P.changeJob(progress, 'priest').ok, true);
   check('직업 레벨이 남아 있다', P.jobLevel(progress), priestLevel);
-  check('배운 스킬도 남아 있다', P.learnedSkills(progress).map((def) => def.id), priestSkills);
+  // 이제 배운 것은 계열을 가리지 않으므로, 사제로 돌아온 뒤에도 음유시인에서
+  // 배운 화음이 함께 남는다. 그 계열에서 배운 것만 보려면 jobSkills를 본다.
+  check('사제에서 배운 것이 그대로다', P.jobSkills(progress).map((def) => def.id), priestSkills);
+  check('음유시인에서 배운 것도 함께 남는다',
+    P.learnedSkills(progress).map((def) => def.id), priestSkills.concat(['chord']));
   check('음유시인 레벨도 따로 남는다', progress.jobs.bard.level, 2);
   check('음유시인에서 배운 것도 남는다', progress.learned.chord, 1);
 }
@@ -155,6 +164,9 @@ const gear = (defId, tier) => Items.make(defId, tier || 0, 3);
   check('아래 계열을 키우면 갈 수 있다', P.canChangeJob(progress, 'bishop').ok, true);
   check('전직한다', P.changeJob(progress, 'bishop').ok, true);
   check('주교의 스킬만 배울 수 있다', P.learnSkill(progress, 'touch').ok, false);
+  // 배우는 것은 그 계열 것만이지만, 이미 배운 것은 계열을 가리지 않고 들고 간다.
+  check('앞 계열에서 배운 것은 그대로 들 수 있다',
+    P.validSkills(progress, ['touch']), ['touch']);
   check('주교의 스킬은 배운다', P.learnSkill(progress, 'mend').ok, true);
 
   // 캐릭터 레벨만 채운 성기사는 아래 계열을 안 키워도 간다 — 상위 계열이 아니다.
