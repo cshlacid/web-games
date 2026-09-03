@@ -161,6 +161,16 @@ const gear = (defId, tier) => Items.make(defId, tier || 0, 3);
   const knight = P.create();
   knight.charLevel = D.HERO_JOBS.paladin.need.charLevel;
   check('성기사는 아래 계열을 요구하지 않는다', P.canChangeJob(knight, 'paladin').ok, true);
+
+  // **상위 계열이 계열마다 하나씩 있다.** 아래 계열을 키운 만큼만 열린다.
+  const many = P.create();
+  many.charLevel = 12;
+  const upper = { bishop: 'priest', laureate: 'bard', crusader: 'paladin' };
+  for (const [top, base] of Object.entries(upper)) {
+    check(`${top}: 아래 계열을 안 키우면 못 간다`, P.canChangeJob(many, top).ok, false);
+    many.jobs[base] = { level: D.jobMaxLevel(base), exp: 0 };
+    check(`${top}: 아래 계열을 키우면 갈 수 있다`, P.canChangeJob(many, top).ok, true);
+  }
 }
 
 // --- 인벤토리와 장착 ----------------------------------------------------

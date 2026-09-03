@@ -234,7 +234,13 @@ function withGear(base, gear, armorBase) {
 const LEVEL = {
   maxLevel: 30,
   charExpTo: (level) => Math.round(90 * Math.pow(level, 1.45)),
-  jobExpTo: (level) => Math.round(70 * Math.pow(level, 1.4)),
+  // **직업 레벨은 캐릭터 레벨보다 훨씬 천천히 오른다.** 예전 곡선(70 × 레벨^1.4)
+  // 으로는 판당 직업 경험치가 483~3273인데 6레벨까지가 1735뿐이라, **네 판이면
+  // 만렙**이었다. 계열을 고르고 무엇을 배울지 고민할 시간이 그 전에 끝난다.
+  // 지금은 6레벨까지 26,900이라, 자기 레벨의 의뢰를 이어서 깨면 **열여섯 판**쯤
+  // 걸린다(전에는 네 판). 상위 계열이 요구하는 캐릭터 12는 스물두 판쯤이라,
+  // 아래 계열을 끝까지 키우고도 한참 더 걸어야 상위로 간다.
+  jobExpTo: (level) => Math.round(600 * Math.pow(level, 1.85)),
 
   // 체력·마나·공격력·회복량은 이제 능력치(ATTRS)가 정한다. 레벨은 능력치를
   // 올리고, 능력치가 수치를 만든다.
@@ -1191,6 +1197,98 @@ const PLAYER_SKILLS = {
     mp: 30, cd: 10, damage: 150, icon: 'judgement',
     desc: '적 하나에게 벌을 내린다.',
   },
+
+  // --- 성전사 (성기사의 상위) --------------------------------------------
+  //
+  // 앞에 서는 힘이 더 커진 쪽이다. **광역 도발과 기절이 여기서 처음 나온다** —
+  // 성기사가 적 하나를 끌어오는 데 그쳤다면, 이쪽은 무리를 통째로 붙든다.
+  // 이름과 아이콘은 수호자·전사 계열의 같은 기술에서 그대로 가져왔다.
+  bracing: {
+    id: 'bracing', job: 'crusader', unlock: 1, kind: 'buff', range: 24, cast: 0, name: '굳히기', type: '강화', targeting: 'ally',
+    mp: 22, cd: 18, stat: 'armor', mul: 0.78, duration: 12, icon: 'bracing',
+    desc: '받는 피해를 크게 줄인다. 성기사의 방패보다 세다.',
+  },
+  charge: {
+    id: 'charge', job: 'crusader', unlock: 1, kind: 'damage', range: 30, cast: 0, name: '돌진', type: '개별 대상', targeting: 'enemy',
+    mp: 20, cd: 8, damage: 150, icon: 'charge',
+    desc: '멀리서 달려들어 내리친다.',
+  },
+  roar: {
+    id: 'roar', job: 'crusader', unlock: 2, kind: 'taunt-area', range: 26, cast: 0, name: '전투 함성', type: '광역 도발', targeting: 'area-enemy',
+    mp: 26, cd: 16, duration: 7, radius: 26, icon: 'roar',
+    desc: '기준점 주변의 적을 한꺼번에 자신에게 끌어온다.',
+  },
+  secondWind: {
+    id: 'secondWind', job: 'crusader', unlock: 3, kind: 'mana', range: 0, cast: 1.6, name: '재정비', type: '마나 회복', targeting: 'self',
+    mp: 0, cd: 26, mana: 84, icon: 'secondWind',
+    desc: '숨을 고르며 자신의 마나를 되찾는다.',
+  },
+  blessing: {
+    id: 'blessing', job: 'crusader', unlock: 3, kind: 'heal-dot', range: 32, cast: 0.8, name: '축복', type: '도트', targeting: 'ally',
+    mp: 28, cd: 8, tick: 34, interval: 1, duration: 8, icon: 'blessing',
+    desc: '동료 하나에게 걸어 두면 시간을 두고 회복된다.',
+  },
+  thorns: {
+    id: 'thorns', job: 'crusader', unlock: 4, kind: 'dot', range: 20, cast: 0, name: '가시 방패', type: '도트', targeting: 'enemy',
+    mp: 22, cd: 9, tick: 32, interval: 1, duration: 6, icon: 'thorns',
+    desc: '붙은 적을 가시로 계속 찌른다.',
+  },
+  quake: {
+    id: 'quake', job: 'crusader', unlock: 5, kind: 'damage-area', range: 20, cast: 1.0, name: '발구르기', type: '광역', targeting: 'area-enemy',
+    mp: 34, cd: 14, damage: 110, radius: 20, icon: 'quake',
+    desc: '땅을 굴러 주변의 적을 함께 때린다.',
+  },
+  shieldSlam: {
+    id: 'shieldSlam', job: 'crusader', unlock: 5, kind: 'stun', range: 16, cast: 0, name: '방패 밀치기', type: '기절', targeting: 'enemy',
+    mp: 26, cd: 14, damage: 100, duration: 1.6, icon: 'shieldSlam',
+    desc: '방패로 밀쳐 굳힌다. 외우던 것이 끊긴다.',
+  },
+
+  // --- 서사시인 (음유시인의 상위) ----------------------------------------
+  //
+  // 노래가 더 크고 멀리 간다. **회복량을 올리는 강화는 여기뿐이다**(갈채) —
+  // 파티의 힐러 전체를 세게 만드는 것이라, 회복을 남에게 맡기고 노래로 판을
+  // 굴리는 계열의 끝이다. 아이콘은 음표가 아니라 책·두루마리·월계관이다.
+  ballad: {
+    id: 'ballad', job: 'laureate', unlock: 1, kind: 'heal', range: 40, cast: 1.0, name: '발라드', type: '개별 대상', targeting: 'ally',
+    mp: 24, cd: 1.8, heal: 168, icon: 'ballad',
+    desc: '동료 하나를 크게 회복한다. 음유시인의 화음보다 훨씬 세다.',
+  },
+  harmony: {
+    id: 'harmony', job: 'laureate', unlock: 1, kind: 'buff', range: 32, cast: 1.0, name: '화성', type: '강화', targeting: 'ally',
+    mp: 22, cd: 16, stat: 'armor', mul: 0.8, duration: 12, icon: 'harmony',
+    desc: '동료 하나가 받는 피해를 줄인다.',
+  },
+  chorus: {
+    id: 'chorus', job: 'laureate', unlock: 2, kind: 'mana-area', range: 32, cast: 1.6, name: '합창', type: '광역 마나', targeting: 'area-ally',
+    mp: 20, cd: 22, mana: 40, radius: 24, icon: 'chorus',
+    desc: '기준점 주변 아군의 마나를 함께 채운다. 메아리보다 많이 준다.',
+  },
+  epic: {
+    id: 'epic', job: 'laureate', unlock: 3, kind: 'buff-area', range: 32, cast: 1.4, name: '서사시', type: '광역 강화', targeting: 'area-ally',
+    mp: 34, cd: 24, stat: 'atk', mul: 1.3, duration: 12, radius: 30, icon: 'epic',
+    desc: '기준점 주변 아군의 공격력을 크게 올린다.',
+  },
+  tune: {
+    id: 'tune', job: 'laureate', unlock: 3, kind: 'mana', range: 0, cast: 1.8, name: '조율', type: '마나 회복', targeting: 'self',
+    mp: 0, cd: 24, mana: 84, icon: 'tune',
+    desc: '악기를 고르며 자신의 마나를 되찾는다.',
+  },
+  requiem: {
+    id: 'requiem', job: 'laureate', unlock: 4, kind: 'debuff-area', range: 44, cast: 1.4, name: '진혼곡', type: '광역 약화', targeting: 'area-enemy',
+    mp: 30, cd: 20, stat: 'armor', mul: 1.28, duration: 10, radius: 24, icon: 'requiem',
+    desc: '기준점 주변의 적이 받는 피해를 크게 늘린다.',
+  },
+  ovation: {
+    id: 'ovation', job: 'laureate', unlock: 5, kind: 'buff-area', range: 30, cast: 1.2, name: '갈채', type: '광역 강화', targeting: 'area-ally',
+    mp: 32, cd: 26, stat: 'heal', mul: 1.3, duration: 12, radius: 26, icon: 'ovation',
+    desc: '주변 아군의 회복량을 올린다. 자신과 동료 힐러가 함께 세진다.',
+  },
+  saga: {
+    id: 'saga', job: 'laureate', unlock: 5, kind: 'damage', range: 42, cast: 1.4, name: '무훈시', type: '개별 대상', targeting: 'enemy',
+    mp: 30, cd: 11, damage: 180, icon: 'saga',
+    desc: '적 하나의 최후를 노래한다.',
+  },
 };
 
 // **주인공이 고를 수 있는 계열.** 힐러 게임이므로 회복을 맡는 계열만 둔다 —
@@ -1219,11 +1317,23 @@ const HERO_JOBS = {
     desc: '앞에 서는 보조 탱커이자 보조 힐러. 신성 공격과 도발, 회복은 약하다.',
   },
   // **상위 계열은 최대 직업 레벨이 하나 낮다.** 하나하나가 세면서 점수까지 같으면
-  // 사제를 고를 이유가 사라진다 — 적게 배우고 세게 쓰는 쪽이다.
+  // 아래 계열을 고를 이유가 사라진다 — 적게 배우고 세게 쓰는 쪽이다.
+  // **계열마다 상위가 하나씩 있다.** 하나에만 있으면 나머지를 고르는 것이
+  // "끝이 없는 길"이 된다.
   bishop: {
     id: 'bishop', name: '주교', spec: 'priest', maxLevel: 5,
     need: { charLevel: 12, jobLevel: { priest: 6 } },
     desc: '사제의 상위 계열. 회복이 더 크고 마나를 더 먹는다. 약화를 걷어낸다.',
+  },
+  laureate: {
+    id: 'laureate', name: '서사시인', spec: 'bard', maxLevel: 5,
+    need: { charLevel: 12, jobLevel: { bard: 6 } },
+    desc: '음유시인의 상위 계열. 노래가 더 크고, 아군의 회복량까지 올린다.',
+  },
+  crusader: {
+    id: 'crusader', name: '성전사', spec: 'tank', maxLevel: 5,
+    need: { charLevel: 12, jobLevel: { paladin: 6 } },
+    desc: '성기사의 상위 계열. 광역 도발과 기절로 무리를 통째로 붙든다.',
   },
 };
 
@@ -1296,7 +1406,11 @@ function skillEffect(def) {
   if (def.mana && def.targeting === 'ally') return `동료의 마나 ${def.mana} 회복`;
   if (def.mana && def.radius) return `반경 ${def.radius} 안 아군의 마나 ${def.mana} 회복`;
   if (def.mana) return `마나 ${def.mana} 회복`;
+  if (def.kind === 'taunt-area') {
+    return `반경 ${def.radius} 안의 적을 ${def.duration}초 동안 끌어온다`;
+  }
   if (def.kind === 'taunt') return `${def.duration}초 동안 자신에게 끌어온다`;
+  if (def.kind === 'stun') return `${def.damage} 피해 · ${def.duration}초 기절`;
   if (def.damage) {
     return def.radius ? `반경 ${def.radius} 안의 적에게 ${def.damage} 피해`
       : `${def.damage} 피해`;

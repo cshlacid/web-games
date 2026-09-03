@@ -694,10 +694,24 @@ function resolvePlayerSkill(state, def, spot) {
   }
   // **도발은 성기사만 들고 온다.** 주인공이 어그로를 옮기는 유일한 수단이라,
   // 동료 탱커의 도발과 같은 자리를 건드린다 — 규칙이 둘이 되면 한쪽만 고치게 된다.
-  if (def.kind === 'taunt') {
-    unit.tauntUid = caster.uid;
-    unit.tauntUntil = state.t + def.duration;
-    unit.targetUid = caster.uid;
+  if (def.kind === 'taunt' || def.kind === 'taunt-area') {
+    // 광역 도발은 기준점 주변을 한꺼번에 끌어온다. 대상 목록만 다르고 나머지는
+    // 같아, 동료 탱커의 도발과 같은 모양으로 둔다.
+    const pulled = def.kind === 'taunt-area'
+      ? alive(state, 'enemy').filter((foe) => dist(foe, point) <= def.radius)
+      : [unit];
+    for (const foe of pulled) {
+      foe.tauntUid = caster.uid;
+      foe.tauntUntil = state.t + def.duration;
+      foe.targetUid = caster.uid;
+    }
+    return;
+  }
+  // 기절은 때리면서 굳힌다. 피해를 먼저 넣는 것은, 기절이 외우던 것을 끊으므로
+  // 순서를 뒤집으면 같은 틱에 죽은 적에게 기절이 걸린 것으로 남기 때문이다.
+  if (def.kind === 'stun') {
+    if (def.damage) applyDamage(state, caster, unit, harm(def.damage));
+    stun(state, caster, unit, def.duration);
     return;
   }
   if (def.kind === 'mana-ally') { giveMana(state, caster, unit, def.mana); return; }
