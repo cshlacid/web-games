@@ -868,6 +868,65 @@ function cast(state, skillId, target) {
     fresh.units.every((u) => u.y >= D.FIELD.top && u.y <= D.FIELD.bottom), true);
 }
 
+// --- 주인공의 계열 스킬 --------------------------------------------------
+//
+// 음유시인은 강화·약화와 마나 나눔이 본업이라, 회복·도트·장판만 다루던 실행부에
+// 종류가 넷 늘었다. **동료 스킬과 같은 함수를 부른다** — 따로 구현하면 "같은
+// 스킬은 겹쳐 쌓이지 않는다" 같은 규칙을 주인공만 안 지키게 된다.
+{
+  // 전투에 들고 갈 수 있는 것은 다섯뿐이라(SKILL_MAX) 화음은 빼고 넣는다.
+  const state = battle({ skills: ['refrain', 'anthem', 'lament', 'dissonance', 'finale'] });
+  const tank = unit(state, '강철의 브란');
+  const foe = AI.alive(state, 'enemy')[0];
+  // 적은 반대편 끝에 서 있어 사거리 밖이다. 여기서 보려는 것은 사거리가 아니다.
+  foe.x = L.hero(state).x + 8;
+  foe.y = L.hero(state).y;
+
+  // 강화: 기준점 주변 아군 모두에게 걸린다.
+  cast(state, 'anthem', { x: tank.x, y: tank.y });
+  check('광역 강화가 아군에게 걸린다', tank.auras.length, 1);
+  check('올리는 수치가 적혀 있다', tank.auras[0].stat, 'atk');
+  check('적에게는 안 걸린다', foe.auras.length, 0);
+
+  // 약화: 고른 적 하나에게.
+  cast(state, 'dissonance', { uid: foe.uid });
+  check('약화가 적에게 걸린다', foe.auras.map((a) => a.skillId), ['dissonance']);
+  check('약화는 아군에게 안 걸린다', tank.auras.length, 1);
+
+  // 광역 약화: 기준점 주변 적 모두에게.
+  cast(state, 'lament', { x: foe.x, y: foe.y });
+  check('광역 약화가 적에게 걸린다', foe.auras.length, 2);
+
+  // 마나 나눔: 제 마나값보다 많이 준다(노래로 채우는 것이지 제 것을 나누는 것이 아니다).
+  tank.mp = 0;
+  cast(state, 'refrain', { uid: tank.uid });
+  check('동료의 마나가 찬다', tank.mp > 0, true);
+  check('주는 마나가 제 마나값보다 크다',
+    D.PLAYER_SKILLS.refrain.mana > D.PLAYER_SKILLS.refrain.mp, true);
+
+  // 직접 피해: 마법 공격력 배수를 탄다. 앞의 넷으로 마나를 거의 다 썼으므로
+  // 채워 준다 — 여기서 보려는 것은 마나가 아니다.
+  L.hero(state).mp = L.hero(state).maxMp;
+  const before = foe.hp;
+  cast(state, 'finale', { uid: foe.uid });
+  check('직접 피해가 들어간다', foe.hp < before, true);
+}
+
+// **계열마다 본업과 보조가 갈린다.** 같은 값을 주면 "노래도 부르는 사제"가 되어
+// 둘 중 하나를 고를 이유가 사라진다.
+{
+  check('음유시인의 직접 회복이 사제보다 작다',
+    D.PLAYER_SKILLS.chord.heal < D.PLAYER_SKILLS.touch.heal, true);
+  check('아군의 마나를 채우는 것은 음유시인뿐',
+    D.heroSkillsOf('priest').some((def) => def.kind === 'mana-ally'), false);
+  check('강화·약화는 음유시인뿐',
+    D.heroSkillsOf('priest').some((def) => def.stat), false);
+  // 계열의 스킬은 그 계열의 상한 안에서 열려야 한다. 넘으면 영영 못 배운다.
+  const late = Object.values(D.PLAYER_SKILLS)
+    .filter((def) => def.unlock > D.jobMaxLevel(def.job)).map((def) => def.id);
+  check('상한 안에서 다 열린다', late, []);
+}
+
 // --- 무리 사이의 이동 ---------------------------------------------------
 //
 // 다음 무리가 있으면 그 자리에 적이 솟는 것이 아니라, 걸어가서 만나는 것으로

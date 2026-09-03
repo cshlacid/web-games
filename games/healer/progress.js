@@ -19,15 +19,19 @@ const Loot = node ? require('./loot.js') : root.HealerLoot;
 
 const STORAGE_KEY = 'web-games.healer.progress';
 // 판이 바뀌면 저장본을 통째로 버린다. 어중간하게 읽으면 더 이상한 상태가 된다.
-// 3에서 바뀐 것: 스킬 레벨. 2에서 바뀐 것: 아이템에 uid와 무작위 옵션, 동료
-// 명부, 물약 보유량.
-const VERSION = 3;
+// 4에서 바뀐 것: 주인공의 계열과 계열별 직업 레벨·스킬 점수, 스킬을 점수로
+// 배우는 것. 3에서 바뀐 것: 스킬 레벨. 2에서 바뀐 것: 아이템에 uid와 무작위
+// 옵션, 동료 명부, 물약 보유량.
+const VERSION = 4;
 
 function create() {
   return {
     version: VERSION,
     charLevel: 1, charExp: 0,
-    jobLevel: 1, jobExp: 0,
+    // 지금 맡고 있는 계열과, **계열마다 따로 쌓이는 직업 레벨·경험치**. 하나로
+    // 두면 계열을 바꾸는 순간 지금까지 키운 것이 사라져 아무도 바꿔 보지 않는다.
+    job: D.HERO_JOB_START,
+    jobs: { [D.HERO_JOB_START]: { level: 1, exp: 0 } },
     // 레벨이 오를 때마다 받는 점수를 어디에 넣었는지. 자동으로 오르는 몫은
     // 여기 없다 — 그쪽은 레벨에서 바로 계산된다.
     spent: { str: 0, agi: 0, int: 0, vit: 0 },
@@ -39,10 +43,13 @@ function create() {
     // 주인공이 들고 갈 물약. 동료는 직업에 따라 자동으로 들고 가지만(roster.js),
     // 주인공 것은 사서 채운다.
     potions: { mana: 3, health: 1 },
-    // 스킬마다의 레벨. 직업 레벨이 오를 때마다 받는 점수로 올린다. 안 적힌
-    // 스킬은 1레벨이다 — 새 스킬이 열릴 때마다 여기 자리를 만들어 두면,
-    // 자료가 바뀌었을 때 저장본에 없는 스킬과 있는 스킬이 갈린다.
-    skillLevels: {},
+    // **배운 스킬과 그 레벨.** 안 적힌 스킬은 아직 배우지 않은 것이다 — 직업
+    // 레벨이 되면 저절로 열리던 것을 점수로 배우는 것으로 바꿨다. 계열을 가리지
+    // 않고 한 표에 담는 것은 **배운 것이 계열이 달라도 남아야** 하기 때문이다.
+    //
+    // 첫 스킬 하나는 배운 채로 시작한다. 아무것도 없는 채로 편성 화면에 서면
+    // "전투 시작"이 꺼져 있는 이유가 화면에 없다.
+    learned: { touch: 1 },
     // 전투에 등록해 둔 스킬. **새로고침해도 남아야 한다** — 매번 다시 고르게 하면
     // 게시판에서 의뢰 하나 고르는 데 스킬 다섯을 다시 누르는 일이 된다.
     skills: [],
@@ -60,35 +67,84 @@ function create() {
 
 // 남는 경험치는 다음 레벨로 넘긴다. 한 전투에서 두 레벨이 오를 수 있고, 그때
 // 넘긴 만큼을 버리면 큰 퀘스트를 깰수록 손해가 된다.
-function gainLevels(level, exp, expTo) {
+// **상한이 밖에서 온다.** 캐릭터 레벨과 직업 레벨의 천장이 다르고, 직업 레벨은
+// 계열마다도 다르다 — 여기에 `D.LEVEL.maxLevel`을 박아 두면 계열 상한이 무시된다.
+function gainLevels(level, exp, expTo, maxLevel) {
+  const max = maxLevel || D.LEVEL.maxLevel;
   let gained = 0;
-  while (level + gained < D.LEVEL.maxLevel && exp >= expTo(level + gained)) {
+  while (level + gained < max && exp >= expTo(level + gained)) {
     exp -= expTo(level + gained);
     gained++;
   }
-  if (level + gained >= D.LEVEL.maxLevel) exp = 0;
+  if (level + gained >= max) exp = 0;
   return { level: level + gained, exp, gained };
 }
 
+// 계열마다의 레벨·경험치 자리. 처음 맡는 계열은 여기서 생긴다 — 만들 때 전부
+// 채워 두면 자료에 계열을 더할 때마다 저장본이 어긋난다.
+function jobEntry(progress, jobId) {
+  const id = D.heroJob(jobId || progress.job).id;
+  if (!progress.jobs) progress.jobs = {};
+  if (!progress.jobs[id]) progress.jobs[id] = { level: 1, exp: 0 };
+  return progress.jobs[id];
+}
+
+const jobLevel = (progress, jobId) => jobEntry(progress, jobId).level;
+const jobExpOf = (progress, jobId) => jobEntry(progress, jobId).exp;
+
 function addExp(progress, charExp, jobExp) {
-  const before = { char: progress.charLevel, job: progress.jobLevel };
+  const entry = jobEntry(progress);
+  const before = { char: progress.charLevel, job: entry.level };
 
   const char = gainLevels(progress.charLevel, progress.charExp + charExp, D.LEVEL.charExpTo);
   progress.charLevel = char.level;
   progress.charExp = char.exp;
 
-  const job = gainLevels(progress.jobLevel, progress.jobExp + jobExp, D.LEVEL.jobExpTo);
-  progress.jobLevel = job.level;
-  progress.jobExp = job.exp;
+  const job = gainLevels(entry.level, entry.exp + jobExp, D.LEVEL.jobExpTo,
+    D.jobMaxLevel(progress.job));
+  entry.level = job.level;
+  entry.exp = job.exp;
 
   return {
     charExp, jobExp,
     charLevels: char.gained, jobLevels: job.gained,
-    // 이번에 열린 스킬. 결과 화면에서 알려 주지 않으면 캐릭터 화면에 들어가
-    // 직접 찾아봐야 안다.
-    unlocked: Object.values(D.PLAYER_SKILLS)
-      .filter((def) => def.unlock > before.job && def.unlock <= progress.jobLevel),
+    // 이번에 배울 수 있게 된 스킬. 결과 화면에서 알려 주지 않으면 캐릭터 화면에
+    // 들어가 직접 찾아봐야 안다. **여는 것이 아니라 배울 수 있게 되는 것이다** —
+    // 배우는 데에는 점수가 든다.
+    unlocked: D.heroSkillsOf(progress.job)
+      .filter((def) => def.unlock > before.job && def.unlock <= entry.level),
   };
+}
+
+// --- 계열 --------------------------------------------------------------
+
+// **전직 조건은 자료에 있다**(`HERO_JOBS`의 `need`). 조건을 코드에 적으면 계열을
+// 더할 때마다 분기가 는다.
+function canChangeJob(progress, jobId) {
+  const job = D.HERO_JOBS[jobId];
+  if (!job) return { ok: false, reason: '없는 계열' };
+  if (progress.job === jobId) return { ok: false, reason: '이미 맡고 있다' };
+  const need = job.need || {};
+  if (need.charLevel && progress.charLevel < need.charLevel) {
+    return { ok: false, reason: `캐릭터 레벨 ${need.charLevel} 필요` };
+  }
+  if (need.cleared && (progress.cleared | 0) < need.cleared) {
+    return { ok: false, reason: `의뢰 ${need.cleared}건 완료 필요` };
+  }
+  return { ok: true };
+}
+
+// 계열을 바꾼다. **배운 스킬은 그대로 두고 점수만 그 계열 것으로 돌아간다** —
+// 되돌아왔을 때 처음부터 다시 배우게 하면 아무도 바꿔 보지 않는다.
+function changeJob(progress, jobId) {
+  const can = canChangeJob(progress, jobId);
+  if (!can.ok) return can;
+  progress.job = jobId;
+  jobEntry(progress);
+  // 등록해 둔 다섯은 앞 계열의 스킬이다. 그대로 두면 쓸 수 없는 것을 든 채로
+  // 전투가 시작된다.
+  progress.skills = validSkills(progress, progress.skills || []);
+  return { ok: true, job: D.heroJob(jobId), level: jobLevel(progress) };
 }
 
 // --- 스탯 ---------------------------------------------------------------
@@ -241,56 +297,78 @@ function compare(progress, item) {
 
 // --- 스킬 ---------------------------------------------------------------
 
+// 지금 계열에서 **배울 수 있게 된** 스킬. 배웠다는 뜻이 아니다.
 function unlockedSkills(progress) {
-  return Object.values(D.PLAYER_SKILLS).filter((def) => def.unlock <= progress.jobLevel);
+  return D.heroSkillsOf(progress.job).filter((def) => def.unlock <= jobLevel(progress));
 }
 
-// 등록해 둔 스킬이 아직 안 열린 것일 수 있다(저장본을 지운 뒤 등). 열린 것만 남긴다.
+// 지금 계열에서 **실제로 배운** 스킬. 전투에 등록할 수 있는 것은 이것뿐이다.
+function learnedSkills(progress) {
+  return D.heroSkillsOf(progress.job).filter((def) => skillLevel(progress, def.id) > 0);
+}
+
+// 등록해 둔 스킬이 배우지 않은 것이거나 다른 계열의 것일 수 있다(계열을 바꿨거나
+// 저장본을 손댔거나). 지금 들 수 있는 것만 남긴다.
 function validSkills(progress, skills) {
-  const open = new Set(unlockedSkills(progress).map((def) => def.id));
-  return skills.filter((id) => open.has(id)).slice(0, D.SKILL_MAX);
+  const mine = new Set(learnedSkills(progress).map((def) => def.id));
+  return skills.filter((id) => mine.has(id)).slice(0, D.SKILL_MAX);
 }
 
-// --- 스킬 레벨 ----------------------------------------------------------
+// --- 스킬 레벨과 점수 ---------------------------------------------------
 
-// 능력치 점수와 같은 셈법이다: 받은 것에서 쓴 것을 뺀다. 따로 세어 두면
-// 저장본이 어긋났을 때 점수가 늘거나 줄어든다.
-const skillLevel = (progress, id) =>
-  D.skillLevelOf((progress.skillLevels || {})[id] || 1);
+// **0은 아직 배우지 않은 것이다.** 예전에는 안 적힌 스킬이 1레벨이었는데, 그때는
+// 직업 레벨만 되면 저절로 열렸기 때문이다. 지금은 배우는 데에도 점수가 드므로
+// "안 배움"과 "1레벨"을 갈라야 한다.
+function skillLevel(progress, id) {
+  const level = (progress.learned || {})[id] | 0;
+  return level <= 0 ? 0 : Math.min(D.SKILL.max, level);
+}
 
 // 레벨을 반영한 스킬 정의. 화면과 전투가 같은 함수를 봐야 캐릭터 창에 적힌
 // 수치와 실제로 나가는 스킬이 어긋나지 않는다.
 const skillDef = (progress, id) =>
-  D.skillAt(D.PLAYER_SKILLS[id], skillLevel(progress, id));
+  D.skillAt(D.PLAYER_SKILLS[id], Math.max(1, skillLevel(progress, id)));
 
 // 전투에 넘길 표. 전투는 진행 상태를 모르므로 필요한 것만 뽑아 넘긴다.
 function skillLevels(progress) {
   const out = {};
-  for (const id of Object.keys(D.PLAYER_SKILLS)) out[id] = skillLevel(progress, id);
+  for (const id of Object.keys(D.PLAYER_SKILLS)) out[id] = Math.max(1, skillLevel(progress, id));
   return out;
 }
 
-const earnedSkillPoints = (progress) => (progress.jobLevel - 1) * D.SKILL.pointsPerLevel;
+// **점수는 계열마다 따로 쌓이고 따로 쓰인다.** 한 통에 담으면 사제로 쌓은 점수로
+// 음유시인의 스킬을 전부 배워, 계열을 고르는 일이 "둘 다 하기"가 된다.
+const earnedSkillPoints = (progress, jobId) =>
+  D.SKILL.start + (jobLevel(progress, jobId) - 1) * D.SKILL.pointsPerLevel;
 
-function spentSkillPoints(progress) {
-  return Object.keys(D.PLAYER_SKILLS)
-    .reduce((sum, id) => sum + (skillLevel(progress, id) - 1), 0);
+// 배우는 데 1, 한 칸 올릴 때마다 1. 그래서 쓴 점수는 그 계열 스킬의 레벨 합이다.
+function spentSkillPoints(progress, jobId) {
+  return D.heroSkillsOf(jobId || progress.job)
+    .reduce((sum, def) => sum + skillLevel(progress, def.id), 0);
 }
 
-const freeSkillPoints = (progress) =>
-  Math.max(0, earnedSkillPoints(progress) - spentSkillPoints(progress));
+const freeSkillPoints = (progress, jobId) =>
+  Math.max(0, earnedSkillPoints(progress, jobId) - spentSkillPoints(progress, jobId));
 
-// 아직 열리지 않은 스킬은 올릴 수 없다. 열리기 전에 올려 두면 직업 레벨이
-// 새 스킬을 여는 뜻이 옅어진다.
-function raiseSkill(progress, id) {
+// 배우기와 올리기가 같은 점수를 쓴다. 둘을 한 함수로 묶지 않은 것은 화면이
+// 단추 이름을 갈라야 하기 때문이다 — "배우기"와 "＋"는 다른 일로 보여야 한다.
+function spendSkill(progress, id, learning) {
   const def = D.PLAYER_SKILLS[id];
   if (!def) return { ok: false, reason: '없는 스킬' };
-  if (def.unlock > progress.jobLevel) return { ok: false, reason: '아직 열리지 않았다' };
-  if (skillLevel(progress, id) >= D.SKILL.max) return { ok: false, reason: '더 올릴 수 없다' };
+  if (def.job !== progress.job) return { ok: false, reason: '다른 계열의 스킬' };
+  if (def.unlock > jobLevel(progress)) return { ok: false, reason: '아직 열리지 않았다' };
+  const level = skillLevel(progress, id);
+  if (learning && level > 0) return { ok: false, reason: '이미 배웠다' };
+  if (!learning && level <= 0) return { ok: false, reason: '아직 안 배웠다' };
+  if (level >= D.SKILL.max) return { ok: false, reason: '더 올릴 수 없다' };
   if (freeSkillPoints(progress) <= 0) return { ok: false, reason: '남은 점수가 없다' };
-  progress.skillLevels[id] = skillLevel(progress, id) + 1;
-  return { ok: true, level: progress.skillLevels[id], left: freeSkillPoints(progress) };
+  if (!progress.learned) progress.learned = {};
+  progress.learned[id] = level + 1;
+  return { ok: true, level: progress.learned[id], left: freeSkillPoints(progress) };
 }
+
+const learnSkill = (progress, id) => spendSkill(progress, id, true);
+const raiseSkill = (progress, id) => spendSkill(progress, id, false);
 
 // --- 저장 ---------------------------------------------------------------
 
@@ -345,16 +423,39 @@ function load() {
     budget -= give;
   }
 
-  // 스킬 레벨도 받은 점수를 넘을 수 없다. 능력치 점수와 같은 이유로 예산을
-  // 정해 앞에서부터 나눠 준다.
-  progress.skillLevels = {};
-  let skillBudget = (Math.max(1, Math.min(D.LEVEL.maxLevel, saved.jobLevel | 0 || 1)) - 1)
-    * D.SKILL.pointsPerLevel;
-  for (const id of Object.keys(D.PLAYER_SKILLS)) {
-    const want = D.skillLevelOf((saved.skillLevels || {})[id] || 1) - 1;
-    const give = Math.min(want, skillBudget);
-    if (give > 0) progress.skillLevels[id] = give + 1;
-    skillBudget -= give;
+  // 계열별 직업 레벨. 계열마다 상한이 다르므로 각각의 상한으로 자른다.
+  // 조건을 못 채운 계열이 적혀 있으면 처음 계열로 되돌린다. 저장본을 손대서
+  // 캐릭터 레벨 1짜리가 음유시인으로 앉아 있으면 전직 조건이 아무것도 아니게 된다.
+  progress.job = D.HERO_JOB_START;
+  if (D.HERO_JOBS[saved.job] && saved.job !== D.HERO_JOB_START) {
+    progress.charLevel = Math.max(1, Math.min(D.LEVEL.maxLevel, saved.charLevel | 0 || 1));
+    if (canChangeJob(progress, saved.job).ok) progress.job = saved.job;
+  }
+  progress.jobs = {};
+  for (const id of Object.keys(D.HERO_JOBS)) {
+    const kept = (saved.jobs || {})[id];
+    if (!kept && id !== progress.job) continue;   // 겪지 않은 계열은 만들지 않는다
+    progress.jobs[id] = {
+      level: Math.max(1, Math.min(D.jobMaxLevel(id), (kept || {}).level | 0 || 1)),
+      exp: Math.max(0, (kept || {}).exp | 0),
+    };
+  }
+  jobEntry(progress);
+
+  // 배운 스킬도 받은 점수를 넘을 수 없다. 능력치 점수와 같은 이유로 **계열마다**
+  // 예산을 정해 앞에서부터 나눠 준다 — 한 통으로 세면 사제로 쌓은 점수가
+  // 음유시인의 스킬을 배운 것으로 넘어간다.
+  progress.learned = {};
+  for (const jobId of Object.keys(D.HERO_JOBS)) {
+    let budget = D.SKILL.start
+      + (((progress.jobs[jobId] || {}).level || 1) - 1) * D.SKILL.pointsPerLevel;
+    for (const def of D.heroSkillsOf(jobId)) {
+      const want = Math.min(D.SKILL.max, Math.max(0, (saved.learned || {})[def.id] | 0));
+      const give = def.unlock <= ((progress.jobs[jobId] || {}).level || 1)
+        ? Math.min(want, budget) : 0;
+      if (give > 0) progress.learned[def.id] = give;
+      budget -= give;
+    }
   }
 
   // 등록해 둔 스킬은 저장본에서 그대로 믿지 않는다. 자료가 바뀌어 없어진 스킬이나
@@ -365,7 +466,6 @@ function load() {
 
   progress.roster = Roster.adopt(saved.roster);
   progress.charLevel = Math.max(1, Math.min(D.LEVEL.maxLevel, progress.charLevel | 0));
-  progress.jobLevel = Math.max(1, Math.min(D.LEVEL.maxLevel, progress.jobLevel | 0));
   progress.gold = Math.max(0, progress.gold | 0);
   return progress;
 }
@@ -381,8 +481,9 @@ const api = {
   earnedPoints, spentPoints, freePoints, spendPoint,
   addItem, findItem, equip, unequip, compare,
   spend, buyGear, buyPotion, sell,
-  unlockedSkills, validSkills,
-  skillLevel, skillDef, skillLevels, raiseSkill,
+  jobEntry, jobLevel, jobExpOf, canChangeJob, changeJob,
+  unlockedSkills, learnedSkills, validSkills,
+  skillLevel, skillDef, skillLevels, learnSkill, raiseSkill,
   earnedSkillPoints, spentSkillPoints, freeSkillPoints,
 };
 

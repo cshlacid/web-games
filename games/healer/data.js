@@ -1005,46 +1005,130 @@ function skillsFor(spec, level, seed, always) {
 // 숫자를 적지 않는 것은 그 때문이다 — 숫자는 skillEffect가 레벨에서 만든다.
 const PLAYER_SKILLS = {
   touch: {
-    id: 'touch', unlock: 1, kind: 'heal', range: 40, cast: 1.0, name: '치유의 손길', type: '개별 대상', targeting: 'ally',
+    id: 'touch', job: 'priest', unlock: 1, kind: 'heal', range: 40, cast: 1.0, name: '치유의 손길', type: '개별 대상', targeting: 'ally',
     mp: 14, cd: 1.4, heal: 130, icon: 'cross',
     desc: '동료 하나의 체력을 한 번에 크게 회복한다.',
   },
   quick: {
-    id: 'quick', unlock: 1, kind: 'heal', range: 36, cast: 0, name: '신속한 치유', type: '개별 대상', targeting: 'ally',
+    id: 'quick', job: 'priest', unlock: 1, kind: 'heal', range: 36, cast: 0, name: '신속한 치유', type: '개별 대상', targeting: 'ally',
     mp: 9, cd: 1.2, heal: 62, icon: 'quickHeal',
     desc: '싸고 빠르지만 회복량이 작다.',
   },
   regen: {
-    id: 'regen', unlock: 2, kind: 'heal-dot', range: 40, cast: 1.0, name: '재생의 축복', type: '도트', targeting: 'ally',
+    id: 'regen', job: 'priest', unlock: 2, kind: 'heal-dot', range: 40, cast: 1.0, name: '재생의 축복', type: '도트', targeting: 'ally',
     mp: 20, cd: 8, tick: 26, interval: 1, duration: 8, icon: 'regen',
     desc: '동료 하나에게 걸어 두면 시간을 두고 회복된다.',
   },
   ripple: {
-    id: 'ripple', unlock: 4, kind: 'heal-area', range: 44, cast: 1.5, name: '빛의 파문', type: '범위', targeting: 'area-ally',
+    id: 'ripple', job: 'priest', unlock: 4, kind: 'heal-area', range: 44, cast: 1.5, name: '빛의 파문', type: '범위', targeting: 'area-ally',
     mp: 30, cd: 7.5, heal: 76, radius: 20, icon: 'ripple',
     desc: '기준점 주변의 아군을 한 번에 회복한다.',
   },
   sanctuary: {
-    id: 'sanctuary', unlock: 6, kind: 'heal-area', range: 48, cast: 2.0, name: '생명의 성역', type: '장판', targeting: 'area-ally',
+    id: 'sanctuary', job: 'priest', unlock: 6, kind: 'heal-area', range: 48, cast: 2.0, name: '생명의 성역', type: '장판', targeting: 'area-ally',
     mp: 38, cd: 20, tick: 22, interval: 1, duration: 10, radius: 21, icon: 'sanctuary',
     desc: '바닥에 남는 장판. 안에 서 있는 아군이 계속 회복된다.',
   },
   focus: {
-    id: 'focus', unlock: 3, kind: 'mana', range: 0, cast: 2.0, name: '정신 집중', type: '마나 회복', targeting: 'self',
+    id: 'focus', job: 'priest', unlock: 3, kind: 'mana', range: 0, cast: 2.0, name: '정신 집중', type: '마나 회복', targeting: 'self',
     mp: 0, cd: 28, mana: 70, icon: 'focus',
     desc: '서서 외워 자신의 마나를 되찾는다.',
   },
   flame: {
-    id: 'flame', unlock: 5, kind: 'dot', range: 40, cast: 1.0, name: '심판의 불꽃', type: '도트', targeting: 'enemy',
+    id: 'flame', job: 'priest', unlock: 5, kind: 'dot', range: 40, cast: 1.0, name: '심판의 불꽃', type: '도트', targeting: 'enemy',
     mp: 16, cd: 9, tick: 22, interval: 1, duration: 6, icon: 'flame',
     desc: '적 하나를 태운다. 어그로를 끌 수 있다.',
   },
   pyre: {
-    id: 'pyre', unlock: 8, kind: 'zone', range: 44, cast: 1.8, name: '성스러운 불길', type: '장판', targeting: 'area-enemy',
+    id: 'pyre', job: 'priest', unlock: 6, kind: 'zone', range: 44, cast: 1.8, name: '성스러운 불길', type: '장판', targeting: 'area-enemy',
     mp: 34, cd: 18, tick: 26, interval: 1, duration: 8, radius: 18, icon: 'pyre',
     desc: '바닥에 남는 장판. 안에 선 적이 계속 탄다.',
   },
+
+  // --- 음유시인 ---------------------------------------------------------
+  //
+  // **강화·약화가 본업이고 회복이 보조다.** 사제와 같은 값을 주면 "노래도 부르는
+  // 사제"가 되어 둘 중 하나를 고를 이유가 사라진다 — 직접 회복은 사제보다 작고
+  // (화음 84 대 치유의 손길 130), 대신 파티 전체의 공격력과 마나를 만진다.
+  //
+  // **이름과 아이콘은 동료 음유시인의 같은 기술에서 가져왔다.** 주인공의 후렴과
+  // 동료의 후렴은 같은 것이라, 다른 그림을 주면 다른 기술로 보인다.
+  chord: {
+    id: 'chord', job: 'bard', unlock: 1, kind: 'heal', range: 38, cast: 0.8, name: '화음', type: '개별 대상', targeting: 'ally',
+    mp: 12, cd: 1.6, heal: 84, icon: 'chord',
+    desc: '동료 하나를 회복한다. 사제의 손길보다 작다.',
+  },
+  refrain: {
+    id: 'refrain', job: 'bard', unlock: 1, kind: 'mana-ally', range: 36, cast: 0, name: '후렴', type: '마나 나눔', targeting: 'ally',
+    mp: 10, cd: 10, mana: 34, icon: 'refrain',
+    desc: '동료 하나의 마나를 채운다. 제 마나보다 많이 준다.',
+  },
+  anthem: {
+    id: 'anthem', job: 'bard', unlock: 2, kind: 'buff-area', range: 30, cast: 1.2, name: '전투가', type: '광역 강화', targeting: 'area-ally',
+    mp: 26, cd: 24, stat: 'atk', mul: 1.18, duration: 12, radius: 26, icon: 'anthem',
+    desc: '기준점 주변 아군의 공격력을 올린다.',
+  },
+  lament: {
+    id: 'lament', job: 'bard', unlock: 3, kind: 'debuff-area', range: 42, cast: 1.4, name: '만가', type: '광역 약화', targeting: 'area-enemy',
+    mp: 24, cd: 20, stat: 'armor', mul: 1.16, duration: 10, radius: 20, icon: 'lament',
+    desc: '기준점 주변의 적이 받는 피해를 늘린다.',
+  },
+  serenade: {
+    id: 'serenade', job: 'bard', unlock: 3, kind: 'heal-dot', range: 38, cast: 0, name: '자장가', type: '도트', targeting: 'ally',
+    mp: 18, cd: 7, tick: 24, interval: 1, duration: 8, icon: 'serenade',
+    desc: '동료 하나에게 걸어 두면 시간을 두고 회복된다.',
+  },
+  dissonance: {
+    id: 'dissonance', job: 'bard', unlock: 4, kind: 'debuff', range: 40, cast: 1.0, name: '불협화음', type: '약화', targeting: 'enemy',
+    mp: 20, cd: 16, stat: 'atk', mul: 0.85, duration: 10, icon: 'dissonance',
+    desc: '적 하나의 공격력을 떨어뜨린다.',
+  },
+  echo: {
+    id: 'echo', job: 'bard', unlock: 5, kind: 'mana-area', range: 30, cast: 1.6, name: '메아리', type: '광역 마나', targeting: 'area-ally',
+    mp: 16, cd: 26, mana: 26, radius: 22, icon: 'echo',
+    desc: '기준점 주변 아군의 마나를 함께 채운다.',
+  },
+  finale: {
+    id: 'finale', job: 'bard', unlock: 6, kind: 'damage', range: 40, cast: 1.2, name: '종막', type: '개별 대상', targeting: 'enemy',
+    mp: 22, cd: 12, damage: 96, icon: 'finale',
+    desc: '적 하나를 노래로 내리친다.',
+  },
 };
+
+// **주인공이 고를 수 있는 계열.** 힐러 게임이므로 회복을 맡는 계열만 둔다 —
+// 딜러나 탱커를 고를 수 있게 하면 "손을 놓아도 이기면 안 된다"는 이 게임의
+// 전제가 무너진다.
+//
+// - **최대 직업 레벨이 낮다.** 예전에는 캐릭터 레벨과 같은 30까지 올라 결국
+//   전부 배웠고, 그러면 무엇을 배울지 고르는 일이 사라진다. 여섯에서 멈추므로
+//   받는 점수는 일곱뿐이고, 사제의 여덟 스킬을 다 배울 수 없다.
+// - **레벨과 점수는 계열마다 따로 쌓인다**(`progress.jobs`). 다른 계열을 겪어
+//   보려다 지금까지 키운 것이 날아가면 아무도 바꿔 보지 않는다.
+// - **배운 스킬은 계열이 달라도 남는다.** 계열을 되돌리면 그때 배운 것이 그대로
+//   있다 — 점수만 그 계열 것으로 돌아간다.
+// - 조건은 임시다. 지금은 캐릭터 레벨 하나만 본다.
+const HERO_JOBS = {
+  priest: {
+    id: 'priest', name: '사제', spec: 'priest', maxLevel: 6, need: null,
+    desc: '직접 회복이 본업. 크게 한 번에 채우고 장판으로 버틴다.',
+  },
+  bard: {
+    id: 'bard', name: '음유시인', spec: 'bard', maxLevel: 6, need: { charLevel: 5 },
+    desc: '강화·약화가 본업, 회복이 보조. 파티 전체의 공격력과 마나를 만진다.',
+  },
+};
+
+const HERO_JOB_START = 'priest';
+
+// 그 계열의 스킬만. 자료를 계열별로 쪼개지 않고 표 하나에 두는 것은, 전투와
+// 저장본이 스킬을 id 하나로 찾기 때문이다 — 쪼개면 찾는 곳마다 계열을 알아야 한다.
+const heroSkillsOf = (jobId) =>
+  Object.values(PLAYER_SKILLS).filter((def) => def.job === jobId);
+
+const heroJob = (jobId) => HERO_JOBS[jobId] || HERO_JOBS[HERO_JOB_START];
+
+// 그 계열의 최대 직업 레벨. 레벨 상한이 계열마다 다르므로 경험치도 여기서 멈춘다.
+const jobMaxLevel = (jobId) => heroJob(jobId).maxLevel;
 
 // 스킬 레벨. **직업 레벨이 오를 때마다 점수를 받아 스킬 하나를 올린다.**
 // 캐릭터 레벨이 능력치를 올리듯 직업 레벨은 스킬을 올린다 — 예전에는 직업
@@ -1057,6 +1141,9 @@ const PLAYER_SKILLS = {
 const SKILL = {
   max: 5,
   pointsPerLevel: 1,
+  // 직업 레벨 1에서 받는 점수. 0으로 두면 새로 시작한 사람이 배울 수 있는 스킬이
+  // 하나도 없는 채로 편성 화면에 서고, "전투 시작"이 왜 꺼져 있는지 알 수 없다.
+  start: 2,
   effect: 0.18,   // 레벨당 회복량·피해·마나 회복
   cost: 0.09,     // 레벨당 소비 마나
 };
@@ -1074,8 +1161,13 @@ function skillAt(def, level) {
 
   const grow = 1 + SKILL.effect * (lv - 1);
   const cost = 1 + SKILL.cost * (lv - 1);
-  for (const key of ['heal', 'tick', 'mana']) {
+  for (const key of ['heal', 'tick', 'mana', 'damage']) {
     if (def[key]) out[key] = Math.round(def[key] * grow);
+  }
+  // 강화·약화는 곱이라 그대로 곱하면 1.22가 1.44가 된다. **1에서 떨어진 만큼**을
+  // 키운다 — 지속을 늘리지 않는 것은 다른 스킬과 같은 이유다(성격이 바뀐다).
+  if (def.stat && def.mul) {
+    out.mul = Math.round((1 + (def.mul - 1) * grow) * 1000) / 1000;
   }
   if (def.mp) out.mp = Math.round(def.mp * cost);
   return out;
@@ -1085,7 +1177,17 @@ function skillAt(def, level) {
 // 오른 것이 화면에 보이지 않는다.
 function skillEffect(def) {
   if (!def) return '';
+  // 강화·약화는 무엇을 몇 배로 만드는지가 전부다. 이름만으로는 공격력인지
+  // 받는 피해인지 알 수 없다.
+  if (def.stat) {
+    const name = AURA_STATS[def.stat] || def.stat;
+    const where = def.radius ? `반경 ${def.radius} 안, ` : '';
+    return `${where}${name} ×${def.mul} (${def.duration}초)`;
+  }
+  if (def.mana && def.targeting === 'ally') return `동료의 마나 ${def.mana} 회복`;
+  if (def.mana && def.radius) return `반경 ${def.radius} 안 아군의 마나 ${def.mana} 회복`;
   if (def.mana) return `마나 ${def.mana} 회복`;
+  if (def.damage) return `${def.damage} 피해`;
   const kind = def.targeting === 'enemy' || def.targeting === 'area-enemy' ? '피해' : '회복';
   if (def.heal) {
     return def.radius ? `반경 ${def.radius} 안의 아군을 ${def.heal}씩 회복`
@@ -1291,7 +1393,8 @@ const api = {
   SLOTS, GEAR, MATERIALS, REGIONS, NAMES, SPECIAL_POOL, SPECIAL_CHANCE,
   withGear, attrsWithGear, WHOLE_AFFIX,
   HERO, COMPANIONS, UNIT_SKILLS, SKILL_KINDS, skillKind, AURA_STATS, SPEC_SKILLS, UNIT_SKILL_MAX, skillsFor, skillSeed,
-  PLAYER_SKILLS, SKILL, skillAt, skillEffect, skillLevelOf,
+  PLAYER_SKILLS, HERO_JOBS, HERO_JOB_START, heroSkillsOf, heroJob, jobMaxLevel,
+  SKILL, skillAt, skillEffect, skillLevelOf,
   POTIONS, JOB_POTIONS, POTION_MAX, ENEMIES,
   PARTY_MAX, SKILL_MAX,
   potionPrice,
