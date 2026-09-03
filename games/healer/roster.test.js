@@ -225,6 +225,60 @@ const SEEDS = [1, 5, 77, 4242, 20260825];
   check('배열이 아니어도 버틴다', R.adopt(null).length, R.START_SIZE);
 }
 
+// --- 계열 바꾸기 ----------------------------------------------------------
+//
+// **역할은 그대로 두고 계열만 바꾼다.** 탱커가 마법사가 되면 편성 화면이 보장하는
+// "탱커 하나, 힐러 하나"가 뜻을 잃는다.
+{
+  const dealer = R.makeMember(Items.createRng(3), new Set(), 1, 'mira');
+  check('딜러는 넷 중에서 고른다', R.specChoices(dealer).sort(),
+    ['archer', 'mage', 'rogue', 'warrior']);
+  check('낮은 레벨에는 못 바꾼다', R.canChangeSpec(dealer, 'mage').ok, false);
+  check('안 바뀐 채로 남는다', R.changeSpec(dealer, 'mage').ok, false);
+
+  dealer.level = D.SPEC_CHANGE_LEVEL;
+  const had = R.skillsOf(dealer);
+  check('레벨이 되면 바꿀 수 있다', R.changeSpec(dealer, 'mage').ok, true);
+  check('계열이 바뀐다', R.specOf(dealer), 'mage');
+  check('역할은 그대로다', R.jobOf(dealer), 'dealer');
+  // 그림은 계열을 따라간다 — 궁수가 마법사가 되면 손에 든 것이 바뀐다.
+  check('그림도 바뀐다', R.spriteOf(dealer), 'mage');
+  // **바꾸기 전에 들고 다니던 넷은 배운 것으로 남는다.** 바꾸는 것이 곧 잃는
+  // 일이면 아무도 바꾸지 않는다.
+  check('쓰던 넷이 배운 것으로 남는다',
+    had.every((id) => dealer.learned.includes(id)), true);
+  check('다른 계열 스킬을 섞어 든다',
+    R.skillsOf(dealer).some((id) => !D.SPEC_SKILLS.mage.includes(id)), true);
+  check('그래도 넷을 넘지 않는다', R.skillsOf(dealer).length <= D.UNIT_SKILL_MAX, true);
+
+  // 역할 밖의 계열은 고를 수 없다.
+  check('딜러가 사제로는 못 간다', R.canChangeSpec(dealer, 'priest').ok, false);
+  const tank = R.makeMember(Items.createRng(9), new Set(), D.SPEC_CHANGE_LEVEL, 'bran');
+  check('탱커의 선택지는 둘', R.specChoices(tank).sort(), ['tank', 'warrior']);
+  check('탱커가 궁수로는 못 간다', R.canChangeSpec(tank, 'archer').ok, false);
+
+  // 레벨이 올라 새로 들게 된 것도 배운 것이 된다.
+  const grown = R.makeMember(Items.createRng(4), new Set(), 1, 'lyle');
+  R.gainExp(grown, 1e6);
+  check('레벨이 오르면 그때 든 것도 배운다', grown.learned.length > 0, true);
+}
+
+// --- 저장본에 남는다 -------------------------------------------------------
+{
+  const member = R.makeMember(Items.createRng(3), new Set(), D.SPEC_CHANGE_LEVEL, 'mira');
+  R.changeSpec(member, 'mage');
+  const back = R.adopt([member])[0];
+  check('바꾼 계열이 남는다', R.specOf(back), 'mage');
+  check('배운 것도 남는다', back.learned.sort(), member.learned.sort());
+
+  // 저장본을 손대서 역할 밖의 계열을 적어 두면 되돌린다.
+  const forged = R.adopt([Object.assign({}, member, { spec: 'priest' })])[0];
+  check('고를 수 없는 계열은 되돌린다', R.baseSpecOf(forged), R.defOf(forged).spec);
+  // 모르는 스킬이 섞여 있으면 버린다 — 전투가 빈 스킬을 들고 들어간다.
+  const junk = R.adopt([Object.assign({}, member, { learned: ['없는스킬', 'snipe'] })])[0];
+  check('모르는 스킬은 버린다', junk.learned, ['snipe']);
+}
+
 // --- 상위 계열 ------------------------------------------------------------
 //
 // 명부와 전투가 같은 함수를 봐야 편성 화면에 적힌 계열과 전장에서 쓰는 스킬이

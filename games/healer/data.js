@@ -969,6 +969,31 @@ const SPEC_UP = {
   mage:    { spec: 'archmage',  skills: ['meteor', 'maelstrom'] },
 };
 
+// **동료도 계열을 바꾼다.** 역할(`job`)은 그대로 두고 계열만 바꾸는 것이라,
+// "역할은 전투에서 하는 일, 계열은 그 일을 어떤 손으로 하는가"라는 두 겹 구조를
+// 그대로 쓴다 — 탱커가 마법사가 되면 편성 화면이 보장하는 "탱커 하나, 힐러 하나"가
+// 뜻을 잃는다. 탱커가 전사를 고를 수 있는 것은 전사가 도발과 굳히기를 들고 있어
+// 역할을 바꾸지 않고도 손이 달라지기 때문이다.
+const SPEC_CHOICES = {
+  tank: ['tank', 'warrior'],
+  dealer: ['warrior', 'rogue', 'archer', 'mage'],
+  healer: ['priest', 'bard'],
+};
+
+// 바꿀 수 있게 되는 레벨. 1레벨부터 바꿀 수 있으면 명부를 받자마자 전부 갈아
+// 끼우게 되어, 처음 뽑힌 계열이 아무 뜻도 없어진다.
+const SPEC_CHANGE_LEVEL = 5;
+
+// 그 계열이 쓰는 그림. **상위 계열은 아래 계열의 그림을 그대로 쓴다**(같은 사람이
+// 강해진 것이라). 계열을 바꾸는 것은 다르다 — 궁수가 마법사가 되면 손에 든 것이
+// 바뀌므로 그림도 따라간다.
+function spriteFor(spec) {
+  for (const [base, up] of Object.entries(SPEC_UP)) {
+    if (up.spec === spec) return base;
+  }
+  return spec;
+}
+
 // 상위 계열로 올라가는 레벨. **난이도 검사가 도는 구간(1~10레벨)보다 위에 둔다** —
 // 그 아래에 두면 자동 힐러로 재 둔 승률이 통째로 흔들린다.
 const SPEC_UP_LEVEL = 12;
@@ -1067,9 +1092,16 @@ for (const [base, up] of Object.entries(SPEC_UP)) {
 // 이쪽은 그 개체의 정체다 — 등급이 무엇을 들고 오는가를 정하는 자리라, 같은
 // 수호자 계열이라도 정예 오크만 휩쓸기를 확실히 들고 온다. 취향에 맡겨 두면
 // "광역기를 든 정예"가 우연에 걸리고, 등급을 올린 뜻이 사라진다.
-function skillsFor(spec, level, seed, always) {
+//
+// **learned는 다른 계열에서 배워 온 것이다.** 계열을 바꿔도 손에 남으므로 지금
+// 계열의 목록 뒤에 이어 붙인다. 뒤에 두는 것은 `SPEC_SKILLS`의 순서가 곧 AI의
+// 우선순위이기 때문이다 — 빌려 온 기술이 제 계열의 정체보다 먼저 나가면, 계열을
+// 바꾼 것이 아니라 스킬을 모으는 놀이가 된다.
+function skillsFor(spec, level, seed, always, learned) {
   const list = SPEC_SKILLS[spec] || [];
-  const open = list.filter((id) => level >= UNIT_SKILLS[id].minLevel);
+  const extra = (learned || []).filter((id) => UNIT_SKILLS[id] && list.indexOf(id) < 0);
+  const order = list.concat(extra);
+  const open = order.filter((id) => level >= UNIT_SKILLS[id].minLevel);
   if (seed == null) return open.slice(0, UNIT_SKILL_MAX);
 
   const forced = (always || []).filter((id) => open.indexOf(id) >= 0);
@@ -1077,7 +1109,7 @@ function skillsFor(spec, level, seed, always) {
   const rest = open.filter((id) => !UNIT_SKILLS[id].core && forced.indexOf(id) < 0)
     .sort((a, b) => taste(seed, a) - taste(seed, b));
   const picked = new Set(forced.concat(core, rest).slice(0, UNIT_SKILL_MAX));
-  return list.filter((id) => picked.has(id));
+  return order.filter((id) => picked.has(id));
 }
 
 // 기획서에 나온 다섯 유형을 모두 쓴다: 개별 대상 / 범위 / 장판 / 도트 / 마나 회복.
@@ -1732,7 +1764,8 @@ const api = {
   RANKS, rankOf,
   SLOTS, GEAR, MATERIALS, REGIONS, NAMES, SPECIAL_POOL, SPECIAL_CHANCE,
   withGear, attrsWithGear, WHOLE_AFFIX,
-  HERO, COMPANIONS, UNIT_SKILLS, SPEC_UP, SPEC_UP_LEVEL, specAt, SKILL_KINDS, skillKind, AURA_STATS, SPEC_SKILLS, UNIT_SKILL_MAX, skillsFor, skillSeed,
+  HERO, COMPANIONS, UNIT_SKILLS, SPEC_UP, SPEC_UP_LEVEL, specAt,
+  SPEC_CHOICES, SPEC_CHANGE_LEVEL, spriteFor, SKILL_KINDS, skillKind, AURA_STATS, SPEC_SKILLS, UNIT_SKILL_MAX, skillsFor, skillSeed,
   PLAYER_SKILLS, HERO_JOBS, HERO_JOB_START, heroSkillsOf, heroJob, jobMaxLevel,
   SKILL, skillAt, skillEffect, skillLevelOf,
   POTIONS, JOB_POTIONS, POTION_MAX, ENEMIES,

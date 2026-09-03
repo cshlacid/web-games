@@ -737,9 +737,9 @@ function jobTag(job, spec, race) {
 // **레벨을 함께 받는다.** 계열은 레벨이 오르면 한 번 올라가므로(`D.specAt`),
 // 정의에 적힌 것을 그대로 적으면 12레벨 동료가 카드에서는 수호자인데 전장에서는
 // 철벽의 스킬을 쓴다.
-function specTag(def, level) {
-  const spec = D.specAt(def.spec, level);
-  return text('span', `job ${def.job} spec-${spec}`, D.SPECS[spec]);
+function specTag(member) {
+  const spec = Roster.specOf(member);
+  return text('span', `job ${Roster.jobOf(member)} spec-${spec}`, D.SPECS[spec]);
 }
 
 function renderBrief() {
@@ -808,14 +808,14 @@ function renderRoster() {
     // **레벨은 그림 아래에 둔다.** 직업 앞에 붙여 두었더니 좁은 칸에서 직업·계열이
     // 두 줄로 감겼다. 여기로 옮기면 글자 줄은 이름과 직업 둘뿐이다.
     const face = el('span', 'pick-face');
-    face.append(avatar(def.sprite));
+    face.append(avatar(Roster.spriteOf(member)));
     face.append(text('span', 'lv', `Lv ${member.level}`));
     open.append(face);
 
     const body = el('div', 'pick-body');
     body.append(text('div', 'pick-name', member.name));
     // 카드에는 종족을 적지 않는다. 셋을 다 적으면 좁은 칸에서 줄이 늘어난다.
-    body.append(specTag(def, member.level));
+    body.append(specTag(member));
     open.append(body);
     open.addEventListener('click', () => openMember(member));
     row.append(open);
@@ -858,11 +858,11 @@ function openMember(member) {
 
   const head = $('member-head');
   head.textContent = '';
-  head.append(avatar(def.sprite));
+  head.append(avatar(Roster.spriteOf(member)));
   const body = el('div', 'pick-body');
   body.append(text('div', 'pick-name', `${member.name} Lv ${member.level}`));
   const tag = el('div', 'pick-sub');
-  tag.append(jobTag(def.job, D.specAt(def.spec, member.level), def.race));
+  tag.append(jobTag(def.job, Roster.specOf(member), def.race));
   body.append(tag);
   body.append(text('div', 'pick-sub', memberSummary(member)));
   head.append(body);
@@ -901,11 +901,57 @@ function openMember(member) {
   if (!chips.children.length) chips.append(text('span', 'pick-sub', '들고 오는 것이 없다'));
   hideChip();
 
+  renderSpecSwap(member);
+
   const picked = app.party.includes(member);
   const take = $('member-take');
   take.textContent = picked ? '파티에서 뺀다' : '데려간다';
   take.disabled = !picked && app.party.length >= D.PARTY_MAX - 1;
   sheet.hidden = false;
+}
+
+// **계열을 바꾸면 손이 바뀐다.** 역할은 그대로라 고를 수 있는 것은 그 역할의
+// 계열뿐이고, 그때까지 들고 다니던 넷은 배운 것으로 남는다 — 바꾸는 것이 곧
+// 잃는 일이면 아무도 바꾸지 않는다.
+function renderSpecSwap(member) {
+  const box = $('member-specs');
+  box.textContent = '';
+  const choices = Roster.specChoices(member);
+  box.hidden = choices.length < 2;
+  if (box.hidden) return;
+
+  const now = Roster.baseSpecOf(member);
+  const ready = member.level >= D.SPEC_CHANGE_LEVEL;
+  box.append(text('div', 'pick-sub dim', ready
+    ? '계열을 바꾼다. 역할은 그대로고, 지금 들고 다니는 넷은 배운 것으로 남는다.'
+    : `계열은 레벨 ${D.SPEC_CHANGE_LEVEL}부터 바꿀 수 있다.`));
+
+  const row = el('div', 'spec-row');
+  for (const spec of choices) {
+    const button = el('button', `chip spec-pick spec-${spec}`);
+    button.type = 'button';
+    button.setAttribute('aria-pressed', String(spec === now));
+    button.disabled = spec === now || !ready;
+    button.append(document.createTextNode(D.SPECS[spec]));
+    button.addEventListener('click', () => {
+      const moved = Roster.changeSpec(member, spec);
+      sound.play(moved.ok ? 'click' : 'deny');
+      if (!moved.ok) { note(moved.reason); return; }
+      persist();
+      renderRoster();
+      openMember(member);
+    });
+    row.append(button);
+  }
+  box.append(row);
+
+  // 다른 계열에서 배워 온 것. 지금 넷에 들어 있지 않아도 손에는 남아 있다.
+  const list = D.SPEC_SKILLS[Roster.specOf(member)] || [];
+  const borrowed = (member.learned || []).filter((id) => !list.includes(id));
+  if (borrowed.length) {
+    box.append(text('div', 'pick-sub dim',
+      `다른 계열에서 배운 것: ${borrowed.map((id) => D.UNIT_SKILLS[id].name).join(', ')}`));
+  }
 }
 
 function chipButton(cls, iconName, label, run) {

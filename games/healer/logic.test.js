@@ -1160,6 +1160,32 @@ function cast(state, skillId, target) {
     low.units.find((u) => u.defId === 'bran').spec, 'tank');
 }
 
+// --- 계열을 바꾼 동료 ------------------------------------------------------
+//
+// 전투는 명부를 들여다보지 않으므로 파티 항목이 바꾼 계열과 배운 것을 함께
+// 넘긴다. 넘기지 않으면 편성 화면에 적힌 계열과 전장의 스킬이 갈린다.
+{
+  const state = battle({ party: [{ defId: 'mira', level: 8, name: '시험용 미라',
+    spec: 'mage', learned: ['snipe', 'volley', 'aimed', 'quickShot'] }] });
+  const mate = unit(state, '시험용 미라');
+  check('전투가 바꾼 계열을 쓴다', mate.spec, 'mage');
+  check('그림도 따라간다', mate.sprite, 'mage');
+  const ids = mate.skills.map((s) => s.id);
+  check('넷을 넘지 않는다', ids.length <= D.UNIT_SKILL_MAX, true);
+  const borrowed = ['snipe', 'volley', 'aimed', 'quickShot'];
+  check('배운 적 없는 계열의 스킬은 안 든다',
+    ids.every((id) => D.SPEC_SKILLS.mage.includes(id) || borrowed.includes(id)), true);
+
+  // **누가 무엇을 드는지는 이름이 정한다**(취향). 그래서 한 캐릭터로는 섞였는지를
+  // 볼 수 없고, 여러 이름을 놓고 "섞이는 사람이 있다"를 본다.
+  const names = ['가', '나', '다', '라', '마', '바', '사', '아'];
+  const mixed = names.filter((name) =>
+    D.skillsFor('mage', 8, D.skillSeed(name), null, borrowed)
+      .some((id) => borrowed.includes(id)));
+  check('배워 온 것을 섞어 드는 사람이 있다', mixed.length > 0, true);
+  check('제 계열만 드는 사람도 있다', mixed.length < names.length, true);
+}
+
 // --- 무리 사이의 이동 ---------------------------------------------------
 //
 // 다음 무리가 있으면 그 자리에 적이 솟는 것이 아니라, 걸어가서 만나는 것으로
