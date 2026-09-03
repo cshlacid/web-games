@@ -373,7 +373,7 @@ function addZone(state, source, def, x, y, kind, amount) {
     x, y, radius: def.radius, amount: amount == null ? def.tick : amount,
     interval: def.interval,
     endsAt: state.t + def.duration, nextAt: state.t + def.interval,
-    bornAt: state.t, skillId: def.id,
+    bornAt: state.t, scrollAt: state.scroll, skillId: def.id,
   });
 }
 
@@ -391,19 +391,32 @@ function updateDots(state) {
   state.dots = state.dots.filter((dot) => dot.nextAt <= dot.endsAt + 1e-6);
 }
 
+// **장판은 바닥에 놓인 것이라 바닥과 함께 흐른다.** 무리 사이를 걸어가는 동안
+// 움직이는 것은 배경뿐이고 유닛 좌표는 그대로라, 깔아 둔 자리를 그냥 두면 장판이
+// 파티를 따라오는 것으로 보였다. 깔릴 때의 `scroll`을 적어 두고 그 뒤로 흘러간
+// 만큼 왼쪽으로 민다 — 걷는 동안 판 위를 지나가는 것이지, 판이 따라오는 것이
+// 아니다. 싸우는 동안에는 `scroll`이 멈춰 있으므로 아무것도 달라지지 않는다.
+function zoneX(state, zone) {
+  return zone.x - (state.scroll - (zone.scrollAt || 0));
+}
+
 function updateZones(state) {
   for (const zone of state.zones) {
+    const spot = { x: zoneX(state, zone), y: zone.y };
     while (zone.nextAt <= state.t && zone.nextAt <= zone.endsAt + 1e-6) {
       const source = zone.sourceUid ? byUid(state, zone.sourceUid) : null;
       for (const unit of alive(state, zone.side)) {
-        if (dist(unit, zone) > zone.radius) continue;
+        if (dist(unit, spot) > zone.radius) continue;
         if (zone.kind === 'heal') applyHeal(state, source, unit, zone.amount);
         else applyDamage(state, source, unit, zone.amount);
       }
       zone.nextAt += zone.interval;
     }
   }
-  state.zones = state.zones.filter((zone) => zone.nextAt <= zone.endsAt + 1e-6);
+  // 화면 왼쪽으로 완전히 빠져나간 것은 시간이 남았어도 치운다. 남겨 두면 보이지
+  // 않는 자리에서 계속 도는데, 되감기는 배경과 달리 장판은 돌아오지 않는다.
+  state.zones = state.zones.filter((zone) => zone.nextAt <= zone.endsAt + 1e-6
+    && zoneX(state, zone) + zone.radius > 0);
 }
 
 // --- 동료·적 행동 실행 -------------------------------------------------
@@ -772,12 +785,10 @@ function checkEnd(state) {
     if (!state.nextWaveAt) {
       state.nextWaveAt = state.t + WAVE_GAP;
       state.marching = true;
-      // **깔아 둔 장판은 그 자리에 두고 온다.** 장판은 유닛 좌표계에 있고 이동
-      // 중에는 그 좌표가 그대로라, 배경만 흘러가면 장판이 파티를 따라오는
-      // 것으로 보인다. 시체를 치우는 것과 같은 이유다. 남겨 두면 걸어가는 동안
-      // 회복 장판이 공짜로 도는 문제도 함께 있다. 도트는 몸에 붙은 것이라
+      // 깔아 둔 장판은 지우지 않는다 — 바닥에 붙어 있어 걸어가는 동안 저절로
+      // 뒤로 흘러가고, 화면 밖으로 나가면 사라진다(`zoneX`). 이동 중에 새로 까는
+      // 것도 같은 규칙을 타므로 여기에 예외가 없다. 도트는 몸에 붙은 것이라
       // 따라가는 것이 맞으므로 건드리지 않는다.
-      state.zones = [];
       emit(state, { type: 'march', text: '다음 무리를 찾아 나선다' });
     } else if (state.t >= state.nextWaveAt) {
       state.nextWaveAt = 0;
@@ -952,7 +963,7 @@ const api = {
   rewardOf, dropsOf, battleReport,
   createRng, createBattle, advance, step, drainEvents,
   castSkill, playerSkill, usePotion, drink, magicPowerOf, rollCrit, applyDamage, applyHeal, addDot, addZone,
-  hero, skillSlot, resolveTarget, moveToward, giveMana,
+  hero, skillSlot, resolveTarget, moveToward, giveMana, zoneX,
   startCast, tickCast, cancelCast, runUnitSkill, resolvePlayerSkill, stun, stunned,
 };
 
