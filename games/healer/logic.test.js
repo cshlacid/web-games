@@ -891,13 +891,15 @@ function cast(state, skillId, target) {
   check('올리는 수치가 적혀 있다', tank.auras[0].stat, 'atk');
   check('적에게는 안 걸린다', foe.auras.length, 0);
 
-  // 약화: 고른 적 하나에게.
-  cast(state, 'dissonance', { uid: foe.uid });
-  check('약화가 적에게 걸린다', foe.auras.map((a) => a.skillId), ['dissonance']);
+  // 약화: 고른 적 하나에게. **만가가 단일, 불협화음이 광역이다** — 동료 음유시인의
+  // 같은 이름이 그렇게 생겼고, 한 이름이 두 모양이면 같은 기술로 보이지 않는다.
+  cast(state, 'lament', { uid: foe.uid });
+  check('약화가 적에게 걸린다', foe.auras.map((a) => a.skillId), ['lament']);
   check('약화는 아군에게 안 걸린다', tank.auras.length, 1);
 
   // 광역 약화: 기준점 주변 적 모두에게.
-  cast(state, 'lament', { x: foe.x, y: foe.y });
+  L.hero(state).mp = L.hero(state).maxMp;
+  cast(state, 'dissonance', { x: foe.x, y: foe.y });
   check('광역 약화가 적에게 걸린다', foe.auras.length, 2);
 
   // 마나 나눔: 제 마나값보다 많이 준다(노래로 채우는 것이지 제 것을 나누는 것이 아니다).
@@ -1075,6 +1077,37 @@ function cast(state, skillId, target) {
     D.heroSkillsOf('priest').some((def) => def.kind === 'mana-ally'), false);
   check('강화·약화는 음유시인뿐',
     D.heroSkillsOf('priest').some((def) => def.stat), false);
+}
+
+// --- 같은 기술은 한 번만 적는다 --------------------------------------------
+//
+// 주인공과 동료가 같은 기술을 스물여덟 개 나눠 쓴다. 두 벌로 적어 두었을 때에는
+// 정화가 동료는 190, 주인공은 90을 회복했고 만가는 한쪽이 광역이었다.
+{
+  const twins = Object.keys(D.PLAYER_SKILLS).filter((id) => D.UNIT_SKILLS[id]);
+  check('두 표가 나눠 쓰는 기술이 있다', twins.length > 20, true);
+
+  const split = twins.filter((id) => {
+    const h = D.PLAYER_SKILLS[id], u = D.UNIT_SKILLS[id];
+    return h.name !== u.name || h.icon !== u.icon || h.kind !== u.kind;
+  });
+  check('나눠 쓰는 기술은 이름·아이콘·종류가 같다', split, []);
+
+  // 아이콘 하나를 서로 다른 기술이 쓰면 스킬바에서 무엇을 누르는지 알 수 없다.
+  const byIcon = {};
+  for (const def of Object.values(D.PLAYER_SKILLS).concat(Object.values(D.UNIT_SKILLS))) {
+    (byIcon[def.icon] = byIcon[def.icon] || new Set()).add(def.id);
+  }
+  check('아이콘 하나에 기술 하나',
+    Object.entries(byIcon).filter(([, set]) => set.size > 1).map(([icon]) => icon), []);
+
+  // 이름도 마찬가지다. 같은 이름이 서로 다른 기술이면 편람에서 구별되지 않는다.
+  const byName = {};
+  for (const def of Object.values(D.PLAYER_SKILLS).concat(Object.values(D.UNIT_SKILLS))) {
+    (byName[def.name] = byName[def.name] || new Set()).add(def.id);
+  }
+  check('이름 하나에 기술 하나',
+    Object.entries(byName).filter(([, set]) => set.size > 1).map(([name]) => name), []);
 }
 
 // --- 동료의 상위 계열 -----------------------------------------------------
