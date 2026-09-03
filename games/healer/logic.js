@@ -122,7 +122,11 @@ function makeUnit(def, side, uid, x, y, level, override, bonus, potions, name) {
     // **캐릭터마다 다른 넷을 든다.** 아군은 이름이 씨앗이라 편성 화면에서 본 것과
     // 같고, 적은 이름에 uid를 섞어 같은 무리의 고블린 셋이 서로 다른 것을 들게
     // 한다 — uid는 무리와 자리에서 나오므로 같은 씨앗의 전투는 그대로 재현된다.
-    skills: D.skillsFor(def.spec, level,
+    // **레벨이 오르면 계열이 한 번 올라간다**(`specAt`). 정의에 적힌 계열을 그대로
+    // 보면 12레벨 동료가 상위 스킬을 못 들고 오고, 편성 화면에 적힌 계열과
+    // 전투에서 쓰는 것이 갈린다.
+    spec: D.specAt(def.spec, level),
+    skills: D.skillsFor(D.specAt(def.spec, level), level,
       D.skillSeed(side === 'ally' ? (name || def.name) : `${def.id}:${uid}`), def.always)
       .map((id) => ({ id, readyAt: 0 })),
     targetUid: null, tauntUid: null, tauntUntil: 0,

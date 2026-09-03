@@ -251,7 +251,11 @@ function gather(state) {
   const stunSpecs = Object.entries(D.SPEC_SKILLS)
     .filter(([, list]) => list.some((id) => D.UNIT_SKILLS[id].kind === 'stun'))
     .map(([spec]) => spec).sort();
-  check('기절은 근접 계열만 갖는다', stunSpecs, ['rogue', 'tank', 'warrior']);
+  // 상위 계열은 아래 계열의 목록을 물려받으므로 근접 셋의 상위 셋까지 나온다.
+  // 늘어난 것이 그 여섯뿐인지를 본다 — 원거리 상위가 기절을 얻으면 여기서 걸린다.
+  const melee = ['rogue', 'tank', 'warrior'];
+  check('기절은 근접 계열만 갖는다', stunSpecs,
+    melee.concat(melee.map((spec) => D.SPEC_UP[spec].spec)).sort());
 }
 
 // --- 음유시인: 아군의 마나를 채운다 -------------------------------------

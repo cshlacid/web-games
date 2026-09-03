@@ -47,6 +47,13 @@
   --spec-bard: #c07a2f;
   --spec-grunt: #7a8a4a;
   --spec-chieftain: #a83b2c;
+  /* 상위 계열. 아래 계열과 **같은 계통이되 한 단 진하다** — 다른 색을 주면 같은
+     동료가 레벨 하나에 전혀 다른 사람으로 보인다. */
+  --spec-bulwark: #2f4f8c;
+  --spec-berserker: #8c2f26;
+  --spec-assassin: #3b4353;
+  --spec-marksman: #1e6635;
+  --spec-archmage: #6a2fae;
   /* 전투 화면이 가로로 길어 다른 게임(440px)보다 넓게 잡았다. 좁히면 아군과 적
      사이가 붙어 버려 거리와 장판 반경이 눈에 들어오지 않는다. */
   --app-max: 860px;
@@ -96,6 +103,11 @@
     --spec-bard: #e8a95f;
     --spec-grunt: #b3c47a;
     --spec-chieftain: #e2705c;
+    --spec-bulwark: #9dbdf2;
+    --spec-berserker: #e8867c;
+    --spec-assassin: #a3adbf;
+    --spec-marksman: #7fd39a;
+    --spec-archmage: #c49af0;
   }
 }
 
@@ -336,6 +348,11 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .job.spec-bard { color: var(--spec-bard); }
 .job.spec-grunt { color: var(--spec-grunt); }
 .job.spec-chieftain { color: var(--spec-chieftain); }
+.job.spec-bulwark { color: var(--spec-bulwark); }
+.job.spec-berserker { color: var(--spec-berserker); }
+.job.spec-assassin { color: var(--spec-assassin); }
+.job.spec-marksman { color: var(--spec-marksman); }
+.job.spec-archmage { color: var(--spec-archmage); }
 
 /* 스킬 이름표. 색이 무엇을 하는 스킬인지를 알린다. */
 .chip { display: inline-flex; align-items: center; gap: 4px; }

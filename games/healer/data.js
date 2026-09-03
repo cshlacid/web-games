@@ -885,6 +885,12 @@ const SPECS = {
   priest:  '사제',
   shaman:  '주술사',
   bard:    '음유시인',
+  // 상위 계열. 레벨이 오르면 여기로 올라간다(SPEC_UP).
+  bulwark:   '철벽',
+  berserker: '광전사',
+  assassin:  '암살자',
+  marksman:  '명궁',
+  archmage:  '대마법사',
   grunt:   '잡졸',
   chieftain: '우두머리',
 };
@@ -892,6 +898,86 @@ const SPECS = {
 // **한 유닛이 전투에 들고 들어가는 스킬 수.** 계열의 목록 중 레벨이 되는 것을
 // 앞에서부터 이만큼 자른다. 전부 들고 가게 하면 스킬을 늘린 것이 그냥 "더 세짐"이
 // 되고, 레벨이 올라 새 스킬이 열려도 달라지는 것이 없다.
+// --- 상위 계열 전용 --------------------------------------------------------
+//
+// **동료도 레벨이 오르면 계열이 한 번 올라간다**(`SPEC_UP`). 여기 있는 열 개는
+// 그때 열리는 것이고, 아래 계열의 목록을 그대로 물려받은 위에 얹힌다 — 목록을
+// 통째로 새로 짜면 같은 캐릭터가 레벨 하나에 전혀 다른 사람이 된다.
+//
+// **둘씩만 둔다.** 넷 중 둘이 바뀌는 것으로 충분하고(`UNIT_SKILL_MAX`), 그보다
+// 많으면 상위 계열의 스킬끼리 자리를 다투느라 아래 계열의 정체가 밀려난다.
+const UPPER_SKILLS = {
+  // 철벽. 하나는 파티를, 하나는 자기를 지킨다 — 수호자에게 없던 방향이다.
+  aegis:  { id: 'aegis', icon: 'aegis', name: '수호의 장막', spec: 'bulwark', cd: 26, mp: 34,
+            kind: 'buff-area', stat: 'armor', mul: 0.8, duration: 10, radius: 20, range: 20, cast: 0.8,
+            minLevel: 12, core: 1,
+            desc: '주변 아군이 받는 피해를 함께 줄인다' },
+  ironWall: { id: 'ironWall', icon: 'ironWall', name: '강철 벽', spec: 'bulwark', cd: 30, mp: 22,
+            kind: 'buff', stat: 'armor', mul: 0.55, duration: 8, range: 0, cast: 0, minLevel: 12,
+            desc: '한동안 거의 뚫리지 않는다' },
+
+  // 광전사. 자기를 세게 만들고 한 번에 여럿을 벤다.
+  frenzy: { id: 'frenzy', icon: 'frenzy', name: '광란', spec: 'berserker', cd: 26, mp: 20,
+            kind: 'buff', stat: 'atk', mul: 1.35, duration: 10, range: 0, cast: 0, minLevel: 12, core: 1,
+            desc: '제 공격력을 크게 올린다' },
+  massacre: { id: 'massacre', icon: 'massacre', name: '학살', spec: 'berserker', cd: 16, mp: 30,
+            kind: 'damage-area', mul: 2.2, radius: 13, range: 9, cast: 0.6, minLevel: 12,
+            desc: '주변 적을 한 번에 크게 벤다' },
+
+  // 암살자. 한 명을 끝내고, 끝내는 동안 맞지 않는다.
+  assassinate: { id: 'assassinate', icon: 'assassinate', name: '암살', spec: 'assassin', cd: 20, mp: 32,
+            kind: 'damage', mul: 5.2, range: 7, cast: 0, minLevel: 12, core: 1,
+            desc: '급소를 찔러 한 번에 크게 넣는다' },
+  vanish: { id: 'vanish', icon: 'vanish', name: '자취 감추기', spec: 'assassin', cd: 26, mp: 18,
+            kind: 'buff', stat: 'armor', mul: 0.62, duration: 6, range: 0, cast: 0, minLevel: 12,
+            desc: '잠시 모습을 감춰 받는 피해를 줄인다' },
+
+  // 명궁. 한 발이 더 세고, 표식이 파티 전체의 딜을 키운다.
+  deadeye: { id: 'deadeye', icon: 'deadeye', name: '필중', spec: 'marksman', cd: 18, mp: 30,
+            kind: 'damage', mul: 4.8, range: 46, cast: 1.6, minLevel: 12, core: 1,
+            desc: '겨눈 하나에게 한 발을 크게 넣는다' },
+  huntersMark: { id: 'huntersMark', icon: 'huntersMark', name: '사냥 표식', spec: 'marksman', cd: 20, mp: 22,
+            kind: 'debuff', stat: 'armor', mul: 1.3, duration: 12, range: 40, cast: 0.8, minLevel: 12,
+            desc: '표식을 남겨 그 적이 받는 피해를 늘린다' },
+
+  // 대마법사. 한 방과 장판 둘 다 마법사의 것보다 크다.
+  meteor: { id: 'meteor', icon: 'meteor', name: '운석', spec: 'archmage', cd: 24, mp: 40,
+            kind: 'damage-area', mul: 2.6, radius: 18, range: 40, cast: 2.0, minLevel: 12, core: 1,
+            desc: '하늘에서 돌덩이를 떨어뜨린다' },
+  maelstrom: { id: 'maelstrom', icon: 'maelstrom', name: '소용돌이', spec: 'archmage', cd: 26, mp: 36,
+            kind: 'zone', tick: 30, interval: 1, duration: 8, radius: 16, range: 36, cast: 1.4,
+            minLevel: 12,
+            desc: '한 자리를 계속 휘몰아친다' },
+};
+
+Object.assign(UNIT_SKILLS, UPPER_SKILLS);
+
+// **상위 계열은 아래 계열이 레벨로 올라간 것이다**(`specAt`). 목록도 그렇게 만든다 —
+// 아래 것을 그대로 물려받고 전용 둘을 **앞에** 얹는다. 앞에 두는 것은 `SPEC_SKILLS`의
+// 순서가 곧 AI의 우선순위이자 넷을 고르는 순서라, 뒤에 두면 상위 계열이 되어도
+// 들고 오는 넷이 그대로일 수 있기 때문이다.
+//
+// **그림은 아래 계열의 것을 그대로 쓴다.** 계열마다 그림이 하나씩이라는 규칙의
+// 예외처럼 보이지만, 이쪽은 다른 종류가 아니라 **같은 사람이 더 강해진 것**이다 —
+// 명부의 같은 이름이 이어서 자란 결과라, 그림이 바뀌면 다른 동료로 보인다.
+const SPEC_UP = {
+  tank:    { spec: 'bulwark',   skills: ['aegis', 'ironWall'] },
+  warrior: { spec: 'berserker', skills: ['frenzy', 'massacre'] },
+  rogue:   { spec: 'assassin',  skills: ['assassinate', 'vanish'] },
+  archer:  { spec: 'marksman',  skills: ['deadeye', 'huntersMark'] },
+  mage:    { spec: 'archmage',  skills: ['meteor', 'maelstrom'] },
+};
+
+// 상위 계열로 올라가는 레벨. **난이도 검사가 도는 구간(1~10레벨)보다 위에 둔다** —
+// 그 아래에 두면 자동 힐러로 재 둔 승률이 통째로 흔들린다.
+const SPEC_UP_LEVEL = 12;
+
+
+// 그 레벨에서 실제로 무슨 계열인가. **정의(`def.spec`)를 직접 보는 자리를 남기지
+// 않는다** — 한 곳만 잊어도 편성 화면에 적힌 계열과 전투에서 쓰는 스킬이 갈린다.
+const specAt = (spec, level) =>
+  (level >= SPEC_UP_LEVEL && SPEC_UP[spec] ? SPEC_UP[spec].spec : spec);
+
 const UNIT_SKILL_MAX = 4;
 
 // 계열별 스킬 목록. **순서가 곧 AI의 우선순위이자 들고 가는 넷을 고르는 순서다.**
@@ -963,6 +1049,12 @@ function taste(seed, id) {
 // 그 유닛이 이 레벨에서 전투에 들고 가는 스킬. 편성 화면과 전투가 같은 것을
 // 보여야 하므로 한 곳에서만 계산한다.
 //
+// 상위 계열의 목록은 아래 계열이 정해진 뒤에 만든다 — 클래식 스크립트라 선언
+// 순서가 곧 의존이다.
+for (const [base, up] of Object.entries(SPEC_UP)) {
+  SPEC_SKILLS[up.spec] = up.skills.concat(SPEC_SKILLS[base]);
+}
+
 // **씨앗을 주면 캐릭터마다 다른 넷을 든다.** 같은 계열이면 누구나 같은 넷을 들던
 // 때에는 사제 둘을 나란히 놓아도 다를 것이 없었다. 다만 계열의 정체가 걸린
 // 스킬(`core`: 탱커의 도발, 마나를 되찾는 것, 사제의 치유술, 음유시인의 후렴)은
@@ -1620,7 +1712,7 @@ const api = {
   RANKS, rankOf,
   SLOTS, GEAR, MATERIALS, REGIONS, NAMES, SPECIAL_POOL, SPECIAL_CHANCE,
   withGear, attrsWithGear, WHOLE_AFFIX,
-  HERO, COMPANIONS, UNIT_SKILLS, SKILL_KINDS, skillKind, AURA_STATS, SPEC_SKILLS, UNIT_SKILL_MAX, skillsFor, skillSeed,
+  HERO, COMPANIONS, UNIT_SKILLS, SPEC_UP, SPEC_UP_LEVEL, specAt, SKILL_KINDS, skillKind, AURA_STATS, SPEC_SKILLS, UNIT_SKILL_MAX, skillsFor, skillSeed,
   PLAYER_SKILLS, HERO_JOBS, HERO_JOB_START, heroSkillsOf, heroJob, jobMaxLevel,
   SKILL, skillAt, skillEffect, skillLevelOf,
   POTIONS, JOB_POTIONS, POTION_MAX, ENEMIES,

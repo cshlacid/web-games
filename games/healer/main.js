@@ -712,8 +712,13 @@ function jobTag(job, spec, race) {
 // **동료 카드에는 계열만 적는다.** 역할까지 적으면 좁은 칸에서 "딜러 · 음유시인"이
 // 잘렸고, 잘린 계열 이름은 역할보다 잃는 것이 크다 — 무엇을 들고 오는지는 계열이
 // 정하고, 역할은 카드 순서(탱커 → 딜러 → 힐러)와 상세에 있다.
-function specTag(def) {
-  return text('span', `job ${def.job} spec-${def.spec}`, D.SPECS[def.spec]);
+//
+// **레벨을 함께 받는다.** 계열은 레벨이 오르면 한 번 올라가므로(`D.specAt`),
+// 정의에 적힌 것을 그대로 적으면 12레벨 동료가 카드에서는 수호자인데 전장에서는
+// 철벽의 스킬을 쓴다.
+function specTag(def, level) {
+  const spec = D.specAt(def.spec, level);
+  return text('span', `job ${def.job} spec-${spec}`, D.SPECS[spec]);
 }
 
 function renderBrief() {
@@ -789,7 +794,7 @@ function renderRoster() {
     const body = el('div', 'pick-body');
     body.append(text('div', 'pick-name', member.name));
     // 카드에는 종족을 적지 않는다. 셋을 다 적으면 좁은 칸에서 줄이 늘어난다.
-    body.append(specTag(def));
+    body.append(specTag(def, member.level));
     open.append(body);
     open.addEventListener('click', () => openMember(member));
     row.append(open);
@@ -836,7 +841,7 @@ function openMember(member) {
   const body = el('div', 'pick-body');
   body.append(text('div', 'pick-name', `${member.name} Lv ${member.level}`));
   const tag = el('div', 'pick-sub');
-  tag.append(jobTag(def.job, def.spec, def.race));
+  tag.append(jobTag(def.job, D.specAt(def.spec, member.level), def.race));
   body.append(tag);
   body.append(text('div', 'pick-sub', memberSummary(member)));
   head.append(body);

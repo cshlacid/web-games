@@ -225,5 +225,22 @@ const SEEDS = [1, 5, 77, 4242, 20260825];
   check('배열이 아니어도 버틴다', R.adopt(null).length, R.START_SIZE);
 }
 
+// --- 상위 계열 ------------------------------------------------------------
+//
+// 명부와 전투가 같은 함수를 봐야 편성 화면에 적힌 계열과 전장에서 쓰는 스킬이
+// 갈리지 않는다.
+{
+  const member = R.makeMember(Items.createRng(7), new Set(), 1, 'bran');
+  check('낮은 레벨은 아래 계열', R.specOf(member), 'tank');
+
+  member.level = D.SPEC_UP_LEVEL;
+  check('문턱에서 상위 계열', R.specOf(member), 'bulwark');
+  check('상위 전용을 들고 온다',
+    R.skillsOf(member).some((id) => D.SPEC_UP.tank.skills.includes(id)), true);
+  // 이름은 처음 만들 때 정해진 신원이라 계열이 올라가도 그대로다.
+  const named = R.makeMember(Items.createRng(7), new Set(), D.SPEC_UP_LEVEL, 'bran');
+  check('이름 조각은 아래 계열에서 나온다', named.name, member.name);
+}
+
 console.log(`${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);

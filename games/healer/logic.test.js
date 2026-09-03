@@ -1057,6 +1057,56 @@ function cast(state, skillId, target) {
     D.heroSkillsOf('priest').some((def) => def.stat), false);
 }
 
+// --- 동료의 상위 계열 -----------------------------------------------------
+//
+// **레벨이 오르면 계열이 한 번 올라간다.** 목록을 통째로 새로 짜지 않고 아래
+// 계열의 것을 물려받는 것은, 같은 캐릭터가 레벨 하나에 전혀 다른 사람이 되지
+// 않게 하려는 것이다.
+{
+  check('문턱 아래는 그대로', D.specAt('tank', D.SPEC_UP_LEVEL - 1), 'tank');
+  check('문턱에서 올라간다', D.specAt('tank', D.SPEC_UP_LEVEL), 'bulwark');
+  check('상위가 없는 계열은 그대로', D.specAt('priest', 99), 'priest');
+  check('상위 계열은 더 안 올라간다', D.specAt('bulwark', 99), 'bulwark');
+
+  // 다섯 계열에 하나씩. 힐러 계열(사제·음유시인)은 주인공 쪽에서 다룬다.
+  check('상위가 다섯', Object.keys(D.SPEC_UP).sort(),
+    ['archer', 'mage', 'rogue', 'tank', 'warrior']);
+
+  for (const [base, up] of Object.entries(D.SPEC_UP)) {
+    // 아래 것을 그대로 물려받는다 — 올라갔다고 쓰던 기술을 잃으면 안 된다.
+    check(`${base}: 아래 목록을 물려받는다`,
+      D.SPEC_SKILLS[base].every((id) => D.SPEC_SKILLS[up.spec].includes(id)), true);
+    // 전용 둘이 앞에 온다. 뒤에 두면 넷을 고르는 순서에서 밀려, 상위가 되어도
+    // 들고 오는 넷이 그대로일 수 있다.
+    check(`${base}: 전용이 앞에 온다`, D.SPEC_SKILLS[up.spec].slice(0, 2), up.skills);
+    check(`${base}: 전용은 문턱 레벨에 열린다`,
+      up.skills.every((id) => D.UNIT_SKILLS[id].minLevel === D.SPEC_UP_LEVEL), true);
+    check(`${base}: 이름표가 있다`, Boolean(D.SPECS[up.spec]), true);
+  }
+
+  // 실제로 들고 오는 넷이 바뀐다. 안 바뀌면 계열이 오른 것이 화면에만 남는다.
+  const before = D.skillsFor('tank', D.SPEC_UP_LEVEL - 1, D.skillSeed('강철의 브란'));
+  const after = D.skillsFor(D.specAt('tank', D.SPEC_UP_LEVEL), D.SPEC_UP_LEVEL,
+    D.skillSeed('강철의 브란'));
+  check('올라가면 들고 오는 것이 달라진다', after.join() !== before.join(), true);
+  check('전용을 하나는 들고 온다',
+    after.some((id) => D.SPEC_UP.tank.skills.includes(id)), true);
+}
+
+{
+  // 전투도 명부도 같은 함수를 본다 — 한쪽만 보면 편성 화면에 적힌 계열과
+  // 전장에서 쓰는 스킬이 갈린다.
+  const state = battle({ party: [{ defId: 'bran', level: D.SPEC_UP_LEVEL }] });
+  const tank = state.units.find((u) => u.defId === 'bran');
+  check('전투의 유닛이 상위 계열이다', tank.spec, 'bulwark');
+  check('상위 전용을 들고 들어온다',
+    tank.skills.some((s) => D.SPEC_UP.tank.skills.includes(s.id)), true);
+
+  const low = battle({ party: [{ defId: 'bran', level: 1 }] });
+  check('낮은 레벨은 아래 계열 그대로',
+    low.units.find((u) => u.defId === 'bran').spec, 'tank');
+}
+
 // --- 무리 사이의 이동 ---------------------------------------------------
 //
 // 다음 무리가 있으면 그 자리에 적이 솟는 것이 아니라, 걸어가서 만나는 것으로
