@@ -692,6 +692,14 @@ function resolvePlayerSkill(state, def, spot) {
     for (const target of on) addAura(state, caster, target, def);
     return;
   }
+  // **도발은 성기사만 들고 온다.** 주인공이 어그로를 옮기는 유일한 수단이라,
+  // 동료 탱커의 도발과 같은 자리를 건드린다 — 규칙이 둘이 되면 한쪽만 고치게 된다.
+  if (def.kind === 'taunt') {
+    unit.tauntUid = caster.uid;
+    unit.tauntUntil = state.t + def.duration;
+    unit.targetUid = caster.uid;
+    return;
+  }
   if (def.kind === 'mana-ally') { giveMana(state, caster, unit, def.mana); return; }
   if (def.kind === 'mana-area') {
     for (const mate of alive(state, 'ally')) {
@@ -701,8 +709,18 @@ function resolvePlayerSkill(state, def, spot) {
   }
 
   if (def.mana) caster.mp = Math.min(caster.maxMp, caster.mp + def.mana);
-  else if (def.damage) applyDamage(state, caster, unit, harm(def.damage));
-  else if (def.targeting === 'ally' && def.heal) applyHeal(state, caster, unit, heal(def.heal));
+  else if (def.damage && def.targeting === 'area-enemy') {
+    for (const foe of alive(state, 'enemy')) {
+      if (dist(foe, point) <= def.radius) applyDamage(state, caster, foe, harm(def.damage));
+    }
+  } else if (def.damage) applyDamage(state, caster, unit, harm(def.damage));
+  else if (def.targeting === 'ally' && def.heal) {
+    // **정화는 회복하면서 약화를 걷어낸다.** 거는 것과 반대되는 일이라 오라를
+    // 만드는 자리가 아니라 지우는 자리를 따로 두지 않고, 걸린 목록에서 강화가
+    // 아닌 것만 뺀다 — 강화까지 지우면 아군의 노래가 정화에 끊긴다.
+    if (def.cleanse && unit && unit.auras) unit.auras = unit.auras.filter((aura) => aura.buff);
+    applyHeal(state, caster, unit, heal(def.heal));
+  }
   else if (def.targeting === 'ally') addDot(state, caster, unit, def, 'heal', heal(def.tick));
   else if (def.targeting === 'enemy') addDot(state, caster, unit, def, 'damage', harm(def.tick));
   else if (def.targeting === 'area-ally' && def.heal) {
@@ -982,7 +1000,7 @@ const api = {
   HERO_UID, TICK, WAVE_GAP, MARCH_SPEED, MARCH_RECOVER, MARCH_RECOVER_MP, MANA_REGEN_PER_INT,
   rewardOf, dropsOf, battleReport,
   createRng, createBattle, advance, step, drainEvents,
-  castSkill, playerSkill, usePotion, drink, magicPowerOf, rollCrit, applyDamage, applyHeal, addDot, addZone,
+  castSkill, playerSkill, usePotion, drink, magicPowerOf, rollCrit, applyDamage, applyHeal, addDot, addZone, addAura,
   hero, skillSlot, resolveTarget, moveToward, giveMana, zoneX,
   startCast, tickCast, cancelCast, runUnitSkill, resolvePlayerSkill, stun, stunned,
 };

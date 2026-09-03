@@ -141,6 +141,28 @@ const gear = (defId, tier) => Items.make(defId, tier || 0, 3);
   check('음유시인에서 배운 것도 남는다', progress.learned.chord, 1);
 }
 
+// --- 상위 계열 ------------------------------------------------------------
+{
+  // **상위 계열은 아래 계열을 끝까지 키운 사람만 간다.** 이것이 "상위"의 뜻이고,
+  // 조건은 자료에 있으므로 계열을 더해도 분기가 늘지 않는다.
+  const progress = P.create();
+  progress.charLevel = D.HERO_JOBS.bishop.need.charLevel;
+  check('아래 계열을 안 키우면 못 간다', P.canChangeJob(progress, 'bishop').ok, false);
+  check('무엇이 모자란지 알려 준다',
+    P.canChangeJob(progress, 'bishop').reason.includes('사제'), true);
+
+  progress.jobs.priest.level = D.HERO_JOBS.bishop.need.jobLevel.priest;
+  check('아래 계열을 키우면 갈 수 있다', P.canChangeJob(progress, 'bishop').ok, true);
+  check('전직한다', P.changeJob(progress, 'bishop').ok, true);
+  check('주교의 스킬만 배울 수 있다', P.learnSkill(progress, 'touch').ok, false);
+  check('주교의 스킬은 배운다', P.learnSkill(progress, 'mend').ok, true);
+
+  // 캐릭터 레벨만 채운 성기사는 아래 계열을 안 키워도 간다 — 상위 계열이 아니다.
+  const knight = P.create();
+  knight.charLevel = D.HERO_JOBS.paladin.need.charLevel;
+  check('성기사는 아래 계열을 요구하지 않는다', P.canChangeJob(knight, 'paladin').ok, true);
+}
+
 // --- 인벤토리와 장착 ----------------------------------------------------
 {
   const progress = P.create();

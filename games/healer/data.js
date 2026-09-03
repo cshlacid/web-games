@@ -1093,6 +1093,104 @@ const PLAYER_SKILLS = {
     mp: 22, cd: 12, damage: 96, icon: 'finale',
     desc: '적 하나를 노래로 내리친다.',
   },
+
+  // --- 성기사 -----------------------------------------------------------
+  //
+  // **서브 탱커이자 서브 힐러다.** 앞에 서서 맞아 주고 신성한 것으로 때리며,
+  // 회복은 급한 불만 끈다 — 회복량이 사제의 절반이고 사거리도 짧다. 대신 이
+  // 계열만 **도발**을 들고 온다: 주인공이 직접 적을 끌어오는 것은 여기뿐이다.
+  //
+  // 근접 계열이라 사거리가 전부 짧다. 뒤에 서서 다 할 수 있으면 "앞에 선다"가
+  // 수치에 없는 말이 된다.
+  smite: {
+    id: 'smite', job: 'paladin', unlock: 1, kind: 'damage', range: 14, cast: 0, name: '성스러운 일격', type: '개별 대상', targeting: 'enemy',
+    mp: 14, cd: 3.5, damage: 110, icon: 'smite',
+    desc: '붙어서 내리친다. 즉시 나가고 세지만 사거리가 짧다.',
+  },
+  layHands: {
+    id: 'layHands', job: 'paladin', unlock: 1, kind: 'heal', range: 30, cast: 0.6, name: '신성한 손길', type: '개별 대상', targeting: 'ally',
+    mp: 14, cd: 2.2, heal: 64, icon: 'layHands',
+    desc: '동료 하나를 조금 회복한다. 사제의 손길보다 훨씬 작다.',
+  },
+  taunt: {
+    id: 'taunt', job: 'paladin', unlock: 2, kind: 'taunt', range: 28, cast: 0, name: '도발', type: '도발', targeting: 'enemy',
+    mp: 16, cd: 9, duration: 6, icon: 'taunt',
+    desc: '적 하나를 자신에게 끌어온다. 주인공이 어그로를 옮기는 유일한 수단이다.',
+  },
+  holyShield: {
+    id: 'holyShield', job: 'paladin', unlock: 3, kind: 'buff', range: 26, cast: 0, name: '성스러운 방패', type: '강화', targeting: 'ally',
+    mp: 20, cd: 18, stat: 'armor', mul: 0.84, duration: 12, icon: 'holyShield',
+    desc: '동료 하나가 받는 피해를 줄인다. 자신에게도 걸 수 있다.',
+  },
+  oath: {
+    id: 'oath', job: 'paladin', unlock: 3, kind: 'mana', range: 0, cast: 1.6, name: '서약', type: '마나 회복', targeting: 'self',
+    mp: 0, cd: 26, mana: 66, icon: 'oath',
+    desc: '무릎 꿇어 맹세하며 자신의 마나를 되찾는다.',
+  },
+  radiance: {
+    id: 'radiance', job: 'paladin', unlock: 4, kind: 'heal-area', range: 32, cast: 1.2, name: '광휘', type: '범위', targeting: 'area-ally',
+    mp: 26, cd: 9, heal: 48, radius: 18, icon: 'radiance',
+    desc: '기준점 주변의 아군을 조금씩 회복한다.',
+  },
+  hammer: {
+    id: 'hammer', job: 'paladin', unlock: 5, kind: 'damage-area', range: 24, cast: 1.0, name: '심판의 망치', type: '광역', targeting: 'area-enemy',
+    mp: 28, cd: 12, damage: 84, radius: 16, icon: 'hammer',
+    desc: '기준점 주변의 적을 한 번에 내리친다.',
+  },
+  devotion: {
+    id: 'devotion', job: 'paladin', unlock: 6, kind: 'buff-area', range: 24, cast: 1.4, name: '헌신', type: '광역 강화', targeting: 'area-ally',
+    mp: 30, cd: 24, stat: 'armor', mul: 0.9, duration: 10, radius: 20, icon: 'devotion',
+    desc: '기준점 주변 아군이 받는 피해를 함께 줄인다.',
+  },
+
+  // --- 주교 -------------------------------------------------------------
+  //
+  // **사제의 상위 계열이다.** 전직하려면 사제를 끝까지 키워야 하고(`need`),
+  // 하나하나가 사제보다 세다. 대신 **최대 직업 레벨이 하나 낮아 점수를 덜 받고,
+  // 마나를 훨씬 많이 먹는다** — 그냥 상위 호환이면 사제를 고를 이유가 사라진다.
+  //
+  // 이름과 아이콘은 동료 사제의 기술에서 가져왔다. 같은 전통의 더 높은 기술이라
+  // 다른 그림을 주면 다른 계통으로 보인다.
+  mend: {
+    id: 'mend', job: 'bishop', unlock: 1, kind: 'heal', range: 40, cast: 1.0, name: '치유술', type: '개별 대상', targeting: 'ally',
+    mp: 20, cd: 1.6, heal: 150, icon: 'mend',
+    desc: '동료 하나를 크게 회복한다. 사제의 손길보다 세고 마나를 더 먹는다.',
+  },
+  renew: {
+    id: 'renew', job: 'bishop', unlock: 2, kind: 'heal-dot', range: 40, cast: 0.8, name: '재생', type: '도트', targeting: 'ally',
+    mp: 26, cd: 8, tick: 32, interval: 1, duration: 8, icon: 'renew',
+    desc: '동료 하나에게 걸어 두면 시간을 두고 회복된다.',
+  },
+  waveHeal: {
+    id: 'waveHeal', job: 'bishop', unlock: 2, kind: 'heal-area', range: 46, cast: 1.6, name: '치유의 물결', type: '범위', targeting: 'area-ally',
+    mp: 38, cd: 8, heal: 96, radius: 22, icon: 'wave',
+    desc: '기준점 주변의 아군을 한 번에 크게 회복한다.',
+  },
+  purify: {
+    id: 'purify', job: 'bishop', unlock: 3, kind: 'heal', range: 40, cast: 0.8, name: '정화', type: '개별 대상', targeting: 'ally',
+    mp: 24, cd: 12, heal: 90, cleanse: 1, icon: 'purify',
+    desc: '회복하면서 걸려 있는 약화를 걷어낸다. 이것만 할 수 있는 계열이다.',
+  },
+  meditate: {
+    id: 'meditate', job: 'bishop', unlock: 3, kind: 'mana', range: 0, cast: 2.0, name: '명상', type: '마나 회복', targeting: 'self',
+    mp: 0, cd: 26, mana: 92, icon: 'meditate',
+    desc: '서서 외워 자신의 마나를 되찾는다. 사제의 정신 집중보다 많이 채운다.',
+  },
+  chastise: {
+    id: 'chastise', job: 'bishop', unlock: 4, kind: 'dot', range: 40, cast: 0.8, name: '응징', type: '도트', targeting: 'enemy',
+    mp: 20, cd: 9, tick: 28, interval: 1, duration: 6, icon: 'chastise',
+    desc: '적 하나를 벌한다. 시간을 두고 깎인다.',
+  },
+  greaterMend: {
+    id: 'greaterMend', job: 'bishop', unlock: 5, kind: 'heal', range: 40, cast: 2.2, name: '대치유술', type: '개별 대상', targeting: 'ally',
+    mp: 48, cd: 6, heal: 280, icon: 'greaterMend',
+    desc: '오래 외워 한 명을 크게 되살린다. 마나를 많이 먹는다.',
+  },
+  judgement: {
+    id: 'judgement', job: 'bishop', unlock: 5, kind: 'damage', range: 42, cast: 1.4, name: '신벌', type: '개별 대상', targeting: 'enemy',
+    mp: 30, cd: 10, damage: 150, icon: 'judgement',
+    desc: '적 하나에게 벌을 내린다.',
+  },
 };
 
 // **주인공이 고를 수 있는 계열.** 힐러 게임이므로 회복을 맡는 계열만 둔다 —
@@ -1115,6 +1213,17 @@ const HERO_JOBS = {
   bard: {
     id: 'bard', name: '음유시인', spec: 'bard', maxLevel: 6, need: { charLevel: 5 },
     desc: '강화·약화가 본업, 회복이 보조. 파티 전체의 공격력과 마나를 만진다.',
+  },
+  paladin: {
+    id: 'paladin', name: '성기사', spec: 'tank', maxLevel: 6, need: { charLevel: 8 },
+    desc: '앞에 서는 보조 탱커이자 보조 힐러. 신성 공격과 도발, 회복은 약하다.',
+  },
+  // **상위 계열은 최대 직업 레벨이 하나 낮다.** 하나하나가 세면서 점수까지 같으면
+  // 사제를 고를 이유가 사라진다 — 적게 배우고 세게 쓰는 쪽이다.
+  bishop: {
+    id: 'bishop', name: '주교', spec: 'priest', maxLevel: 5,
+    need: { charLevel: 12, jobLevel: { priest: 6 } },
+    desc: '사제의 상위 계열. 회복이 더 크고 마나를 더 먹는다. 약화를 걷어낸다.',
   },
 };
 
@@ -1187,11 +1296,16 @@ function skillEffect(def) {
   if (def.mana && def.targeting === 'ally') return `동료의 마나 ${def.mana} 회복`;
   if (def.mana && def.radius) return `반경 ${def.radius} 안 아군의 마나 ${def.mana} 회복`;
   if (def.mana) return `마나 ${def.mana} 회복`;
-  if (def.damage) return `${def.damage} 피해`;
+  if (def.kind === 'taunt') return `${def.duration}초 동안 자신에게 끌어온다`;
+  if (def.damage) {
+    return def.radius ? `반경 ${def.radius} 안의 적에게 ${def.damage} 피해`
+      : `${def.damage} 피해`;
+  }
   const kind = def.targeting === 'enemy' || def.targeting === 'area-enemy' ? '피해' : '회복';
   if (def.heal) {
-    return def.radius ? `반경 ${def.radius} 안의 아군을 ${def.heal}씩 회복`
-      : `${def.heal} 회복`;
+    const cleanse = def.cleanse ? ' · 약화 제거' : '';
+    return def.radius ? `반경 ${def.radius} 안의 아군을 ${def.heal}씩 회복${cleanse}`
+      : `${def.heal} 회복${cleanse}`;
   }
   if (def.tick) {
     const total = Math.round(def.tick * (def.duration / (def.interval || 1)));

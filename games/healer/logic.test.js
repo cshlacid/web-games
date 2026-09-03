@@ -912,6 +912,69 @@ function cast(state, skillId, target) {
   check('직접 피해가 들어간다', foe.hp < before, true);
 }
 
+// --- 성기사와 주교 --------------------------------------------------------
+//
+// 성기사는 주인공이 직접 어그로를 옮기는 유일한 계열이고, 광역 즉발 피해도
+// 여기서 처음 나왔다. 주교는 회복하면서 약화를 걷어낸다.
+{
+  const state = battle({ skills: ['smite', 'taunt', 'holyShield', 'hammer', 'radiance'] });
+  const hero = L.hero(state);
+  const foes = AI.alive(state, 'enemy');
+  foes.forEach((foe, i) => { foe.x = hero.x + 8 + i * 2; foe.y = hero.y; });
+  hero.mp = hero.maxMp;
+
+  // 도발: 동료 탱커의 도발과 같은 자리를 건드린다.
+  cast(state, 'taunt', { uid: foes[0].uid });
+  check('주인공이 적을 끌어온다',
+    [foes[0].tauntUid, foes[0].targetUid], [hero.uid, hero.uid]);
+  check('끌린 시간이 정해져 있다', foes[0].tauntUntil > state.t, true);
+
+  // 광역 즉발 피해: 반경 안의 적 모두가 맞는다.
+  hero.mp = hero.maxMp;
+  const before = foes.map((foe) => foe.hp);
+  cast(state, 'hammer', { x: foes[1].x, y: foes[1].y });
+  check('반경 안의 적이 모두 맞는다', foes.every((foe, i) => foe.hp < before[i]), true);
+
+  // 강화: 자신에게도 걸 수 있다(앞에 서는 계열이라 그것이 본래 쓰임이다).
+  hero.mp = hero.maxMp;
+  cast(state, 'holyShield', { uid: hero.uid });
+  check('자신에게 강화를 건다', hero.auras.map((a) => a.skillId), ['holyShield']);
+  check('받는 피해를 줄이는 강화다',
+    [hero.auras[0].stat, hero.auras[0].mul < 1], ['armor', true]);
+}
+
+{
+  // 정화: 걸린 약화만 걷어낸다. 강화까지 지우면 아군의 노래가 정화에 끊긴다.
+  const state = battle({ skills: ['purify', 'mend'] });
+  const tank = unit(state, '강철의 브란');
+  L.hero(state).mp = L.hero(state).maxMp;
+  L.addAura(state, null, tank, D.PLAYER_SKILLS.dissonance);   // 약화
+  L.addAura(state, null, tank, D.PLAYER_SKILLS.holyShield);   // 강화
+  tank.hp = tank.maxHp - 300;
+  cast(state, 'purify', { uid: tank.uid });
+  check('약화를 걷어낸다', tank.auras.map((a) => a.skillId), ['holyShield']);
+  check('회복도 함께 들어간다', tank.hp > tank.maxHp - 300, true);
+}
+
+// **상위 계열은 그냥 상위 호환이 아니다.** 수치가 세면 마나도 세고, 배울 수 있는
+// 수도 적어야 아래 계열을 고를 이유가 남는다.
+{
+  check('주교의 회복이 사제보다 크다',
+    D.PLAYER_SKILLS.mend.heal > D.PLAYER_SKILLS.touch.heal, true);
+  check('주교의 마나도 더 먹는다',
+    D.PLAYER_SKILLS.mend.mp > D.PLAYER_SKILLS.touch.mp, true);
+  check('주교는 점수를 덜 받는다', D.jobMaxLevel('bishop') < D.jobMaxLevel('priest'), true);
+  // 성기사의 회복은 급한 불만 끄는 정도다. 이것이 "보조 힐러"의 뜻이다.
+  check('성기사의 회복이 사제의 절반 아래',
+    D.PLAYER_SKILLS.layHands.heal < D.PLAYER_SKILLS.touch.heal / 2, true);
+  check('도발은 성기사만 들고 온다',
+    Object.values(D.PLAYER_SKILLS).filter((def) => def.kind === 'taunt')
+      .map((def) => def.job), ['paladin']);
+  // 앞에 서는 계열이라 사거리가 짧다. 뒤에서 다 할 수 있으면 수치에 없는 말이 된다.
+  check('성기사의 사거리가 사제보다 짧다',
+    D.PLAYER_SKILLS.smite.range < D.PLAYER_SKILLS.flame.range, true);
+}
+
 // **계열마다 본업과 보조가 갈린다.** 같은 값을 주면 "노래도 부르는 사제"가 되어
 // 둘 중 하나를 고를 이유가 사라진다.
 {
