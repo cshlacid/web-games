@@ -234,13 +234,14 @@ function withGear(base, gear, armorBase) {
 const LEVEL = {
   maxLevel: 30,
   charExpTo: (level) => Math.round(90 * Math.pow(level, 1.45)),
-  // **직업 레벨은 캐릭터 레벨보다 훨씬 천천히 오른다.** 예전 곡선(70 × 레벨^1.4)
-  // 으로는 판당 직업 경험치가 483~3273인데 6레벨까지가 1735뿐이라, **네 판이면
-  // 만렙**이었다. 계열을 고르고 무엇을 배울지 고민할 시간이 그 전에 끝난다.
-  // 지금은 6레벨까지 26,900이라, 자기 레벨의 의뢰를 이어서 깨면 **열여섯 판**쯤
-  // 걸린다(전에는 네 판). 상위 계열이 요구하는 캐릭터 12는 스물두 판쯤이라,
-  // 아래 계열을 끝까지 키우고도 한참 더 걸어야 상위로 간다.
-  jobExpTo: (level) => Math.round(600 * Math.pow(level, 1.85)),
+  // **상한이 20이라 곡선이 완만해야 한다.** 6에서 멈추던 때의 곡선(600 × 레벨^1.85)
+  // 을 그대로 두면 10레벨에 백 판을 넘겨 상한이 있으나 마나였다. 지금은 자기
+  // 레벨의 의뢰를 이어서 깰 때 6레벨이 여섯 판, 12레벨이 서른세 판, 20레벨이
+  // 예순여덟 판이다 — 캐릭터 30이 여든세 판이므로 **직업 만렙이 조금 먼저 온다.**
+  //
+  // 초반이 빠른 것은 상한이 6이 아니기 때문이다. 그때는 여섯 판이 곧 만렙이라
+  // 고민할 시간이 사라졌지만, 지금 6레벨은 스킬 넷을 겨우 배운 자리다.
+  jobExpTo: (level) => Math.round(220 * Math.pow(level, 1.35)),
 
   // 체력·마나·공격력·회복량은 이제 능력치(ATTRS)가 정한다. 레벨은 능력치를
   // 올리고, 능력치가 수치를 만든다.
@@ -1132,16 +1133,6 @@ const PLAYER_SKILLS = {
     mp: 0, cd: 28, mana: 70, icon: 'focus',
     desc: '서서 외워 자신의 마나를 되찾는다.',
   },
-  flame: {
-    id: 'flame', job: 'priest', unlock: 5, kind: 'dot', range: 40, cast: 1.0, name: '심판의 불꽃', type: '도트', targeting: 'enemy',
-    mp: 16, cd: 9, tick: 22, interval: 1, duration: 6, icon: 'flame',
-    desc: '적 하나를 태운다. 어그로를 끌 수 있다.',
-  },
-  pyre: {
-    id: 'pyre', job: 'priest', unlock: 6, kind: 'zone', range: 44, cast: 1.8, name: '성스러운 불길', type: '장판', targeting: 'area-enemy',
-    mp: 34, cd: 18, tick: 26, interval: 1, duration: 8, radius: 18, icon: 'pyre',
-    desc: '바닥에 남는 장판. 안에 선 적이 계속 탄다.',
-  },
 
   // --- 음유시인 ---------------------------------------------------------
   //
@@ -1239,6 +1230,20 @@ const PLAYER_SKILLS = {
     id: 'devotion', job: 'paladin', unlock: 6, kind: 'buff-area', range: 24, cast: 1.4, name: '헌신', type: '광역 강화', targeting: 'area-ally',
     mp: 30, cd: 24, stat: 'armor', mul: 0.9, duration: 10, radius: 20, icon: 'devotion',
     desc: '기준점 주변 아군이 받는 피해를 함께 줄인다.',
+  },
+  // **사제에게 있던 공격 둘을 여기로 옮겼다.** 사제는 회복만 하는 계열이고,
+  // 때리는 것은 앞에 서는 성기사의 일이다 — 힐러 게임에서 "회복만 하는 계열"이
+  // 하나도 없으면 회복이 본업이라는 말이 수치에 없는 말이 된다. 사거리도 성기사에
+  // 맞춰 줄였다(40 → 26, 44 → 30).
+  flame: {
+    id: 'flame', job: 'paladin', unlock: 4, kind: 'dot', range: 26, cast: 1.0, name: '심판의 불꽃', type: '도트', targeting: 'enemy',
+    mp: 16, cd: 9, tick: 22, interval: 1, duration: 6, icon: 'flame',
+    desc: '적 하나를 태운다. 어그로를 끌 수 있다.',
+  },
+  pyre: {
+    id: 'pyre', job: 'paladin', unlock: 6, kind: 'zone', range: 30, cast: 1.8, name: '성스러운 불길', type: '장판', targeting: 'area-enemy',
+    mp: 34, cd: 18, tick: 26, interval: 1, duration: 8, radius: 18, icon: 'pyre',
+    desc: '바닥에 남는 장판. 안에 선 적이 계속 탄다.',
   },
 
   // --- 주교 -------------------------------------------------------------
@@ -1387,9 +1392,10 @@ const PLAYER_SKILLS = {
 // 딜러나 탱커를 고를 수 있게 하면 "손을 놓아도 이기면 안 된다"는 이 게임의
 // 전제가 무너진다.
 //
-// - **최대 직업 레벨이 낮다.** 예전에는 캐릭터 레벨과 같은 30까지 올라 결국
-//   전부 배웠고, 그러면 무엇을 배울지 고르는 일이 사라진다. 여섯에서 멈추므로
-//   받는 점수는 일곱뿐이고, 사제의 여덟 스킬을 다 배울 수 없다.
+// - **최대 직업 레벨이 캐릭터 레벨보다 낮다**(20 대 30). 받는 점수가 스물하나라,
+//   배우는 데 여덟을 쓰고 나면 올리는 데 열셋이 남는다 — **전부를 상한까지 올릴
+//   수는 없다**(마흔 점이 든다). 여섯에서 멈추던 때에는 점수가 일곱뿐이라 배우는
+//   것만으로 끝나 스킬 레벨을 올릴 자리가 없었다.
 // - **레벨과 점수는 계열마다 따로 쌓인다**(`progress.jobs`). 다른 계열을 겪어
 //   보려다 지금까지 키운 것이 날아가면 아무도 바꿔 보지 않는다.
 // - **배운 스킬은 계열이 달라도 남는다.** 계열을 되돌리면 그때 배운 것이 그대로
@@ -1397,34 +1403,34 @@ const PLAYER_SKILLS = {
 // - 조건은 임시다. 지금은 캐릭터 레벨 하나만 본다.
 const HERO_JOBS = {
   priest: {
-    id: 'priest', name: '사제', spec: 'priest', maxLevel: 6, need: null,
+    id: 'priest', name: '사제', spec: 'priest', maxLevel: 20, need: null,
     desc: '직접 회복이 본업. 크게 한 번에 채우고 장판으로 버틴다.',
   },
   bard: {
-    id: 'bard', name: '음유시인', spec: 'bard', maxLevel: 6, need: { charLevel: 5 },
+    id: 'bard', name: '음유시인', spec: 'bard', maxLevel: 20, need: { charLevel: 5 },
     desc: '강화·약화가 본업, 회복이 보조. 파티 전체의 공격력과 마나를 만진다.',
   },
   paladin: {
-    id: 'paladin', name: '성기사', spec: 'tank', maxLevel: 6, need: { charLevel: 8 },
+    id: 'paladin', name: '성기사', spec: 'tank', maxLevel: 20, need: { charLevel: 8 },
     desc: '앞에 서는 보조 탱커이자 보조 힐러. 신성 공격과 도발, 회복은 약하다.',
   },
-  // **상위 계열은 최대 직업 레벨이 하나 낮다.** 하나하나가 세면서 점수까지 같으면
-  // 아래 계열을 고를 이유가 사라진다 — 적게 배우고 세게 쓰는 쪽이다.
+  // **상위 계열은 최대 직업 레벨이 낮다**(16 대 20). 하나하나가 세면서 점수까지
+  // 같으면 아래 계열을 고를 이유가 사라진다 — 적게 배우고 세게 쓰는 쪽이다.
   // **계열마다 상위가 하나씩 있다.** 하나에만 있으면 나머지를 고르는 것이
   // "끝이 없는 길"이 된다.
   bishop: {
-    id: 'bishop', name: '주교', spec: 'priest', maxLevel: 5,
-    need: { charLevel: 12, jobLevel: { priest: 6 } },
+    id: 'bishop', name: '주교', spec: 'priest', maxLevel: 16,
+    need: { charLevel: 12, jobLevel: { priest: 12 } },
     desc: '사제의 상위 계열. 회복이 더 크고 마나를 더 먹는다. 약화를 걷어낸다.',
   },
   laureate: {
-    id: 'laureate', name: '서사시인', spec: 'bard', maxLevel: 5,
-    need: { charLevel: 12, jobLevel: { bard: 6 } },
+    id: 'laureate', name: '서사시인', spec: 'bard', maxLevel: 16,
+    need: { charLevel: 12, jobLevel: { bard: 12 } },
     desc: '음유시인의 상위 계열. 노래가 더 크고, 아군의 회복량까지 올린다.',
   },
   crusader: {
-    id: 'crusader', name: '성전사', spec: 'tank', maxLevel: 5,
-    need: { charLevel: 12, jobLevel: { paladin: 6 } },
+    id: 'crusader', name: '성전사', spec: 'tank', maxLevel: 16,
+    need: { charLevel: 12, jobLevel: { paladin: 12 } },
     desc: '성기사의 상위 계열. 광역 도발과 기절로 무리를 통째로 붙든다.',
   },
 };

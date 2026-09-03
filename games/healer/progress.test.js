@@ -342,9 +342,12 @@ const gear = (defId, tier) => Items.make(defId, tier || 0, 3);
   progress.jobs.priest.level = D.jobMaxLevel('priest');
   const cap = D.SKILL.start + (D.jobMaxLevel('priest') - 1) * D.SKILL.pointsPerLevel;
   check('레벨마다 하나씩 받는다', P.freeSkillPoints(progress), cap - 2);
-  // **상한이 낮아 다 배울 수는 없다.** 그래야 무엇을 들고 갈지가 선택이 된다.
-  check('점수로 계열의 스킬을 다 배울 수는 없다',
-    cap < D.heroSkillsOf('priest').length + (D.SKILL.max - 1), true);
+  // **배우는 것까지는 되지만 전부를 상한까지 올릴 수는 없다.** 상한이 6이던
+  // 때에는 배우는 것만으로 점수가 끝나 스킬 레벨을 올릴 자리가 없었고, 지금은
+  // 무엇을 올릴지가 고르는 자리다.
+  const all = D.heroSkillsOf('priest').length;
+  check('배우는 데는 점수가 넉넉하다', cap > all, true);
+  check('전부를 상한까지 올릴 수는 없다', cap < all * D.SKILL.max, true);
 
   check('올린다', P.raiseSkill(progress, 'touch').level, 2);
   check('쓴 만큼 준다', P.freeSkillPoints(progress), cap - 3);

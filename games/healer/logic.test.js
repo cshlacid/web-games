@@ -147,6 +147,9 @@ function cast(state, skillId, target) {
   check('적 장판은 위치로 깐다', cast(state, 'pyre', { x: 80, y: 28 }).ok, true);
   check('적 도트는 아군에게 못 건다',
     L.castSkill(state, 'flame', { uid: tank.uid }).ok, false);
+  // 불꽃은 성기사의 것이 되면서 사거리가 26으로 줄었다. 여기서 보려는 것은
+  // 사거리가 아니라 대상이 갈리는가라, 적을 사거리 안으로 옮긴다.
+  foe.x = 78; foe.y = 28;
   check('적 도트는 적에게 건다', cast(state, 'flame', { uid: foe.uid }).ok, true);
 }
 
@@ -972,7 +975,14 @@ function cast(state, skillId, target) {
       .map((def) => def.job), ['paladin']);
   // 앞에 서는 계열이라 사거리가 짧다. 뒤에서 다 할 수 있으면 수치에 없는 말이 된다.
   check('성기사의 사거리가 사제보다 짧다',
-    D.PLAYER_SKILLS.smite.range < D.PLAYER_SKILLS.flame.range, true);
+    D.heroSkillsOf('paladin').every((def) => def.range <= D.PLAYER_SKILLS.touch.range), true);
+  // **사제는 회복만 한다.** 때리는 것은 앞에 서는 성기사의 일로 옮겼다 — 회복만
+  // 하는 계열이 하나도 없으면 "회복이 본업"이 수치에 없는 말이 된다.
+  check('사제에 공격 스킬이 없다',
+    D.heroSkillsOf('priest').some((def) => def.targeting === 'enemy'
+      || def.targeting === 'area-enemy'), false);
+  check('옮긴 둘은 성기사가 들고 있다',
+    ['flame', 'pyre'].every((id) => D.PLAYER_SKILLS[id].job === 'paladin'), true);
 }
 
 // --- 상위 계열의 새 수단 ---------------------------------------------------
@@ -1037,13 +1047,23 @@ function cast(state, skillId, target) {
   check('주인공 스킬의 아이콘이 서로 겹치지 않는다', new Set(icons).size, icons.length);
 }
 
-// **직업 레벨은 캐릭터 레벨보다 훨씬 천천히 오른다.** 예전에는 네 판이면 만렙이라,
-// 무엇을 배울지 고민할 시간이 그 전에 끝났다.
+// **같은 레벨까지 직업 쪽이 더 든다.** 예전에는 네 판이면 만렙이라 무엇을 배울지
+// 고민할 시간이 그 전에 끝났다. 지금은 직업 20이 캐릭터 20보다 무겁고, 상한도
+// 캐릭터(30)보다 낮다 — 스킬을 다 올리는 것이 캐릭터를 키우는 것보다 늦게 끝난다.
 {
-  let job = 0, char = 0;
-  for (let level = 1; level < 6; level++) job += D.LEVEL.jobExpTo(level);
-  for (let level = 1; level < 6; level++) char += D.LEVEL.charExpTo(level);
-  check('직업 레벨이 캐릭터 레벨보다 느리다', job > char * 3, true);
+  const upto = (f, max) => {
+    let sum = 0;
+    for (let level = 1; level < max; level++) sum += f(level);
+    return sum;
+  };
+  const top = D.jobMaxLevel('priest');
+  check('같은 레벨까지 직업 경험치가 더 든다',
+    upto(D.LEVEL.jobExpTo, top) > upto(D.LEVEL.charExpTo, top), true);
+  check('직업 상한이 캐릭터 상한보다 낮다', top < D.LEVEL.maxLevel, true);
+  // 상한이 20이라도 스킬을 전부 끝까지 올릴 수는 없다 — 그러면 고를 것이 없어진다.
+  const points = D.SKILL.start + (top - 1) * D.SKILL.pointsPerLevel;
+  check('점수로 전부를 상한까지 올릴 수는 없다',
+    points < D.heroSkillsOf('priest').length * D.SKILL.max, true);
 }
 
 // **계열마다 본업과 보조가 갈린다.** 같은 값을 주면 "노래도 부르는 사제"가 되어
