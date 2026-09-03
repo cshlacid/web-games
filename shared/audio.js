@@ -210,6 +210,23 @@ window.createGameAudio = function createGameAudio(config) {
     if (ctx.state === 'running' && prefs.bgm) startBgm();
   }
 
+  // **첫 조작 한 번만 듣고 끊으면 안 된다.** 자동재생이 막힌 브라우저에서는 조작이
+  // 곧 시작 신호인데, 그 한 번의 resume()이 통하지 않는 경우가 있다. 그러면 그
+  // 뒤로는 게임이 직접 unlock()을 부르는 자리(힐러의 전장 누르기 같은)에 닿기
+  // 전까지 곡이 나오지 않는다 — 실제로 특정 스킬을 써야 BGM이 시작됐다.
+  // 컨텍스트가 열릴 때까지 계속 듣고, 열리면 스스로 뗀다.
+  //
+  // **캡처 단계에서 듣는다.** 게임이 자기 처리에서 전파를 멈추면 문서까지 오지
+  // 않는데, 소리를 여는 것은 어느 게임의 처리보다 앞이다.
+  const GESTURES = ['pointerdown', 'touchend', 'keydown', 'click'];
+  function onGesture() {
+    unlock();
+    if (ctx && ctx.state === 'running') {
+      for (const name of GESTURES) document.removeEventListener(name, onGesture, true);
+    }
+  }
+  for (const name of GESTURES) document.addEventListener(name, onGesture, true);
+
   document.addEventListener('visibilitychange', () => {
     if (!ctx) return;
     if (document.hidden) stopBgm();

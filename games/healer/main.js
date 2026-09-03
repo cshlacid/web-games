@@ -1136,14 +1136,18 @@ function syncZones(state) {
   const seen = new Set();
   for (const zone of state.zones) {
     seen.add(zone.id);
-    if (zoneNodes.has(zone.id)) continue;
-    const node = el('div', `zone ${zone.kind === 'heal' ? '' : 'damage'}`);
-    node.style.left = `${pctX(zone.x)}%`;
-    node.style.top = `${pctY(zone.y)}%`;
-    node.style.width = `${pctX(zone.radius * 2)}%`;
-    node.style.height = `${pctY(zone.radius * 2)}%`;
-    field.append(node);
-    zoneNodes.set(zone.id, node);
+    let node = zoneNodes.get(zone.id);
+    if (!node) {
+      node = el('div', `zone ${zone.kind === 'heal' ? '' : 'damage'}`);
+      node.style.top = `${pctY(zone.y)}%`;
+      node.style.width = `${pctX(zone.radius * 2)}%`;
+      node.style.height = `${pctY(zone.radius * 2)}%`;
+      field.append(node);
+      zoneNodes.set(zone.id, node);
+    }
+    // 가로 자리는 매 프레임 다시 잡는다. 장판은 바닥에 붙어 있어 무리 사이를
+    // 걸어가는 동안 배경과 함께 뒤로 흘러간다(`L.zoneX`).
+    node.style.left = `${pctX(L.zoneX(state, zone))}%`;
   }
   for (const [id, node] of zoneNodes) {
     if (seen.has(id)) continue;
@@ -1455,7 +1459,6 @@ function cast(skillId, target) {
 const SNAP = 12;
 
 field.addEventListener('pointerdown', (event) => {
-  sound.unlock();
   const state = app.battle;
   if (!state || state.status !== 'fighting' || !app.aiming) return;
 
@@ -1926,7 +1929,6 @@ $('member-close').addEventListener('click', () => { sound.play('click'); closeMe
 $('member-take').addEventListener('click', () => { if (app.member) toggleMember(app.member); });
 
 $('help-open').addEventListener('click', () => {
-  sound.unlock();
   sound.play('click');
   $('help').hidden = false;
   $('help-open').setAttribute('aria-pressed', 'true');
@@ -1942,7 +1944,6 @@ $('help-close').addEventListener('click', () => {
   lastFrame = 0;
 });
 
-document.addEventListener('pointerdown', () => sound.unlock(), { once: true });
 
 refreshQuests();
 openHome('quest');

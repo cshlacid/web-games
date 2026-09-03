@@ -874,22 +874,44 @@ function cast(state, skillId, target) {
 // 보여야 한다. 배경이 흘러가고 아군은 대열을 다시 짠다.
 {
   const state = battle({ skills: ['touch', 'sanctuary'] });
-  // 장판을 하나 깔아 둔 채로 무리를 정리한다. 장판은 유닛 좌표계에 있고 이동
-  // 중에는 그 좌표가 그대로라, 배경만 흘러가면 장판이 파티를 따라오는 것으로
-  // 보인다 — 시체를 치우는 것과 같은 이유로 두고 온다.
+  // 장판을 하나 깔아 둔 채로 무리를 정리한다. 장판은 바닥에 놓인 것이라 걸어가는
+  // 동안 배경과 함께 뒤로 흘러가야 한다 — 유닛 좌표만 보면 그 자리에 남아
+  // 파티를 따라오는 것으로 보인다.
   cast(state, 'sanctuary', { uid: unit(state, '강철의 브란').uid });
   check('장판이 깔렸다', state.zones.length > 0, true);
+  const laid = state.zones[0];
+  const laidX = L.zoneX(state, laid);
 
   AI.alive(state, 'enemy').forEach((u) => L.applyDamage(state, null, u, 99999));
   // 대열이 흐트러진 상태에서 시작해야 다시 짜는 것이 보인다.
   AI.alive(state, 'ally').forEach((u) => { u.x = 80; });
   run(state, 0.2);
   check('무리를 정리하면 이동이 시작된다', state.marching, true);
-  check('깔아 둔 장판은 두고 온다', state.zones, []);
 
   const scrolled = state.scroll;
   run(state, 1);
   check('배경이 흘러간다', state.scroll > scrolled, true);
+  // 걸어간 만큼 그대로 뒤로 밀린다 — 파티는 제자리이므로 판 위를 지나가는 것이
+  // 이렇게만 보인다.
+  check('장판이 바닥과 함께 뒤로 흘러간다',
+    Math.abs((laidX - L.zoneX(state, laid)) - state.scroll) < 1e-6, true);
+  // 이동 중에 새로 까는 것도 같은 규칙을 탄다 — 예외를 두면 이동 중에 깐 것만
+  // 파티를 따라온다.
+  const during = state.zones.length;
+  // 방금 깔았으므로 쿨타임을 풀어 준다 — 여기서 보려는 것은 쿨타임이 아니다.
+  L.skillSlot(state, 'sanctuary').readyAt = 0;
+  L.hero(state).mp = L.hero(state).maxMp;
+  cast(state, 'sanctuary', { uid: unit(state, '강철의 브란').uid });
+  const fresh2 = state.zones[state.zones.length - 1];
+  check('이동 중에도 장판을 깔 수 있다', state.zones.length, during + 1);
+  const freshX = L.zoneX(state, fresh2);
+  run(state, 0.5);
+  check('이동 중에 깐 장판도 흘러간다', L.zoneX(state, fresh2) < freshX - 1, true);
+  // 화면 밖으로 나가면 시간이 남아 있어도 사라진다. 되감기는 배경과 달리 장판은
+  // 돌아오지 않으므로, 보이지 않는 자리에서 계속 돌게 두지 않는다.
+  laid.scrollAt -= D.FIELD.w;
+  run(state, 0.05);
+  check('바닥 밖으로 나간 장판은 사라진다', state.zones.includes(laid), false);
   check('아군이 제자리로 대열을 다시 짠다',
     AI.alive(state, 'ally').every((u) => !u.speed || u.x < 80), true);
 
