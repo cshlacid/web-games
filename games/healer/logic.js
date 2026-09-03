@@ -122,7 +122,11 @@ function makeUnit(def, side, uid, x, y, level, override, bonus, potions, name) {
     // **캐릭터마다 다른 넷을 든다.** 아군은 이름이 씨앗이라 편성 화면에서 본 것과
     // 같고, 적은 이름에 uid를 섞어 같은 무리의 고블린 셋이 서로 다른 것을 들게
     // 한다 — uid는 무리와 자리에서 나오므로 같은 씨앗의 전투는 그대로 재현된다.
-    skills: D.skillsFor(def.spec, level,
+    // **레벨이 오르면 계열이 한 번 올라간다**(`specAt`). 정의에 적힌 계열을 그대로
+    // 보면 12레벨 동료가 상위 스킬을 못 들고 오고, 편성 화면에 적힌 계열과
+    // 전투에서 쓰는 것이 갈린다.
+    spec: D.specAt(def.spec, level),
+    skills: D.skillsFor(D.specAt(def.spec, level), level,
       D.skillSeed(side === 'ally' ? (name || def.name) : `${def.id}:${uid}`), def.always)
       .map((id) => ({ id, readyAt: 0 })),
     targetUid: null, tauntUid: null, tauntUntil: 0,
@@ -694,10 +698,24 @@ function resolvePlayerSkill(state, def, spot) {
   }
   // **도발은 성기사만 들고 온다.** 주인공이 어그로를 옮기는 유일한 수단이라,
   // 동료 탱커의 도발과 같은 자리를 건드린다 — 규칙이 둘이 되면 한쪽만 고치게 된다.
-  if (def.kind === 'taunt') {
-    unit.tauntUid = caster.uid;
-    unit.tauntUntil = state.t + def.duration;
-    unit.targetUid = caster.uid;
+  if (def.kind === 'taunt' || def.kind === 'taunt-area') {
+    // 광역 도발은 기준점 주변을 한꺼번에 끌어온다. 대상 목록만 다르고 나머지는
+    // 같아, 동료 탱커의 도발과 같은 모양으로 둔다.
+    const pulled = def.kind === 'taunt-area'
+      ? alive(state, 'enemy').filter((foe) => dist(foe, point) <= def.radius)
+      : [unit];
+    for (const foe of pulled) {
+      foe.tauntUid = caster.uid;
+      foe.tauntUntil = state.t + def.duration;
+      foe.targetUid = caster.uid;
+    }
+    return;
+  }
+  // 기절은 때리면서 굳힌다. 피해를 먼저 넣는 것은, 기절이 외우던 것을 끊으므로
+  // 순서를 뒤집으면 같은 틱에 죽은 적에게 기절이 걸린 것으로 남기 때문이다.
+  if (def.kind === 'stun') {
+    if (def.damage) applyDamage(state, caster, unit, harm(def.damage));
+    stun(state, caster, unit, def.duration);
     return;
   }
   if (def.kind === 'mana-ally') { giveMana(state, caster, unit, def.mana); return; }

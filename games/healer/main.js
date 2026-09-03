@@ -395,6 +395,27 @@ function renderCharacter() {
     }
     skills.append(row);
   }
+  // **다른 계열에서 배운 것도 전투에 들고 갈 수 있다.** 여기에 적지 않으면 편성
+  // 화면에만 나타나, 무엇을 들고 갈 수 있는지 캐릭터 창에서는 알 수 없다.
+  // 올리는 단추는 없다 — 점수는 그 계열 것이라 지금 계열에서는 쓸 수 없다.
+  const others = P.learnedSkills(progress).filter((def) => def.job !== progress.job);
+  const kept = $('char-kept');
+  kept.textContent = '';
+  kept.hidden = !others.length;
+  for (const base of others) {
+    const row = el('li', 'skill-row');
+    row.append(icon(base.icon, 'icon'));
+    const body = el('div', 'pick-body');
+    const name = el('div', 'pick-name');
+    name.append(document.createTextNode(base.name));
+    name.append(text('span', 'job', D.heroJob(base.job).name));
+    name.append(text('span', 'job', `Lv ${P.skillLevel(progress, base.id)}`));
+    body.append(name);
+    body.append(text('div', 'pick-sub', D.skillEffect(P.skillDef(progress, base.id))));
+    row.append(body);
+    kept.append(row);
+  }
+
   $('skill-points').textContent = points ? `남은 점수 ${points}` : '남은 점수 없음';
   $('skill-open').textContent = `${P.learnedSkills(progress).length} / ${D.heroSkillsOf(progress.job).length}`;
 }
@@ -712,8 +733,13 @@ function jobTag(job, spec, race) {
 // **동료 카드에는 계열만 적는다.** 역할까지 적으면 좁은 칸에서 "딜러 · 음유시인"이
 // 잘렸고, 잘린 계열 이름은 역할보다 잃는 것이 크다 — 무엇을 들고 오는지는 계열이
 // 정하고, 역할은 카드 순서(탱커 → 딜러 → 힐러)와 상세에 있다.
-function specTag(def) {
-  return text('span', `job ${def.job} spec-${def.spec}`, D.SPECS[def.spec]);
+//
+// **레벨을 함께 받는다.** 계열은 레벨이 오르면 한 번 올라가므로(`D.specAt`),
+// 정의에 적힌 것을 그대로 적으면 12레벨 동료가 카드에서는 수호자인데 전장에서는
+// 철벽의 스킬을 쓴다.
+function specTag(def, level) {
+  const spec = D.specAt(def.spec, level);
+  return text('span', `job ${def.job} spec-${spec}`, D.SPECS[spec]);
 }
 
 function renderBrief() {
@@ -789,7 +815,7 @@ function renderRoster() {
     const body = el('div', 'pick-body');
     body.append(text('div', 'pick-name', member.name));
     // 카드에는 종족을 적지 않는다. 셋을 다 적으면 좁은 칸에서 줄이 늘어난다.
-    body.append(specTag(def));
+    body.append(specTag(def, member.level));
     open.append(body);
     open.addEventListener('click', () => openMember(member));
     row.append(open);
@@ -836,7 +862,7 @@ function openMember(member) {
   const body = el('div', 'pick-body');
   body.append(text('div', 'pick-name', `${member.name} Lv ${member.level}`));
   const tag = el('div', 'pick-sub');
-  tag.append(jobTag(def.job, def.spec, def.race));
+  tag.append(jobTag(def.job, D.specAt(def.spec, member.level), def.race));
   body.append(tag);
   body.append(text('div', 'pick-sub', memberSummary(member)));
   head.append(body);
@@ -974,6 +1000,11 @@ function renderSkillPicks() {
     name.append(document.createTextNode(def.name));
     name.append(text('span', 'job', def.type));
     if (level > 1) name.append(text('span', 'job', `Lv ${level}`));
+    // **다른 계열에서 배운 것도 들고 갈 수 있다.** 어디서 온 것인지 안 적으면
+    // 지금 계열의 목록에 없는 스킬이 왜 여기 있는지 알 수 없다.
+    if (base.job !== app.progress.job) {
+      name.append(text('span', 'job dim', D.heroJob(base.job).name));
+    }
     body.append(name);
     body.append(text('div', 'pick-sub', D.skillEffect(def)));
     body.append(text('div', 'pick-sub dim', def.desc));
@@ -1001,8 +1032,7 @@ function renderSkillPicks() {
   if (!list.children.length) {
     const empty = el('li');
     empty.append(text('div', 'pick-sub',
-      `지금 계열(${D.heroJob(app.progress.job).name})에서 배운 스킬이 없다.`
-      + ' 캐릭터 화면에서 스킬 점수로 배운다.'));
+      '배운 스킬이 없다. 캐릭터 화면에서 스킬 점수로 배운다.'));
     list.append(empty);
   }
   $('skill-count').textContent = `${app.skills.length} / ${D.SKILL_MAX}`;

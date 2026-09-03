@@ -975,6 +975,77 @@ function cast(state, skillId, target) {
     D.PLAYER_SKILLS.smite.range < D.PLAYER_SKILLS.flame.range, true);
 }
 
+// --- 상위 계열의 새 수단 ---------------------------------------------------
+//
+// 성전사는 무리를 통째로 붙들고 굳힌다. 광역 도발과 기절은 여기서 처음 나왔다.
+{
+  const state = battle({ skills: ['roar', 'shieldSlam', 'charge', 'bracing', 'quake'] });
+  const hero = L.hero(state);
+  const foes = AI.alive(state, 'enemy');
+  foes.forEach((foe, i) => { foe.x = hero.x + 8 + i * 2; foe.y = hero.y; });
+  hero.mp = hero.maxMp;
+
+  cast(state, 'roar', { x: foes[1].x, y: foes[1].y });
+  check('광역 도발이 여럿을 끌어온다',
+    foes.every((foe) => foe.tauntUid === hero.uid), true);
+
+  hero.mp = hero.maxMp;
+  const before = foes[0].hp;
+  cast(state, 'shieldSlam', { uid: foes[0].uid });
+  check('밀치면 굳는다', L.stunned(state, foes[0]), true);
+  check('밀치면서 때린다', foes[0].hp < before, true);
+}
+
+// 서사시인은 회복량을 올리는 강화를 든다. 회복량 강화는 이 계열뿐이라, 파티의
+// 힐러 전체를 세게 만드는 유일한 수단이다.
+{
+  const state = battle({ skills: ['ovation', 'ballad', 'epic', 'requiem', 'chorus'] });
+  const hero = L.hero(state);
+  const tank = unit(state, '강철의 브란');
+  hero.mp = hero.maxMp;
+  cast(state, 'ovation', { x: hero.x, y: hero.y });
+  check('회복량을 올리는 강화가 걸린다',
+    hero.auras.map((a) => a.stat), ['heal']);
+
+  // 걸린 채로 회복하면 더 들어간다. 곱하는 자리가 applyHeal 하나라 주인공도 탄다.
+  tank.hp = tank.maxHp - 600;
+  const healed = tank.hp;
+  L.applyHeal(state, hero, tank, 100);
+  const withAura = tank.hp - healed;
+  hero.auras = [];
+  tank.hp = healed;
+  L.applyHeal(state, hero, tank, 100);
+  check('강화가 걸린 쪽이 더 회복시킨다', withAura > tank.hp - healed, true);
+}
+
+// **상위 계열이 계열마다 하나씩 있다.** 하나에만 있으면 나머지를 고르는 것이
+// 끝이 없는 길이 된다.
+{
+  const uppers = Object.values(D.HERO_JOBS).filter((job) => (job.need || {}).jobLevel);
+  check('상위 계열이 셋', uppers.length, 3);
+  check('저마다 다른 아래 계열을 요구한다',
+    uppers.map((job) => Object.keys(job.need.jobLevel)[0]).sort(), ['bard', 'paladin', 'priest']);
+  check('상위 계열은 점수를 덜 받는다',
+    uppers.every((job) => job.maxLevel < D.HERO_JOBS[Object.keys(job.need.jobLevel)[0]].maxLevel),
+    true);
+  // 모든 계열의 스킬이 그 계열 상한 안에서 열려야 한다. 넘으면 영영 못 배운다.
+  const late = Object.values(D.PLAYER_SKILLS)
+    .filter((def) => def.unlock > D.jobMaxLevel(def.job)).map((def) => def.id);
+  check('상한 안에서 다 열린다', late, []);
+  // 아이콘이 겹치면 스킬바에서 무엇을 누르는지 알 수 없다.
+  const icons = Object.values(D.PLAYER_SKILLS).map((def) => def.icon);
+  check('주인공 스킬의 아이콘이 서로 겹치지 않는다', new Set(icons).size, icons.length);
+}
+
+// **직업 레벨은 캐릭터 레벨보다 훨씬 천천히 오른다.** 예전에는 네 판이면 만렙이라,
+// 무엇을 배울지 고민할 시간이 그 전에 끝났다.
+{
+  let job = 0, char = 0;
+  for (let level = 1; level < 6; level++) job += D.LEVEL.jobExpTo(level);
+  for (let level = 1; level < 6; level++) char += D.LEVEL.charExpTo(level);
+  check('직업 레벨이 캐릭터 레벨보다 느리다', job > char * 3, true);
+}
+
 // **계열마다 본업과 보조가 갈린다.** 같은 값을 주면 "노래도 부르는 사제"가 되어
 // 둘 중 하나를 고를 이유가 사라진다.
 {
@@ -984,10 +1055,56 @@ function cast(state, skillId, target) {
     D.heroSkillsOf('priest').some((def) => def.kind === 'mana-ally'), false);
   check('강화·약화는 음유시인뿐',
     D.heroSkillsOf('priest').some((def) => def.stat), false);
-  // 계열의 스킬은 그 계열의 상한 안에서 열려야 한다. 넘으면 영영 못 배운다.
-  const late = Object.values(D.PLAYER_SKILLS)
-    .filter((def) => def.unlock > D.jobMaxLevel(def.job)).map((def) => def.id);
-  check('상한 안에서 다 열린다', late, []);
+}
+
+// --- 동료의 상위 계열 -----------------------------------------------------
+//
+// **레벨이 오르면 계열이 한 번 올라간다.** 목록을 통째로 새로 짜지 않고 아래
+// 계열의 것을 물려받는 것은, 같은 캐릭터가 레벨 하나에 전혀 다른 사람이 되지
+// 않게 하려는 것이다.
+{
+  check('문턱 아래는 그대로', D.specAt('tank', D.SPEC_UP_LEVEL - 1), 'tank');
+  check('문턱에서 올라간다', D.specAt('tank', D.SPEC_UP_LEVEL), 'bulwark');
+  check('상위가 없는 계열은 그대로', D.specAt('priest', 99), 'priest');
+  check('상위 계열은 더 안 올라간다', D.specAt('bulwark', 99), 'bulwark');
+
+  // 다섯 계열에 하나씩. 힐러 계열(사제·음유시인)은 주인공 쪽에서 다룬다.
+  check('상위가 다섯', Object.keys(D.SPEC_UP).sort(),
+    ['archer', 'mage', 'rogue', 'tank', 'warrior']);
+
+  for (const [base, up] of Object.entries(D.SPEC_UP)) {
+    // 아래 것을 그대로 물려받는다 — 올라갔다고 쓰던 기술을 잃으면 안 된다.
+    check(`${base}: 아래 목록을 물려받는다`,
+      D.SPEC_SKILLS[base].every((id) => D.SPEC_SKILLS[up.spec].includes(id)), true);
+    // 전용 둘이 앞에 온다. 뒤에 두면 넷을 고르는 순서에서 밀려, 상위가 되어도
+    // 들고 오는 넷이 그대로일 수 있다.
+    check(`${base}: 전용이 앞에 온다`, D.SPEC_SKILLS[up.spec].slice(0, 2), up.skills);
+    check(`${base}: 전용은 문턱 레벨에 열린다`,
+      up.skills.every((id) => D.UNIT_SKILLS[id].minLevel === D.SPEC_UP_LEVEL), true);
+    check(`${base}: 이름표가 있다`, Boolean(D.SPECS[up.spec]), true);
+  }
+
+  // 실제로 들고 오는 넷이 바뀐다. 안 바뀌면 계열이 오른 것이 화면에만 남는다.
+  const before = D.skillsFor('tank', D.SPEC_UP_LEVEL - 1, D.skillSeed('강철의 브란'));
+  const after = D.skillsFor(D.specAt('tank', D.SPEC_UP_LEVEL), D.SPEC_UP_LEVEL,
+    D.skillSeed('강철의 브란'));
+  check('올라가면 들고 오는 것이 달라진다', after.join() !== before.join(), true);
+  check('전용을 하나는 들고 온다',
+    after.some((id) => D.SPEC_UP.tank.skills.includes(id)), true);
+}
+
+{
+  // 전투도 명부도 같은 함수를 본다 — 한쪽만 보면 편성 화면에 적힌 계열과
+  // 전장에서 쓰는 스킬이 갈린다.
+  const state = battle({ party: [{ defId: 'bran', level: D.SPEC_UP_LEVEL }] });
+  const tank = state.units.find((u) => u.defId === 'bran');
+  check('전투의 유닛이 상위 계열이다', tank.spec, 'bulwark');
+  check('상위 전용을 들고 들어온다',
+    tank.skills.some((s) => D.SPEC_UP.tank.skills.includes(s.id)), true);
+
+  const low = battle({ party: [{ defId: 'bran', level: 1 }] });
+  check('낮은 레벨은 아래 계열 그대로',
+    low.units.find((u) => u.defId === 'bran').spec, 'tank');
 }
 
 // --- 무리 사이의 이동 ---------------------------------------------------

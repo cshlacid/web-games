@@ -74,7 +74,10 @@ function create(seed) {
 }
 
 const jobOf = (member) => D.COMPANIONS[member.defId].job;
-const specOf = (member) => D.COMPANIONS[member.defId].spec;
+// **레벨이 오르면 계열이 한 번 올라간다.** 이름 짓기만은 정의에 적힌 계열을 보고
+// 하는데, 이름은 처음 만들 때 정해져 신원이 되기 때문이다 — 상위로 올라갔다고
+// 이름 조각이 바뀌면 같은 동료가 다른 사람이 된다.
+const specOf = (member) => D.specAt(D.COMPANIONS[member.defId].spec, member.level);
 const defOf = (member) => D.COMPANIONS[member.defId];
 
 // 레벨에 맞춰 실제로 들고 나가는 스킬. 편성 화면이 보여 주는 것과 전투가
