@@ -96,15 +96,6 @@ function toast(text) {
 
 // --- 판 그리기 ---
 
-function line(x1, y1, x2, y2) {
-  const node = document.createElementNS(SVG_NS, 'line');
-  node.setAttribute('x1', x1);
-  node.setAttribute('y1', y1);
-  node.setAttribute('x2', x2);
-  node.setAttribute('y2', y2);
-  return node;
-}
-
 function buildBoard() {
   const size = game.size;
   const regions = game.board.regions;
@@ -126,29 +117,61 @@ function buildBoard() {
   // 영역 경계는 칸 배경색만으로는 약하다 — 비슷한 밝기의 아홉 색을 쓰기 때문에
   // 어디까지가 한 영역인지 색만 보고 가르기 어렵다. 선을 칸 위에 겹쳐 긋는다.
   // viewBox를 칸 수로 잡아 두면 판 크기가 달라져도 좌표를 다시 계산할 일이 없다.
+  //
+  // **칸 구분선(얇은 흰 선)도 여기서 함께 긋는다.** 예전에는 칸마다 box-shadow로
+  // 그었는데, 칸은 배치 엔진이 기기 픽셀에 맞춰 반올림해 칠하고 이 SVG는 소수점
+  // 좌표 그대로 그린다. 그 어긋남 때문에 굵은 경계선이 흰 선보다 오른쪽 아래로
+  // 반 픽셀쯤 밀려 보였다(9×9에서 실측 0.74·0.45 기기픽셀). 둘을 같은 좌표계에
+  // 두면 어긋날 자리가 없다.
   const svg = document.createElementNS(SVG_NS, 'svg');
   svg.setAttribute('class', 'edges');
   svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
 
-  // 선 끝을 둥글게 마감하므로 끝점 너머로 굵기의 절반만큼 반원이 더 나간다.
-  // 판 가장자리에 닿는 세로·가로선을 칸 경계(0이나 size)에서 끊으면 그 반원이
-  // 바깥 테두리 밖으로 삐져나온다. 대신 **바깥 테두리 선의 한가운데**에서
-  // 끊고 테두리를 맨 나중에 덧그린다 — 반원이 테두리 선 굵기 안에 정확히
-  // 들어가므로 굵기를 바꿔도 이 관계가 유지된다.
+  // 선 끝은 굵기의 절반만큼 더 나간다(`stroke-linecap: square`). 판 가장자리에
+  // 닿는 선을 칸 경계(0이나 size)에서 끊으면 그만큼 바깥 테두리 밖으로
+  // 삐져나오므로 **바깥 테두리 선의 한가운데**에서 끊고 테두리를 맨 나중에
+  // 덧그린다 — 튀어나온 만큼이 테두리 선 굵기 안에 정확히 들어가므로 굵기를
+  // 바꿔도 이 관계가 유지된다.
   const stop = (v) => (v <= 0 ? EDGE_INSET : v >= size ? size - EDGE_INSET : v);
 
-  for (let cell = 0; cell < size * size; cell++) {
-    const r = Math.floor(cell / size);
-    const c = cell % size;
-    if (c < size - 1 && regions[cell] !== regions[cell + 1]) {
-      svg.appendChild(line(c + 1, stop(r), c + 1, stop(r + 1)));
+  const grid = [];
+  for (let k = 1; k < size; k++) {
+    grid.push(`M${k} ${stop(0)}L${k} ${stop(size)}`);
+    grid.push(`M${stop(0)} ${k}L${stop(size)} ${k}`);
+  }
+
+  // 이어지는 경계는 한 구간으로 잇는다. 칸마다 토막을 내면 토막의 경계마다
+  // 반투명한 가장자리가 겹쳐 이음매가 옅은 자국으로 보인다.
+  const edges = [];
+  for (let c = 1; c < size; c++) {
+    let from = null;
+    for (let r = 0; r <= size; r++) {
+      const cut = r < size && regions[r * size + c - 1] !== regions[r * size + c];
+      if (cut && from === null) from = r;
+      if (!cut && from !== null) { edges.push(`M${c} ${stop(from)}L${c} ${stop(r)}`); from = null; }
     }
-    if (r < size - 1 && regions[cell] !== regions[cell + size]) {
-      svg.appendChild(line(stop(c), r + 1, stop(c + 1), r + 1));
+  }
+  for (let r = 1; r < size; r++) {
+    let from = null;
+    for (let c = 0; c <= size; c++) {
+      const cut = c < size && regions[(r - 1) * size + c] !== regions[r * size + c];
+      if (cut && from === null) from = c;
+      if (!cut && from !== null) { edges.push(`M${stop(from)} ${r}L${stop(c)} ${r}`); from = null; }
     }
   }
 
+  // 구간을 전부 한 path에 담는 것도 이음매 때문이다. 요소를 나누면 겹치는 자리가
+  // 따로따로 그려져 섞이지만, 한 path는 통째로 한 번에 칠해진다.
+  for (const [cls, parts] of [['grid', grid], ['region', edges]]) {
+    if (!parts.length) continue;
+    const node = document.createElementNS(SVG_NS, 'path');
+    node.setAttribute('class', cls);
+    node.setAttribute('d', parts.join(''));
+    svg.appendChild(node);
+  }
+
   const outline = document.createElementNS(SVG_NS, 'rect');
+  outline.setAttribute('class', 'region');
   outline.setAttribute('x', EDGE_INSET);
   outline.setAttribute('y', EDGE_INSET);
   outline.setAttribute('width', size - EDGE_INSET * 2);
