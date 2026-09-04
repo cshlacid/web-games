@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>한붓</title>
+<meta name="description" content="1번 칸에서 시작해 숫자를 순서대로 밟으며 모든 칸을 한 번씩 지나는 선을 긋는 퍼즐">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235f6d87' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='M4 4 H20 L4 12 H20 L4 20 H20'/></svg>">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="app">
+  <header class="head">
+    <div class="title-row">
+      <div class="head-nav">
+        <a class="back" href="../../">← 목록</a>
+        <button class="toggle" id="help-open" type="button" aria-pressed="false">도움말</button>
+      </div>
+      <h1>한붓</h1>
+      <div class="head-actions">
+        <button class="toggle sound" id="toggle-bgm" type="button" aria-pressed="true">BGM</button>
+        <button class="toggle sound" id="toggle-sfx" type="button" aria-pressed="true">효과음</button>
+      </div>
+    </div>
+    <div class="picker-row">
+      <div class="picker" id="sizes" role="group" aria-label="판 크기"></div>
+      <span class="best" id="best"></span>
+      <span class="timer" id="timer">0:00</span>
+    </div>
+  </header>
+
+  <div class="board-wrap">
+    <div class="board" id="board"></div>
+    <div class="veil" id="veil" hidden>만드는 중…</div>
+  </div>
+
+  <p class="toast" id="toast" role="status" aria-live="polite"></p>
+
+  <div class="pad">
+    <div class="tools">
+      <button class="tool" id="undo" type="button">
+        <span class="tool-icon" data-icon="undo"></span><span class="tool-label">되돌리기</span>
+      </button>
+      <button class="tool" id="clear" type="button">
+        <span class="tool-icon" data-icon="backspace"></span><span class="tool-label">지우기</span>
+      </button>
+      <button class="tool" id="hint" type="button">
+        <span class="tool-icon" data-icon="hint"></span><span class="tool-label">힌트</span>
+      </button>
+      <button class="tool" id="new-game" type="button">
+        <span class="tool-icon" data-icon="plus"></span><span class="tool-label">새 판</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="sheet" id="result" hidden>
+    <p class="sheet-title" id="result-title"></p>
+    <p class="sheet-note" id="result-note"></p>
+    <div class="sheet-actions">
+      <button class="btn" id="again" type="button">한 판 더</button>
+    </div>
+  </div>
+
+  <div class="sheet" id="help" hidden>
+    <p class="sheet-title">규칙</p>
+    <ul class="help-list">
+      <li><b>1</b>이 적힌 칸에서 출발해 <b>2, 3, …을 순서대로</b> 지나는 선 하나를 긋습니다.
+        숫자를 건너뛸 수 없습니다.</li>
+      <li>선은 <b>모든 칸을 정확히 한 번씩</b> 지나야 합니다. 한 칸이라도 비면 완성이 아닙니다.</li>
+      <li>선은 <b>위아래·양옆으로만</b> 움직이고, 자기 자신과 겹칠 수 없습니다.</li>
+      <li>칸과 칸 사이의 <b>굵은 선은 벽</b>입니다. 벽은 지나갈 수 없으니 돌아가야 합니다.</li>
+      <li><b>이 게임의 모든 판은 답이 하나뿐입니다.</b> 답이 여럿인 판은 나오지 않습니다.</li>
+      <li>판 크기가 곧 난이도입니다. 칸이 늘면 벽도 함께 늘어납니다.</li>
+      <li>칸을 <b>누른 채 끌어</b> 선을 긋습니다. 지나온 칸을 되짚어 끌면 그만큼 지워집니다.
+        한 칸씩 톡톡 눌러 이어 가도 됩니다.</li>
+      <li>키보드: <b>방향키</b>로 잇고, <b>Backspace</b>로 한 칸 되돌리고, <b>Esc</b>로 전부 지웁니다.</li>
+      <li><b>힌트</b>는 어긋난 곳까지 지우고 다음 한 칸을 놓아 줍니다. 힌트를 쓴 판은
+        최고 기록으로 남기지 않습니다.</li>
+    </ul>
+    <div class="sheet-actions">
+      <button class="btn" id="help-close" type="button">닫기</button>
+    </div>
+  </div>
+</main>
+
+<script src="rules.js"></script>
+<script src="solver.js"></script>
+<script src="generator.js"></script>
+<script src="../../shared/icons.js"></script>
+<script src="../../shared/audio.js"></script>
+<script src="audio.js"></script>
+<script src="main.js"></script>
+</body>
+</html>
