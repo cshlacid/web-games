@@ -17,6 +17,11 @@
 
 * { box-sizing: border-box; }
 
+/* 더블 탭 확대를 막는다. 게임과 달리 여기서는 손가락으로 벌려 키우는 확대까지
+   막지는 않는다 — 읽는 페이지라 그건 남겨 둔다. body만으로는 모자란다: body가
+   뷰포트보다 짧을 때 그 아래 빈자리를 두 번 두드리면 html을 두드린 것이 된다. */
+html, body { touch-action: manipulation; }
+
 body {
   margin: 0;
   min-height: 100vh;
