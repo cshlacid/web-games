@@ -382,15 +382,7 @@
 
   bindSoundToggle(el.toggleBgm, 'bgm', (on) => Sound.setBgm(on));
   bindSoundToggle(el.toggleSfx, 'sfx', (on) => Sound.setSfx(on));
-  el.helpOpen.addEventListener('click', () => {
-    const open = el.help.hidden;
-    el.help.hidden = !open;
-    el.helpOpen.setAttribute('aria-pressed', String(open));
-  });
-  el.helpClose.addEventListener('click', () => {
-    el.help.hidden = true;
-    el.helpOpen.setAttribute('aria-pressed', 'false');
-  });
+  window.SharedSheet.bind({ sheet: el.help, opener: el.helpOpen, closer: el.helpClose });
 
   el.share.addEventListener('click', async () => {
     const text = L.shareText(state.rows, L.dateKey(), state.status === 'won');
