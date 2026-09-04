@@ -46,7 +46,6 @@ const game = {
   board: null,
   state: null,
   cells: [],
-  drawn: null,
   history: [],
   lit: null,
   cursor: null,
@@ -104,12 +103,16 @@ function buildBoard() {
   el.board.classList.remove('done');
   el.board.replaceChildren();
   game.cells = [];
-  game.drawn = new Int8Array(size * size).fill(-1);
 
+  // **그림을 둘 다 넣어 두고 감춘다.** 예전에는 칸이 바뀔 때마다 innerHTML을 갈아
+  // 끼웠는데, 그러면 손가락 밑의 요소가 그 자리에서 사라진다. 사라진 요소에서
+  // 시작한 두드림은 뒤이은 터치 이벤트가 문서까지 올라오지 않아, 더블 탭을
+  // 가로채는 공용 처리기(`shared/base.js`)가 이 게임에서만 듣지 못했다.
   for (let cell = 0; cell < size * size; cell++) {
     const node = document.createElement('div');
     node.className = `cell rg${regions[cell]}`;
     node.dataset.cell = String(cell);
+    node.innerHTML = Icons.svg('mark') + Icons.svg('crown');
     el.board.appendChild(node);
     game.cells.push(node);
   }
@@ -187,11 +190,8 @@ function paint() {
   const bad = new Set(game.autoCheck ? R.conflicts(game.board, game.state) : []);
 
   game.cells.forEach((node, cell) => {
-    if (game.drawn[cell] !== marks[cell]) {
-      node.innerHTML = marks[cell] === R.CROWN ? Icons.svg('crown')
-        : marks[cell] === R.MARK ? Icons.svg('mark') : '';
-      game.drawn[cell] = marks[cell];
-    }
+    node.classList.toggle('marked', marks[cell] === R.MARK);
+    node.classList.toggle('crowned', marks[cell] === R.CROWN);
     node.classList.toggle('bad', bad.has(cell));
     node.classList.toggle('lit', game.lit !== null && game.lit.has(cell));
     node.classList.toggle('cursor', game.cursor === cell);
