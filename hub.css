@@ -50,25 +50,31 @@ h1 {
 
 /* 한 줄에 하나씩 늘어놓던 것을 격자로 바꿨다. 게임이 여덟 개가 되면서 한 줄
    목록은 화면 하나에 다 들어오지 않았고, 다 들어오지 않는 목록은 훑는 것이
-   아니라 스크롤하는 것이 된다. 열 수를 못 박지 않고 칸 너비로 정하므로 좁은
-   화면에서는 둘, 넓은 화면에서는 셋이 된다. */
+   아니라 스크롤하는 것이 된다. */
 .games {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  /* 좁은 화면에서는 폭이 되는 만큼 채운다 — 360pt에서 두 줄이 되도록 150px이다. */
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   /* 줄마다 높이를 맞춘다. 그러지 않으면 이름이 라틴 문자인 카드(2048)와 한글인
      카드의 줄 높이가 몇 픽셀씩 달라 격자가 어긋나 보인다. */
   grid-auto-rows: 1fr;
   gap: 12px;
 }
 
+/* 넓은 화면에서는 열 수를 못 박는다. 폭이 되는 만큼 채우게 두면 640px에 네 열이
+   들어가는데, 그 폭에서는 "한붓그리기"가 아이콘 옆에 다 서지 못하고 접힌다. */
+@media (min-width: 560px) {
+  .games { grid-template-columns: repeat(3, 1fr); }
+}
+
 .card {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 12px;
+  gap: 8px;
   height: 100%;
   padding: 16px;
   border: 1px solid var(--card-border);
@@ -88,15 +94,17 @@ h1 {
    모양과 크기가 달랐고 제 색을 들고 왔다 — 여러 장이 나란히 선 목록에서 그것이
    가장 잘 보인다. `currentColor`로 그리므로 밝은 테마와 어두운 테마를 함께 탄다. */
 .card-icon {
-  width: 30px;
-  height: 30px;
+  width: 26px;
+  height: 26px;
   flex: none;
 }
 
-.card-body {
+/* 아이콘과 이름은 한 줄에, 설명은 그 아래 한 줄에 둔다. 설명까지 이름 옆에
+   세우면 좁은 카드에서 글자가 들어갈 폭이 반으로 줄어 두 줄로 접힌다. */
+.card-head {
   display: flex;
-  flex-direction: column;
-  gap: 3px;
+  align-items: center;
+  gap: 9px;
 }
 
 .card-title {
