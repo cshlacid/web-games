@@ -51,6 +51,24 @@ document.addEventListener('touchmove', (event) => {
   if (event.touches.length > 1) event.preventDefault();
 }, { capture: true, passive: false });
 
+// 마지막 그물. 위의 것들이 다 새더라도 **확대된 채로 남지는 않게** 한다. 막는 것이
+// 아니라 되돌리는 것이라 어떤 경로로 확대됐든 걸린다 — 사파리 판마다 새는 자리가
+// 달라 하나씩 틀어막는 방식으로는 끝이 나지 않았다.
+//
+// viewport 메타의 내용을 다시 써 넣으면 사파리가 제약을 다시 적용하며 배율을
+// 되돌린다. 같은 값을 그대로 넣으면 바뀐 것이 없어 다시 적용하지 않으므로 한 번
+// 다른 값을 거쳐 간다. 배율이 1일 때는 아무것도 하지 않으니, 이 방법이 통하지
+// 않는 판에서도 해가 없다.
+const viewport = document.querySelector('meta[name="viewport"]');
+if (viewport && window.visualViewport) {
+  const wanted = viewport.getAttribute('content');
+  window.visualViewport.addEventListener('resize', () => {
+    if (window.visualViewport.scale <= 1.01) return;
+    viewport.setAttribute('content', `${wanted}, minimum-scale=1`);
+    requestAnimationFrame(() => viewport.setAttribute('content', wanted));
+  });
+}
+
 // touch-action은 상속되지 않지만, 실제로 걸리는 값은 조상까지의 교집합이다.
 // 그래서 위로 올라가며 하나라도 none이면 그 자리는 none이다.
 function handled(node) {
