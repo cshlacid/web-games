@@ -165,8 +165,6 @@ h1 {
   align-items: center;
   justify-content: center;
   background: var(--cell-bg);
-  box-shadow: inset 0 0 0 1px var(--board-bg);
-  border-radius: 4px;
   font-weight: 800;
   font-size: calc(var(--cell) * 0.42);
 }
@@ -198,6 +196,14 @@ h1 {
   z-index: 1;
 }
 
+/* 칸 구분선. 칸이 아니라 여기서 긋는 이유는 main.js에 적어 두었다 — 벽과 같은
+   좌표계에 있어야 서로 밀려 보이지 않는다. */
+.ink .grid {
+  fill: none;
+  stroke: var(--board-bg);
+  stroke-width: 0.05;
+}
+
 .ink .trail {
   fill: none;
   stroke: var(--path);
@@ -215,6 +221,7 @@ h1 {
 }
 
 .ink .wall {
+  fill: none;
   stroke: var(--wall);
   stroke-width: 0.14;
   stroke-linecap: round;
