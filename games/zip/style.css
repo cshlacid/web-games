@@ -1,0 +1,303 @@
+:root {
+  --bg: #f4f6f9;
+  --fg: #2c3542;
+  --muted: #7b8698;
+  --line: #cdd5e0;
+  --cell-bg: #ffffff;
+  --board-bg: #e7ecf3;
+  --path: #5b8def;
+  --path-soft: #dfe8fb;
+  --num-bg: #55637a;
+  --num-fg: #f2f5f9;
+  --wall: #55637a;
+  --btn-bg: #55637a;
+  --btn-fg: #f2f5f9;
+  --sheet-bg: #ffffff;
+  --hint-ring: #c9962f;
+  /* 판이 쓸 수 있는 폭을 칸 크기 계산에서 다시 세야 해서 둘 다 변수로 둔다. */
+  --pad-x: clamp(10px, 4vmin, 28px);
+  --app-max: 440px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #171b21;
+    --fg: #dfe5ee;
+    --muted: #8892a3;
+    --line: #333c49;
+    --cell-bg: #212832;
+    --board-bg: #2b333f;
+    --path: #6f9bf0;
+    --path-soft: #2b3648;
+    --num-bg: #93a1bd;
+    --num-fg: #1a1f27;
+    --wall: #aab4c6;
+    --btn-bg: #4a5568;
+    --sheet-bg: #212832;
+    --hint-ring: #d8a13a;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  display: flex;
+  justify-content: center;
+  padding: clamp(10px, 3vmin, 24px) var(--pad-x);
+  overscroll-behavior: none;
+  touch-action: manipulation;
+}
+
+.app {
+  width: min(100%, var(--app-max));
+  display: flex;
+  flex-direction: column;
+  gap: clamp(8px, 2vmin, 14px);
+}
+
+/* 게임을 옮겨 다닐 때 목록으로 돌아가는 길을 매번 다시 찾지 않도록 헤더 배치는
+   모든 게임이 같다. 양옆을 1fr로 묶으면 좌우 폭이 달라도 이름이 가운데에 온다. */
+.title-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 10px;
+}
+
+.title-row h1 { text-align: center; }
+.title-row .head-nav { justify-self: start; }
+.head-nav { display: flex; align-items: center; gap: 14px; }
+.title-row .head-actions { justify-self: end; }
+
+h1 {
+  margin: 0;
+  font-size: clamp(24px, 6vmin, 34px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.head-actions { display: flex; align-items: baseline; gap: 14px; }
+
+.toggle {
+  border: 0; background: none; padding: 0;
+  color: inherit; font-family: inherit; font-size: 14px; font-weight: 600;
+  cursor: pointer; opacity: 0.6;
+}
+.toggle:hover { opacity: 1; }
+.toggle.sound { font-size: 12px; }
+/* 취소선은 소리 토글에만 준다. 도움말의 꺼짐은 "안 열림"이라 뜻이 다르다. */
+.toggle.sound[aria-pressed="false"] { opacity: 0.38; text-decoration: line-through; }
+
+.back {
+  color: inherit; opacity: 0.6; text-decoration: none;
+  font-size: 14px; font-weight: 600;
+}
+.back:hover { opacity: 1; }
+
+.picker-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.picker { display: flex; gap: 4px; }
+
+.pick {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.pick[aria-pressed="true"] {
+  background: var(--btn-bg);
+  border-color: var(--btn-bg);
+  color: var(--btn-fg);
+}
+
+.best {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.timer {
+  margin-inline-start: auto;
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+/* 8×8을 만드는 데 1초 넘게 걸리는 판이 있어 가림막이 실제로 보인다. 판이 아직
+   없는 첫 순간에도 자리를 차지해야 하므로 상자에 최소 높이를 준다. */
+.board-wrap { position: relative; min-height: 200px; }
+
+.board {
+  position: relative;
+  user-select: none;
+  /* 화면 폭에 맞춰 줄이는 항이 없으면 8×8이 좁은 폰에서 옆으로 잘린다.
+     --cols는 buildBoard가 넣는다. */
+  --cell: min(clamp(30px, 11vmin, 52px),
+    calc((min(100vw - 2 * var(--pad-x), var(--app-max))) / var(--cols)));
+  display: grid;
+  width: max-content;
+  margin-inline: auto;
+  background: var(--board-bg);
+  border-radius: 10px;
+  /* 선을 격자 위에 겹쳐 긋기 때문에 칸 사이에 틈을 두지 않는다. 틈을 두면 SVG
+     좌표와 칸 좌표가 칸마다 조금씩 어긋나 선이 칸 가운데를 벗어난다. */
+  gap: 0;
+  padding: 2px;
+  touch-action: none;
+}
+
+.cell {
+  position: relative;
+  width: var(--cell);
+  height: var(--cell);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--cell-bg);
+  box-shadow: inset 0 0 0 1px var(--board-bg);
+  border-radius: 4px;
+  font-weight: 800;
+  font-size: calc(var(--cell) * 0.42);
+}
+
+/* 선이 지나간 칸. 선 자체는 SVG로 긋고, 칸은 옅게만 물들인다. */
+.cell.on { background: var(--path-soft); }
+
+.num {
+  position: relative;
+  z-index: 2;
+  width: calc(var(--cell) * 0.72);
+  height: calc(var(--cell) * 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--num-bg);
+  color: var(--num-fg);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 어디서 시작하는지 한눈에 보이게 1번만 색을 준다. */
+.cell.start .num { background: var(--path); color: #ffffff; }
+
+.ink {
+  position: absolute;
+  inset: 2px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.ink .trail {
+  fill: none;
+  stroke: var(--path);
+  stroke-width: 0.34;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* 선 끝 표시. 선과 같은 색으로 두면 선 위에서 보이지 않으므로 속을 비운다.
+   칸이 하나뿐일 때도 뭔가 그려져 있어야 눌린 것이 보인다. */
+.ink .head {
+  fill: var(--cell-bg);
+  stroke: var(--path);
+  stroke-width: 0.07;
+}
+
+.ink .wall {
+  stroke: var(--wall);
+  stroke-width: 0.14;
+  stroke-linecap: round;
+}
+
+.veil {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--bg) 75%, transparent);
+  font-weight: 700;
+  color: var(--muted);
+}
+.veil[hidden] { display: none; }
+
+.toast {
+  margin: 0;
+  min-height: 20px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.tools { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
+
+.tool {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 7px 0;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  cursor: pointer;
+}
+/* 도구 아이콘은 글자가 아니라 도형이다(`shared/icons.js`). */
+.tool-icon { display: inline-flex; line-height: 0; }
+.tool-icon svg { width: 19px; height: 19px; }
+.tool-label { font-size: 11px; font-weight: 600; opacity: 0.8; }
+.tool:disabled { opacity: 0.35; cursor: default; }
+
+.sheet {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--sheet-bg);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sheet[hidden] { display: none; }
+
+.sheet-title { margin: 0; font-size: 19px; font-weight: 800; }
+.sheet-note { margin: 0; font-size: 14px; color: var(--muted); }
+.sheet-actions { display: flex; gap: 8px; }
+
+.btn {
+  flex: 1;
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  border: 0;
+  border-radius: 8px;
+  padding: 11px 16px;
+  font-size: 15px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.help-list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 1.55;
+}
