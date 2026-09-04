@@ -1,0 +1,85 @@
+/* 바텀시트. 도움말이 이 모양이다 — 화면 아래에서 겹판이 올라오고, 손잡이를 잡거나
+   본문을 아래로 밀면 닫힌다.
+   `shared/sheet.js`가 만드는 껍데기의 생김새만 여기 있다. 게임마다 색이 다르므로
+   색은 각 게임이 이미 들고 있는 토큰(--sheet-bg, --line, --muted)을 그대로 쓴다. */
+
+.sheet-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.sheet-layer[hidden] { display: none; }
+
+.sheet-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(12, 16, 22, 0.45);
+  opacity: 0;
+  transition: opacity 0.22s ease;
+}
+.sheet-layer.open .sheet-scrim { opacity: 1; }
+
+.sheet-panel {
+  position: relative;
+  width: min(100%, 520px);
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--sheet-bg, #ffffff);
+  border-radius: 18px 18px 0 0;
+  box-shadow: 0 -10px 34px rgba(0, 0, 0, 0.22);
+  transform: translateY(100%);
+  transition: transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.sheet-layer.open .sheet-panel { transform: translateY(0); }
+
+/* 끌고 있는 동안에는 손가락이 곧 위치다. 전환 시간이 남아 있으면 손가락보다
+   판이 늦게 따라와 미끄러지는 느낌이 난다. */
+.sheet-layer.dragging .sheet-panel,
+.sheet-layer.dragging .sheet-scrim { transition: none; }
+
+.sheet-grip {
+  flex: none;
+  display: flex;
+  justify-content: center;
+  padding: 10px 0 4px;
+  /* 손잡이 위에서는 브라우저가 스크롤을 가져가면 안 된다. */
+  touch-action: none;
+  cursor: grab;
+}
+.sheet-grip::before {
+  content: "";
+  width: 42px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--line, #cdd5e0);
+}
+
+.sheet-body {
+  overflow-y: auto;
+  /* 시트 안에서 끝까지 스크롤했을 때 뒤에 있는 게임 화면이 따라 움직이지 않게 한다. */
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* 겹판이 이미 자리·테두리·배경을 그리므로 안에 든 시트는 제 것을 전부 접는다.
+   힐러의 도움말은 그 자체가 화면 아래에 붙는 fixed 시트였는데, 그대로 두면 겹판
+   안에서 흐름을 벗어나 겹판 높이가 0이 된다. 결과 시트 같은 제자리 시트는 겹판
+   밖에 있으므로 이 규칙에 걸리지 않는다. */
+.sheet-panel .sheet {
+  position: static;
+  transform: none;
+  width: auto;
+  max-height: none;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  z-index: auto;
+  padding: 4px 18px 18px;
+}

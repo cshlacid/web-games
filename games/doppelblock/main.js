@@ -745,15 +745,7 @@
   el.hint.addEventListener('click', hint);
   el.newGame.addEventListener('click', () => { Sound.play('click'); newGame(); });
   el.again.addEventListener('click', () => { Sound.play('click'); newGame(); });
-  el.helpOpen.addEventListener('click', () => {
-    const open = el.help.hidden;
-    el.help.hidden = !open;
-    el.helpOpen.setAttribute('aria-pressed', String(open));
-  });
-  el.helpClose.addEventListener('click', () => {
-    el.help.hidden = true;
-    el.helpOpen.setAttribute('aria-pressed', 'false');
-  });
+  window.SharedSheet.bind({ sheet: el.help, opener: el.helpOpen, closer: el.helpClose });
 
   window.addEventListener('keydown', (event) => {
     Sound.unlock();

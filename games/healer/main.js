@@ -1817,7 +1817,7 @@ function finishBattle(state) {
 // logic.advance가 0.25초로 자르지만, 아예 멈춰 두는 편이 정직하다.
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) app.paused = true;
-  else if ($('help').hidden) app.paused = false;
+  else if (!helpSheet.isOpen()) app.paused = false;
   lastFrame = 0;
 });
 
@@ -2069,20 +2069,20 @@ bindToggle('toggle-sfx', 'sfx', (on) => sound.setSfx(on));
 $('member-close').addEventListener('click', () => { sound.play('click'); closeMember(); });
 $('member-take').addEventListener('click', () => { if (app.member) toggleMember(app.member); });
 
-$('help-open').addEventListener('click', () => {
-  sound.play('click');
-  $('help').hidden = false;
-  $('help-open').setAttribute('aria-pressed', 'true');
-  // 실시간 전투 중에 규칙을 읽는 동안 파티가 죽어 있으면 안 된다.
-  app.paused = true;
-});
-
-$('help-close').addEventListener('click', () => {
-  sound.play('click');
-  $('help').hidden = true;
-  $('help-open').setAttribute('aria-pressed', 'false');
-  app.paused = false;
-  lastFrame = 0;
+const helpSheet = window.SharedSheet.bind({
+  sheet: $('help'),
+  opener: $('help-open'),
+  closer: $('help-close'),
+  onOpen() {
+    sound.play('click');
+    // 실시간 전투 중에 규칙을 읽는 동안 파티가 죽어 있으면 안 된다.
+    app.paused = true;
+  },
+  onClose() {
+    sound.play('click');
+    app.paused = false;
+    lastFrame = 0;
+  },
 });
 
 
