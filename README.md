@@ -13,6 +13,8 @@
 | [스도쿠](games/sudoku/) | 힌트만으로 풀리는 판만 나온다 | 순수 HTML/CSS/JS |
 | [더블블록](games/doppelblock/) | 검은 칸 사이 숫자의 합을 맞힌다 | 순수 HTML/CSS/JS |
 | [체스 퍼즐](games/chess-puzzle/) | 가장 강한 수를 찾아 전술을 푼다 | 순수 HTML/CSS/JS |
+| [한붓그리기](games/zip/) | 숫자를 순서대로 밟아 모든 칸을 한 번에 지난다 | 순수 HTML/CSS/JS |
+| [왕관 놓기](games/queens/) | 행·열·색마다 왕관을 하나씩 놓는다 | 순수 HTML/CSS/JS |
 | [힐러](games/healer/) | 파티에서 힐러 하나만 맡는다 | 순수 HTML/CSS/JS |
 
 ## 로컬에서 실행
@@ -37,6 +39,12 @@ node games/doppelblock/solver.test.js
 node games/doppelblock/generator.test.js
 node games/chess-puzzle/logic.test.js
 node games/chess-puzzle/data.test.js
+node games/zip/rules.test.js
+node games/zip/solver.test.js
+node games/zip/generator.test.js
+node games/queens/rules.test.js
+node games/queens/solver.test.js
+node games/queens/generator.test.js
 node games/healer/logic.test.js
 node games/healer/ai.test.js
 node games/healer/attrs.test.js
