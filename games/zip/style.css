@@ -143,8 +143,14 @@ h1 {
   user-select: none;
   /* 화면 폭에 맞춰 줄이는 항이 없으면 8×8이 좁은 폰에서 옆으로 잘린다.
      --cols는 buildBoard가 넣는다. */
-  --cell: min(clamp(30px, 11vmin, 52px),
+  /* **칸 너비를 정수 픽셀로 끊는다.** 소수점으로 두면 브라우저가 열마다 다르게
+     반올림해 어떤 칸이 1픽셀 넓어지고, 그만큼 칸 안의 그림도 열마다 다른 자리에
+     놓인다 — 아이폰에서 재 보니 129와 130으로 갈렸다. 정수로 끊으면 모든 칸 경계가
+     같은 소수 자리를 갖게 되어 폭이 하나로 맞는다. 끊는 것은 아래 @supports가
+     맡는다. */
+  --cell-raw: min(clamp(30px, 11vmin, 52px),
     calc((min(100vw - 2 * var(--pad-x), var(--app-max))) / var(--cols)));
+  --cell: var(--cell-raw);
   display: grid;
   width: max-content;
   margin-inline: auto;
@@ -155,6 +161,13 @@ h1 {
   gap: 0;
   padding: 2px;
   touch-action: none;
+}
+
+/* `round()`를 아는 브라우저에서만 끊는다. **커스텀 속성은 값이 이상해도 파싱에서
+   버려지지 않아**, 모르는 브라우저에 그냥 두면 `--cell`이 통째로 무효가 되어 판이
+   무너진다. 보통 속성처럼 앞 선언으로 물러나 주지 않는다. */
+@supports (width: round(down, 3px, 2px)) {
+  .board { --cell: round(down, var(--cell-raw), 1px); }
 }
 
 .cell {
