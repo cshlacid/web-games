@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Patches</title>
+<meta name="description" content="격자를 직사각형 조각으로 남김없이 나누는 퍼즐">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><rect x='2' y='2' width='9' height='9' rx='1.5' fill='%23d98a6b'/><rect x='13' y='2' width='9' height='20' rx='1.5' fill='%236b91d9'/><rect x='2' y='13' width='9' height='9' rx='1.5' fill='%23789e5e'/></svg>">
+<link rel="stylesheet" href="../../shared/base.css">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="../../shared/sheet.css">
+</head>
+<body>
+<main class="app">
+  <header class="head">
+    <div class="title-row">
+      <div class="head-nav">
+        <a class="back" href="../../">← 목록</a>
+        <button class="toggle" id="help-open" type="button" aria-pressed="false">도움말</button>
+      </div>
+      <h1>Patches</h1>
+      <div class="head-actions">
+        <button class="toggle sound" id="toggle-bgm" type="button" aria-pressed="true">BGM</button>
+        <button class="toggle sound" id="toggle-sfx" type="button" aria-pressed="true">효과음</button>
+      </div>
+    </div>
+    <div class="picker-row">
+      <div class="picker" id="sizes" role="group" aria-label="판 크기"></div>
+      <span class="best" id="best"></span>
+      <span class="timer" id="timer">0:00</span>
+    </div>
+  </header>
+
+  <div class="board-wrap">
+    <div class="board" id="board"></div>
+    <div class="veil" id="veil" hidden>만드는 중…</div>
+  </div>
+
+  <p class="toast" id="toast" role="status" aria-live="polite"></p>
+
+  <div class="pad">
+    <div class="tools">
+      <button class="tool" id="undo" type="button">
+        <span class="tool-icon" data-icon="undo"></span><span class="tool-label">되돌리기</span>
+      </button>
+      <button class="tool" id="clear" type="button">
+        <span class="tool-icon" data-icon="backspace"></span><span class="tool-label">지우기</span>
+      </button>
+      <button class="tool" id="hint" type="button">
+        <span class="tool-icon" data-icon="hint"></span><span class="tool-label">힌트</span>
+      </button>
+      <button class="tool" id="new-game" type="button">
+        <span class="tool-icon" data-icon="plus"></span><span class="tool-label">새 판</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="sheet" id="result" hidden>
+    <p class="sheet-title" id="result-title"></p>
+    <p class="sheet-note" id="result-note"></p>
+    <div class="sheet-actions">
+      <button class="btn" id="again" type="button">한 판 더</button>
+    </div>
+  </div>
+
+  <div class="sheet" id="help" hidden>
+    <p class="sheet-title">규칙</p>
+    <ul class="help-list">
+      <li>격자를 <b>직사각형 조각으로 남김없이</b> 나눕니다. 빈 칸도, 겹치는 칸도
+        없어야 합니다.</li>
+      <li>조각 하나에 <b>단서가 정확히 하나</b> 들어갑니다.</li>
+      <li>단서를 두른 <b>테두리가 조각의 모양</b>입니다. 정사각형, 가로로 긴 것,
+        세로로 긴 것 셋 중 하나이고, <b>점선이면 모양은 자유</b>입니다.</li>
+      <li>단서의 <b>숫자는 그 조각의 칸 수</b>입니다. 6이면 여섯 칸짜리 조각입니다.
+        숫자는 알려 줄 때만 있습니다 — 점선에 숫자도 없는 단서는 "여기에 조각이
+        하나 있다"만 말합니다.</li>
+      <li>칸에서 칸으로 <b>끌어서</b> 조각을 그립니다. 이미 있는 조각 위로 그리면
+        그 조각은 지워집니다. 조각을 <b>톡 누르면</b> 지워집니다.</li>
+      <li>규칙을 어긴 조각은 <b>붉게</b> 표시됩니다. 단서가 없거나 둘 이상이거나,
+        칸 수나 모양이 맞지 않는 경우입니다.</li>
+      <li><b>이 게임의 모든 판은 답이 하나뿐이고, 찍지 않고 논리만으로 풀립니다.</b></li>
+      <li><b>힌트</b>는 어긋난 조각을 걷어 내고, 지금 알아낼 수 있는 조각 하나를
+        놓아 줍니다. 힌트를 쓴 판은 최고 기록으로 남기지 않습니다.</li>
+      <li>키보드: <b>방향키</b>로 칸을 옮기고, <b>스페이스</b>로 한 귀퉁이를 찍은 뒤
+        다시 눌러 조각을 그립니다. <b>Backspace</b>로 되돌립니다.</li>
+    </ul>
+    <div class="sheet-actions">
+      <button class="btn" id="help-close" type="button">닫기</button>
+    </div>
+  </div>
+</main>
+
+<script src="rules.js"></script>
+<script src="solver.js"></script>
+<script src="generator.js"></script>
+<script src="icons.js"></script>
+<script src="../../shared/icons.js"></script>
+<script src="../../shared/audio.js"></script>
+<script src="audio.js"></script>
+<script src="../../shared/sheet.js"></script>
+<script src="main.js"></script>
+</body>
+</html>
