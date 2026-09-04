@@ -155,7 +155,9 @@ h1 {
   width: max-content;
   margin-inline: auto;
   background: var(--board-bg);
-  border-radius: 10px;
+  /* 모서리를 둥글게 두지 않는다. 칸은 네모라서 둥근 판과 곡률이 어긋나고, 그
+     틈으로 칸 색이 한 픽셀 비어져 나온다. */
+  border-radius: 0;
   /* 선을 격자 위에 겹쳐 긋기 때문에 칸 사이에 틈을 두지 않는다. 틈을 두면 SVG
      좌표와 칸 좌표가 칸마다 조금씩 어긋나 선이 칸 가운데를 벗어난다. */
   gap: 0;
@@ -210,11 +212,16 @@ h1 {
 }
 
 /* 칸 구분선. 칸이 아니라 여기서 긋는 이유는 main.js에 적어 두었다 — 벽과 같은
-   좌표계에 있어야 서로 밀려 보이지 않는다. */
+   좌표계에 있어야 서로 밀려 보이지 않는다.
+
+   **픽셀 격자에 맞춰 그린다.** 칸 크기에서 나온 굵기는 소수점이라(6.45 기기픽셀)
+   양쪽 끝이 반투명하게 번지고, 재 보면 두께가 6과 9로 갈렸다. 가로세로로만 긋는
+   선이라 맞춰 끊어도 잃는 것이 없다. */
 .ink .grid {
   fill: none;
   stroke: var(--board-bg);
   stroke-width: 0.05;
+  shape-rendering: crispEdges;
 }
 
 .ink .trail {
