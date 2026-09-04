@@ -63,7 +63,14 @@
 }
 
 * { box-sizing: border-box; }
-html, body { margin: 0; min-height: 100%; }
+/* 더블 탭 확대를 막는다. `user-scalable=no`는 iOS 사파리가 무시하므로 실제로
+   막는 것은 이쪽이다. **body만으로는 모자란다** — body가 뷰포트보다 짧을 때
+   그 아래 빈자리를 두 번 두드리면 그건 html을 두드린 것이라 확대가 걸린다. */
+html, body {
+  margin: 0;
+  min-height: 100%;
+  touch-action: manipulation;
+}
 
 body {
   background: var(--bg);
@@ -74,7 +81,6 @@ body {
   justify-content: center;
   padding: clamp(10px, 3vmin, 24px) var(--pad-x);
   overscroll-behavior: none;
-  touch-action: manipulation;
 }
 
 .app {
@@ -178,6 +184,9 @@ h1 {
   margin-inline: auto;
   background: var(--board-bg);
   border-radius: 10px;
+  /* 칸은 네모라서 모서리가 둥근 판 밖으로 색이 삐져나온다. 바깥 테두리 선은
+     판 모서리보다 안쪽에 있어 잘리지 않는다. */
+  overflow: hidden;
   /* 영역 경계를 칸 위에 SVG로 겹쳐 긋기 때문에 칸 사이에 틈을 두지 않는다.
      틈을 두면 SVG 좌표와 칸 좌표가 칸마다 조금씩 어긋나 선이 경계를 벗어난다. */
   gap: 0;

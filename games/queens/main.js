@@ -8,6 +8,10 @@ const Icons = window.QueensIcons;
 const Sound = window.QueensSound;
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
+// 바깥 테두리 선의 중심이 놓이는 자리(칸 하나를 1로 센 좌표). 안쪽 경계선도 판
+// 가장자리에서는 여기까지만 긋는다.
+const EDGE_INSET = 0.05;
+
 const SIZE_KEY = 'web-games.queens.size';
 const BEST_KEY = 'web-games.queens.best';
 const CHECK_KEY = 'web-games.queens.autocheck';
@@ -126,24 +130,31 @@ function buildBoard() {
   svg.setAttribute('class', 'edges');
   svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
 
-  const outline = document.createElementNS(SVG_NS, 'rect');
-  outline.setAttribute('x', 0.05);
-  outline.setAttribute('y', 0.05);
-  outline.setAttribute('width', size - 0.1);
-  outline.setAttribute('height', size - 0.1);
-  outline.setAttribute('rx', 0.12);
-  svg.appendChild(outline);
+  // 선 끝을 둥글게 마감하므로 끝점 너머로 굵기의 절반만큼 반원이 더 나간다.
+  // 판 가장자리에 닿는 세로·가로선을 칸 경계(0이나 size)에서 끊으면 그 반원이
+  // 바깥 테두리 밖으로 삐져나온다. 대신 **바깥 테두리 선의 한가운데**에서
+  // 끊고 테두리를 맨 나중에 덧그린다 — 반원이 테두리 선 굵기 안에 정확히
+  // 들어가므로 굵기를 바꿔도 이 관계가 유지된다.
+  const stop = (v) => (v <= 0 ? EDGE_INSET : v >= size ? size - EDGE_INSET : v);
 
   for (let cell = 0; cell < size * size; cell++) {
     const r = Math.floor(cell / size);
     const c = cell % size;
     if (c < size - 1 && regions[cell] !== regions[cell + 1]) {
-      svg.appendChild(line(c + 1, r, c + 1, r + 1));
+      svg.appendChild(line(c + 1, stop(r), c + 1, stop(r + 1)));
     }
     if (r < size - 1 && regions[cell] !== regions[cell + size]) {
-      svg.appendChild(line(c, r + 1, c + 1, r + 1));
+      svg.appendChild(line(stop(c), r + 1, stop(c + 1), r + 1));
     }
   }
+
+  const outline = document.createElementNS(SVG_NS, 'rect');
+  outline.setAttribute('x', EDGE_INSET);
+  outline.setAttribute('y', EDGE_INSET);
+  outline.setAttribute('width', size - EDGE_INSET * 2);
+  outline.setAttribute('height', size - EDGE_INSET * 2);
+  outline.setAttribute('rx', 0.12);
+  svg.appendChild(outline);
 
   el.board.appendChild(svg);
 }
