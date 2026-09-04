@@ -78,8 +78,38 @@ function handled(node) {
   return false;
 }
 
+// **`none`이 아닌 자리에도 그물을 친다.** CSS의 `pan-x pan-y`로 화면 대부분은
+// 막혔지만 꼬들의 글자판에서는 두 번 두드리면 확대된다는 보고를 받았다. 여기서는
+// 조건을 건다 — 조건 없이 막으면 뒤따르는 click이 나지 않아 단추가 죽는다.
+//
+//   - 누를 것(단추·링크·입력)은 건드리지 않는다. 자판을 빠르게 두 번 눌러야 하는
+//     조작이 있고, 그런 자리는 사파리가 알아서 더블 탭을 접는다.
+//   - 나머지는 **짧은 사이에 같은 자리를 두 번**일 때만 막는다. 누를 것이 아닌
+//     자리에는 연달아 두드릴 이유가 없으므로 간격을 넉넉히 잡는다.
+const PRESSABLE = 'button, a, input, select, textarea, label, summary, [role="button"], [tabindex]';
+const GAP = 700;
+const NEAR = 40;
+
+let last = 0;
+let lastX = 0;
+let lastY = 0;
+
 document.addEventListener('touchend', (event) => {
-  if (!handled(event.target)) return;
+  if (handled(event.target)) { event.preventDefault(); return; }
+
+  const touch = event.changedTouches[0];
+  if (!touch) return;
+
+  const now = Date.now();
+  const again = now - last < GAP
+    && Math.abs(touch.clientX - lastX) < NEAR
+    && Math.abs(touch.clientY - lastY) < NEAR;
+  last = now;
+  lastX = touch.clientX;
+  lastY = touch.clientY;
+
+  if (!again) return;
+  if (event.target.closest && event.target.closest(PRESSABLE)) return;
   event.preventDefault();
 }, { capture: true, passive: false });
 
