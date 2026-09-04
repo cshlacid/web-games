@@ -164,10 +164,8 @@ function buildBoard() {
   frame.setAttribute('y', inset);
   frame.setAttribute('width', size - inset * 2);
   frame.setAttribute('height', size - inset * 2);
-  // 모서리는 둥글게 두지 않는다. 판이 `overflow: hidden`으로 둥글게 잘라 주므로
-  // 여기서 또 둥글게 하면 두 곡률이 미묘하게 어긋나 그 사이로 네모난 칸의 색이
-  // 한 픽셀 비어져 나온다. 네모로 두면 테두리가 모서리를 끝까지 덮고, 둥근 모양은
-  // 판의 잘림이 만든다.
+  // 모서리는 네모다. 둥글게 두면 네모난 칸과 곡률이 어긋나 그 사이로 칸 색이 한
+  // 픽셀 비어져 나온다 — 판의 `border-radius`를 없앤 것도 같은 이유다.
 
   svg.appendChild(game.ink.cursor);
   svg.appendChild(game.ink.ghost);
