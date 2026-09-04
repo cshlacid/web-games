@@ -178,6 +178,9 @@ h1 {
   margin-inline: auto;
   background: var(--board-bg);
   border-radius: 10px;
+  /* 칸은 네모라서 모서리가 둥근 판 밖으로 색이 삐져나온다. 바깥 테두리 선은
+     판 모서리보다 안쪽에 있어 잘리지 않는다. */
+  overflow: hidden;
   /* 영역 경계를 칸 위에 SVG로 겹쳐 긋기 때문에 칸 사이에 틈을 두지 않는다.
      틈을 두면 SVG 좌표와 칸 좌표가 칸마다 조금씩 어긋나 선이 경계를 벗어난다. */
   gap: 0;
