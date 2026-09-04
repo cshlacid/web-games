@@ -33,19 +33,23 @@
 
 // 손가락을 벌려 키우는 확대도 막는다. `user-scalable=no`는 iOS 사파리가 무시하고,
 // `touch-action: manipulation`은 이름 그대로 벌리기를 허용하는 값이라 CSS로는
-// 남는다. 웹킷의 gesture 이벤트를 취소하는 것이 iOS에서 이것을 막는 길이다.
-// 안드로이드 크롬은 viewport 메타를 지키므로 여기까지 오지 않는다.
+// 남는다. 목록 페이지까지 모든 페이지가 이 파일을 부른다.
+//
+// **두 갈래로 막는다.** 웹킷의 gesture 이벤트는 사파리가 벌리기를 알아채는 지점이고,
+// 손가락이 둘 이상인 touchmove는 규격에 있는 쪽이다. 사파리 판에 따라 한쪽이 새는
+// 일이 있어 둘 다 둔다. 손가락 하나로 하는 스크롤은 건드리지 않는다.
 //
 // **`touch-action`을 `pan-x pan-y`로 바꾸는 길도 있지만 택하지 않았다.** 규격대로면
 // 그 값이 벌리기와 더블 탭을 함께 막지만, 사파리가 `none`을 더블 탭에 대해 무시한
 // 전례가 있어 `manipulation`에서 옮기는 것은 이미 되는 것을 걸고 하는 내기가 된다.
 // 지금은 CSS가 더블 탭을, 이쪽이 벌리기를 맡아 서로 기대지 않는다.
-//
-// **이 파일은 게임만 불러온다.** 목록 페이지는 읽는 페이지라 벌려 키우는 확대를
-// 남겨 두기로 했고, 그 결정이 여기 파일 목록으로 지켜진다.
 for (const type of ['gesturestart', 'gesturechange', 'gestureend']) {
   document.addEventListener(type, (event) => event.preventDefault(), { passive: false });
 }
+
+document.addEventListener('touchmove', (event) => {
+  if (event.touches.length > 1) event.preventDefault();
+}, { capture: true, passive: false });
 
 // touch-action은 상속되지 않지만, 실제로 걸리는 값은 조상까지의 교집합이다.
 // 그래서 위로 올라가며 하나라도 none이면 그 자리는 none이다.
