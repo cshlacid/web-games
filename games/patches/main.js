@@ -11,11 +11,6 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 const SIZE_KEY = 'web-games.patches.size';
 const BEST_KEY = 'web-games.patches.best';
 
-// 바깥 테두리 선의 중심이 놓이는 자리(칸 하나를 1로 센 좌표). 안쪽 선도 판
-// 가장자리에서는 여기까지만 긋는다 — 끝을 네모로 마감해 굵기의 절반만큼 더
-// 나가는데, 그만큼이 테두리 선 굵기 안에 정확히 들어간다.
-const EDGE_INSET = 0.05;
-
 // 조각 색의 가짓수. `--pc0`~`--pc8`과 맞춘다.
 const PALETTE = 9;
 
@@ -129,8 +124,21 @@ function buildBoard() {
   // 칸의 box-shadow로 두면 조각 테두리가 그보다 밀려 보인다.
   const svg = node('svg', 'ink');
   svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
+  // 계산된 굵기를 읽으려면 먼저 붙어 있어야 한다.
+  el.board.appendChild(svg);
 
-  const stop = (v) => (v <= 0 ? EDGE_INSET : v >= size ? size - EDGE_INSET : v);
+  // **바깥 테두리는 굵기의 절반만큼 들여 두른다.** 들이는 양을 굵기와 따로 정해
+  // 두면 둘이 어긋나 칸 색이 테두리 밖으로 새거나(모서리에 1픽셀 자국이 남았다)
+  // 테두리가 칸을 덮는다. 절반만큼 들이면 테두리 바깥면이 칸 경계에 정확히 닿는다.
+  // 굵기는 CSS가 정하므로 여기서 읽어 온다.
+  const frame = node('rect', 'frame');
+  svg.appendChild(frame);
+  const inset = parseFloat(getComputedStyle(frame).strokeWidth) / 2;
+
+  // 선 끝은 굵기의 절반만큼 더 나간다(`stroke-linecap: square`). 판 가장자리에
+  // 닿는 선을 칸 경계에서 끊으면 그만큼 테두리 밖으로 삐져나오므로 테두리 선의
+  // 한가운데에서 끊는다.
+  const stop = (v) => (v <= 0 ? inset : v >= size ? size - inset : v);
   const grid = [];
   for (let k = 1; k < size; k++) {
     grid.push(`M${k} ${stop(0)}L${k} ${stop(size)}`);
@@ -138,7 +146,7 @@ function buildBoard() {
   }
   const gridPath = node('path', 'grid');
   gridPath.setAttribute('d', grid.join(''));
-  svg.appendChild(gridPath);
+  svg.insertBefore(gridPath, frame);
 
   // 조각 테두리는 판이 바뀔 때마다 다시 그린다. 요소를 나누면 겹치는 자리가
   // 따로따로 칠해져 이음매가 자국으로 남으므로 종류마다 path 하나에 담는다.
@@ -148,21 +156,21 @@ function buildBoard() {
     ghost: node('rect', 'ghost'),
     cursor: node('rect', 'cursor'),
   };
-  svg.appendChild(game.ink.patch);
-  svg.appendChild(game.ink.wrong);
+  // 조각 테두리는 바깥 테두리 아래에 둔다 — 가장자리에서 끊은 끝을 덮어야 한다.
+  svg.insertBefore(game.ink.patch, frame);
+  svg.insertBefore(game.ink.wrong, frame);
 
-  const frame = node('rect', 'frame');
-  frame.setAttribute('x', EDGE_INSET);
-  frame.setAttribute('y', EDGE_INSET);
-  frame.setAttribute('width', size - EDGE_INSET * 2);
-  frame.setAttribute('height', size - EDGE_INSET * 2);
-  frame.setAttribute('rx', 0.12);
-  svg.appendChild(frame);
+  frame.setAttribute('x', inset);
+  frame.setAttribute('y', inset);
+  frame.setAttribute('width', size - inset * 2);
+  frame.setAttribute('height', size - inset * 2);
+  // 모서리는 둥글게 두지 않는다. 판이 `overflow: hidden`으로 둥글게 잘라 주므로
+  // 여기서 또 둥글게 하면 두 곡률이 미묘하게 어긋나 그 사이로 네모난 칸의 색이
+  // 한 픽셀 비어져 나온다. 네모로 두면 테두리가 모서리를 끝까지 덮고, 둥근 모양은
+  // 판의 잘림이 만든다.
 
   svg.appendChild(game.ink.cursor);
   svg.appendChild(game.ink.ghost);
-
-  el.board.appendChild(svg);
 }
 
 function outline(rect) {
