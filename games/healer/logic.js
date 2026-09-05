@@ -995,23 +995,15 @@ function rewardOf(state) {
   const guild = Math.round((state.quest.guildReward.exp || 0) * (won ? 1 : 0.5));
   const healExp = D.LEVEL.healExp(state.stats.healed);
 
-  // **길드가 내는 골드는 파티가 나눠 갖는다.** 쓰러진 동료도 몫을 받는다 — 몫을
-  // 생존으로 가르면 죽은 동료를 버리고 다시 짜는 것이 최선이 되고, 명부가 자라는
-  // 규칙과도 어긋난다.
-  const party = state.units.filter((unit) => unit.side === 'ally').length || 1;
-  const purse = won ? state.quest.guildReward.gold : 0;
-  const share = Math.floor(purse / party);
-
+  // **골드는 여기서 나누지 않는다.** 동료가 모집할 때 부른 삯이 정해져 있고
+  // (hire.js), 그것을 내고 남는 것이 주인공 몫이다 — 전투가 인원수로 나누던
+  // 규칙을 여기 남겨 두면 같은 일을 하는 규칙이 둘이 된다.
   return {
     won, kills, guild, healExp,
     charExp: kills + guild,
     // 힐러의 직업 경험치는 벤 것보다 살린 것에서 더 나온다. 힐만 하다 전투가
     // 끝나도 남는 것이 있어야 이 직업을 하는 뜻이 산다.
     jobExp: Math.round(kills * 0.5) + guild + healExp,
-    // 의뢰를 받아 온 것이 주인공이라 **잔돈은 주인공이 갖는다**. 버리면 판마다
-    // 몇 골드씩 증발하고, 어디로 갔는지 화면에서 설명할 자리도 없다.
-    purse, party, share,
-    gold: purse ? share + (purse - share * party) : 0,
   };
 }
 

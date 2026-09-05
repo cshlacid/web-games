@@ -19,10 +19,10 @@ const Loot = node ? require('./loot.js') : root.HealerLoot;
 
 const STORAGE_KEY = 'web-games.healer.progress';
 // 판이 바뀌면 저장본을 통째로 버린다. 어중간하게 읽으면 더 이상한 상태가 된다.
-// 4에서 바뀐 것: 주인공의 계열과 계열별 직업 레벨·스킬 점수, 스킬을 점수로
-// 배우는 것. 3에서 바뀐 것: 스킬 레벨. 2에서 바뀐 것: 아이템에 uid와 무작위
-// 옵션, 동료 명부, 물약 보유량.
-const VERSION = 4;
+// 5에서 바뀐 것: 평판과 동료별 신뢰도. 4에서 바뀐 것: 주인공의 계열과 계열별
+// 직업 레벨·스킬 점수, 스킬을 점수로 배우는 것. 3에서 바뀐 것: 스킬 레벨.
+// 2에서 바뀐 것: 아이템에 uid와 무작위 옵션, 동료 명부, 물약 보유량.
+const VERSION = 5;
 
 function create() {
   return {
@@ -36,6 +36,9 @@ function create() {
     // 여기 없다 — 그쪽은 레벨에서 바로 계산된다.
     spent: { str: 0, agi: 0, int: 0, vit: 0 },
     gold: 0,
+    // 세상이 주인공을 어떻게 보는가. 동료별 신뢰도(`roster`의 `trust`)와 달리
+    // 하나뿐이고, 게시판에 걸리는 의뢰의 상한을 이것이 정한다.
+    rep: D.REPUTATION.start,
     // 장착은 인벤토리 항목을 가리키는 것이 아니라 따로 들고 있는다. 인벤토리
     // 인덱스를 가리키면 아이템 하나가 빠질 때마다 장착이 엉뚱한 것으로 바뀐다.
     equipped: { weapon: null, armor: null, trinket: null },
@@ -480,6 +483,7 @@ function load() {
   progress.lootMethod = Loot.METHODS[saved.lootMethod] ? saved.lootMethod : 'even';
 
   progress.roster = Roster.adopt(saved.roster);
+  progress.rep = Math.max(0, Math.min(D.REPUTATION.max, saved.rep | 0));
   progress.charLevel = Math.max(1, Math.min(D.LEVEL.maxLevel, progress.charLevel | 0));
   progress.gold = Math.max(0, progress.gold | 0);
   return progress;

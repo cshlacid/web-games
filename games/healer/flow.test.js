@@ -18,6 +18,8 @@ const R = require('./roster.js');
 const Loot = require('./loot.js');
 const Items = require('./items.js');
 const Shop = require('./shop.js');
+const Rep = require('./reputation.js');
+const Hire = require('./hire.js');
 
 let passed = 0;
 let failed = 0;
@@ -34,7 +36,9 @@ function check(name, actual, expected) {
 }
 
 // 결과 화면이 하는 일을 순서 그대로. 화면에서 이 순서가 바뀌면 여기도 바뀌어야 한다.
-function settle(progress, state, party, method, lootSeed, dropsOverride) {
+// `contracts`는 편성 화면에서 굳은 계약이다 — 화면과 마찬가지로 여기서 다시
+// 계산하지 않고 받아 쓴다.
+function settle(progress, state, party, method, lootSeed, dropsOverride, contracts, tips) {
   const won = state.status === 'won';
   const quest = state.quest;
   const members = state.units.filter((u) => u.side === 'ally')
@@ -42,17 +46,38 @@ function settle(progress, state, party, method, lootSeed, dropsOverride) {
 
   const reward = L.rewardOf(state);
   const gained = P.addExp(progress, reward.charExp, reward.jobExp);
-  progress.gold += reward.gold;
+  // **삯을 내고 남는 것이 주인공 몫이다.** 전투가 인원수로 나누던 자리가 여기로
+  // 옮겨 왔다.
+  const deal = Hire.settle(quest, contracts || [], won, tips);
+  progress.gold += deal.hero;
   progress.potions = Object.assign({}, state.potions);
 
   const names = party.map((m) => m.name);
   const roster = R.awardExp(progress.roster, names, reward.charExp, 1);
-  // 길드 골드는 파티가 나눠 갖는다. 동료 몫은 지갑에 쌓이고, 그 돈으로 제
-  // 장비를 산다 — 화면이 밟는 순서를 여기서도 그대로 밟는다.
-  const purses = R.awardGold(progress.roster, names, reward.share, 2);
+  // 데려간 동료는 약속한 삯을, 남은 동료는 다른 파티에서 번 몫을 받는다.
+  const paid = {};
+  for (const row of deal.paid) paid[row.name] = row.gold;
+  const purses = R.awardGold(progress.roster, names,
+    won ? Hire.baseWage(quest) : 0, 2, paid);
   const bought = progress.roster
     .map((member) => R.goShopping(member, 3))
     .filter(Boolean);
+
+  // 신뢰도와 평판. 화면과 같은 순서로 — 신뢰도를 먼저 굴리고 평판을 올린다.
+  const downed = new Set(members.filter((m) => AI.byUid(state, m.id).dead).map((m) => m.name));
+  const trustMoves = party.map((member) => {
+    const row = deal.paid.find((entry) => entry.name === member.name) || {};
+    const change = Rep.trustDelta(member, quest, {
+      won, downed: downed.has(member.name), asked: row.asked || 0, paid: row.gold || 0,
+    });
+    return Object.assign(Rep.addTrust(member, change.delta), { parts: change.parts });
+  });
+  // 데려가지 않은 동료는 앙금이 가라앉는다. 이것이 없으면 신뢰도가 한 방향으로만
+  // 간다 — 이 게임은 아군이 자주 쓰러진다.
+  const joinedSet = new Set(names);
+  const rested = progress.roster.filter((m) => !joinedSet.has(m.name)).map((m) => Rep.rest(m));
+  const repMove = Rep.addRep(progress, Rep.repDelta(quest, progress.charLevel, won,
+    [...downed].filter((name) => name !== D.HERO.name).length).delta);
 
   const lines = [];
   let mine = 0;
@@ -83,7 +108,8 @@ function settle(progress, state, party, method, lootSeed, dropsOverride) {
     progress.shopSeed = 54321;
   }
 
-  return { won, reward, gained, roster, purses, bought, lines, mine, handed, members };
+  return { won, reward, deal, gained, roster, purses, bought, lines, mine, handed, members,
+    trustMoves, repMove, rested };
 }
 
 // 명부는 씨앗을 주지 않으면 무작위로 만들어진다. 그대로 두면 전투 결과가 판마다
@@ -104,6 +130,10 @@ function runQuest(progress, seed, autoHeal, questOver) {
     const found = candidates.find((m) => R.jobOf(m) === job && !party.includes(m));
     if (found) party.push(found);
   }
+
+  // 편성 화면이 하는 일: 후보 전원의 삯을 내고, 데려간 넷의 것만 계약으로 굳힌다.
+  const ctx = { rep: Rep.repValue(progress), method: 'even' };
+  const contracts = Hire.contractsFor(party, quest, ctx);
 
   const state = L.createBattle({
     quest,
@@ -128,7 +158,7 @@ function runQuest(progress, seed, autoHeal, questOver) {
     }
     L.drainEvents(state);
   }
-  return { quest, party, state };
+  return { quest, party, state, contracts };
 }
 
 // --- 이긴 판 -----------------------------------------------------------
@@ -149,7 +179,7 @@ function runQuest(progress, seed, autoHeal, questOver) {
       Items.make('staff', 2, 3), Items.make('fang', 0, 4)],
   });
 
-  const { party, state } = runQuest(progress, 7, true, quest);
+  const { party, state, contracts } = runQuest(progress, 7, true, quest);
   check('이겼다', state.status, 'won');
 
   const goldBefore = progress.gold;
@@ -159,7 +189,7 @@ function runQuest(progress, seed, autoHeal, questOver) {
     rolled.every((item) => Boolean(Items.def(item))), true);
   check('한 번 굴린 것은 다시 굴리지 않는다', Array.isArray(rolled), true);
 
-  const out = settle(progress, state, party, 'job', 99, quest.drops);
+  const out = settle(progress, state, party, 'job', 99, quest.drops, contracts);
 
   check('분배 줄을 전부 그린다', out.lines.length, quest.drops.length);
   check('물음표가 섞이지 않는다', out.lines.some((line) => line.includes('?')), false);
@@ -170,15 +200,22 @@ function runQuest(progress, seed, autoHeal, questOver) {
   check('경험치가 오른다', out.reward.charExp > 0, true);
   check('명부 전원이 보고에 들어간다', out.roster.length, progress.roster.length);
 
-  // 길드 골드가 파티 전체에 나뉜다. 주인공은 제 몫과 잔돈만 지갑에 넣는다.
-  check('적힌 금액이 파티 전체 몫이다', out.reward.purse, quest.guildReward.gold);
-  check('주인공은 제 몫만 받는다', progress.gold - goldBefore, out.reward.gold);
-  check('전액을 혼자 받지 않는다', out.reward.gold < out.reward.purse, true);
+  // **삯을 내고 남는 것이 주인공 몫이다.** 동료마다 부른 값이 다르므로 인원수로
+  // 나눈 값과 견줄 수 없다 — 합계가 적힌 금액을 넘지 않는지로 본다.
+  check('적힌 금액이 판 전체의 값이다', out.deal.purse, quest.guildReward.gold);
+  check('주인공은 삯을 뺀 나머지를 받는다', progress.gold - goldBefore, out.deal.hero);
+  check('전액을 혼자 받지 않는다', out.deal.hero < out.deal.purse, true);
+  check('낸 삯과 내 몫을 합치면 적힌 금액이다', out.deal.spent + out.deal.hero, out.deal.purse);
   check('동료도 몫을 받는다', out.purses.length, progress.roster.length);
-  check('데려간 동료는 몫을 전부 받는다',
-    out.purses.filter((p) => p.joined).every((p) => p.gold === out.reward.share), true);
-  check('나눈 몫을 다 합치면 적힌 금액이다',
-    out.reward.gold + out.reward.share * (out.reward.party - 1), out.reward.purse);
+  check('데려간 동료는 약속한 삯을 받는다',
+    out.purses.filter((p) => p.joined).map((p) => p.gold).sort((a, b) => a - b),
+    contracts.map((c) => c.gold).sort((a, b) => a - b));
+
+  // 평판과 신뢰도. 이긴 판에서 둘 다 움직여야 한다.
+  check('이기면 평판이 오른다', out.repMove.delta > 0, true);
+  check('데려간 동료의 신뢰도가 움직인다', out.trustMoves.length, party.length);
+  check('신뢰도 변화에는 이유가 붙는다',
+    out.trustMoves.every((move) => move.parts.length > 0), true);
 
   // 캐릭터 창에서 올린 스킬이 전투에 그대로 들어간다. 창과 전투가 다른 값을
   // 보면 점수를 넣은 것이 화면의 글자로만 남는다.
@@ -238,21 +275,39 @@ function runQuest(progress, seed, autoHeal, questOver) {
 // --- 진 판 -------------------------------------------------------------
 {
   const progress = seededProgress(4242);
+  // 평판을 조금 쌓아 두고 진다. 0에서 시작하면 바닥에 걸려 깎이는 것이 보이지 않는다.
+  progress.rep = 100;
 
-  const { party, state } = runQuest(progress, 3, false);
+  const { party, state, contracts } = runQuest(progress, 3, false);
   // 확실히 지게 만든다.
   AI.alive(state, 'ally').forEach((u) => L.applyDamage(state, null, u, 1e9));
   L.step(state, L.TICK);
   check('졌다', state.status, 'lost');
 
-  const out = settle(progress, state, party, 'even', 5);
+  const out = settle(progress, state, party, 'even', 5, null, contracts);
   check('분배는 하지 않는다', out.lines.length, 0);
   check('골드는 없다', progress.gold, 0);
   check('의뢰를 깬 것으로 세지 않는다', progress.cleared, 0);
 
+  // **실패하면 아무도 받지 못한다.** 길드가 내는 돈이 성공 보수라 나눌 것이 없고,
+  // 없는 돈에서 삯을 내려면 주인공이 빚을 지는 규칙을 따로 만들어야 한다.
+  check('실패하면 삯도 나가지 않는다', out.deal.spent, 0);
+  check('주인공이 빚지지 않는다', out.deal.hero, 0);
+  check('데려간 동료도 못 받는다',
+    out.purses.filter((p) => p.joined).every((p) => p.gold === 0), true);
+
   // 아무것도 없이 끝나면 어려운 의뢰를 시도할 이유가 사라진다.
   check('길드 몫의 절반은 받는다', out.reward.charExp > 0, true);
   check('명부는 그래도 자란다', out.roster.every((entry) => entry.exp > 0), true);
+
+  // 실패는 평판과 신뢰도로 갚는다. 돈이 안 나간 자리를 여기가 메운다.
+  check('실패하면 평판이 깎인다', out.repMove.delta < 0, true);
+  // 데려가지 않은 동료도 명부에 있다. 이 판에서는 아직 0이라 움직일 것이 없다.
+  check('남은 동료도 명부에서 함께 굴러간다',
+    out.rested.length, progress.roster.length - party.length);
+  check('평판은 0 아래로 안 간다', Rep.addRep({ rep: 0 }, -999).after, 0);
+  check('전멸했으니 신뢰도도 깎인다',
+    out.trustMoves.every((move) => move.delta < 0), true);
 }
 
 // --- 상점을 거쳐 가는 길 ------------------------------------------------

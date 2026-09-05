@@ -1038,3 +1038,66 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 }
 .float.harm.crit { color: #ff9a3c; }
 .float.heal.crit { color: #8fe07a; }
+
+/* --- 평판과 신뢰도 --- */
+
+/* 평판 한 줄. 게시판 위와 결과 화면 두 곳이 같은 모양을 쓴다 — 두 벌로 두면
+   한쪽만 고치게 된다. */
+.rep { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; }
+.rep-head { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.rep-head .ico-box svg { width: 15px; height: 15px; }
+.rep-head .why { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.rep-bar {
+  position: relative; height: 6px; border-radius: 3px;
+  background: rgba(128, 128, 128, 0.25); overflow: hidden;
+}
+.rep-bar span { display: block; height: 100%; background: var(--hero); }
+.rep-note { margin: 0; font-size: 11.5px; color: var(--muted); }
+
+/* 신뢰도 값표. **단계마다 색이 갈린다** — 숫자만으로는 -20과 -60이 다르다는
+   것이 훑을 때 보이지 않고, 그 둘 사이에 모집 거부가 있다. 색만으로 가르지
+   않도록 상세에는 단계 이름이 글자로도 적힌다. */
+.trust-tag {
+  flex: none; font-size: 11px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  border: 1px solid currentColor; border-radius: 999px; padding: 0 5px;
+}
+.t-broken { color: var(--tier-myth); }
+.t-hate { color: var(--harm); }
+.t-cold { color: var(--spec-bard); }
+.t-neutral { color: var(--muted); }
+.t-warm { color: var(--spec-archer); }
+.t-high { color: var(--heal); }
+.t-bond { color: var(--kind-boon); }
+
+/* 편성 카드의 아랫줄. 신뢰도와 삯 둘뿐이라 한 줄에 들어간다 — 이유까지 적으면
+   카드가 다시 네 줄이 되어 격자로 바꾼 뜻이 사라진다. */
+.pick-deal { display: flex; align-items: center; gap: 5px; margin-top: 3px; }
+.pick-deal .ico-box svg { width: 12px; height: 12px; }
+.pick-deal .wage {
+  font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.pick-deal .wage.no { color: var(--harm); font-weight: 600; }
+
+/* 동료 상세의 신뢰도 자리. 값을 이룬 배수와 대사가 여기에만 있다. */
+.trust { display: flex; flex-direction: column; gap: 4px; margin: 8px 0 2px; }
+.trust-head { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.trust-head .ico-box svg { width: 15px; height: 15px; }
+.trust-line { margin: 0; font-size: 12.5px; }
+.trust-line.no { color: var(--harm); font-weight: 600; }
+.trust-wage { display: flex; align-items: baseline; gap: 6px; font-size: 14px; }
+.trust-wage .ico-box svg { width: 14px; height: 14px; }
+.trust-wage .why { color: var(--muted); font-size: 11.5px; }
+.trust .pick-sub.dim { opacity: 0.85; }
+
+/* 얹어 주기와 선물. 칩이 줄바꿈으로 흘러야 인벤토리가 길어져도 시트가 가로로
+   밀리지 않는다. */
+.favor { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.favor-row { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.favor-row .chip { cursor: pointer; font: inherit; }
+/* 그 동료가 쓸 수 있는 물건. 색만으로 가르지 않도록 칩에 오른 신뢰도가 적혀 있다. */
+.favor-row .chip.liked { border-color: currentColor; font-weight: 700; }
+
+/* 모자라거나 깎인 값. 오르는 쪽(.up)과 짝이다. */
+.count.short, .stat-value.short { color: var(--harm); }
+.count.up { color: var(--hp); }
