@@ -1585,7 +1585,7 @@ function cast(state, skillId, target) {
   check('처치 경험치가 들어간다', reward.kills > 0, true);
   check('길드 몫을 그대로 받는다', reward.guild, quest().guildReward.exp);
 
-  // **골드는 전투가 나누지 않는다.** 모집할 때 부른 삯이 정해져 있고(hire.js),
+  // **골드는 전투가 나누지 않는다.** 모집할 때 부른 보수가 정해져 있고(hire.js),
   // 그것을 내고 남는 것이 주인공 몫이다 — 같은 일을 하는 규칙을 둘로 두면
   // 한쪽만 고치게 된다.
   check('전투는 골드를 세지 않는다',

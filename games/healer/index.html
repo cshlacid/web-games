@@ -169,11 +169,11 @@
       <ul class="roster" id="roster"></ul>
     </div>
 
-    <!-- 삯은 동료가 먼저 부른다. 남는 것이 주인공 몫이라 음수가 될 수도 있어,
+    <!-- 보수는 동료가 먼저 부른다. 남는 것이 주인공 몫이라 음수가 될 수도 있어,
          계약을 확정하기 전에 합계를 한 자리에서 보여 준다. -->
     <div class="panel" id="deal-panel">
       <div class="panel-head">
-        <h2>삯</h2>
+        <h2>보수</h2>
         <span class="count" id="deal-hero"></span>
       </div>
       <p class="panel-note">동료가 부르는 값이다. 신뢰도·평판·난이도·분배 방식이 값을 흔든다.</p>
@@ -252,7 +252,7 @@
 
     <div class="panel" id="guild-panel">
       <div class="panel-head"><h2>모험가 길드 확정 보상</h2></div>
-      <p class="panel-note">동료에게 약속한 삯을 내고 남는 것이 주인공 몫이다.</p>
+      <p class="panel-note">동료에게 약속한 보수를 내고 남는 것이 주인공 몫이다.</p>
       <ul class="loot" id="guild-loot"></ul>
     </div>
 
@@ -277,7 +277,7 @@
 
     <div class="panel" id="roster-panel">
       <div class="panel-head"><h2>동료</h2></div>
-      <p class="panel-note">데려간 동료가 받은 삯과, 이번 판으로 움직인 신뢰도다.</p>
+      <p class="panel-note">데려간 동료가 받은 보수와, 이번 판으로 움직인 신뢰도다.</p>
       <ul class="stats" id="roster-report"></ul>
     </div>
 
@@ -353,13 +353,13 @@
         의뢰를 깰수록 오르며, <b>게시판에 걸리는 의뢰의 상한을 정한다</b> — 어려운
         의뢰를 깰수록 크게 오른다. 신뢰도는 동료마다 따로이고 −100에서 +100까지다.
         <b>동료가 전투불능이 되면 그 동료의 신뢰도가 크게 깎인다.</b></li>
-      <li><b>삯은 동료가 먼저 부른다.</b> 게시판의 금액에서 동료에게 줄 삯을 내고
+      <li><b>보수는 동료가 먼저 부른다.</b> 게시판의 금액에서 동료에게 줄 보수를 내고
         남는 것이 내 몫이라, <b>0이나 음수가 될 수도 있다</b>(그때는 내 돈을 보탠다).
         부르는 값은 신뢰도·평판·분배 방식과 <b>그 동료가 이 의뢰를 어떻게 보는가</b>로
         정해진다 — 시시할 만큼 쉬워도, 목숨을 걸 만큼 어려워도 값이 오른다.
         <b>실패하면 아무도 받지 못한다.</b></li>
       <li><b>신뢰도는 관계를 관리해 올린다.</b> 알맞거나 조금 벅찬 의뢰를 함께
-        깨는 것이 가장 크고, 부른 값보다 삯을 더 얹어 주거나 인벤토리의 물건을
+        깨는 것이 가장 크고, 부른 값보다 보수를 더 얹어 주거나 인벤토리의 물건을
         선물해도 오른다 — 둘 다 동료를 눌러 여는 상세에 있다. 반대로 <b>시시한
         의뢰만 반복하면 오히려 깎인다.</b> 관계가 끊어진 동료는 모집에 응하지 않는다.</li>
       <li><b>범위·장판 스킬은 기준점을 고른다.</b> 아래쪽 <b>동료 초상화</b>를
@@ -398,7 +398,7 @@
      쓰므로 shop.js가 먼저 온다. -->
 <script src="shop.js"></script>
 <script src="roster.js"></script>
-<!-- 삯의 이유에 분배 방식 이름을 적으므로 hire.js가 loot.js를 본다. 평판과
+<!-- 보수의 이유에 분배 방식 이름을 적으므로 hire.js가 loot.js를 본다. 평판과
      신뢰도의 수치 규칙은 reputation.js에 있고 hire.js가 그것을 쓴다. -->
 <script src="reputation.js"></script>
 <script src="hire.js"></script>

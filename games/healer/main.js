@@ -52,7 +52,7 @@ const app = {
   candidates: [],
   party: [],
   skills: [],
-  lootMethod: 'even',
+  lootMethod: Loot.DEFAULT,
   // 이번 편성의 계약. 후보 전원에 대해 한 번에 내고(이름 → 계약), 데려간
   // 동료의 것만 전투 뒤 정산에 쓴다. 전투가 시작할 때 굳는다 — 결과 화면에서
   // 다시 계산하면 부른 값과 준 값이 갈린다.
@@ -833,10 +833,10 @@ function renderBrief() {
   brief.append(meta);
 }
 
-// --- 삯과 계약 ----------------------------------------------------------
+// --- 보수와 계약 ----------------------------------------------------------
 
 // 후보 전원의 계약을 한 번에 낸다. **하나씩 부르지 않는 것은** 분배 방식을
-// 바꿨을 때 일부만 갱신되는 일을 막기 위해서다 — 방식이 삯을 흔든다.
+// 바꿨을 때 일부만 갱신되는 일을 막기 위해서다 — 방식이 보수를 흔든다.
 function refreshWages() {
   const ctx = { rep: Rep.repValue(app.progress), method: app.lootMethod };
   app.wages = new Map(Hire.contractsFor(app.candidates, app.quest, ctx)
@@ -894,7 +894,7 @@ function renderDeal() {
   note.textContent = afford.ok
     ? (deal.hero < 0
       ? `길드 ${deal.purse} 골드로는 모자란다 · 내 돈 ${-deal.hero} 골드를 보탠다`
-      : `길드 ${deal.purse} 골드 · 삯 ${deal.spent}`)
+      : `길드 ${deal.purse} 골드 · 보수 ${deal.spent}`)
     : `${afford.short} 골드가 모자라 이 편성으로는 계약할 수 없다`;
   return afford;
 }
@@ -975,7 +975,7 @@ function renderRoster() {
     body.append(text('div', 'pick-name', member.name));
     // 카드에는 종족을 적지 않는다. 셋을 다 적으면 좁은 칸에서 줄이 늘어난다.
     body.append(specTag(member));
-    // **삯과 신뢰도는 카드에 있어야 한다.** 상세를 열어야만 보이면 열 명의
+    // **보수와 신뢰도는 카드에 있어야 한다.** 상세를 열어야만 보이면 열 명의
     // 값을 견주는 데 열 번을 열어야 한다. 왜 그 값인지는 상세에서 본다.
     const contract = wageOf(member);
     if (contract) {
@@ -1020,7 +1020,7 @@ $('roster-refresh').addEventListener('click', () => {
     (Math.random() * 1e9) | 0, Roster.REDRAW_JOIN_CHANCE);
   if (joined) persist();
   drawCandidates();
-  // 새로 뽑은 뒤에는 계약도 다시 낸다 — 목록과 삯이 같은 후보를 봐야 한다.
+  // 새로 뽑은 뒤에는 계약도 다시 낸다 — 목록과 보수가 같은 후보를 봐야 한다.
   refreshWages();
   renderRoster();
   updateStart();
@@ -1153,7 +1153,7 @@ function renderSpecSwap(member) {
   }
 }
 
-// 신뢰도와 이번 의뢰의 삯. **카드에는 숫자만 있고 이유는 여기에만 있다** —
+// 신뢰도와 이번 의뢰의 보수. **카드에는 숫자만 있고 이유는 여기에만 있다** —
 // 열 명의 카드에 이유를 다 적으면 카드가 다시 네 줄이 된다.
 function renderTrust(member) {
   const box = $('member-trust');
@@ -1208,7 +1208,7 @@ function renderFavor(member) {
 
   const tip = tipFor(member.name);
   const row = el('div', 'favor-row');
-  row.append(text('span', 'pick-sub', `삯에 얹기 +${tip}`));
+  row.append(text('span', 'pick-sub', `보수에 얹기 +${tip}`));
   const step = Math.max(1, Math.round(contract.gold * TIP_STEP));
   row.append(chipButton('chip', 'coin', `+${step}`, () => {
     app.tips[member.name] = tip + step;
@@ -1251,7 +1251,7 @@ function renderFavor(member) {
   }
 }
 
-// 선물을 준다. **바로 신뢰도가 오르고 삯이 다시 매겨진다** — 값이 그대로면
+// 선물을 준다. **바로 신뢰도가 오르고 보수가 다시 매겨진다** — 값이 그대로면
 // 선물이 이번 편성에 아무것도 하지 않는 것으로 보인다.
 function giveGift(member, item) {
   const index = P.findItem(app.progress, item.uid);
@@ -1416,7 +1416,7 @@ function renderMethods() {
       // 스킬 등록과 같다 — 고르는 순간 저장한다.
       app.progress.lootMethod = method.id;
       persist();
-      // **방식이 삯을 흔든다**(기획서 15.1). 값을 다시 내지 않으면 편성 화면의
+      // **방식이 보수를 흔든다**(기획서 15.1). 값을 다시 내지 않으면 편성 화면의
       // 숫자가 실제 계약과 갈린다.
       refreshWages();
       renderMethods();
@@ -1435,7 +1435,7 @@ function rememberSkills() {
 }
 
 function updateStart() {
-  // 삯을 감당할 수 있는지도 여기서 본다. 계약을 확정하는 단추가 이것 하나라,
+  // 보수를 감당할 수 있는지도 여기서 본다. 계약을 확정하는 단추가 이것 하나라,
   // 다른 곳에서 막으면 눌러 놓고 전투 화면에서 튕기는 일이 난다.
   const afford = renderDeal();
   $('start').disabled = app.skills.length === 0 || !afford.ok;
@@ -1460,14 +1460,14 @@ function openParty(quest) {
   app.tips = {};
   // 지난번에 등록해 둔 것이 저장본에 남아 있다. 처음이면 열린 것을 앞에서부터
   // 채워 준다 — 빈 채로 두면 "전투 시작"이 꺼져 있는 이유를 알 수 없다.
-  app.lootMethod = Loot.METHODS[app.progress.lootMethod] ? app.progress.lootMethod : 'even';
+  app.lootMethod = Loot.METHODS[app.progress.lootMethod] ? app.progress.lootMethod : Loot.DEFAULT;
   const remembered = app.skills.length ? app.skills : app.progress.skills;
   app.skills = P.validSkills(app.progress, remembered.length
     ? remembered
     : P.learnedSkills(app.progress).map((def) => def.id));
   rememberSkills();
 
-  // 삯이 먼저다 — 목록도 요약도 계약을 보고 그린다.
+  // 보수가 먼저다 — 목록도 요약도 계약을 보고 그린다.
   refreshWages();
   renderBrief();
   renderRoster();
@@ -2199,7 +2199,7 @@ function openResult(state) {
   const job = D.heroJob(app.progress.job);
   const gained = P.addExp(app.progress, reward.charExp, reward.jobExp);
 
-  // **삯을 내고 남는 것이 주인공 몫이다.** 계약은 전투가 시작할 때 굳었고
+  // **보수를 내고 남는 것이 주인공 몫이다.** 계약은 전투가 시작할 때 굳었고
   // (`app.contracts`), 여기서는 그대로 지불만 한다. 실패하면 길드가 내지
   // 않으므로 아무도 받지 못한다 — 대신 신뢰도로 갚는다.
   const deal = Hire.settle(quest, app.contracts, won, app.tips);
@@ -2214,9 +2214,9 @@ function openResult(state) {
   const roster = Roster.awardExp(app.progress.roster, joinedNames,
     reward.charExp, (Math.random() * 1e9) | 0);
 
-  // **데려간 동료는 약속한 삯을, 남은 동료는 다른 파티에서 번 몫을 받는다.**
+  // **데려간 동료는 약속한 보수를, 남은 동료는 다른 파티에서 번 몫을 받는다.**
   // 받은 돈으로 동료가 제 장비를 갖춘다 — 쓸 데가 없으면 저장본에 숫자만 쌓이고,
-  // 삯을 흥정한 것이 화면의 글자로만 남는다.
+  // 보수를 흥정한 것이 화면의 글자로만 남는다.
   const paid = {};
   for (const row of deal.paid) paid[row.name] = row.gold;
   const purses = Roster.awardGold(app.progress.roster, joinedNames,
@@ -2255,12 +2255,12 @@ function openResult(state) {
   if (won) {
     const guild = $('guild-loot');
     guild.textContent = '';
-    // 적힌 금액에서 삯이 빠진 것이 내 몫이라, 셋을 함께 적지 않으면 지갑에
+    // 적힌 금액에서 보수가 빠진 것이 내 몫이라, 셋을 함께 적지 않으면 지갑에
     // 들어온 숫자와 화면의 숫자가 다르다.
     const gold = el('li');
     gold.append(icon('coin'));
     gold.append(text('span', null, `${deal.purse} 골드`));
-    gold.append(text('span', 'why', deal.spent ? `삯 ${deal.spent}` : '삯 없음'));
+    gold.append(text('span', 'why', deal.spent ? `보수 ${deal.spent}` : '보수 없음'));
     gold.append(text('span', 'to', `내 몫 ${deal.hero}`));
     guild.append(gold);
 

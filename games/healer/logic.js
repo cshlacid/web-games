@@ -995,7 +995,7 @@ function rewardOf(state) {
   const guild = Math.round((state.quest.guildReward.exp || 0) * (won ? 1 : 0.5));
   const healExp = D.LEVEL.healExp(state.stats.healed);
 
-  // **골드는 여기서 나누지 않는다.** 동료가 모집할 때 부른 삯이 정해져 있고
+  // **골드는 여기서 나누지 않는다.** 동료가 모집할 때 부른 보수가 정해져 있고
   // (hire.js), 그것을 내고 남는 것이 주인공 몫이다 — 전투가 인원수로 나누던
   // 규칙을 여기 남겨 두면 같은 일을 하는 규칙이 둘이 된다.
   return {

@@ -58,7 +58,7 @@ function create() {
     skills: [],
     // 보상 분배 방식도 같은 이유로 남는다. 파티가 미리 합의한다는 이 시스템의
     // 뜻이 "매번 고르는 칸"이 되면 사라진다.
-    lootMethod: 'even',
+    lootMethod: Loot.DEFAULT,
     roster: Roster.create(),
     questSeed: (Math.random() * 1e9) | 0,
     shopSeed: (Math.random() * 1e9) | 0,
@@ -480,7 +480,7 @@ function load() {
   // 아직 안 열린 스킬이 섞여 있을 수 있다.
   progress.skills = validSkills(progress, Array.isArray(saved.skills) ? saved.skills : []);
 
-  progress.lootMethod = Loot.METHODS[saved.lootMethod] ? saved.lootMethod : 'even';
+  progress.lootMethod = Loot.METHODS[saved.lootMethod] ? saved.lootMethod : Loot.DEFAULT;
 
   progress.roster = Roster.adopt(saved.roster);
   progress.rep = Math.max(0, Math.min(D.REPUTATION.max, saved.rep | 0));

@@ -46,7 +46,7 @@ function settle(progress, state, party, method, lootSeed, dropsOverride, contrac
 
   const reward = L.rewardOf(state);
   const gained = P.addExp(progress, reward.charExp, reward.jobExp);
-  // **삯을 내고 남는 것이 주인공 몫이다.** 전투가 인원수로 나누던 자리가 여기로
+  // **보수를 내고 남는 것이 주인공 몫이다.** 전투가 인원수로 나누던 자리가 여기로
   // 옮겨 왔다.
   const deal = Hire.settle(quest, contracts || [], won, tips);
   progress.gold += deal.hero;
@@ -54,7 +54,7 @@ function settle(progress, state, party, method, lootSeed, dropsOverride, contrac
 
   const names = party.map((m) => m.name);
   const roster = R.awardExp(progress.roster, names, reward.charExp, 1);
-  // 데려간 동료는 약속한 삯을, 남은 동료는 다른 파티에서 번 몫을 받는다.
+  // 데려간 동료는 약속한 보수를, 남은 동료는 다른 파티에서 번 몫을 받는다.
   const paid = {};
   for (const row of deal.paid) paid[row.name] = row.gold;
   const purses = R.awardGold(progress.roster, names,
@@ -131,7 +131,7 @@ function runQuest(progress, seed, autoHeal, questOver) {
     if (found) party.push(found);
   }
 
-  // 편성 화면이 하는 일: 후보 전원의 삯을 내고, 데려간 넷의 것만 계약으로 굳힌다.
+  // 편성 화면이 하는 일: 후보 전원의 보수를 내고, 데려간 넷의 것만 계약으로 굳힌다.
   const ctx = { rep: Rep.repValue(progress), method: 'even' };
   const contracts = Hire.contractsFor(party, quest, ctx);
 
@@ -200,14 +200,14 @@ function runQuest(progress, seed, autoHeal, questOver) {
   check('경험치가 오른다', out.reward.charExp > 0, true);
   check('명부 전원이 보고에 들어간다', out.roster.length, progress.roster.length);
 
-  // **삯을 내고 남는 것이 주인공 몫이다.** 동료마다 부른 값이 다르므로 인원수로
+  // **보수를 내고 남는 것이 주인공 몫이다.** 동료마다 부른 값이 다르므로 인원수로
   // 나눈 값과 견줄 수 없다 — 합계가 적힌 금액을 넘지 않는지로 본다.
   check('적힌 금액이 판 전체의 값이다', out.deal.purse, quest.guildReward.gold);
-  check('주인공은 삯을 뺀 나머지를 받는다', progress.gold - goldBefore, out.deal.hero);
+  check('주인공은 보수를 뺀 나머지를 받는다', progress.gold - goldBefore, out.deal.hero);
   check('전액을 혼자 받지 않는다', out.deal.hero < out.deal.purse, true);
-  check('낸 삯과 내 몫을 합치면 적힌 금액이다', out.deal.spent + out.deal.hero, out.deal.purse);
+  check('낸 보수와 내 몫을 합치면 적힌 금액이다', out.deal.spent + out.deal.hero, out.deal.purse);
   check('동료도 몫을 받는다', out.purses.length, progress.roster.length);
-  check('데려간 동료는 약속한 삯을 받는다',
+  check('데려간 동료는 약속한 보수를 받는다',
     out.purses.filter((p) => p.joined).map((p) => p.gold).sort((a, b) => a - b),
     contracts.map((c) => c.gold).sort((a, b) => a - b));
 
@@ -290,8 +290,8 @@ function runQuest(progress, seed, autoHeal, questOver) {
   check('의뢰를 깬 것으로 세지 않는다', progress.cleared, 0);
 
   // **실패하면 아무도 받지 못한다.** 길드가 내는 돈이 성공 보수라 나눌 것이 없고,
-  // 없는 돈에서 삯을 내려면 주인공이 빚을 지는 규칙을 따로 만들어야 한다.
-  check('실패하면 삯도 나가지 않는다', out.deal.spent, 0);
+  // 없는 돈에서 보수를 내려면 주인공이 빚을 지는 규칙을 따로 만들어야 한다.
+  check('실패하면 보수도 나가지 않는다', out.deal.spent, 0);
   check('주인공이 빚지지 않는다', out.deal.hero, 0);
   check('데려간 동료도 못 받는다',
     out.purses.filter((p) => p.joined).every((p) => p.gold === 0), true);
