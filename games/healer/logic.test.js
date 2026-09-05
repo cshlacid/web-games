@@ -905,6 +905,27 @@ function cast(state, skillId, target) {
   const spot = AI.freeSpot(senior, pair, { x: senior.x, y: senior.y });
   check('앞선 쪽은 제자리를 지킨다', [spot.x, spot.y], [kept.x, kept.y]);
 }
+{
+  // **적과도 겹치지 않는다.** 같은 편끼리만 벌리던 때에는 근접 적이 아군 위에
+  // 그대로 올라섰다 — 화면에서 둘이 한 덩어리로 보인다.
+  const state = battle();
+  const ally = unit(state, '강철의 브란');
+  const foe = AI.alive(state, 'enemy')[0];
+  ally.x = 40; ally.y = 28;
+  foe.x = 40; foe.y = 28;
+  const junior = ally.uid < foe.uid ? foe : ally;
+  const spot = AI.freeSpot(junior, state, { x: junior.x, y: junior.y });
+  check('적 위에 겹쳐 서면 비켜선다', Math.abs(spot.y - 28), AI.CLOSE);
+
+  // **적과 벌리는 거리는 가장 짧은 근접 사거리보다 좁다.** 사거리 밖으로 비켜서면
+  // 붙으려는 힘과 비키려는 힘이 매 틱 싸워 근접 유닛이 사거리 언저리에서 떤다.
+  const melee = Object.values(D.UNIT_SKILLS).map((def) => def.range)
+    .concat(Object.values(D.COMPANIONS).map((def) => def.range))
+    .filter((range) => range > 0 && range <= D.MELEE_RANGE);
+  check('적과의 거리가 근접 사거리 안이다', AI.CLOSE < Math.min(...melee), true);
+  // 같은 편끼리는 붙을 이유가 없으니 더 넉넉히 벌린다.
+  check('같은 편끼리 더 벌린다', AI.SPACING > AI.CLOSE, true);
+}
 
 // --- 넉백 ---------------------------------------------------------------
 //

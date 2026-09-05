@@ -518,17 +518,30 @@ function wantedMove(unit, state, target) {
 //
 // **가로가 아니라 세로로 비킨다.** 가로 거리가 곧 사거리라서 가로로 옮기면 붙었다
 // 떨어졌다를 반복한다. 세로로 벌리면 사거리를 거의 건드리지 않는다.
+//
+// **편에 따라 벌리는 거리가 다르다.** 같은 편끼리는 서로 붙을 이유가 없어 넉넉히
+// 벌리지만, 적과는 **가장 짧은 근접 사거리(7)보다 좁게** 벌려야 한다 — 사거리
+// 밖으로 비켜서면 붙으려는 힘과 비키려는 힘이 매 틱 싸워, 근접 유닛이 사거리
+// 언저리에서 떤다. 예전에 양쪽을 다 밀어내다 걷어 낸 것이 그 진동이었다.
 const SPACING = 10;
+const CLOSE = 6;
+
+// 이 유닛이 저 유닛에게서 얼마나 떨어져 서야 하는가.
+const gapTo = (unit, other) => (other.side === unit.side ? SPACING : CLOSE);
+
 
 function freeSpot(unit, state, spot) {
-  const seniors = mates(unit, state)
-    .filter((mate) => mate.uid < unit.uid)
+  // **양보하는 쪽은 늘 한쪽이다**(uid가 큰 쪽). 편을 가리지 않고 같은 규칙을
+  // 쓰므로 아군과 적 사이에서도 서로 피하다 떠는 일이 없다.
+  const seniors = alive(state, 'ally').concat(alive(state, 'enemy'))
+    .filter((other) => other.uid < unit.uid)
     .sort((a, b) => (a.uid < b.uid ? -1 : 1));
   let y = spot.y;
-  for (const mate of seniors) {
-    if (Math.abs(mate.x - spot.x) >= SPACING) continue;
-    if (Math.abs(mate.y - y) >= SPACING) continue;
-    y = mate.y + (y >= mate.y ? SPACING : -SPACING);
+  for (const other of seniors) {
+    const gap = gapTo(unit, other);
+    if (Math.abs(other.x - spot.x) >= gap) continue;
+    if (Math.abs(other.y - y) >= gap) continue;
+    y = other.y + (y >= other.y ? gap : -gap);
   }
   return { x: spot.x, y: Math.min(D.FIELD.bottom, Math.max(D.FIELD.top, y)) };
 }
@@ -560,7 +573,7 @@ function decide(unit, state) {
 
 const api = {
   dist, alive, byUid, opposite, nearest, roleOf, rankOf, frontTank, anchorOf, behind,
-  tauntReserve, manaTarget, freeSpot, SPACING,
+  tauntReserve, manaTarget, freeSpot, SPACING, CLOSE,
   attackersOf, endangered, healReach,
   chooseTarget, healTarget, chooseSkill, choosePotion, chooseMove, decide,
   POTION_HP, POTION_MP, STICK, RETREAT, SPREAD,
