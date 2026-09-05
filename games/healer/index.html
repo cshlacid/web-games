@@ -46,62 +46,76 @@
     </div>
 
     <div class="tab-page" id="tab-character" hidden>
-      <div class="panel">
-        <div class="panel-head">
-          <h2>주인공</h2>
-          <span id="char-job"></span>
-          <span class="count" id="char-gold">0 골드</span>
+      <!-- 캐릭터 화면은 하는 일이 셋(점수 넣기·스킬 배우기·장비 갈아입기)으로
+           갈리고 한 번에 하나만 한다. 한 페이지에 이어 붙였더니 폰에서 화면 세
+           장이었다 — 스킬과 인벤토리는 진행할수록 더 길어지는 쪽이라 갈래를 나눈다. -->
+      <nav class="subtabs" id="char-tabs">
+        <button class="subtab" type="button" data-page="stats" aria-pressed="true">능력치</button>
+        <button class="subtab" type="button" data-page="skill" aria-pressed="false">스킬</button>
+        <button class="subtab" type="button" data-page="gear" aria-pressed="false">장비</button>
+      </nav>
+
+      <div class="char-page" id="char-page-stats">
+        <div class="panel">
+          <div class="panel-head">
+            <h2>주인공</h2>
+            <span id="char-job"></span>
+            <span class="count" id="char-gold">0 골드</span>
+          </div>
+          <ul class="levels" id="char-levels"></ul>
+          <ul class="stats" id="char-stats"></ul>
         </div>
-        <ul class="levels" id="char-levels"></ul>
-        <ul class="stats" id="char-stats"></ul>
-      </div>
 
-      <div class="panel">
-        <div class="panel-head"><h2>계열</h2></div>
-        <p class="panel-note">힐러 게임이라 회복을 맡는 계열만 고를 수 있다. 직업 레벨과 스킬 점수는 계열마다 따로 쌓이고, 한번 배운 스킬은 계열을 바꿔도 남는다.</p>
-        <div class="job-cards" id="char-jobs"></div>
-      </div>
-
-      <div class="panel">
-        <div class="panel-head">
-          <h2>능력치</h2>
-          <span class="count" id="attr-points">남은 점수 0</span>
+        <div class="panel">
+          <div class="panel-head">
+            <h2>능력치</h2>
+            <span class="count" id="attr-points">남은 점수 0</span>
+          </div>
+          <p class="panel-note">캐릭터 레벨이 오를 때마다 점수를 받는다. 한번 넣으면 되돌릴 수 없다.</p>
+          <ul class="attrs" id="char-attrs"></ul>
         </div>
-        <p class="panel-note">캐릭터 레벨이 오를 때마다 점수를 받는다. 한번 넣으면 되돌릴 수 없다.</p>
-        <ul class="attrs" id="char-attrs"></ul>
       </div>
 
-      <div class="panel">
-        <div class="panel-head"><h2>장비</h2></div>
-        <p class="panel-note">인벤토리의 물건을 눌러 장착한다. 슬롯을 누르면 벗는다.</p>
-        <ul class="slots" id="char-slots"></ul>
-      </div>
-
-      <div class="panel">
-        <div class="panel-head"><h2>물약</h2></div>
-        <p class="panel-note">전투에 들고 간다. 상점에서 사서 채운다. 동료는 직업에 맞는 물약을 알아서 챙긴다.</p>
-        <ul class="stats" id="char-potions"></ul>
-      </div>
-
-      <div class="panel">
-        <div class="panel-head">
-          <h2>인벤토리</h2>
-          <span class="count" id="inv-count">0</span>
+      <div class="char-page" id="char-page-skill" hidden>
+        <div class="panel">
+          <div class="panel-head"><h2>계열</h2></div>
+          <p class="panel-note">회복을 맡는 계열만 고를 수 있다. 직업 레벨과 스킬 점수는 계열마다 따로 쌓이고, 배운 스킬은 계열을 바꿔도 남는다.</p>
+          <div class="job-cards" id="char-jobs"></div>
         </div>
-        <p class="panel-note">누르면 장착한다. 파는 것은 상점에서 한다.</p>
-        <ul class="inventory" id="inventory"></ul>
+
+        <div class="panel">
+          <div class="panel-head">
+            <h2>스킬</h2>
+            <span class="count" id="skill-points">남은 점수 0</span>
+            <span class="count" id="skill-open">0 / 8</span>
+          </div>
+          <p class="panel-note">배우는 데 1점, 한 칸 올리는 데 1점이 든다. 전투에는 다섯까지 가져간다.</p>
+          <ul class="skill-list" id="char-skills"></ul>
+          <p class="panel-note">다른 계열에서 배운 스킬. 그대로 들고 갈 수 있지만 올리는 점수는 그 계열에서만 쓴다.</p>
+          <ul class="skill-list" id="char-kept" hidden></ul>
+        </div>
       </div>
 
-      <div class="panel">
-        <div class="panel-head">
-          <h2>스킬</h2>
-          <span class="count" id="skill-points">남은 점수 0</span>
-          <span class="count" id="skill-open">0 / 8</span>
+      <div class="char-page" id="char-page-gear" hidden>
+        <div class="panel">
+          <div class="panel-head"><h2>장비</h2></div>
+          <p class="panel-note">인벤토리의 물건을 눌러 장착한다. 슬롯을 누르면 벗는다.</p>
+          <ul class="slots" id="char-slots"></ul>
         </div>
-        <p class="panel-note">스킬은 저절로 열리지 않는다. 직업 레벨이 오르면 스킬 점수를 받고, 배우는 데 1점·한 칸 올리는 데 1점이 든다. 점수를 넣으면 효과가 오르고 소비 마나도 조금 오른다. 전투에는 배운 것 중 다섯까지 가져간다. 적힌 회복량은 기준값이고, 여기에 회복력 배수가 곱해진다.</p>
-        <ul class="skill-list" id="char-skills"></ul>
-        <p class="panel-note">다른 계열에서 배운 스킬도 그대로 전투에 들고 갈 수 있다. 다만 올리는 점수는 그 계열에서만 쓴다.</p>
-        <ul class="skill-list" id="char-kept" hidden></ul>
+
+        <div class="panel">
+          <div class="panel-head">
+            <h2>인벤토리</h2>
+            <span class="count" id="inv-count">0</span>
+          </div>
+          <ul class="inventory" id="inventory"></ul>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h2>물약</h2></div>
+          <p class="panel-note">전투에 들고 간다. 상점에서 사서 채운다. 동료는 직업에 맞는 물약을 알아서 챙긴다.</p>
+          <ul class="stats" id="char-potions"></ul>
+        </div>
       </div>
     </div>
 

@@ -41,6 +41,9 @@ const icon = (name, cls) => {
 const app = {
   screen: 'home',
   tab: 'quest',
+  // 캐릭터 화면 안의 갈래. 저장본에 남기지 않는다 — 어디를 보고 있었는지는
+  // 다음에 켰을 때 이어 갈 것이 아니다.
+  charPage: 'stats',
   progress: P.load(),
   quests: [],
   quest: null,
@@ -90,6 +93,32 @@ $('step-back').addEventListener('click', () => {
   sound.play('click');
   openHome();
 });
+
+// 캐릭터 화면의 갈래 고르기. **점수가 남아 있으면 그 갈래에 표시를 단다** —
+// 갈래로 나누면서 생긴 값이 "다른 화면에 있는 것을 못 본다"라, 레벨이 올랐는데
+// 점수를 안 쓰고 지나가는 일이 그대로 늘어난다.
+function openCharPage(page) {
+  if (page) app.charPage = page;
+  const left = {
+    stats: P.freePoints(app.progress),
+    skill: P.freeSkillPoints(app.progress),
+    gear: 0,
+  };
+  for (const button of $('char-tabs').children) {
+    const name = button.dataset.page;
+    button.setAttribute('aria-pressed', String(name === app.charPage));
+    button.classList.toggle('has-point', left[name] > 0);
+    $(`char-page-${name}`).hidden = name !== app.charPage;
+  }
+}
+
+for (const button of $('char-tabs').children) {
+  button.addEventListener('click', () => {
+    sound.play('click');
+    openCharPage(button.dataset.page);
+    window.scrollTo(0, 0);
+  });
+}
 
 function openHome(tab) {
   if (tab) app.tab = tab;
@@ -418,6 +447,10 @@ function renderCharacter() {
 
   $('skill-points').textContent = points ? `남은 점수 ${points}` : '남은 점수 없음';
   $('skill-open').textContent = `${P.learnedSkills(progress).length} / ${D.heroSkillsOf(progress.job).length}`;
+
+  // 갈래와 그 위의 점수 표시는 화면을 다시 그릴 때마다 함께 맞춘다. 점수를 쓰는
+  // 단추가 전부 renderCharacter를 다시 부르므로 여기 한 곳이면 된다.
+  openCharPage();
 }
 
 
