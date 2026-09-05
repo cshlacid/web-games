@@ -487,7 +487,7 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 /* 무리와 무리 사이의 걸음. 배경이 흘러가는 동안 유닛도 걷는 티가 나야 이동하는
    것으로 읽힌다 — 배경만 움직이면 화면이 미끄러지는 것처럼 보인다. */
 /* 주인공은 걷는 프레임이 따로 있으므로 흔들기에서 뺀다 — 겹치면 두 번 걷는다. */
-.field.marching .unit.ally:not(.is-sheet) .sprite { animation: trudge 0.42s steps(2, end) infinite; }
+.field.marching .unit.ally:not(.is-sheet):not(.dead) .sprite { animation: trudge 0.42s steps(2, end) infinite; }
 @keyframes trudge {
   from { transform: translateY(0); }
   50% { transform: translateY(-4%); }
