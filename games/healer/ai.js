@@ -468,6 +468,30 @@ function anchorOf(unit, state) {
   return nearest(unit, mates(unit, state).filter((u) => roleOf(u) === 'melee'));
 }
 
+// **대열은 처음 선 자리보다 뒤로 밀리지 않는다.** 후열이 설 자리는 앞줄의 뒤인데,
+// 앞줄이 제 뒤로 파고든 적을 잡으러 돌아서면 후열은 그 뒤로 또 물러선다. 그러면
+// 적이 따라오고 앞줄이 다시 돌아서서, 양쪽이 함께 화면 끝까지 걸어간다 — 재 보니
+// 전투 시간의 절반이 전장 왼쪽 3할에서 지나갔고 끝에는 아군도 적도 왼쪽 벽에
+// 붙어 있었다. 밀리지 않으면 적도 거기까지만 들어오므로, 싸움이 처음 만난 자리
+// 근처에 머무른다.
+//
+// **아주 못 물러서게 하지는 않는다**(`LINE_GIVE`). 붙을 앞줄이 다 쓰러진 뒤에도
+// 한 발도 못 빼면 마지막 하나가 적 한가운데에 선 채로 죽는데, 그것은 "도망은
+// 이동일 뿐"이라는 아래 규칙을 없애는 것이다. 한 번 밀리는 폭만 열어 두면 뒤로
+// 걸어가는 일이 쌓이지 않는다 — 밀리는 자리가 기준선에서 재는 절대 위치라
+// 그렇다.
+//
+// **편을 가리는 분기가 아니다** — 앞이 어느 쪽인지만 `forward`로 물어보는, 이
+// 파일의 다른 자리와 같은 방식이다.
+const LINE_GIVE = 12;
+
+function holdLine(unit, spot) {
+  if (unit.homeX == null) return spot;
+  const forward = unit.side === 'ally' ? 1 : -1;
+  const limit = unit.homeX - forward * LINE_GIVE;
+  return { x: forward > 0 ? Math.max(spot.x, limit) : Math.min(spot.x, limit), y: spot.y };
+}
+
 // **후열은 맞아도 도망가지 않는다.** 도망가면 어그로를 끌 탱커에게서 멀어지고,
 // 결국 탱커가 닿지 못하는 곳에서 혼자 맞는다. 탱커 곁에 붙어 있어야 탱커가
 // 그 적을 도발 사거리 안에 둔다. 붙을 탱커도 근접 딜러도 없을 때에만 물러선다.
@@ -493,14 +517,16 @@ function wantedMove(unit, state, target) {
     if (anchor) {
       // 제자리 근처에서는 움직이지 않는다. 조금씩이라도 계속 걸으면 캐스팅이
       // 매번 취소되어 후열이 아무 스킬도 못 쓴다.
-      const spot = behind(unit, anchor, STICK);
+      // **앞줄을 앞지르지 않는 것이 먼저다.** 앞줄이 제 뒤로 물러선 판에서는 두
+      // 규칙이 부딪히는데, 여기서 기준선을 이기게 두면 힐러가 탱커보다 앞에 선다.
+      const spot = holdBehind(unit, anchor, holdLine(unit, behind(unit, anchor, STICK)));
       return dist(unit, spot) > STICK * 0.4 ? spot : null;
     }
 
     // 앞에 아무도 없다. 이제야 물러서되, 공격과 힐은 계속한다 — 도망은
     // 이동일 뿐이고 logic.js는 사거리만 맞으면 때린다.
     const foe = nearest(unit, foesOf(unit, state));
-    if (foe && dist(unit, foe) < RETREAT) return standoff(unit, foe, RETREAT + 4);
+    if (foe && dist(unit, foe) < RETREAT) return holdLine(unit, standoff(unit, foe, RETREAT + 4));
     return null;
   }
 
@@ -576,7 +602,7 @@ const api = {
   tauntReserve, manaTarget, freeSpot, SPACING, CLOSE,
   attackersOf, endangered, healReach,
   chooseTarget, healTarget, chooseSkill, choosePotion, chooseMove, decide,
-  POTION_HP, POTION_MP, STICK, RETREAT, SPREAD,
+  POTION_HP, POTION_MP, STICK, RETREAT, SPREAD, LINE_GIVE, holdLine,
   hasAura, buffTarget, carriesHeal,
   EFFICIENT, EMERGENCY,
 };

@@ -319,10 +319,14 @@ function cast(state, skillId, target) {
   check('굳어 있는 동안에는 때리지 못한다', hero.hp, before);
   check('걸음도 멈춘다', foe.x, stood);
 
-  // 시간이 지나면 풀리고 다시 움직인다.
+  // 시간이 지나면 풀리고 다시 움직인다. **갈 곳을 만들어 주고 본다** — 붙어
+  // 있는 동안에는 이미 사거리 안이라 풀려도 제자리에 서 있는 것이 정상이다.
   run(state, 2);
   check('시간이 지나면 풀린다', L.stunned(state, foe), false);
-  check('풀리면 다시 움직인다', foe.x !== stood, true);
+  foe.x = hero.x + 30;
+  const far = foe.x;
+  run(state, 0.5);
+  check('풀리면 다시 움직인다', foe.x !== far, true);
 
   // **거는 순간 외우던 것이 끊긴다.** 끊지 않으면 기절이 아무 일도 하지 않은
   // 것으로 보인다.
@@ -1786,6 +1790,41 @@ function cast(state, skillId, target) {
     kit.some((id) => D.UNIT_SKILLS[id].kind === 'damage-area'), true);
   check('어그로도 가져간다',
     kit.some((id) => D.UNIT_SKILLS[id].kind.startsWith('taunt')), true);
+}
+
+// --- 싸움이 벌어지는 자리 ------------------------------------------------
+//
+// **전투는 화면 가운데 근처에서 벌어져야 한다.** 적이 걸어와 아군에게 붙으므로
+// 싸움은 아군이 선 자리에서 열리는데, 예전에는 대열이 왼쪽 끝에 있었고 게다가
+// 앞줄이 제 뒤로 파고든 적을 잡으러 돌아설 때마다 후열이 그보다 더 물러서서,
+// 양쪽이 함께 왼쪽 벽까지 걸어갔다(재 보니 전투 위치의 중앙값이 x 25, 전투
+// 시간의 절반이 전장 왼쪽 3할에서 지나갔다). 대열을 가운데로 옮기고
+// `ai.holdLine`으로 밀리지 않게 한 뒤로는 중앙값이 x 48이다.
+{
+  const spots = [];
+  let left = 0;
+  let ticks = 0;
+  for (const seed of [1, 2, 3, 4, 5, 6]) {
+    const state = battle({ seed, quest: quest({ level: 6 }),
+      party: PARTY.map((p) => ({ defId: p.defId, level: 6 })) });
+    for (let i = 0; i < 90 / L.TICK && state.status === 'fighting'; i++) {
+      L.step(state, L.TICK);
+      if (state.marching) continue;
+      const live = state.units.filter((u) => !u.dead);
+      const allies = live.filter((u) => u.side === 'ally');
+      const foes = live.filter((u) => u.side === 'enemy');
+      if (!allies.length || !foes.length) continue;
+      const mid = live.reduce((sum, u) => sum + u.x, 0) / live.length;
+      spots.push(mid);
+      ticks++;
+      if (mid < D.FIELD.w * 0.3) left++;
+    }
+  }
+  const mid = spots.slice().sort((a, b) => a - b)[Math.floor(spots.length / 2)];
+  check('싸움이 전장 가운데 근처에서 벌어진다', mid > 40 && mid < 62, true);
+  // 벽에 붙는 일이 아예 없어야 한다는 뜻은 아니다 — 마지막 하나가 물러설 자리는
+  // 남겨 두었다(`ai.LINE_GIVE`). 그것이 전투의 기본이 되지 않는지를 본다.
+  check('왼쪽 끝에서 싸우는 시간은 드물다', left / ticks < 0.1, true);
 }
 
 // --- 난이도 확인 --------------------------------------------------------

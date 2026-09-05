@@ -465,8 +465,11 @@ function gather(state) {
   check('탱커가 없으면 근접 딜러에게', toMelee && toMelee.x > ranged.x, true);
   check('붙을 자리가 근접 딜러다', AI.anchorOf(ranged, state).uid, melee.uid);
 
-  // 둘 다 없으면 그제야 물러선다.
+  // 둘 다 없으면 그제야 물러선다. **대열의 기준선도 지금 자리로 옮긴다** —
+  // 처음 배치된 자리가 기준으로 남아 있으면 `holdLine`이 "여기는 네 자리보다
+  // 뒤"라며 앞으로 되돌린다(그것이 이 규칙이 하는 일이다).
   melee.dead = true;
+  ranged.homeX = ranged.x;
   const away = AI.chooseMove(ranged, state, foe);
   check('붙을 곳이 없으면 물러선다', away && away.x < ranged.x, true);
   check('그래도 때리는 것은 멈추지 않는다', AI.decide(ranged, state).attack !== null, true);

@@ -152,7 +152,18 @@ function makeUnit(def, side, uid, x, y, level, override, bonus, potions, name, h
 
 // 아군 배치. 직업에 따라 앞뒤를 나눠 세운다 — 다들 같은 자리에서 출발하면
 // 첫 몇 초 동안 힐러가 최전선에 서 있게 된다.
-const ALLY_LANE = { tank: 32, dealer: 22, healer: 12 };
+//
+// **대열 전체를 전장 가운데 쪽으로 38만큼 옮겼다**(예전에는 탱커 32·딜러 22·
+// 힐러 12에 주인공 7이었다). 싸움은 아군이 선 자리에서 벌어진다 — 적이 걸어와서
+// 붙기 때문이다. 그래서 대열이 왼쪽 끝에 있으면 전투도 왼쪽 끝에서 벌어지고
+// 화면의 절반이 빈 채로 남는다: 재 보니 전투 위치의 중앙값이 x 25였고, 전투
+// 시간의 절반이 전장 왼쪽 3할 안에서 지나갔다. 지금은 중앙값이 x 48이고 왼쪽
+// 3할에서 보내는 시간이 0이다.
+//
+// **옮긴 만큼이 그대로 반영되는 것은 `ai.holdLine`이 이 자리를 지켜 주기
+// 때문이다.** 그 규칙이 없을 때에는 대열을 앞으로 밀어도 싸움이 다시 왼쪽으로
+// 흘러내려, x 34 언저리에서 더 나아가지 않았다.
+const ALLY_LANE = { tank: 70, dealer: 60, healer: 50 };
 
 // 줄 세우기. 위아래로 FIELD.top~bottom 안에서만 세운다 — 그 밖은 유닛의 몸통이
 // 화면을 벗어나는 자리다.
@@ -167,7 +178,7 @@ function placeAllies(state, members) {
     const def = member.def;
     const hero = def.id === D.HERO.id;
     const unit = makeUnit(def, 'ally', hero ? HERO_UID : `a${i}`,
-      hero ? 7 : ALLY_LANE[def.job], laneY(i, members.length),
+      hero ? 45 : ALLY_LANE[def.job], laneY(i, members.length),
       member.level, member.stats, member.bonus, member.potions, member.name,
       { spec: member.spec, learned: member.learned });
     // 웨이브 사이에 되돌아갈 자리. 다음 무리를 만나러 갈 때 대열을 다시 짠다.
@@ -186,8 +197,14 @@ function spawnWave(state, index) {
     const y = laneY(i, wave.length);
     // 물약은 인간형만 마신다. 지금 적은 전부 비인간형이라 빈손으로 오는데,
     // 그 대신 마나를 쓰는 계열은 마나를 되찾는 스킬을 1레벨부터 들고 온다.
-    state.units.push(makeUnit(def, 'enemy', `e${index}_${i}`, x, y, state.quest.level || 1,
-      null, null, D.potionsFor(def)));
+    const unit = makeUnit(def, 'enemy', `e${index}_${i}`, x, y, state.quest.level || 1,
+      null, null, D.potionsFor(def));
+    // 적에게도 대열의 기준선을 준다. `ai.holdLine`이 편을 가리지 않고 이 값을
+    // 보므로, 없으면 아군만 밀리지 않는 규칙이 된다. 무리 사이의 이동(`march`)은
+    // 아군만 돌아가므로 여기에 걸리지 않는다.
+    unit.homeX = unit.x;
+    unit.homeY = unit.y;
+    state.units.push(unit);
   });
   emit(state, { type: 'wave', index, total: state.quest.waves.length,
     text: `${index + 1}번째 무리 (${state.quest.waves.length} 중)` });
