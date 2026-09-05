@@ -759,6 +759,33 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 
 .tab-page { display: flex; flex-direction: column; gap: clamp(8px, 2vmin, 14px); }
 
+/* 캐릭터 화면 안의 갈래. 아래 탭바와 달리 화면에 붙여 두지 않고 페이지 맨 위에
+   둔다 — 같은 화면 안에서 무엇을 보고 있는지를 가르는 것이라, 화면을 옮기는
+   탭바와 같은 무게로 보이면 안 된다. */
+.subtabs {
+  display: flex; gap: 4px;
+  background: var(--card-bg);
+  border: 1px solid var(--line); border-radius: 999px;
+  padding: 4px;
+}
+.subtab {
+  flex: 1;
+  border: 0; border-radius: 999px; background: none; color: var(--muted);
+  font-family: inherit; font-size: 13px; font-weight: 700;
+  padding: 8px 4px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+}
+.subtab[aria-pressed="true"] { background: var(--btn-bg); color: var(--btn-fg); }
+/* 안 쓴 점수가 있는 갈래에 점을 찍는다. 갈래로 나눈 값이 "다른 화면에 있는 것을
+   못 본다"라, 이것이 없으면 레벨이 올랐는데 점수를 그냥 지나간다. */
+.subtab.has-point::after {
+  content: ''; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--kind-mend);
+}
+.subtab[aria-pressed="true"].has-point::after { background: var(--btn-fg); }
+
+.char-page { display: flex; flex-direction: column; gap: clamp(8px, 2vmin, 14px); }
+
 .mini {
   border: 1px solid var(--line); border-radius: 999px;
   background: none; color: inherit; font-family: inherit;
