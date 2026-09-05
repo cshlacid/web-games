@@ -161,7 +161,8 @@ h1 {
   /* 선을 격자 위에 겹쳐 긋기 때문에 칸 사이에 틈을 두지 않는다. 틈을 두면 SVG
      좌표와 칸 좌표가 칸마다 조금씩 어긋나 선이 칸 가운데를 벗어난다. */
   gap: 0;
-  padding: 2px;
+  --board-pad: 2px;
+  padding: var(--board-pad);
   touch-action: none;
 }
 
@@ -206,7 +207,15 @@ h1 {
 
 .ink {
   position: absolute;
-  inset: 2px;
+  inset: var(--board-pad);
+  /* **크기를 인셋에 맡기지 않고 직접 준다.** `<svg>`는 대체 요소라 width가 auto면
+     사파리가 오른쪽·아래 인셋을 버리고 제 본래 크기(width·height의 기본값 100%,
+     곧 패딩 상자)를 쓴다. 그러면 칸 영역보다 패딩 두 몫만큼 큰 상자에 판이 그려져
+     칸 하나가 47px일 때 선은 47.57px 간격으로 가고, 열마다 조금씩 벌어진 것이
+     쌓인다 — 아이폰 7×7에서 마지막 열의 그림이 11.6 기기픽셀 밀려 있었다.
+     크로뮴은 인셋대로 그리므로 헤드리스로는 보이지 않는다. */
+  width: calc(100% - 2 * var(--board-pad));
+  height: calc(100% - 2 * var(--board-pad));
   pointer-events: none;
   z-index: 1;
 }
