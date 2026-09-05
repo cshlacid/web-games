@@ -904,6 +904,9 @@ function memberSummary(member) {
   const gear = Roster.gearOf(member);
   const parts = [def.note];
   if (gear.length) parts.push(`장비 ${gear.length}`);
+  // **떠날 만큼 쉰 동료는 그 사실을 적는다.** 결과 화면이 떠난 뒤에 알려 주는
+  // 것만으로는 늦다 — 미리 보이지 않으면 규칙이 아니라 사고로 읽힌다.
+  if (Roster.leaveChance(member) > 0) parts.push(`${member.idle}판째 쉬는 중`);
   return parts.join(' · ');
 }
 
@@ -2348,6 +2351,13 @@ function openResult(state) {
     if (!joinedSet.has(member.name)) Rep.rest(member);
   }
 
+  // **일이 없으면 마을을 떠난다.** 이긴 판이든 진 판이든 한 판은 한 판이라
+  // 여기서 센다 — 이기는 동안에만 세면 지는 판이 명부를 얼어붙게 한다.
+  // 떠난 사람은 결과 화면에 적는다: 편성 화면을 열고서야 알면, 없어진 것이
+  // 규칙 때문인지 내가 잘못 본 것인지 알 수 없다.
+  const left = Roster.tickIdle(app.progress.roster, joinedNames,
+    (Math.random() * 1e9) | 0, Rep.isFriend);
+
   // 깬 의뢰는 게시판에서 사라지고 새 의뢰가 걸린다. 상점 진열대도 함께 바뀐다.
   let joined = null;
   if (won) {
@@ -2359,7 +2369,7 @@ function openResult(state) {
   }
 
   renderBattleReport(L.battleReport(state));
-  renderRosterReport(roster, joined, purses, bought, trustMoves);
+  renderRosterReport(roster, joined, purses, bought, trustMoves, left);
   persist();
   show('result', quest.name);
 }
@@ -2405,7 +2415,7 @@ function renderRepResult(move, downed) {
   $('rep-note').textContent = lines.join(' · ');
 }
 
-function renderRosterReport(report, joined, purses, bought, trustMoves) {
+function renderRosterReport(report, joined, purses, bought, trustMoves, left) {
   const list = $('roster-report');
   list.textContent = '';
 
@@ -2457,6 +2467,15 @@ function renderRosterReport(report, joined, purses, bought, trustMoves) {
     const row = el('li');
     row.append(text('span', null, `${joined.name} 합류`));
     row.append(text('b', 'stat-value up', `Lv ${joined.level}`));
+    list.append(row);
+  }
+
+  // **떠난 사람은 데려갔든 아니든 적는다.** 편성 화면을 열고서야 알면, 없어진
+  // 것이 규칙 때문인지 내가 잘못 본 것인지 알 수 없다.
+  for (const member of left || []) {
+    const row = el('li');
+    row.append(text('span', null, `${member.name} 떠남`));
+    row.append(text('b', 'stat-value', `${member.idle}판 쉬었다`));
     list.append(row);
   }
 }

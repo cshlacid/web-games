@@ -217,6 +217,61 @@ const SEEDS = [1, 5, 77, 4242, 20260825];
   check('물약도 들어 있다', party.potions.health, D.JOB_POTIONS.tank.health);
 }
 
+// --- 일이 없으면 마을을 떠난다 --------------------------------------------
+//
+// 명부가 쌓이기만 하면 상한을 올린 것이 그대로 "훑을 목록이 길어짐"이 된다.
+// 새 얼굴이 들어올 자리를 만드는 것이 이 규칙의 값이다.
+{
+  const roster = R.create(5);
+  const taken = [roster[0].name, roster[1].name];
+
+  R.tickIdle(roster, taken, 1);
+  check('데려간 쪽은 0으로 돌아간다', [roster[0].idle, roster[1].idle], [0, 0]);
+  check('안 데려간 쪽은 하나씩 쌓인다', roster[2].idle, 1);
+  R.tickIdle(roster, taken, 2);
+  check('이어서 쌓인다', roster[2].idle, 2);
+  R.tickIdle(roster, [roster[2].name], 3);
+  check('한 번 데려가면 다시 0이다', roster[2].idle, 0);
+
+  // **몇 판은 봐 준다.** 한 판 걸렀다고 사라지면 편성을 바꿔 볼 수가 없다.
+  check('봐 주는 동안은 확률이 0이다', R.leaveChance({ idle: R.IDLE_GRACE }), 0);
+  check('그 뒤로는 오른다',
+    R.leaveChance({ idle: R.IDLE_GRACE + 2 }) > R.leaveChance({ idle: R.IDLE_GRACE + 1 }), true);
+  check('상한에서 멈춘다', R.leaveChance({ idle: 99 }), R.IDLE_CAP);
+  check('반드시 떠나지는 않는다', R.IDLE_CAP < 1, true);
+
+  // 오래 쉬면 결국 떠난다. 확률이라 여러 씨앗으로 본다.
+  let gone = 0;
+  for (let seed = 1; seed <= 40; seed++) {
+    const town = R.create(seed);
+    town.forEach((m) => { m.idle = 20; });
+    for (let i = 0; i < 6; i++) R.tickIdle(town, [], seed * 7 + i);
+    if (town.length < R.create(seed).length) gone++;
+  }
+  check('오래 쉬면 떠난다', gone, 40);
+
+  // **명부가 파티를 못 짤 만큼 줄면 게임이 멈춘다.**
+  const shrink = R.create(11);
+  shrink.forEach((m) => { m.idle = 99; });
+  for (let i = 0; i < 60; i++) R.tickIdle(shrink, [], i);
+  check('바닥 아래로는 안 내보낸다', shrink.length >= R.KEEP_MIN, true);
+
+  // **친구는 떠나지 않는다.** 공들여 쌓은 관계가 몇 판 안 데려간 것으로 사라지면
+  // 친구를 만든 것이 손해가 된다.
+  const friends = R.create(13);
+  friends.forEach((m) => { m.idle = 99; });
+  const keep = friends[0].name;
+  for (let i = 0; i < 60; i++) {
+    R.tickIdle(friends, [], i, (m) => m.name === keep);
+  }
+  check('친구는 남는다', friends.some((m) => m.name === keep), true);
+
+  // 저장본에도 남는다 — 껐다 켜면 쉰 판이 0으로 돌아가면 규칙이 없는 것과 같다.
+  const saved = R.create(19);
+  saved[0].idle = 7;
+  check('쉰 판이 저장본에 남는다', R.adopt(JSON.parse(JSON.stringify(saved)))[0].idle, 7);
+}
+
 // --- 새 동료 ------------------------------------------------------------
 {
   // **확률을 밖에서 받는다.** 편성 화면의 새로 고침은 연달아 누를 수 있어 의뢰를

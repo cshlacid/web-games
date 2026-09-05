@@ -76,6 +76,8 @@ function settle(progress, state, party, method, lootSeed, dropsOverride, contrac
   // 간다 — 이 게임은 아군이 자주 쓰러진다.
   const joinedSet = new Set(names);
   const rested = progress.roster.filter((m) => !joinedSet.has(m.name)).map((m) => Rep.rest(m));
+  // 일이 없으면 마을을 떠난다. 이긴 판이든 진 판이든 한 판은 한 판이다.
+  const left = R.tickIdle(progress.roster, names, 4, Rep.isFriend);
   const repMove = Rep.addRep(progress, Rep.repDelta(quest, progress.charLevel, won,
     [...downed].filter((name) => name !== D.HERO.name).length).delta);
 
@@ -108,7 +110,7 @@ function settle(progress, state, party, method, lootSeed, dropsOverride, contrac
     progress.shopSeed = 54321;
   }
 
-  return { won, reward, deal, gained, roster, purses, bought, lines, mine, handed, members,
+  return { won, reward, deal, gained, roster, purses, bought, left, lines, mine, handed, members,
     trustMoves, repMove, rested };
 }
 
@@ -198,7 +200,17 @@ function runQuest(progress, seed, autoHeal, questOver) {
   check('골드가 들어온다', progress.gold > goldBefore, true);
   check('의뢰를 깬 것으로 센다', progress.cleared, 1);
   check('경험치가 오른다', out.reward.charExp > 0, true);
-  check('명부 전원이 보고에 들어간다', out.roster.length, progress.roster.length);
+  // 떠난 사람은 보고를 받은 뒤에 빠지므로, 지금 명부에 그만큼을 더해야 맞다.
+  check('명부 전원이 보고에 들어간다',
+    out.roster.length, progress.roster.length + out.left.length);
+  // 한 판으로는 아무도 안 떠난다 — 봐 주는 판이 있다.
+  check('한 판으로는 떠나지 않는다', out.left.length, 0);
+  check('데려간 동료는 쉰 판이 0으로 돌아간다',
+    progress.roster.filter((m) => party.some((p) => p.name === m.name))
+      .every((m) => m.idle === 0), true);
+  check('안 데려간 동료는 쉰 판이 쌓인다',
+    progress.roster.filter((m) => !party.some((p) => p.name === m.name))
+      .every((m) => m.idle > 0), true);
 
   // **보수를 내고 남는 것이 주인공 몫이다.** 동료마다 부른 값이 다르므로 인원수로
   // 나눈 값과 견줄 수 없다 — 합계가 적힌 금액을 넘지 않는지로 본다.
