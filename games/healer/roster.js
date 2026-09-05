@@ -15,7 +15,26 @@ const Shop = node ? require('./shop.js') : root.HealerShop;
 // 처음 명부에 있는 동료 수. 여섯이던 것을 늘렸다 — 편성 목록이 격자가 되면서
 // 한 화면에 더 담을 수 있게 됐고, 여섯일 때에는 고를 것이 사실상 정해져 있었다.
 const START_SIZE = 9;
-const MAX_SIZE = 14;    // 이 이상은 새로 들어오지 않는다 — 편성 화면이 목록 훑기가 된다
+// **명부의 상한.** 열넷이던 때에는 한 번에 보여 주는 수(열)와 거의 같아, 새로
+// 고쳐도 같은 얼굴이 돌아왔다 — 뽑는 것이 아니라 순서만 섞는 셈이었다. 스물넷이면
+// 열 자리를 채우는 방법이 훨씬 많다. **화면이 길어지지는 않는다**: 편성 목록은
+// 여전히 열까지만 세우고, 명부 전체를 훑는 화면은 없다.
+const MAX_SIZE = 24;
+
+// 길드에 새로 등록하는 모험가의 레벨. **주인공 레벨을 보지 않는다** — 길드는
+// 주인공을 중심으로 돌지 않고, 갓 등록한 초심자가 가장 많은 곳이다. 한 단계
+// 올라갈 때마다 확률이 이 배수만큼 남으므로 낮은 레벨이 흔하고 높은 레벨은 드물다.
+//
+// 예전에는 주인공 레벨 ±1로 맞췄다. 그러면 명부가 늘 주인공과 같은 높이라
+// **"어느 모험가를 데려갈까"가 아니라 "몇 번째 복제품을 데려갈까"**가 됐고,
+// 시시한 의뢰를 거절할 사람도 없었다.
+const GUILD_LEVEL_STEP = 0.78;
+
+function guildLevel(rng) {
+  let level = 1;
+  while (level < D.LEVEL.maxLevel && rng() < GUILD_LEVEL_STEP) level++;
+  return level;
+}
 
 function createRng(seed) {
   let a = (seed >>> 0) || 1;
@@ -266,23 +285,23 @@ function toParty(member) {
 
 // --- 새 동료 ------------------------------------------------------------
 
-// 의뢰를 깰 때마다 낮은 확률로 명부에 새 얼굴이 들어온다. 레벨은 주인공 근처로
-// 맞춘다 — 1레벨이 들어오면 명부에만 있고 아무도 안 데려간다.
+// 의뢰를 깰 때마다, 그리고 편성 화면에서 목록을 새로 고칠 때마다 명부에 새 얼굴이
+// 들어온다. **레벨은 길드의 분포를 따른다**(`guildLevel`) — 주인공 레벨은 인자로
+// 받지도 않는다.
 //
-// **확률을 밖에서 받는다.** 편성 화면의 "동료 새로 고침"도 같은 규칙을 쓰는데,
-// 그쪽은 몇 번이고 연달아 누를 수 있어 같은 확률이면 여덟 번에 명부가 상한까지
-// 찬다(실제로 9 → 14였다). 의뢰를 깨는 쪽이 새 얼굴을 만나는 본래 자리다.
+// **확률을 밖에서 받는다.** 새로 고침은 몇 번이고 연달아 누를 수 있어 의뢰를 깨는
+// 쪽보다 조금 낮게 둔다. 그래도 명부 상한이 스물넷이라, 눌러서 새 얼굴을 만나는
+// 것이 이 단추의 값이다.
 const JOIN_CHANCE = 0.45;
-const REDRAW_JOIN_CHANCE = 0.12;
+const REDRAW_JOIN_CHANCE = 0.35;
 
-function maybeJoin(members, playerLevel, seed, chance) {
+function maybeJoin(members, seed, chance) {
   if (members.length >= MAX_SIZE) return null;
   const rng = createRng(seed == null ? (Math.random() * 1e9) | 0 : seed);
   if (rng() > (chance == null ? JOIN_CHANCE : chance)) return null;
 
   const taken = new Set(members.map((m) => m.name));
-  const level = Math.max(1, playerLevel + ((rng() * 3) | 0) - 1);
-  const member = makeMember(rng, taken, level);
+  const member = makeMember(rng, taken, guildLevel(rng));
   members.push(member);
   return member;
 }
@@ -335,7 +354,7 @@ const api = {
   create, adopt, makeMember, jobOf, specOf, baseSpecOf, spriteOf, defOf, skillsOf,
   specChoices, canChangeSpec, changeSpec, remember,
   gainExp, awardExp, awardGold, goShopping, offerGear, gearOf, bonusOf, potionsOf, toParty, maybeJoin,
-  JOIN_CHANCE, REDRAW_JOIN_CHANCE,
+  JOIN_CHANCE, REDRAW_JOIN_CHANCE, GUILD_LEVEL_STEP, guildLevel,
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = api;

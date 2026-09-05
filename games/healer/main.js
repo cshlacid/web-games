@@ -1016,7 +1016,7 @@ function renderRoster() {
 $('roster-refresh').addEventListener('click', () => {
   sound.play('click');
   app.rosterSeed = (Math.random() * 1e9) | 0;
-  const joined = Roster.maybeJoin(app.progress.roster, app.progress.charLevel,
+  const joined = Roster.maybeJoin(app.progress.roster,
     (Math.random() * 1e9) | 0, Roster.REDRAW_JOIN_CHANCE);
   if (joined) persist();
   drawCandidates();
@@ -2354,7 +2354,7 @@ function openResult(state) {
     app.progress.cleared++;
     app.progress.questSeed = (Math.random() * 1e9) | 0;
     app.progress.shopSeed = (Math.random() * 1e9) | 0;
-    joined = Roster.maybeJoin(app.progress.roster, app.progress.charLevel, (Math.random() * 1e9) | 0);
+    joined = Roster.maybeJoin(app.progress.roster, (Math.random() * 1e9) | 0);
     refreshQuests();
   }
 
