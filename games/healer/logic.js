@@ -451,6 +451,10 @@ function runUnitSkill(state, unit, choice) {
     icon: def.icon, css: kind.css,
     text: `${unit.name}: ${def.name}` });
 
+  // 넉백은 종류가 아니라 얹는 값이라 여기서 한 번에 본다(`knock`). 종류로 두면
+  // 밀치기가 기절도 걸고 피해도 넣는 것을 표현할 수 없다.
+  if (def.knock) knockback(state, unit, target, def.knock);
+
   if (def.kind === 'taunt' || def.kind === 'taunt-area') {
     // 광역 도발은 반경 안의 적을 한꺼번에 끌어온다. 탱커 하나가 여러 적의
     // 어그로를 다 붙들지 못해 후방이 무너지던 것을 푸는 스킬이라, 대상 하나만
@@ -594,9 +598,9 @@ function tickCast(state, unit) {
   else runUnitSkill(state, unit, { id: cast.skillId, targetUid: cast.targetUid });
 }
 
-// **스스로 움직이면 시전이 취소된다.** 밀려나는 것(separate)은 여기를 거치지
-// 않으므로 취소가 아니다 — 대열을 벌리는 힘까지 취소로 치면 캐스팅 스킬이 아예
-// 나가지 않는다.
+// **스스로 움직이면 시전이 취소된다.** 넉백으로 밀려나는 것은 여기를 거치지
+// 않으므로 취소가 아니다 — 남이 옮긴 자리까지 취소로 치면, 시전 중에는 아무도
+// 나를 건드리지 못한다는 규칙이 하나 더 생긴다.
 function moveToward(state, unit, point, dt) {
   const dx = point.x - unit.x;
   const dy = point.y - unit.y;
@@ -608,47 +612,34 @@ function moveToward(state, unit, point, dt) {
   unit.y += (dy / d) * step;
 }
 
-// 서로 겹쳐 서면 화면에서 유닛을 구분할 수 없고, 장판을 어디에 깔지 고르는
-// 의미도 사라진다. 매 틱 조금씩 밀어내는 것으로 충분하다.
-//
-// **같은 편끼리만 밀어낸다.** 양쪽을 다 밀었더니 근접 사거리보다 밀어내는 거리가
-// 넓어서, 붙으려는 근접 유닛과 밀어내는 힘이 매 틱 싸우며 사거리 밖에서 진동했다.
-//
-// **미는 방향은 세로로 기울인다.** 가로 거리가 곧 사거리라서 가로로 밀면 붙었다
-// 떨어졌다를 반복한다. 세로로 밀면 사거리를 거의 건드리지 않으면서 대열이
-// 화면 높이만큼 퍼진다 — 다 같은 줄에 서 있으면 범위 스킬을 어디에 쓰든 똑같아진다.
-const SPACING = 10;
-const PUSH_X = 0.3;
-
-function separateSide(state, side) {
-  const list = alive(state, side);
-  for (let i = 0; i < list.length; i++) {
-    for (let j = i + 1; j < list.length; j++) {
-      const a = list[i];
-      const b = list[j];
-      if (!a.speed && !b.speed) continue;
-      const dx = b.x - a.x;
-      const dy = b.y - a.y;
-      const d = Math.sqrt(dx * dx + dy * dy);
-      if (d >= SPACING || d === 0) continue;
-      const push = (SPACING - d) / 2;
-      // 정확히 겹쳐 있으면 방향이 없다. 세로로 갈라 놓아야 다음 틱에 방향이 생긴다.
-      const ux = (dx / d) * PUSH_X;
-      const uy = dy === 0 ? 1 : dy / d;
-      if (a.speed) { a.x -= ux * push; a.y -= uy * push; }
-      if (b.speed) { b.x += ux * push; b.y += uy * push; }
-    }
-  }
-}
-
-function separate(state) {
-  separateSide(state, 'ally');
-  separateSide(state, 'enemy');
+// **아무도 남을 밀지 않는다.** 예전에는 매 틱 같은 편끼리 밀어내 대열을 벌렸는데,
+// 그러면 유닛이 제 발로 간 적 없는 자리에 서 있게 된다 — 붙으려는 근접 유닛과
+// 미는 힘이 매 틱 싸워 사거리 밖에서 떨었고, 굳은 유닛도 슬금슬금 흘러갔다.
+// 겹치지 않게 하는 일은 이제 `ai.stepAside`가 맡는다: 겹친 쪽이 스스로 비켜선다.
+// 남의 좌표를 옮기는 것은 넉백 스킬(`def.knock`)뿐이다.
+function holdInField(state) {
   for (const unit of state.units) {
     if (unit.dead) continue;
     unit.x = Math.min(D.FIELD.w - 4, Math.max(4, unit.x));
     unit.y = Math.min(D.FIELD.bottom, Math.max(D.FIELD.top, unit.y));
   }
+}
+
+// 넉백. **남의 좌표를 옮기는 유일한 길이다.** 미는 방향은 시전자에서 대상으로
+// 가는 직선이고, 정확히 겹쳐 서 있으면 방향이 없으므로 시전자가 보는 앞쪽으로 민다.
+//
+// **밀리는 것은 스스로 움직이는 것이 아니라 시전을 끊지 않는다.** 끊고 싶으면
+// 기절을 함께 건다 — 방패 밀치기가 그렇다.
+function knockback(state, caster, target, distance) {
+  if (!target || target.dead || !distance) return;
+  const dx = target.x - caster.x;
+  const dy = target.y - caster.y;
+  const d = Math.sqrt(dx * dx + dy * dy);
+  const ux = d === 0 ? (caster.side === 'ally' ? 1 : -1) : dx / d;
+  const uy = d === 0 ? 0 : dy / d;
+  target.x += ux * distance;
+  target.y += uy * distance;
+  holdInField(state);
 }
 
 // --- 플레이어 조작 -----------------------------------------------------
@@ -697,6 +688,9 @@ function resolvePlayerSkill(state, def, spot) {
   // 않는다 — 회복 쪽 계수가 더 크다.
   const heal = (base) => Math.round(base * caster.healPower);
   const harm = (base) => Math.round(base * magicPowerOf(caster));
+
+  // 넉백은 종류가 아니라 얹는 값이다(`knock`) — 동료 스킬과 같은 규칙이다.
+  if (def.knock && unit) knockback(state, caster, unit, def.knock);
 
   // **강화·약화와 마나 나눔은 종류를 보고 가른다.** 나머지가 대상(`targeting`)으로
   // 갈리는 것과 다른 것은, 같은 "아군 하나"에도 회복·마나·강화가 함께 있기
@@ -910,15 +904,15 @@ function step(state, dt) {
 
   if (state.marching) {
     march(state, dt);
-    separate(state);
+    holdInField(state);
     checkEnd(state);
     return;
   }
 
   for (const unit of state.units) {
     if (unit.dead) continue;
-    // 기절한 동안에는 아무것도 하지 않는다. 대열을 벌리는 힘(separate)은 그대로
-    // 받는다 — 그것은 스스로 움직이는 것이 아니라 서로 밀리는 것이다.
+    // 기절한 동안에는 아무것도 하지 않는다. 넉백은 그대로 받는다 — 그것은 스스로
+    // 움직이는 것이 아니라 남이 옮기는 것이다.
     if (stunned(state, unit)) continue;
 
     // 시전 중이면 그 틱은 외우는 데만 쓴다. 다시 판단하지 않는 것은, 매 틱 새로
@@ -948,7 +942,7 @@ function step(state, dt) {
     }
   }
 
-  separate(state);
+  holdInField(state);
   checkEnd(state);
 }
 
@@ -1032,7 +1026,7 @@ const api = {
   rewardOf, dropsOf, battleReport,
   createRng, createBattle, advance, step, drainEvents,
   castSkill, playerSkill, usePotion, drink, magicPowerOf, rollCrit, applyDamage, applyHeal, addDot, addZone, addAura,
-  hero, skillSlot, resolveTarget, moveToward, giveMana, zoneX,
+  hero, skillSlot, resolveTarget, moveToward, giveMana, zoneX, knockback,
   startCast, tickCast, cancelCast, runUnitSkill, resolvePlayerSkill, stun, stunned,
 };
 

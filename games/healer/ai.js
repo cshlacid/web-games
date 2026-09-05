@@ -471,8 +471,7 @@ function anchorOf(unit, state) {
 // **후열은 맞아도 도망가지 않는다.** 도망가면 어그로를 끌 탱커에게서 멀어지고,
 // 결국 탱커가 닿지 못하는 곳에서 혼자 맞는다. 탱커 곁에 붙어 있어야 탱커가
 // 그 적을 도발 사거리 안에 둔다. 붙을 탱커도 근접 딜러도 없을 때에만 물러선다.
-function chooseMove(unit, state, target) {
-  if (!unit.speed) return null;
+function wantedMove(unit, state, target) {
   const role = roleOf(unit);
 
   if (role === 'healer' || role === 'ranged') {
@@ -510,6 +509,40 @@ function chooseMove(unit, state, target) {
   return dist(unit, target) > want ? standoff(unit, target, want) : null;
 }
 
+// 겹쳐 서면 화면에서 누가 누구인지 알 수 없고, 장판을 어디에 깔지 고르는 의미도
+// 사라진다. **예전에는 logic.js가 매 틱 서로를 밀어냈다.** 그것을 걷어 낸 자리가
+// 여기다 — 미는 대신 겹친 쪽이 제 발로 비켜선다. 남의 좌표를 옮기는 것은 넉백뿐이다.
+//
+// **양보하는 쪽은 늘 한쪽이다**(uid가 큰 쪽). 둘 다 비키면 서로를 피하다 매 틱
+// 자리를 바꾸며 떠는데, 밀어내기가 사거리 밖에서 떨던 것과 같은 모양이 된다.
+//
+// **가로가 아니라 세로로 비킨다.** 가로 거리가 곧 사거리라서 가로로 옮기면 붙었다
+// 떨어졌다를 반복한다. 세로로 벌리면 사거리를 거의 건드리지 않는다.
+const SPACING = 10;
+
+function freeSpot(unit, state, spot) {
+  const seniors = mates(unit, state)
+    .filter((mate) => mate.uid < unit.uid)
+    .sort((a, b) => (a.uid < b.uid ? -1 : 1));
+  let y = spot.y;
+  for (const mate of seniors) {
+    if (Math.abs(mate.x - spot.x) >= SPACING) continue;
+    if (Math.abs(mate.y - y) >= SPACING) continue;
+    y = mate.y + (y >= mate.y ? SPACING : -SPACING);
+  }
+  return { x: spot.x, y: Math.min(D.FIELD.bottom, Math.max(D.FIELD.top, y)) };
+}
+
+function chooseMove(unit, state, target) {
+  if (!unit.speed) return null;
+  const wanted = wantedMove(unit, state, target);
+  const spot = freeSpot(unit, state, wanted || { x: unit.x, y: unit.y });
+  // 가려던 곳이 없으면 겹쳤을 때만 움직인다. 그 문턱이 없으면 비켜설 자리와
+  // 지금 자리가 반 칸 차이일 때에도 매 틱 걸어, 후열의 캐스팅이 계속 끊긴다.
+  if (!wanted) return dist(unit, spot) > 1 ? spot : null;
+  return spot;
+}
+
 function decide(unit, state) {
   const target = chooseTarget(unit, state);
   const potion = choosePotion(unit, state);
@@ -527,7 +560,7 @@ function decide(unit, state) {
 
 const api = {
   dist, alive, byUid, opposite, nearest, roleOf, rankOf, frontTank, anchorOf, behind,
-  tauntReserve, manaTarget,
+  tauntReserve, manaTarget, freeSpot, SPACING,
   attackersOf, endangered, healReach,
   chooseTarget, healTarget, chooseSkill, choosePotion, chooseMove, decide,
   POTION_HP, POTION_MP, STICK, RETREAT, SPREAD,

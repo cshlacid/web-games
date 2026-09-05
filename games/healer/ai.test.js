@@ -129,7 +129,12 @@ function gather(state) {
   // 도발이 쿨타임이면 다시 나가지 않는다.
   const again = enemyOf(state, 'tank');
   again.targetUid = named(state, '사제 노아').uid;
-  check('도발은 쿨타임 동안 다시 안 나간다', AI.chooseSkill(tank, state, again), null);
+  // 아무 스킬도 안 나가는지가 아니라 **도발이** 안 나가는지를 본다. 때리는
+  // 스킬은 사거리만 맞으면 나가도 되고, 사거리는 대열이 어떻게 서느냐에 따라
+  // 달라진다.
+  const later = AI.chooseSkill(tank, state, again);
+  check('도발은 쿨타임 동안 다시 안 나간다',
+    Boolean(later && D.UNIT_SKILLS[later.id].kind.startsWith('taunt')), false);
 }
 {
   // 여럿이 풀렸으면 힐러 → 원거리 → 근접 순으로 구한다.

@@ -554,9 +554,12 @@ const UNIT_SKILLS = {
             desc: '방패로 밀어붙인다' },
   // 기절. 근접 세 계열(수호·전사·도적)만 갖는다 — 붙어 있어야 넣을 수 있는 것이
   // 기절이고, 멀리서 거는 수단까지 있으면 후열이 아무것도 못 하는 판이 나온다.
+  // **남의 자리를 옮기는 유일한 스킬이다**(`knock`). 대열은 서로 밀리지 않으므로,
+  // 적을 물러나게 하려면 이렇게 적어 둔 스킬이 있어야 한다. 굳혀 두지 않으면
+  // 밀어 놓자마자 걸어 돌아와 민 표가 나지 않아, 기절과 한 몸으로 둔다.
   shieldSlam: { id: 'shieldSlam', icon: 'shieldSlam', name: '방패 밀치기', spec: 'tank', cd: 16, mp: 22,
-            kind: 'stun', duration: 2.0, range: 9, cast: 0, minLevel: 4,
-            desc: '방패로 찍어 잠시 못 움직이게 한다' },
+            kind: 'stun', duration: 2.0, knock: 8, range: 9, cast: 0, minLevel: 4,
+            desc: '방패로 밀쳐 내고 잠시 못 움직이게 한다' },
   quake:  { id: 'quake', icon: 'quake', name: '발구르기', spec: 'tank', cd: 15, mp: 24, kind: 'damage-area',
             mul: 1.1, radius: 20, range: 9, cast: 0.8, minLevel: 7,
             desc: '땅을 굴러 주변을 흔든다' },
@@ -1383,8 +1386,8 @@ const PLAYER_SKILLS = {
   }),
   shieldSlam: shared('shieldSlam', {
     job: 'crusader', unlock: 5, range: 16, cast: 0, type: '기절', targeting: 'enemy',
-    mp: 26, cd: 14, damage: 100, duration: 1.6,
-    desc: '방패로 밀쳐 굳힌다. 외우던 것이 끊긴다.',
+    mp: 26, cd: 14, damage: 100, duration: 1.6, knock: 8,
+    desc: '방패로 밀쳐 굳힌다. 뒤로 밀려나고 외우던 것이 끊긴다.',
   }),
 
   // --- 서사시인 (음유시인의 상위) ----------------------------------------
