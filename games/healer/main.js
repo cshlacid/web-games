@@ -977,10 +977,22 @@ function renderRoster() {
     const body = el('div', 'pick-body');
     body.append(text('div', 'pick-name', member.name));
     // 카드에는 종족을 적지 않는다. 셋을 다 적으면 좁은 칸에서 줄이 늘어난다.
-    body.append(specTag(member));
+    const tags = el('div', 'pick-tags');
+    tags.append(specTag(member));
+    body.append(tags);
     // **보수와 신뢰도는 카드에 있어야 한다.** 상세를 열어야만 보이면 열 명의
     // 값을 견주는 데 열 번을 열어야 한다. 왜 그 값인지는 상세에서 본다.
     const contract = wageOf(member);
+    // **제 레벨에 맞는 일이라고 보는 동료에게만 표를 단다.** 난이도를 어떻게
+    // 보는지는 그때까지 상세에만 있어서, 열 명을 견주려면 열 번을 열어야 했다.
+    // 다섯 갈래를 다 적지 않는 것은 후보의 대부분이 벅차다·위험하다라, 전부
+    // 적으면 줄마다 글자가 하나 더 붙을 뿐 고르는 데는 도움이 되지 않기
+    // 때문이다(재 보니 알맞다 16% · 벅차다 41% · 위험하다 32%).
+    // **아랫줄이 아니라 계열 옆에 두는 것은** 신뢰도와 보수가 모든 카드에 있어
+    // 세로로 줄이 맞는데, 거기에 끼우면 그 줄이 밀려 카드 폭을 넘기 때문이다.
+    if (contract && contract.feel.id === 'fit') {
+      tags.append(text('span', 'feel-tag', contract.feel.name));
+    }
     if (contract) {
       const deal = el('div', 'pick-deal');
       const stage = Rep.trustStage(contract.trust);
