@@ -1774,15 +1774,21 @@ const tierCeiling = () => TIERS.length - 1;
 // **1 근처에서 좁게 흔든다.** 보수의 기준이 의뢰 골드의 1인 몫이라(hire.js),
 // 배수들의 곱이 1을 크게 넘으면 넷을 데려가는 순간 주인공 몫이 늘 음수가 되어
 // 편성이 "적게 데려가기"만 남는다.
+//
+// **폭을 1.06~0.90에서 1.02~1.00으로 크게 좁혔다.** 주인공 몫이 길드 돈에서
+// 보수를 뺀 나머지라, 동료 넷에게 1% 깎인 값이 주인공에게는 4% 가까이 얹힌다 —
+// 영웅 단계의 10% 할인 하나가 주인공을 동료의 두 배 가까이로 만들었다. 여기서
+// 남기는 것은 "이름이 나면 조금 싸다"는 방향뿐이고, 이름값의 본업은 여전히
+// `questGap`이다.
 const REPUTATION = {
   start: 0,
   max: 1000,
   stages: [
-    { id: 'unknown', name: '무명',   min: 0,   questGap: 1, wage: 1.06 },
-    { id: 'known',   name: '알려짐', min: 80,  questGap: 2, wage: 1.02 },
-    { id: 'trusted', name: '믿음직', min: 240, questGap: 3, wage: 0.98 },
-    { id: 'famed',   name: '이름난', min: 480, questGap: 4, wage: 0.94 },
-    { id: 'hero',    name: '영웅',   min: 760, questGap: 5, wage: 0.90 },
+    { id: 'unknown', name: '무명',   min: 0,   questGap: 1, wage: 1.020 },
+    { id: 'known',   name: '알려짐', min: 80,  questGap: 2, wage: 1.015 },
+    { id: 'trusted', name: '믿음직', min: 240, questGap: 3, wage: 1.010 },
+    { id: 'famed',   name: '이름난', min: 480, questGap: 4, wage: 1.005 },
+    { id: 'hero',    name: '영웅',   min: 760, questGap: 5, wage: 1.000 },
   ],
 };
 
@@ -1845,12 +1851,20 @@ const TRUST = {
 // 평균 1.5였고, 그래서 **게시판의 51%가 시시하다·쉽다로 읽혔다.** 규칙이 늘
 // 켜져 있으면 그것은 규칙이 아니라 기본값이다. 지금은 두 레벨 아래까지 알맞다로
 // 보고, 다시 재 보니 시시 4% · 쉽다 10% · 알맞다 54%다.
+//
+// **`wage`의 폭을 크게 좁혔다**(위험하다 1.42 → 1.16). 주인공 몫이 길드 돈에서
+// 보수를 뺀 나머지라, 동료 넷에게 걸린 배수 1%가 주인공에게는 4% 가까이로
+// 돌아온다 — 그리고 **명부에는 늘 주인공보다 낮은 새 얼굴이 섞여 있어**(길드
+// 레벨은 주인공과 무관하다) 그들이 이 의뢰를 위험하다고 보는 일이 잦다. 폭이
+// 넓던 동안에는 레벨이 오를수록 파티의 평균 배수가 올라, 같은 값으로도 주인공
+// 몫이 판마다 크게 흔들렸다. 방향(시시해도 비싸고 위험해도 비싸다, 기획서 12장)은
+// 그대로 두고 크기만 줄였다.
 const TRUST_FEEL = [
-  { upTo: -4,       id: 'trivial', name: '시시하다', trust: -10, wage: 1.20, downRelief: 0 },
-  { upTo: -3,       id: 'easy',    name: '쉽다',    trust: -3,  wage: 1.06, downRelief: 4 },
+  { upTo: -4,       id: 'trivial', name: '시시하다', trust: -10, wage: 1.12, downRelief: 0 },
+  { upTo: -3,       id: 'easy',    name: '쉽다',    trust: -3,  wage: 1.03, downRelief: 4 },
   { upTo: 0,        id: 'fit',     name: '알맞다',  trust: 8,   wage: 1.00, downRelief: 10 },
-  { upTo: 2,        id: 'hard',    name: '벅차다',  trust: 15,  wage: 1.15, downRelief: 20 },
-  { upTo: Infinity, id: 'deadly',  name: '위험하다', trust: 22,  wage: 1.42, downRelief: 30 },
+  { upTo: 2,        id: 'hard',    name: '벅차다',  trust: 15,  wage: 1.06, downRelief: 20 },
+  { upTo: Infinity, id: 'deadly',  name: '위험하다', trust: 22,  wage: 1.16, downRelief: 30 },
 ];
 
 // 실패한 의뢰. 성공했을 때의 표와 나란히 두지 않은 것은, 실패는 난이도가 무엇이든
@@ -1881,7 +1895,13 @@ const GIFT = { div: 3, cap: 25, likedMul: 1.5 };
 // 돈이 안 들어와 다음 판에는 더 못 데려가는 내리막이 생긴다(재 보니 스무 판
 // 만에 파티가 하나까지 줄었다). 기획서 11장의 예도 이쪽이다 — 1,000G에서 셋이
 // 450G를 가져가고 주인공이 550G를 남긴다.
-const WAGE_BASE = 0.85;
+//
+// **0.85에서 0.91로 올렸다.** 주인공 몫이 나머지라 이 값이 곧 "동료보다 얼마나
+// 더 가져가는가"를 정하는데, 0.85는 넷을 데려가도 0.6몫이 남아 주인공이 늘 한
+// 사람 반을 가져갔다. 0.91이면 판을 이어서 돌린 중앙값이 1.1~1.2배다(아래 TRUST_FEEL
+// 주석과 같은 측정이다). **1에 붙일 수는 없다** — 붙이면 배수가 조금만 1을 넘는
+// 순간 주인공 몫이 음수가 되어 위의 내리막이 돌아온다.
+const WAGE_BASE = 0.91;
 
 // 동료의 경제적 성격(기획서 16장). **차이를 좁게 둔다** — 벌리면 특정 성격만
 // 데려가는 것이 정답이 되어, 전투 능력과 의뢰 적합도가 판단에서 밀려난다.
