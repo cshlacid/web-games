@@ -1167,6 +1167,9 @@ function makeUnitNode(unit) {
   // 발밑에 색 있는 발판을 깔아 그 일을 대신한다 — 그림자 노릇도 같이 한다.
   node.append(el('div', 'mark'));
   if (Sprites.sheet(unit.sprite)) {
+    // 걷는 그림이 따로 있는 유닛이라는 표시. 무리 사이 흔들기(`trudge`)를
+    // 여기에 걸면 제 걸음 위에 흔들림이 겹쳐 두 번 걷는 것처럼 보인다.
+    node.classList.add('is-sheet');
     node.append(sheetBody(unit.sprite, 'sprite'));
   } else {
     node.insertAdjacentHTML('beforeend', Sprites.svg(unit.sprite));
