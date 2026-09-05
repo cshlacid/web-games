@@ -225,10 +225,10 @@ const SEEDS = [1, 5, 77, 4242, 20260825];
   check('새로 고침 확률이 더 낮다', R.REDRAW_JOIN_CHANCE < R.JOIN_CHANCE, true);
   const never = R.create(21);
   let added = 0;
-  for (let i = 0; i < 50; i++) if (R.maybeJoin(never, 5, i, 0)) added++;
+  for (let i = 0; i < 50; i++) if (R.maybeJoin(never, i, 0)) added++;
   check('확률 0이면 아무도 안 들어온다', added, 0);
   const always = R.create(21);
-  check('확률 1이면 들어온다', Boolean(R.maybeJoin(always, 5, 1, 1)), true);
+  check('확률 1이면 들어온다', Boolean(R.maybeJoin(always, 1, 1)), true);
 }
 {
   // 확률이라 한 번으로는 알 수 없다. 여러 씨앗으로 들어오기도 하고 안 들어오기도
@@ -236,25 +236,38 @@ const SEEDS = [1, 5, 77, 4242, 20260825];
   let joins = 0;
   for (let seed = 1; seed <= 40; seed++) {
     const roster = R.create(seed);
-    if (R.maybeJoin(roster, 5, seed)) joins++;
+    if (R.maybeJoin(roster, seed)) joins++;
   }
   check('가끔 들어온다', joins > 0, true);
   check('늘 들어오지는 않는다', joins < 40, true);
 
   const roster = R.create(2);
   const before = roster.map((m) => m.name);
-  const member = R.maybeJoin(roster, 8, 3) || R.maybeJoin(roster, 8, 5) || R.maybeJoin(roster, 8, 9);
+  const member = R.maybeJoin(roster, 3) || R.maybeJoin(roster, 5) || R.maybeJoin(roster, 9);
   if (member) {
     check('명부에 들어간다', roster.includes(member), true);
     check('이름이 겹치지 않는다', before.includes(member.name), false);
-    // 1레벨이 들어오면 명부에만 있고 아무도 안 데려간다.
-    check('주인공 레벨 근처로 들어온다', Math.abs(member.level - 8) <= 2, true);
+    check('레벨이 1 이상 상한 이하', member.level >= 1 && member.level <= D.LEVEL.maxLevel, true);
   }
+
+  // **길드의 레벨 분포는 주인공과 무관하다.** 갓 등록한 초심자가 가장 많고 위로
+  // 갈수록 드물어야, 명부가 "주인공의 복제품 열넷"이 아니라 길드가 된다.
+  const levels = [];
+  for (let seed = 1; seed <= 3000; seed++) {
+    const guild = [];
+    const joined = R.maybeJoin(guild, seed, 1);
+    if (joined) levels.push(joined.level);
+  }
+  const share = (n) => levels.filter((lv) => lv === n).length / levels.length;
+  check('1레벨이 가장 많다', share(1) > share(2) && share(2) > share(3), true);
+  check('절반 넘게 다섯 아래다', levels.filter((lv) => lv <= 5).length / levels.length > 0.5, true);
+  check('높은 레벨도 가끔 온다', levels.some((lv) => lv >= 10), true);
+  check('상한을 넘지 않는다', levels.every((lv) => lv <= D.LEVEL.maxLevel), true);
 
   // 명부가 너무 길어지면 편성 화면이 목록 훑기가 된다.
   const crowd = R.create(1);
   while (crowd.length < R.MAX_SIZE) crowd.push(R.makeMember(Items.createRng(crowd.length), new Set(crowd.map((m) => m.name)), 1));
-  check('상한을 넘지 않는다', R.maybeJoin(crowd, 5, 1), null);
+  check('상한을 넘지 않는다', R.maybeJoin(crowd, 1), null);
 }
 
 // --- 저장본 -------------------------------------------------------------

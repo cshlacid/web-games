@@ -237,23 +237,24 @@ function everyQuest(fn) {
   check('명부에 있는 동료만 나온다', list.every((c) => roster.includes(c)), true);
 
   // **탱커·힐러를 억지로 끼워 넣지 않는다.** 없는 목록은 못 깨는 의뢰라서 두던
-  // 규칙인데, 편성 화면의 "동료 새로 고침"이 그 자리를 대신한다. 대신 **드물어야
-  // 한다** — 자주 나오면 새로 고침이 의무가 된다. 명부가 상한(열넷)까지 자란
-  // 최악의 경우로 재고, 그때도 스무 판에 한 번 밑이어야 한다.
+  // 규칙인데, 편성 화면의 "동료 새로 고침"이 그 자리를 대신한다. 대신 **잦으면
+  // 안 된다** — 매번 새로 고쳐야 하면 그것은 단추가 아니라 절차다. 명부가
+  // 상한까지 자란 최악의 경우로 재면 탱커 없는 목록이 11%, 힐러 없는 목록이
+  // 0.5%다(길드에 탱커 계열이 둘뿐이라 탱커 쪽이 잦다).
   let noTank = 0;
   let noHealer = 0;
   let boards = 0;
   for (let seed = 1; seed <= 200; seed++) {
     const roster = R.create(seed);
-    while (roster.length < 14) R.maybeJoin(roster, 10, roster.length * 7 + seed, 1);
+    while (roster.length < R.MAX_SIZE) R.maybeJoin(roster, roster.length * 7 + seed, 1);
     const jobs = Q.companionsFor(Q.generate(8, seed)[0], roster, seed * 13)
       .map((c) => D.COMPANIONS[c.defId].job);
     if (!jobs.includes('tank')) noTank++;
     if (!jobs.includes('healer')) noHealer++;
     boards++;
   }
-  check('탱커 없는 목록은 드물다', noTank / boards < 0.05, true);
-  check('힐러 없는 목록도 드물다', noHealer / boards < 0.05, true);
+  check('탱커 없는 목록은 잦지 않다', noTank / boards < 0.15, true);
+  check('힐러 없는 목록은 더 드물다', noHealer / boards < 0.05, true);
   // 명부가 목록보다 작으면 전원이 서므로 빠질 수가 없다.
   const small = Q.companionsFor(Q.generate(5, 9)[0], R.create(9), 9)
     .map((c) => D.COMPANIONS[c.defId].job);

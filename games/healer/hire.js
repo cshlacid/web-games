@@ -70,6 +70,13 @@ function willJoin(member, quest) {
   if (feel.id === 'deadly' && (stage.id === 'hate' || stage.id === 'broken')) {
     return { ok: false, reason: '이런 일을 당신과 할 수는 없습니다.', stage, feel };
   }
+  // **시시한 일은 거절한다.** 길드의 모험가는 주인공 레벨에 맞춰 나오는 것이
+  // 아니라 제 경력이 있고(`roster.guildLevel`), 한참 아래 의뢰는 시간 낭비다 —
+  // 값을 더 부르는 것(`TRUST_FEEL`의 `wage`)만으로는 "안 가는 자리"가 없었다.
+  // **믿는 사이면 따라나선다**: 관계가 그 손해를 대신 갚는 자리다.
+  if (feel.id === 'trivial' && !(stage.id === 'high' || stage.id === 'bond')) {
+    return { ok: false, reason: '이런 일에 저까지 부르실 필요는 없습니다.', stage, feel };
+  }
   return { ok: true, reason: stage.line, stage, feel };
 }
 

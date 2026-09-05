@@ -250,7 +250,7 @@ function runQuest(progress, seed, autoHeal, questOver) {
   }
 
   // 새 동료가 들어와도 명부가 깨지지 않는다.
-  R.maybeJoin(progress.roster, progress.charLevel, 3);
+  R.maybeJoin(progress.roster, 3);
   const names = progress.roster.map((m) => m.name);
   check('이름이 겹치지 않는다', new Set(names).size, names.length);
 

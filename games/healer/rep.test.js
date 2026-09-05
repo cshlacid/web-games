@@ -288,6 +288,28 @@ const nameWithTrait = (want) => {
     Rep.giftValue(m, staff, 'healer').trust > Rep.giftValue(m, staff, 'tank').trust, true);
 }
 
+// --- 모집에 응하는가 ------------------------------------------------------
+//
+// 거절하는 자리가 없으면 신뢰도는 값을 깎아 주는 숫자일 뿐이다.
+{
+  const plain = member(nameWithTrait('coin'), 5, 0);       // 중립
+  const friend = member(nameWithTrait('coin'), 5, 90);     // 매우 높은 신뢰
+  const hated = member(nameWithTrait('coin'), 5, -90);     // 관계 단절
+
+  check('관계가 끊어지면 얼마를 줘도 안 간다', Hire.willJoin(hated, quest(5)).ok, false);
+  check('알맞은 일에는 응한다', Hire.willJoin(plain, quest(5)).ok, true);
+
+  // **시시한 일은 거절한다.** 길드의 모험가는 주인공 레벨에 맞춰 나오는 것이
+  // 아니라 제 경력이 있어, 한참 아래 의뢰는 시간 낭비다.
+  const trivial = quest(1);
+  check('시시한 의뢰는 거절한다', Hire.willJoin(plain, trivial).ok, false);
+  check('그 이유를 적는다', Hire.willJoin(plain, trivial).feel.id, 'trivial');
+  // 믿는 사이면 따라나선다 — 관계가 그 손해를 대신 갚는 자리다.
+  check('친구는 시시해도 따라온다', Hire.willJoin(friend, trivial).ok, true);
+  // 쉬운 정도로는 거절하지 않는다. 거기까지 막으면 고를 의뢰가 사라진다.
+  check('쉬운 정도는 응한다', Hire.willJoin(plain, quest(2)).ok, true);
+}
+
 // --- 보수 계산(기획서 11~13장) --------------------------------------------
 {
   const q = quest(5);
