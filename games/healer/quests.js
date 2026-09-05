@@ -29,14 +29,22 @@ const QUEST_COUNT = 4;
 // 바뀌면서 여섯에서 늘렸다 — 여섯일 때에는 한 번 정한 넷을 계속 쓰게 됐다.
 const COMPANION_COUNT = 10;
 
-// 적정 레벨이 주인공 레벨보다 조금 위아래로 흩어져야 고를 이유가 생긴다.
-// 아래쪽이 좁은 것은, 쉬운 퀘스트만 반복하는 것이 최선이 되면 곤란해서다.
+// 적정 레벨이 주인공 레벨보다 위아래로 흩어져야 고를 이유가 생긴다. 가운데를
+// 두 번씩 적어 그쪽이 자주 나오게 하고, 양 끝은 한 번씩만 둔다.
+//
+// **아래쪽을 -3까지 연 것은 게시판이 한 가지 난이도로만 채워졌기 때문이다.**
+// 예전에는 -1이 바닥이라, 평판이 무명인 동안 게시판 넷이 전부 내 레벨 아니면
+// 하나 아래였다(재 보니 서로 다른 난이도가 넷 중 1.79뿐이었다). 화면의 "쉬움"
+// 딱지는 두 레벨 아래부터인데 **그 딱지가 붙는 의뢰가 아예 생길 수 없었다.**
+// 쉬운 판만 반복하는 것을 막는 일은 이제 다른 자리가 맡는다 — 보상이 레벨을
+// 따라가고(`questValue`), 평판은 한참 쉬운 판에 이름값을 거의 안 주며
+// (`REP_CHANGE.easyClear`), 동료는 시시한 판에서 신뢰가 깎인다(`TRUST_FEEL`).
 //
 // **위쪽은 평판이 자른다**(기획서 3장). 무명인 힐러에게 길드가 영웅급 의뢰를
 // 내주지 않는다는 것이 이 시스템의 뜻이고, 이 게임에서 "상위 콘텐츠"라고 부를
 // 수 있는 것은 의뢰의 난이도뿐이다. 자르고 나면 목록이 통째로 비는 일이
-// 없도록 `-1`과 `0`은 어느 평판에서도 남는다.
-const LEVEL_SPREAD = [-1, 0, 0, 1, 1, 2, 3, 4];
+// 없도록 아래쪽과 `0`은 어느 평판에서도 남는다.
+const LEVEL_SPREAD = [-3, -2, -2, -1, -1, 0, 0, 1, 1, 2, 3, 4, 5];
 
 // 이 의뢰에 나오는 가장 높은 적 등급. 전리품의 등급은 쓰러뜨린 적에게서
 // 굴려지므로, 게시판이 미리 말할 수 있는 것은 "무엇이 나오는가"까지다.
@@ -146,12 +154,28 @@ function spreadFor(gap) {
   return open.length ? open : [0];
 }
 
+// 게시판에 이미 걸린 난이도는 피해서 뽑는다. 넷을 따로따로 뽑으면 같은 값이
+// 겹쳐 **고를 것이 없는 게시판**이 나온다 — 가중치를 넓힌 것만으로는 안 됐다.
+// 몇 번 다시 뽑고 그래도 안 되면 남은 값에서 고르며, 쓸 수 있는 난이도가 넷보다
+// 적으면(평판이 낮을 때) 그때는 겹쳐도 둔다.
+function pickLevel(rng, spread, used) {
+  for (let i = 0; i < 8; i++) {
+    const n = pick(rng, spread);
+    if (!used.has(n)) return n;
+  }
+  const rest = spread.filter((n) => !used.has(n));
+  return rest.length ? pick(rng, rest) : pick(rng, spread);
+}
+
 function generate(playerLevel, seed, gap) {
   const rng = createRng(seed);
   const spread = spreadFor(gap);
   const quests = [];
+  const used = new Set();
   for (let i = 0; i < QUEST_COUNT; i++) {
-    const level = Math.max(1, playerLevel + pick(rng, spread));
+    const off = pickLevel(rng, spread, used);
+    used.add(off);
+    const level = Math.max(1, playerLevel + off);
     quests.push(makeQuest(rng, level, i));
   }
   // 쉬운 것부터 보여 준다. 게시판을 훑을 때 고르는 기준이 레벨이기 때문이다.
