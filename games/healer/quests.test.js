@@ -54,6 +54,39 @@ function everyQuest(fn) {
   check('적정 레벨 순으로 정렬', levels.slice().sort((a, b) => a - b), levels);
 }
 
+// --- 늘 서는 자리(친구·고른 동료) ----------------------------------------
+//
+// 명부에서 한 번에 열만 보여 주므로, 공들여 키운 동료가 이번 뽑기에 안 걸리면
+// 데려갈 방법이 없었다. `always`로 넘긴 동료는 뽑기와 상관없이 목록에 선다.
+{
+  const R = require('./roster.js');
+  const roster = R.create(3);
+  const quest = Q.generate(5, 1)[0];
+  const fixed = [roster[2], roster[5]];
+  const list = Q.companionsFor(quest, roster, 11, fixed);
+
+  check('넘긴 동료가 목록에 있다', fixed.every((m) => list.includes(m)), true);
+  check('같은 동료가 두 번 서지 않는다', list.length, new Set(list).size);
+  // **뽑기 자리를 먹지 않는다.** 먹으면 친구가 늘수록 고를 폭이 줄어, 친구를
+  // 만든 것이 손해가 된다.
+  const plain = Q.companionsFor(quest, roster, 11);
+  check('넘긴 만큼 목록이 좁아지지 않는다', list.length >= plain.length, true);
+
+  // 탱커·힐러 보장은 그대로다. 이미 서 있는 쪽이 맡고 있으면 다시 넣지 않는다.
+  const jobOf = (m) => D.COMPANIONS[m.defId].job;
+  check('탱커와 힐러가 있다',
+    ['tank', 'healer'].every((job) => list.some((m) => jobOf(m) === job)), true);
+  const tanks = roster.filter((m) => jobOf(m) === 'tank');
+  const withTank = Q.companionsFor(quest, roster, 11, [tanks[0]]);
+  check('넘긴 쪽이 탱커면 탱커를 또 넣지 않는다',
+    withTank.filter((m) => jobOf(m) === 'tank').length >= 1, true);
+
+  // 명부에 없는 사람은 넣지 않는다 — 저장본이 어긋났을 때 유령이 목록에 선다.
+  const ghost = Q.companionsFor(quest, roster, 11, [{ name: '없는 사람', defId: 'lyle' }]);
+  check('명부에 없는 사람은 안 선다',
+    ghost.every((m) => roster.includes(m)), true);
+}
+
 // --- 게시판에 여러 난이도가 걸린다 ---------------------------------------
 //
 // **예전에는 넷이 한 가지 난이도로 채워졌다.** 아래쪽 폭이 -1까지뿐이라 평판이

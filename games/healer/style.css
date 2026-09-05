@@ -248,6 +248,13 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 }
 /* 주인공 줄은 고를 수 있는 것이 아니므로 한 줄을 통째로 쓴다. */
 .roster > li.wide { grid-column: 1 / -1; }
+/* 묶음 이름표. 카드가 아니라 줄 사이의 안내라 배경 없이 글자만 둔다 — 카드처럼
+   그리면 누를 수 있는 것으로 보인다. */
+.roster > li.group {
+  display: flex; align-items: baseline; gap: 8px;
+  padding: 4px 2px 0; font-size: 13px; font-weight: 700;
+}
+.roster > li.group .group-note { font-size: 12px; font-weight: 400; color: var(--muted); }
 
 .pick.card { padding: 0; gap: 0; overflow: hidden; }
 .pick-open {

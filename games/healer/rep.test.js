@@ -143,6 +143,21 @@ const nameWithTrait = (want) => {
   check('신뢰가 높으면 버틴다', Rep.trustStage(high.trust).id, 'high');
 }
 
+// --- 친구 ---------------------------------------------------------------
+//
+// **새 문턱을 만들지 않고 신뢰도의 마지막 단계를 그대로 쓴다.** 숫자를 따로 두면
+// 화면에 단계와 친구 두 가지를 설명해야 하고 둘이 어긋날 자리가 생긴다.
+{
+  const at = (trust) => Rep.isFriend(member('시험 동료 0', 5, trust));
+  const bond = D.TRUST.stages.find((s) => s.id === 'bond');
+  check('마지막 단계면 친구', at(bond.min), true);
+  check('한 칸 아래는 아직 아니다', at(bond.min - 1), false);
+  check('중립은 친구가 아니다', at(0), false);
+  check('불신은 당연히 아니다', at(-50), false);
+  check('천장에서도 친구', at(D.TRUST.max), true);
+  check('신뢰도가 없는 동료도 답이 나온다', Rep.isFriend({ name: 'x' }), false);
+}
+
 // --- 성격은 이름에서 나온다 ---------------------------------------------
 {
   const m = member('검사 라일', 5, 0);

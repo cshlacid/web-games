@@ -268,12 +268,17 @@ function toParty(member) {
 
 // 의뢰를 깰 때마다 낮은 확률로 명부에 새 얼굴이 들어온다. 레벨은 주인공 근처로
 // 맞춘다 — 1레벨이 들어오면 명부에만 있고 아무도 안 데려간다.
+//
+// **확률을 밖에서 받는다.** 편성 화면의 "동료 새로 고침"도 같은 규칙을 쓰는데,
+// 그쪽은 몇 번이고 연달아 누를 수 있어 같은 확률이면 여덟 번에 명부가 상한까지
+// 찬다(실제로 9 → 14였다). 의뢰를 깨는 쪽이 새 얼굴을 만나는 본래 자리다.
 const JOIN_CHANCE = 0.45;
+const REDRAW_JOIN_CHANCE = 0.12;
 
-function maybeJoin(members, playerLevel, seed) {
+function maybeJoin(members, playerLevel, seed, chance) {
   if (members.length >= MAX_SIZE) return null;
   const rng = createRng(seed == null ? (Math.random() * 1e9) | 0 : seed);
-  if (rng() > JOIN_CHANCE) return null;
+  if (rng() > (chance == null ? JOIN_CHANCE : chance)) return null;
 
   const taken = new Set(members.map((m) => m.name));
   const level = Math.max(1, playerLevel + ((rng() * 3) | 0) - 1);
@@ -330,6 +335,7 @@ const api = {
   create, adopt, makeMember, jobOf, specOf, baseSpecOf, spriteOf, defOf, skillsOf,
   specChoices, canChangeSpec, changeSpec, remember,
   gainExp, awardExp, awardGold, goShopping, offerGear, gearOf, bonusOf, potionsOf, toParty, maybeJoin,
+  JOIN_CHANCE, REDRAW_JOIN_CHANCE,
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = api;

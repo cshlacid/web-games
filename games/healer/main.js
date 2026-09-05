@@ -936,10 +936,28 @@ function renderRoster() {
   heroItem.append(heroRow);
   list.append(heroItem);
 
-  for (const member of app.candidates) {
+  // **친구는 따로 묶어 위에 세운다.** 뽑기와 상관없이 늘 서는 자리라, 같은 격자에
+  // 섞어 두면 이번에 운 좋게 걸린 것인지 늘 있는 것인지 구별되지 않는다.
+  const friends = app.candidates.filter(Rep.isFriend);
+  const drawn = app.candidates.filter((member) => !Rep.isFriend(member));
+  let group = null;
+
+  for (const member of friends.concat(drawn)) {
     const def = Roster.defOf(member);
     const picked = app.party.includes(member);
     const full = app.party.length >= D.PARTY_MAX - 1;
+
+    // 묶음이 바뀌는 자리에 이름표를 한 줄 끼운다. 친구가 없으면 이름표도 없다 —
+    // 빈 묶음 제목만 남으면 무엇이 없는 것인지 화면이 설명해야 한다.
+    const here = friends.includes(member) ? 'friend' : 'drawn';
+    if (friends.length && here !== group) {
+      const label = el('li', 'wide group');
+      label.append(text('span', 'group-name', here === 'friend' ? '친구' : '이번 의뢰 지원자'));
+      label.append(text('span', 'group-note', here === 'friend'
+        ? '신뢰가 쌓여 언제나 함께 간다' : '새로 고치면 다시 뽑힌다'));
+      list.append(label);
+      group = here;
+    }
 
     const row = el('div', 'pick card');
     const open = el('button', 'pick-open');
@@ -991,6 +1009,23 @@ function renderRoster() {
   }
   $('party-count').textContent = `${app.party.length + 1} / ${D.PARTY_MAX}`;
 }
+
+// **새로 고치면 길드에 새 얼굴이 들어와 있을 수 있다.** 다시 뽑기만 하면 명부
+// 아홉을 섞는 것뿐이라, 몇 번 누르면 볼 것이 없어진다. 들어오는 규칙은 의뢰를
+// 깼을 때와 같은 것을 쓴다(`maybeJoin`) — 규칙이 둘이 되면 한쪽만 고치게 된다.
+$('roster-refresh').addEventListener('click', () => {
+  sound.play('click');
+  app.rosterSeed = (Math.random() * 1e9) | 0;
+  const joined = Roster.maybeJoin(app.progress.roster, app.progress.charLevel,
+    (Math.random() * 1e9) | 0, Roster.REDRAW_JOIN_CHANCE);
+  if (joined) persist();
+  drawCandidates();
+  // 새로 뽑은 뒤에는 계약도 다시 낸다 — 목록과 삯이 같은 후보를 봐야 한다.
+  refreshWages();
+  renderRoster();
+  updateStart();
+  if (joined) note(`${joined.name} 합류`);
+});
 
 function toggleMember(member) {
   const picked = app.party.includes(member);
@@ -1406,10 +1441,20 @@ function updateStart() {
   $('start').disabled = app.skills.length === 0 || !afford.ok;
 }
 
+// 편성 목록을 다시 뽑는다. **친구와 이미 고른 동료는 자리를 지킨다** — 새로
+// 고칠 때마다 고른 것이 흩어지면 넷을 고르는 일을 처음부터 다시 하게 되고,
+// 친구는 애초에 뽑기와 상관없이 서는 자리다.
+function drawCandidates() {
+  const keep = app.progress.roster.filter(Rep.isFriend);
+  for (const member of app.party) if (!keep.includes(member)) keep.push(member);
+  app.candidates = Q.companionsFor(app.quest, app.progress.roster, app.rosterSeed, keep);
+}
+
 function openParty(quest) {
   app.quest = quest;
-  app.candidates = Q.companionsFor(quest, app.progress.roster, app.progress.questSeed + quest.level);
+  app.rosterSeed = app.progress.questSeed + quest.level;
   app.party = [];
+  drawCandidates();
   // 얹어 주기는 이번 편성에만 남는다. 다음 의뢰까지 끌고 가면 값이 다른 판의
   // 것이 되어, 부른 값과 얹은 값의 비가 뜻을 잃는다.
   app.tips = {};
