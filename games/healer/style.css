@@ -835,6 +835,9 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
   font-size: 14px; padding: 4px 0; border-bottom: 1px solid var(--line);
 }
 .stats li:last-child { border-bottom: 0; }
+/* 동료가 제 몫으로 산 것. 위 줄에 딸린 이야기라 선 없이 한 단 작게 둔다 —
+   같은 무게로 두면 명부 줄이 두 배로 길어 보인다. */
+.stats li.sub-row { border-bottom: 0; padding-top: 0; font-size: 12.5px; }
 .stat-value { font-variant-numeric: tabular-nums; }
 
 .slot-row, .item {

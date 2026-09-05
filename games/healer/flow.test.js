@@ -45,7 +45,14 @@ function settle(progress, state, party, method, lootSeed, dropsOverride) {
   progress.gold += reward.gold;
   progress.potions = Object.assign({}, state.potions);
 
-  const roster = R.awardExp(progress.roster, party.map((m) => m.name), reward.charExp, 1);
+  const names = party.map((m) => m.name);
+  const roster = R.awardExp(progress.roster, names, reward.charExp, 1);
+  // 길드 골드는 파티가 나눠 갖는다. 동료 몫은 지갑에 쌓이고, 그 돈으로 제
+  // 장비를 산다 — 화면이 밟는 순서를 여기서도 그대로 밟는다.
+  const purses = R.awardGold(progress.roster, names, reward.share, 2);
+  const bought = progress.roster
+    .map((member) => R.goShopping(member, 3))
+    .filter(Boolean);
 
   const lines = [];
   let mine = 0;
@@ -76,7 +83,7 @@ function settle(progress, state, party, method, lootSeed, dropsOverride) {
     progress.shopSeed = 54321;
   }
 
-  return { won, reward, gained, roster, lines, mine, handed, members };
+  return { won, reward, gained, roster, purses, bought, lines, mine, handed, members };
 }
 
 // 명부는 씨앗을 주지 않으면 무작위로 만들어진다. 그대로 두면 전투 결과가 판마다
@@ -162,6 +169,16 @@ function runQuest(progress, seed, autoHeal, questOver) {
   check('의뢰를 깬 것으로 센다', progress.cleared, 1);
   check('경험치가 오른다', out.reward.charExp > 0, true);
   check('명부 전원이 보고에 들어간다', out.roster.length, progress.roster.length);
+
+  // 길드 골드가 파티 전체에 나뉜다. 주인공은 제 몫과 잔돈만 지갑에 넣는다.
+  check('적힌 금액이 파티 전체 몫이다', out.reward.purse, quest.guildReward.gold);
+  check('주인공은 제 몫만 받는다', progress.gold - goldBefore, out.reward.gold);
+  check('전액을 혼자 받지 않는다', out.reward.gold < out.reward.purse, true);
+  check('동료도 몫을 받는다', out.purses.length, progress.roster.length);
+  check('데려간 동료는 몫을 전부 받는다',
+    out.purses.filter((p) => p.joined).every((p) => p.gold === out.reward.share), true);
+  check('나눈 몫을 다 합치면 적힌 금액이다',
+    out.reward.gold + out.reward.share * (out.reward.party - 1), out.reward.purse);
 
   // 캐릭터 창에서 올린 스킬이 전투에 그대로 들어간다. 창과 전투가 다른 값을
   // 보면 점수를 넣은 것이 화면의 글자로만 남는다.
