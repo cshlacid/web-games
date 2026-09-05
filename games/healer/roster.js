@@ -82,8 +82,10 @@ const defOf = (member) => D.COMPANIONS[member.defId];
 // 동료가 다른 사람이 된다.
 const baseSpecOf = (member) => member.spec || D.COMPANIONS[member.defId].spec;
 const specOf = (member) => D.specAt(baseSpecOf(member), member.level);
-// 그림은 계열을 따라간다 — 궁수가 마법사가 되면 손에 든 것이 바뀐다.
-const spriteOf = (member) => D.spriteFor(specOf(member));
+// **계열을 바꾼 동료만 그림이 따라간다** — 궁수가 마법사가 되면 손에 든 것이
+// 바뀐다. 안 바꿨으면 정의의 그림이다: 계열 이름과 그림 이름이 늘 같지는 않다.
+const spriteOf = (member) =>
+  (member.spec ? D.spriteFor(specOf(member)) : D.COMPANIONS[member.defId].sprite);
 
 // 레벨에 맞춰 실제로 들고 나가는 스킬. 편성 화면이 보여 주는 것과 전투가
 // 쓰는 것이 같아야 하므로 규칙을 한 곳에 둔다 — data.js의 skillsFor 하나다.

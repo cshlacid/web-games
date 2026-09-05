@@ -356,30 +356,24 @@ const SPRITES = {
 const SHEETS = {
   hero: {
     src: 'hero.png',
-    cell: { w: 98, h: 88 },
-    cols: 4, rows: 4,
-    // 이름 → { row, frames }. row는 시트의 줄 번호다.
+    cell: { w: 112, h: 99 },
+    cols: 8, rows: 4,
+    // **칸을 화면에서 몇 칸 높이로 그릴지.** 다른 그림은 상자가 곧 인물이지만
+    // 이 시트는 공격에서 지팡이를 높이 들어 칸 위쪽이 비어 있다 — 22로 두면
+    // 인물이 17칸으로 그려져 동료보다 작아 보인다.
+    box: 25,
     clips: {
-      idle:      { row: 0, frames: 1, fps: 0 },
-      walkRight: { row: 1, frames: 4, fps: 9 },
-      walkLeft:  { row: 2, frames: 4, fps: 9 },
-      // 한 번만 돈다. 준비 → 타격 → 후딜.
-      attack:    { row: 3, frames: 3, fps: 8, once: 1 },
+      idle:      { row: 0, frames: 8, fps: 6 },
+      walkLeft:  { row: 1, frames: 7, fps: 10 },
+      walkRight: { row: 2, frames: 7, fps: 10 },
+      attack:    { row: 3, frames: 7, fps: 12, once: 1 },
     },
-    // **화면마다 칸의 어디를 보여 줄지.** 칸 안의 비율이라 시트 해상도를 바꿔도
-    // 그대로다. 배율 하나로 당겨 쓰던 때에는 가운데를 기준으로 잘려서, 초상화는
-    // 발이 남고 편성 목록은 머리 꼭대기와 발이 함께 잘렸다.
+    // 화면마다 칸의 어디를 보여 줄지(칸 안의 비율). 전장은 칸 전체, 편성 목록은
+    // 서 있는 인물, 초상화는 머리만이다.
     crops: {
-      // 전장은 칸 전체. 걷기·공격 프레임이 좌우로 크게 나가므로 여기를 좁히면
-      // 지팡이와 뻗은 팔이 잘린다.
       full: { x: 0, y: 0, w: 1, h: 1 },
-      // 편성 목록과 상세는 전신이되, 서 있기 한 장만 쓰므로 그 그림에 맞춰
-      // 좁힌다. 칸 전체로 두면 지팡이가 흔들리는 폭만큼 양옆이 비어, 같은 줄의
-      // 도형 동료보다 인물이 작아 보인다.
-      list: { x: 0.185, y: 0.06, w: 0.56, h: 0.94 },
-      // 전투 초상화는 **머리만**. 전신을 30px 안에 넣으면 얼굴이 몇 픽셀뿐이라
-      // 누구인지 알아볼 수 없다 — 초상화에서 읽을 것은 얼굴이다.
-      head: { x: 0.20, y: 0.07, w: 0.51, h: 0.55 },
+      list: { x: 0.19, y: 0.18, w: 0.60, h: 0.82 },
+      head: { x: 0.30, y: 0.17, w: 0.42, h: 0.52 },
     },
   },
 };
@@ -434,9 +428,12 @@ function svg(kind) {
 // 지켜지면 소용이 없다.
 function size(kind) {
   const s = SHEETS[kind];
-  // 그림 파일은 칸의 가로세로비를 그대로 상자로 쓴다. 세로를 도형 그림과 같은
-  // 22로 두면 가로가 그만큼 넓어지고, 인물의 키가 다른 유닛과 맞는다.
-  if (s) return { w: Math.round((22 * s.cell.w) / s.cell.h * 10) / 10, h: 22 };
+  // 그림 파일은 칸의 가로세로비를 그대로 상자로 쓴다. 높이는 시트가 정한다
+  // (`box`) — 칸 위쪽이 비어 있는 시트는 22로 두면 인물이 작게 그려진다.
+  if (s) {
+    const h = s.box || 22;
+    return { w: Math.round((h * s.cell.w) / s.cell.h * 10) / 10, h };
+  }
   const sprite = SPRITES[kind] || SPRITES.warrior;
   return { w: sprite.w + 2, h: sprite.h + 2 };
 }
