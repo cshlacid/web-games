@@ -593,14 +593,17 @@ function cast(state, skillId, target) {
     moving.mp < paid + D.PLAYER_SKILLS.touch.mp, true);
   check('쿨타임도 돈다', L.skillSlot(moved, 'touch').readyAt > moved.t, true);
 
-  // 대열을 벌리는 힘은 이동이 아니다. 그것까지 취소로 치면 캐스팅 스킬이 아예
-  // 나가지 않는다 — 밀어내기는 매 틱 일어난다.
+  // 넉백으로 밀려나는 것은 이동이 아니다. 그것까지 취소로 치면 시전 중에는
+  // 아무도 나를 건드리지 못한다는 규칙이 하나 더 생긴다.
   const pushed = battle();
-  const shover = L.hero(pushed);
-  unit(pushed, '강철의 브란').hp = 400;
-  L.castSkill(pushed, 'touch', { uid: unit(pushed, '강철의 브란').uid });
-  L.step(pushed, L.TICK);
-  check('밀려나는 것은 취소가 아니다', pushed.units[0].cast !== null, true);
+  const shoved = unit(pushed, '사제 노아');
+  const foe = AI.alive(pushed, 'enemy')[0];
+  shoved.x = 40; shoved.y = 28;
+  L.startCast(pushed, shoved, { id: 'mend', targetUid: shoved.uid });
+  const wasAt = shoved.x;
+  L.knockback(pushed, foe, shoved, 8);
+  check('넉백은 자리를 옮긴다', shoved.x !== wasAt, true);
+  check('밀려나는 것은 취소가 아니다', shoved.cast !== null, true);
 
   // 동료의 캐스팅도 같은 규칙이다.
   const ally = battle();
@@ -869,6 +872,65 @@ function cast(state, skillId, target) {
   const fresh = battle();
   check('배치도 여백 안에서 한다',
     fresh.units.every((u) => u.y >= D.FIELD.top && u.y <= D.FIELD.bottom), true);
+}
+
+// --- 서로 밀지 않는다 ---------------------------------------------------
+//
+// 예전에는 매 틱 같은 편끼리 밀어내 대열을 벌렸다. 그러면 유닛이 제 발로 간 적
+// 없는 자리에 서 있게 된다 — 겹치는 것은 이제 스스로 비켜서서 푼다(`ai.freeSpot`).
+{
+  // 굳은 유닛은 스스로 움직이지 않는다. 그 위에 동료를 겹쳐 세워도 자리가
+  // 그대로여야 "아무도 남을 밀지 않는다"가 지켜진 것이다.
+  const state = battle();
+  const stuck = unit(state, '강철의 브란');
+  const crowd = unit(state, '검사 라일');
+  stuck.x = 40; stuck.y = 28;
+  crowd.x = 40; crowd.y = 28;
+  stuck.stunUntil = state.t + 5;
+  const at = { x: stuck.x, y: stuck.y };
+  run(state, 0.5);
+  check('굳은 유닛은 겹쳐도 밀리지 않는다',
+    [stuck.x, stuck.y], [at.x, at.y]);
+
+  // 겹친 쪽은 제 발로 비켜선다. 여기까지 없으면 다섯이 한 점에 포개 선다.
+  check('겹친 쪽이 비켜선다', AI.dist(stuck, crowd) > 1, true);
+
+  // 양보하는 쪽은 늘 한쪽이다. 둘 다 비키면 매 틱 자리를 바꾸며 떤다.
+  const pair = battle();
+  const a = unit(pair, '강철의 브란');
+  const b = unit(pair, '검사 라일');
+  const senior = a.uid < b.uid ? a : b;
+  a.x = 40; a.y = 28; b.x = 40; b.y = 28;
+  const kept = { x: senior.x, y: senior.y };
+  const spot = AI.freeSpot(senior, pair, { x: senior.x, y: senior.y });
+  check('앞선 쪽은 제자리를 지킨다', [spot.x, spot.y], [kept.x, kept.y]);
+}
+
+// --- 넉백 ---------------------------------------------------------------
+//
+// **남의 좌표를 옮기는 유일한 길이다.** 대열이 서로 밀리지 않게 된 뒤로, 적을
+// 물러나게 하는 수단은 이렇게 `knock`이 적힌 스킬뿐이다.
+{
+  const state = battle();
+  const tank = unit(state, '강철의 브란');
+  const foe = AI.alive(state, 'enemy')[0];
+  tank.x = 40; tank.y = 28;
+  foe.x = 46; foe.y = 28;
+  tank.skills = [{ id: 'shieldSlam', readyAt: 0 }];
+  tank.mp = tank.maxMp;
+  L.runUnitSkill(state, tank, { id: 'shieldSlam', targetUid: foe.uid });
+  check('밀치면 뒤로 밀려난다', foe.x > 46, true);
+  check('민 거리는 적어 둔 만큼이다',
+    Math.round(AI.dist(tank, foe)), 6 + D.UNIT_SKILLS.shieldSlam.knock);
+  check('밀치면 굳기도 한다', L.stunned(state, foe), true);
+
+  // 밀린 자리도 전장 안이다. 벽 너머로 밀어내면 그대로 화면 밖에 선다.
+  const edge = battle();
+  const pusher = unit(edge, '강철의 브란');
+  const near = AI.alive(edge, 'enemy')[0];
+  pusher.x = 10; near.x = D.FIELD.w - 6; near.y = pusher.y;
+  L.knockback(edge, pusher, near, 40);
+  check('밀려도 전장 안이다', near.x <= D.FIELD.w - 4, true);
 }
 
 // --- 주인공의 계열 스킬 --------------------------------------------------
