@@ -1778,11 +1778,11 @@ const REPUTATION = {
   start: 0,
   max: 1000,
   stages: [
-    { id: 'unknown', name: '무명',   min: 0,   questGap: 0, wage: 1.06 },
-    { id: 'known',   name: '알려짐', min: 80,  questGap: 1, wage: 1.02 },
-    { id: 'trusted', name: '믿음직', min: 240, questGap: 2, wage: 0.98 },
-    { id: 'famed',   name: '이름난', min: 480, questGap: 3, wage: 0.94 },
-    { id: 'hero',    name: '영웅',   min: 760, questGap: 4, wage: 0.90 },
+    { id: 'unknown', name: '무명',   min: 0,   questGap: 1, wage: 1.06 },
+    { id: 'known',   name: '알려짐', min: 80,  questGap: 2, wage: 1.02 },
+    { id: 'trusted', name: '믿음직', min: 240, questGap: 3, wage: 0.98 },
+    { id: 'famed',   name: '이름난', min: 480, questGap: 4, wage: 0.94 },
+    { id: 'hero',    name: '영웅',   min: 760, questGap: 5, wage: 0.90 },
   ],
 };
 

@@ -54,11 +54,56 @@ function everyQuest(fn) {
   check('적정 레벨 순으로 정렬', levels.slice().sort((a, b) => a - b), levels);
 }
 
+// --- 게시판에 여러 난이도가 걸린다 ---------------------------------------
+//
+// **예전에는 넷이 한 가지 난이도로 채워졌다.** 아래쪽 폭이 -1까지뿐이라 평판이
+// 무명인 동안 서로 다른 난이도가 넷 중 1.79뿐이었고, 화면의 "쉬움" 딱지(두 레벨
+// 아래부터)가 붙는 의뢰는 아예 생길 수 없었다.
+{
+  const spreadOf = (level, seed, gap) =>
+    Q.generate(level, seed, gap).map((q) => q.level - level);
+
+  let same = 0;
+  let boards = 0;
+  let narrow = 0;
+  for (let level = 5; level <= 20; level++) {
+    for (let seed = 1; seed <= 30; seed++) {
+      for (const stage of D.REPUTATION.stages) {
+        const offs = spreadOf(level, seed * 71 + level, stage.questGap);
+        if (new Set(offs).size < 3) same++;
+        if (Math.max(...offs) - Math.min(...offs) < 2) narrow++;
+        boards++;
+      }
+    }
+  }
+  check('한 게시판에 세 가지 넘는 난이도가 걸린다', same, 0);
+  check('가장 쉬운 것과 어려운 것이 두 레벨 넘게 벌어진다', narrow, 0);
+
+  // 아래쪽은 평판이 자르지 않는다. 무명이어도 쉬운 판을 고를 수 있어야
+  // 게시판이 한 가지로 채워지지 않는다.
+  const unknown = D.REPUTATION.stages[0];
+  const low = [];
+  for (let seed = 1; seed <= 40; seed++) low.push(...spreadOf(10, seed, unknown.questGap));
+  check('무명이어도 쉬운 의뢰가 걸린다', low.some((n) => n <= -2), true);
+  check('무명이어도 제 레벨 위가 하나는 있다', low.some((n) => n > 0), true);
+
+  // 위쪽만 평판이 연다 — 이 게임에서 "상위 콘텐츠"라고 부를 수 있는 것이
+  // 의뢰의 난이도뿐이라 그렇게 옮겼다(기획서 3장).
+  const top = (gap) => {
+    let best = -99;
+    for (let seed = 1; seed <= 40; seed++) best = Math.max(best, ...spreadOf(10, seed, gap));
+    return best;
+  };
+  const tops = D.REPUTATION.stages.map((stage) => top(stage.questGap));
+  check('평판이 오르면 더 어려운 의뢰가 걸린다',
+    tops.every((n, i) => i === 0 || n > tops[i - 1]), true);
+}
+
 // --- 어떤 씨앗으로도 성립해야 하는 것 -----------------------------------
 {
   check('적정 레벨은 1 이상', everyQuest((q) => (q.level >= 1 ? null : `레벨 ${q.level}`)), []);
   check('주인공 레벨 근처에서 나온다',
-    everyQuest((q, level) => (Math.abs(q.level - level) <= 4 ? null : `${q.level} vs ${level}`)), []);
+    everyQuest((q, level) => (Math.abs(q.level - level) <= 5 ? null : `${q.level} vs ${level}`)), []);
   check('웨이브가 비어 있지 않다',
     everyQuest((q) => (q.waves.length && q.waves.every((w) => w.length) ? null : '빈 웨이브')), []);
   check('아는 적만 나온다',
