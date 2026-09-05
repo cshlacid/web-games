@@ -174,14 +174,18 @@ const nameWithTrait = (want) => {
 
   const fit = member(nameWithTrait('coin'), 5, 0);   // taste 보정 0
   check('제 레벨이 알맞다', Rep.feelOf(fit, quest(5)).id, 'fit');
-  check('하나 아래는 쉽다', Rep.feelOf(fit, quest(4)).id, 'easy');
-  check('둘 아래는 시시하다', Rep.feelOf(fit, quest(3)).id, 'trivial');
+  // **쉬운 쪽은 여유를 둔다.** 동료가 주인공보다 빨리 자라 명부가 늘 한두 레벨
+  // 위에 있으므로, 한 칸 아래를 곧바로 "쉽다"로 읽으면 게시판의 절반이 그렇게
+  // 보인다(재 보니 51%였다).
+  check('둘 아래까지는 알맞다', Rep.feelOf(fit, quest(3)).id, 'fit');
+  check('셋 아래는 쉽다', Rep.feelOf(fit, quest(2)).id, 'easy');
+  check('넷 아래는 시시하다', Rep.feelOf(fit, quest(1)).id, 'trivial');
   check('둘 위는 벅차다', Rep.feelOf(fit, quest(7)).id, 'hard');
   check('셋 위는 위험하다', Rep.feelOf(fit, quest(8)).id, 'deadly');
 
   // **기획서 8.1의 핵심**: 쉬운 의뢰를 반복해 신뢰를 쌓는 길을 막는다.
   check('시시한 의뢰는 성공해도 신뢰가 깎인다',
-    Rep.trustDelta(fit, quest(3), { won: true }).delta < 0, true);
+    Rep.trustDelta(fit, quest(1), { won: true }).delta < 0, true);
   check('알맞은 의뢰는 오른다', Rep.trustDelta(fit, quest(5), { won: true }).delta > 0, true);
   check('어려울수록 더 오른다',
     Rep.trustDelta(fit, quest(8), { won: true }).delta
@@ -198,7 +202,7 @@ const nameWithTrait = (want) => {
     Rep.trustDelta(fit, quest(5), { won: true, downed: true }).delta
       < Rep.trustDelta(fit, quest(5), { won: true }).delta - 30, true);
   check('시시한 판에서 죽으면 그대로 -50이다',
-    Rep.trustDelta(fit, quest(3), { won: true, downed: true }).parts
+    Rep.trustDelta(fit, quest(1), { won: true, downed: true }).parts
       .find((part) => part.why === '전투불능').delta, D.TRUST.down);
   check('위험한 판에서 죽으면 덜 원망한다',
     Rep.trustDelta(fit, quest(8), { won: true, downed: true }).delta
@@ -289,10 +293,14 @@ const nameWithTrait = (want) => {
   check('아래쪽이 더 가파르다',
     wageAt(-100, 0) - wageAt(0, 0) > wageAt(0, 0) - wageAt(100, 0), true);
 
-  // **12장**: 시시해도 비싸고 위험해도 비싸다.
-  const at = (level) => Hire.wageOf(member(name, 5, 0), quest(level), { rep: 0, method: 'even' }).gold;
-  check('알맞은 난이도가 가장 싸다', at(5) < at(3) && at(5) < at(8), true);
-  check('위험한 일이 가장 비싸다', at(8) > at(7), true);
+  // **12장**: 시시해도 비싸고 위험해도 비싸다. **값이 아니라 난이도가 거는
+  // 배수를 본다** — 삯의 기준은 의뢰 골드라 레벨이 낮으면 그만큼 싸고, 그 몫이
+  // 섞이면 무엇을 보고 있는지가 흐려진다.
+  const feelMul = (level) =>
+    Hire.wageOf(member(name, 5, 0), quest(level), { rep: 0, method: 'even' }).feel.wage;
+  check('알맞은 난이도가 가장 싸다',
+    feelMul(5) < feelMul(1) && feelMul(5) < feelMul(8), true);
+  check('위험한 일이 가장 비싸다', feelMul(8) > feelMul(7), true);
 
   // **15.1장**: 분배 방식에 따라 부르는 값이 달라진다.
   const gearer = nameWithTrait('gear');

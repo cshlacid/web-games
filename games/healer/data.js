@@ -1838,9 +1838,16 @@ const TRUST = {
 // 이어지므로, 쓰러지는 일이 훨씬 잦다 — 그대로 두면 스물다섯 판에 명부 전원이
 // 관계 단절에 닿았다. 각오하고 따라나선 판일수록 덜 원망한다고 보고 덜어 낸다:
 // 위험한 의뢰를 깨고 쓰러진 것은 거의 상쇄되고, 시시한 판에서 죽으면 그대로 -50이다.
+//
+// **쉬운 쪽 칸을 한 번 넓혔다.** 처음에는 한 레벨만 아래여도 쉽다, 둘 아래면
+// 시시하다였는데, 동료가 주인공보다 빨리 자라서(`allyExpTo`가 `charExpTo`보다
+// 싸다) 진행할수록 명부가 주인공을 앞지른다 — 마흔 판을 굴려 재 보니 레벨차가
+// 평균 1.5였고, 그래서 **게시판의 51%가 시시하다·쉽다로 읽혔다.** 규칙이 늘
+// 켜져 있으면 그것은 규칙이 아니라 기본값이다. 지금은 두 레벨 아래까지 알맞다로
+// 보고, 다시 재 보니 시시 4% · 쉽다 10% · 알맞다 54%다.
 const TRUST_FEEL = [
-  { upTo: -2,       id: 'trivial', name: '시시하다', trust: -10, wage: 1.20, downRelief: 0 },
-  { upTo: -1,       id: 'easy',    name: '쉽다',    trust: -3,  wage: 1.06, downRelief: 4 },
+  { upTo: -4,       id: 'trivial', name: '시시하다', trust: -10, wage: 1.20, downRelief: 0 },
+  { upTo: -3,       id: 'easy',    name: '쉽다',    trust: -3,  wage: 1.06, downRelief: 4 },
   { upTo: 0,        id: 'fit',     name: '알맞다',  trust: 8,   wage: 1.00, downRelief: 10 },
   { upTo: 2,        id: 'hard',    name: '벅차다',  trust: 15,  wage: 1.15, downRelief: 20 },
   { upTo: Infinity, id: 'deadly',  name: '위험하다', trust: 22,  wage: 1.42, downRelief: 30 },
