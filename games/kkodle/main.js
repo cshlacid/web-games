@@ -250,6 +250,9 @@
     el.share.hidden = !state.daily;
     renderStats();
     el.result.hidden = false;
+    // 끝난 판에서 자판은 아무것도 하지 않는다. 결과 시트가 그 자리를 차지하므로
+    // 자판을 그대로 두면 판이 대신 줄어들어, 방금 맞힌 줄을 보려고 스크롤해야 한다.
+    el.keyboard.hidden = true;
   }
 
   // --- 저장 ---
@@ -326,6 +329,7 @@
     state.status = 'playing';
     state.shiftOn = false;
     el.result.hidden = true;
+    el.keyboard.hidden = false;
     el.mode.textContent = daily ? '오늘의 단어' : '연습';
     el.mode.setAttribute('aria-pressed', String(daily));
     el.subtitle.textContent = daily
