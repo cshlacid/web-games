@@ -137,7 +137,12 @@ function feelOf(member, quest) {
 // 한 번 쓰러지면 두 판을 잘해야 돌아온다 — 신뢰가 낮은 동료는 그 한 번으로
 // 관계가 사실상 끊어지고, 높은 동료는 버틴다.
 function trustDelta(member, quest, outcome) {
-  const feel = feelOf(member, quest);
+  // **난이도 판단은 계약과 함께 굳는다**(`outcome.feel`). 여기서 다시 재면 그
+  // 사이에 동료가 레벨업한 만큼 기준(`tasteOf`)이 올라가, 알맞다고 보고
+  // 따라나선 판이 끝날 때에는 쉽다가 되어 신뢰도가 깎였다 — 데려가서 키운 것이
+  // 그대로 손해가 되는 자리다. 보수를 계약 때 값으로 지불하는 것과 같은 규칙이고,
+  // 굳은 값이 없을 때만 지금 값으로 잰다(계약을 거치지 않는 자리는 테스트뿐이다).
+  const feel = outcome.feel || feelOf(member, quest);
   const parts = [];
 
   if (outcome.won) {
