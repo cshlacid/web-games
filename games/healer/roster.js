@@ -56,6 +56,10 @@ function makeMember(rng, taken, level, defId) {
     // 제 몫으로 받은 골드. 동료는 인벤토리가 없으므로 이 돈은 장비를 갖추는
     // 데에만 쓰인다(`goShopping`).
     gold: 0,
+    // 주인공에 대한 신뢰도. **초면은 0이다**(기획서 22장 확정). 명부에 남아
+    // 자라는 것이 경험치·장비만이 아니라는 뜻이고, 계산 규칙은 reputation.js에
+    // 있다 — 여기에는 자리만 둔다.
+    trust: D.TRUST.start,
     gear: { weapon: null, armor: null, trinket: null },
   };
 }
@@ -297,6 +301,9 @@ function adopt(saved) {
       level: Math.max(1, Math.min(D.LEVEL.maxLevel, entry.level | 0 || 1)),
       exp: Math.max(0, entry.exp | 0),
       gold: Math.max(0, entry.gold | 0),
+      // 신뢰도는 범위 밖으로 나갈 수 없다. 저장본을 손대서 +999가 되면 삯이
+      // 1골드로 굳어 모집이 뜻을 잃는다.
+      trust: Math.max(D.TRUST.min, Math.min(D.TRUST.max, entry.trust | 0)),
       gear,
       // 배운 것 중 아는 스킬만 남긴다. 자료가 바뀌어 없어진 것이 섞여 있으면
       // 전투가 시작할 때 빈 스킬을 들고 들어간다.

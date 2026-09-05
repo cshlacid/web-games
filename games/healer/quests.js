@@ -31,7 +31,12 @@ const COMPANION_COUNT = 10;
 
 // 적정 레벨이 주인공 레벨보다 조금 위아래로 흩어져야 고를 이유가 생긴다.
 // 아래쪽이 좁은 것은, 쉬운 퀘스트만 반복하는 것이 최선이 되면 곤란해서다.
-const LEVEL_SPREAD = [-1, 0, 0, 1, 1, 2, 3];
+//
+// **위쪽은 평판이 자른다**(기획서 3장). 무명인 힐러에게 길드가 영웅급 의뢰를
+// 내주지 않는다는 것이 이 시스템의 뜻이고, 이 게임에서 "상위 콘텐츠"라고 부를
+// 수 있는 것은 의뢰의 난이도뿐이다. 자르고 나면 목록이 통째로 비는 일이
+// 없도록 `-1`과 `0`은 어느 평판에서도 남는다.
+const LEVEL_SPREAD = [-1, 0, 0, 1, 1, 2, 3, 4];
 
 // 이 의뢰에 나오는 가장 높은 적 등급. 전리품의 등급은 쓰러뜨린 적에게서
 // 굴려지므로, 게시판이 미리 말할 수 있는 것은 "무엇이 나오는가"까지다.
@@ -133,11 +138,20 @@ function makeQuest(rng, level, index) {
   };
 }
 
-function generate(playerLevel, seed) {
+// `gap`은 평판이 허락하는 적정 레벨의 상한(주인공 레벨 대비)이다. 안 넘기면
+// 자르지 않는다 — 난이도 확인처럼 평판을 모르는 자리에서 부르기 때문이다.
+function spreadFor(gap) {
+  if (gap == null) return LEVEL_SPREAD;
+  const open = LEVEL_SPREAD.filter((n) => n <= gap);
+  return open.length ? open : [0];
+}
+
+function generate(playerLevel, seed, gap) {
   const rng = createRng(seed);
+  const spread = spreadFor(gap);
   const quests = [];
   for (let i = 0; i < QUEST_COUNT; i++) {
-    const level = Math.max(1, playerLevel + pick(rng, LEVEL_SPREAD));
+    const level = Math.max(1, playerLevel + pick(rng, spread));
     quests.push(makeQuest(rng, level, i));
   }
   // 쉬운 것부터 보여 준다. 게시판을 훑을 때 고르는 기준이 레벨이기 때문이다.
@@ -171,7 +185,8 @@ function companionsFor(quest, roster, seed) {
     order[D.COMPANIONS[a.defId].job] - order[D.COMPANIONS[b.defId].job]);
 }
 
-const api = { generate, companionsFor, makeQuest, createRng, QUEST_COUNT, COMPANION_COUNT };
+const api = { generate, companionsFor, makeQuest, createRng, spreadFor,
+  QUEST_COUNT, COMPANION_COUNT, LEVEL_SPREAD };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 root.HealerQuests = api;
