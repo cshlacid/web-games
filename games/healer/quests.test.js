@@ -72,15 +72,6 @@ function everyQuest(fn) {
   const plain = Q.companionsFor(quest, roster, 11);
   check('넘긴 만큼 목록이 좁아지지 않는다', list.length >= plain.length, true);
 
-  // 탱커·힐러 보장은 그대로다. 이미 서 있는 쪽이 맡고 있으면 다시 넣지 않는다.
-  const jobOf = (m) => D.COMPANIONS[m.defId].job;
-  check('탱커와 힐러가 있다',
-    ['tank', 'healer'].every((job) => list.some((m) => jobOf(m) === job)), true);
-  const tanks = roster.filter((m) => jobOf(m) === 'tank');
-  const withTank = Q.companionsFor(quest, roster, 11, [tanks[0]]);
-  check('넘긴 쪽이 탱커면 탱커를 또 넣지 않는다',
-    withTank.filter((m) => jobOf(m) === 'tank').length >= 1, true);
-
   // 명부에 없는 사람은 넣지 않는다 — 저장본이 어긋났을 때 유령이 목록에 선다.
   const ghost = Q.companionsFor(quest, roster, 11, [{ name: '없는 사람', defId: 'lyle' }]);
   check('명부에 없는 사람은 안 선다',
@@ -245,18 +236,28 @@ function everyQuest(fn) {
   check('같은 동료가 두 번 나오지 않는다', new Set(list.map((c) => c.name)).size, list.length);
   check('명부에 있는 동료만 나온다', list.every((c) => roster.includes(c)), true);
 
-  // 탱커와 힐러가 없으면 편성을 고민하는 것이 아니라 그냥 못 깨는 의뢰가 된다.
-  const bad = [];
-  for (const seed of SEEDS) {
-    for (const level of LEVELS) {
-      for (const q of Q.generate(level, seed)) {
-        const jobs = Q.companionsFor(q, R.create(seed), seed).map((c) => D.COMPANIONS[c.defId].job);
-        if (!jobs.includes('tank')) bad.push(`Lv${level}/${seed}: 탱커 없음`);
-        if (!jobs.includes('healer')) bad.push(`Lv${level}/${seed}: 힐러 없음`);
-      }
-    }
+  // **탱커·힐러를 억지로 끼워 넣지 않는다.** 없는 목록은 못 깨는 의뢰라서 두던
+  // 규칙인데, 편성 화면의 "동료 새로 고침"이 그 자리를 대신한다. 대신 **드물어야
+  // 한다** — 자주 나오면 새로 고침이 의무가 된다. 명부가 상한(열넷)까지 자란
+  // 최악의 경우로 재고, 그때도 스무 판에 한 번 밑이어야 한다.
+  let noTank = 0;
+  let noHealer = 0;
+  let boards = 0;
+  for (let seed = 1; seed <= 200; seed++) {
+    const roster = R.create(seed);
+    while (roster.length < 14) R.maybeJoin(roster, 10, roster.length * 7 + seed, 1);
+    const jobs = Q.companionsFor(Q.generate(8, seed)[0], roster, seed * 13)
+      .map((c) => D.COMPANIONS[c.defId].job);
+    if (!jobs.includes('tank')) noTank++;
+    if (!jobs.includes('healer')) noHealer++;
+    boards++;
   }
-  check('탱커와 힐러가 반드시 있다', bad, []);
+  check('탱커 없는 목록은 드물다', noTank / boards < 0.05, true);
+  check('힐러 없는 목록도 드물다', noHealer / boards < 0.05, true);
+  // 명부가 목록보다 작으면 전원이 서므로 빠질 수가 없다.
+  const small = Q.companionsFor(Q.generate(5, 9)[0], R.create(9), 9)
+    .map((c) => D.COMPANIONS[c.defId].job);
+  check('명부가 작으면 전원이 선다', ['tank', 'healer'].every((job) => small.includes(job)), true);
 
   // 스킬을 하나도 못 들고 오는 동료는 고를 이유가 없는 동료다.
   const mute = [];

@@ -193,23 +193,16 @@ function generate(playerLevel, seed, gap) {
 // 지금 데려가기로 눌러 둔 동료가 여기로 온다. **뽑기 자리를 먹지 않는다**:
 // 공들여 키운 동료가 목록에 없어서 못 데려가는 것을 막는 것이 이 인자의 목적인데,
 // 자리를 먹으면 친구가 늘수록 고를 수 있는 폭이 줄어 목적과 반대가 된다.
+// **탱커와 힐러를 억지로 끼워 넣지 않는다.** 없는 목록은 못 깨는 의뢰라서 두던
+// 규칙인데, 편성 화면에 "동료 새로 고침"이 생기면서 그 자리가 사라졌다 — 마음에
+// 안 드는 목록은 사람이 다시 뽑으면 된다. 억지로 넣던 동안에는 열 자리 중 둘이
+// 늘 정해져 있어, 명부를 키워도 뽑히는 폭이 그만큼 좁았다.
 function companionsFor(quest, roster, seed, always) {
   const rng = createRng((seed ^ 0x9e3779b9) >>> 0);
   const fixed = (always || []).filter((member) => roster.includes(member));
-  const pool = roster.filter((member) => !fixed.includes(member));
-  const byJob = (job) => pool.filter((member) => D.COMPANIONS[member.defId].job === job);
+  const rest = roster.filter((member) => !fixed.includes(member));
 
   const chosen = [];
-  // 탱커와 힐러는 반드시 하나씩 넣는다. **이미 서 있는 쪽이 맡고 있으면 다시 넣지
-  // 않는다** — 없는 목록은 고민할 편성이 아니라 그냥 못 깨는 의뢰라서 두는 규칙이지,
-  // 직업마다 둘씩 세우려는 것이 아니다.
-  for (const job of ['tank', 'healer']) {
-    if (fixed.some((member) => D.COMPANIONS[member.defId].job === job)) continue;
-    const list = byJob(job);
-    if (list.length) chosen.push(pick(rng, list));
-  }
-
-  const rest = pool.filter((member) => !chosen.includes(member));
   while (chosen.length < COMPANION_COUNT && rest.length) {
     chosen.push(rest.splice((rng() * rest.length) | 0, 1)[0]);
   }
