@@ -118,7 +118,10 @@ function makeQuest(rng, level, index) {
     desc: `적정 레벨 ${level}. ${waves.length}개의 무리를 상대한다.`,
     waves,
     guildReward: {
-      gold: Math.round(60 + value * 1.6),
+      // **게시판에 적힌 골드는 파티 전체 몫이다.** 나눠 갖게 되면서 한 사람 몫이
+      // 아니라 판 전체의 값이 되었으므로, 예전 금액에 `PARTY_MAX`를 곱해 둔다 —
+      // 가득 채워 나가면 주인공 몫이 예전과 같고, 적게 데려가면 제 몫이 커진다.
+      gold: Math.round((60 + value * 1.6) * D.PARTY_MAX),
       // 길드 확정 보상에 경험치가 섞여 있는 것은, 전멸해도 아무것도 없이 끝나지
       // 않게 하려는 것이다 — 실패하면 이 몫만 절반으로 받는다.
       exp: Math.round(value * 0.45),

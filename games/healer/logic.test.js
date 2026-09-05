@@ -1584,7 +1584,16 @@ function cast(state, skillId, target) {
   check('이겼다', reward.won, true);
   check('처치 경험치가 들어간다', reward.kills > 0, true);
   check('길드 몫을 그대로 받는다', reward.guild, quest().guildReward.exp);
-  check('골드는 이겼을 때만', reward.gold, quest().guildReward.gold);
+
+  // **골드는 파티가 나눠 갖는다.** 게시판에 적힌 금액은 판 전체의 값이고,
+  // 주인공이 지갑에 넣는 것은 제 몫과 잔돈이다.
+  const party = AI.alive(reward.won ? state : state, 'ally').length;
+  check('적힌 금액이 파티 전체 몫이다', reward.purse, quest().guildReward.gold);
+  check('인원수로 나눈다', reward.share, Math.floor(reward.purse / party));
+  check('잔돈은 주인공이 갖는다',
+    reward.gold, reward.share + (reward.purse - reward.share * party));
+  check('나눈 몫을 다 합치면 적힌 금액이다',
+    reward.gold + reward.share * (party - 1), reward.purse);
 
   // 힐로도 직업 경험치가 쌓인다. 흘린 힐은 세지 않는다 — 마나를 아껴 쓸 이유를
   // 경험치가 무너뜨리면 안 된다.

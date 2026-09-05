@@ -10,6 +10,7 @@
 const node = typeof module !== 'undefined' && module.exports;
 const D = node ? require('./data.js') : root.HealerData;
 const Items = node ? require('./items.js') : root.HealerItems;
+const Shop = node ? require('./shop.js') : root.HealerShop;
 
 // 처음 명부에 있는 동료 수. 여섯이던 것을 늘렸다 — 편성 목록이 격자가 되면서
 // 한 화면에 더 담을 수 있게 됐고, 여섯일 때에는 고를 것이 사실상 정해져 있었다.
@@ -52,6 +53,9 @@ function makeMember(rng, taken, level, defId) {
     defId: def.id,
     level: Math.max(1, level),
     exp: 0,
+    // 제 몫으로 받은 골드. 동료는 인벤토리가 없으므로 이 돈은 장비를 갖추는
+    // 데에만 쓰인다(`goShopping`).
+    gold: 0,
     gear: { weapon: null, armor: null, trinket: null },
   };
 }
@@ -163,6 +167,50 @@ function awardExp(members, joinedNames, exp, seed) {
   return report;
 }
 
+// 의뢰 골드의 제 몫. **경험치와 같은 규칙으로 나눈다** — 데려간 동료는 몫 전부,
+// 남은 동료는 다른 파티에서 번 몫만 받는다. 규칙을 둘로 두면 한쪽만 고치게 된다.
+function awardGold(members, joinedNames, share, seed) {
+  const rng = createRng(seed == null ? (Math.random() * 1e9) | 0 : seed);
+  const joined = new Set(joinedNames);
+  const [lo, hi] = D.LEVEL.idleExpRate;
+  const report = [];
+
+  for (const member of members) {
+    const here = joined.has(member.name);
+    const got = here ? share : Math.round(share * (lo + rng() * (hi - lo)));
+    member.gold = (member.gold || 0) + got;
+    report.push({ name: member.name, joined: here, gold: got });
+  }
+  return report;
+}
+
+// 동료가 제 돈으로 장비를 갖춘다. **상점 진열대를 같이 보지 않는다** — 동료의
+// 장보기는 화면이 없어 사람이 개입할 수 없으므로, 같은 진열대를 두고 다투면
+// 주인공이 사려던 물건이 말없이 사라진다. 등급 규칙(`Shop.tierFor`)만 빌려 쓴다.
+//
+// **지금 낀 것보다 나은 것만 산다**(`offerGear`와 같은 잣대). 아니면 돈을 모은다 —
+// 몇 판 참으면 더 좋은 등급을 살 수 있는데 매번 다 써 버리면 영영 못 산다.
+function goShopping(member, seed) {
+  const rng = createRng(seed == null ? (Math.random() * 1e9) | 0 : seed);
+  const job = jobOf(member);
+  const pool = Object.values(D.GEAR).filter((def) => !def.job || def.job === job);
+  if (!pool.length) return null;
+
+  // 몇 개만 본다. 전부 훑어 가장 좋은 것을 고르게 하면 동료가 주인공보다 장을
+  // 잘 보게 되고, 무작위 옵션이 뜻을 잃는다.
+  for (let i = 0; i < 3; i++) {
+    const def = pick(rng, pool);
+    const item = Items.make(def.id, Shop.tierFor(member.level, rng), (rng() * 1e9) | 0);
+    const price = Items.price(item);
+    if ((member.gold || 0) < price) continue;
+    const taken = offerGear(member, item);
+    if (!taken.taken) continue;
+    member.gold -= price;
+    return { item, slot: taken.slot, price, previous: taken.previous };
+  }
+  return null;
+}
+
 // --- 장비 ---------------------------------------------------------------
 
 // 동료는 인벤토리가 없다. 분배로 받은 장비가 지금 낀 것보다 나으면 갈아 끼우고,
@@ -248,6 +296,7 @@ function adopt(saved) {
       defId: entry.defId,
       level: Math.max(1, Math.min(D.LEVEL.maxLevel, entry.level | 0 || 1)),
       exp: Math.max(0, entry.exp | 0),
+      gold: Math.max(0, entry.gold | 0),
       gear,
       // 배운 것 중 아는 스킬만 남긴다. 자료가 바뀌어 없어진 것이 섞여 있으면
       // 전투가 시작할 때 빈 스킬을 들고 들어간다.
@@ -268,7 +317,7 @@ const api = {
   START_SIZE, MAX_SIZE, JOIN_CHANCE,
   create, adopt, makeMember, jobOf, specOf, baseSpecOf, spriteOf, defOf, skillsOf,
   specChoices, canChangeSpec, changeSpec, remember,
-  gainExp, awardExp, offerGear, gearOf, bonusOf, potionsOf, toParty, maybeJoin,
+  gainExp, awardExp, awardGold, goShopping, offerGear, gearOf, bonusOf, potionsOf, toParty, maybeJoin,
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = api;

@@ -106,6 +106,55 @@ const SEEDS = [1, 5, 77, 4242, 20260825];
   check('모르는 이름은 참여로 치지 않는다', ghost.every((r) => !r.joined), true);
 }
 
+// --- 제 몫의 골드와 장보기 ------------------------------------------------
+//
+// 길드 골드를 파티가 나눠 가지면서 동료도 지갑을 갖게 됐다. 쓸 데가 없으면
+// 저장본에 숫자만 쌓이므로, 그 돈으로 제 장비를 산다.
+{
+  const roster = R.create(3);
+  const joined = [roster[0].name, roster[1].name];
+  const report = R.awardGold(roster, joined, 400, 9);
+
+  check('모두가 보고에 들어간다', report.length, roster.length);
+  check('데려간 쪽은 몫을 전부 받는다',
+    report.filter((r) => r.joined).every((r) => r.gold === 400), true);
+  // 경험치와 같은 규칙이다 — 규칙을 둘로 두면 한쪽만 고치게 된다.
+  const idle = report.filter((r) => !r.joined);
+  check('남은 쪽은 일부만 받는다', idle.every((r) => r.gold > 0 && r.gold < 400), true);
+  check('받은 만큼 지갑에 쌓인다',
+    roster.every((m) => m.gold === report.find((r) => r.name === m.name).gold), true);
+  R.awardGold(roster, joined, 400, 9);
+  check('다음 판의 몫이 더해진다', roster[0].gold, 800);
+}
+{
+  // 돈이 없으면 아무것도 안 산다. 없는 돈으로 사면 지갑이 음수가 된다.
+  const poor = R.create(11)[0];
+  check('빈 지갑으로는 못 산다', R.goShopping(poor, 5), null);
+
+  const rich = R.create(11)[0];
+  rich.gold = 100000;
+  const deal = R.goShopping(rich, 5);
+  check('돈이 넉넉하면 산다', Boolean(deal), true);
+  check('산 값만큼 지갑이 준다', rich.gold, 100000 - deal.price);
+  check('산 것을 그 자리에서 낀다', rich.gear[deal.slot].uid, deal.item.uid);
+  // 동료는 제 직업 물건만 산다. 아무거나 사면 탱커가 회복 지팡이를 들고 온다.
+  const gearJob = D.GEAR[deal.item.defId].job;
+  check('제 직업에 맞는 것을 산다',
+    !gearJob || gearJob === D.COMPANIONS[rich.defId].job, true);
+
+  // **지금 낀 것보다 나은 것만 산다.** 아니면 돈을 모은다 — 매번 다 써 버리면
+  // 몇 판 참으면 살 수 있는 좋은 등급을 영영 못 산다.
+  const best = R.create(11)[0];
+  best.gold = 100000;
+  for (const slot of Object.keys(best.gear)) {
+    const def = Object.values(D.GEAR).find((g) => g.slot === slot);
+    best.gear[slot] = Items.make(def.id, D.TIERS.length - 1, 7);
+  }
+  const before = best.gold;
+  R.goShopping(best, 5);
+  check('쓰던 것이 나으면 돈을 안 쓴다', best.gold, before);
+}
+
 // --- 스킬 ---------------------------------------------------------------
 {
   const roster = R.create(5);
@@ -202,9 +251,13 @@ const SEEDS = [1, 5, 77, 4242, 20260825];
   R.offerGear(saved[0], Items.make('shield', 2, 1));
   saved[0].level = 6;
 
+  saved[0].gold = 250;
+
   const loaded = R.adopt(JSON.parse(JSON.stringify(saved)));
   check('그대로 돌아온다', loaded.length, saved.length);
   check('레벨이 남는다', loaded[0].level, 6);
+  check('지갑이 남는다', loaded[0].gold, 250);
+  check('지갑이 없던 저장본은 0으로 채운다', loaded[1].gold, 0);
   check('장비가 남는다', loaded[0].gear.armor.defId, 'shield');
   check('아이템 uid는 새로 붙는다', typeof loaded[0].gear.armor.uid, 'string');
 

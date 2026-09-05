@@ -236,7 +236,7 @@
 
     <div class="panel" id="guild-panel">
       <div class="panel-head"><h2>모험가 길드 확정 보상</h2></div>
-      <p class="panel-note">완료하면 나누지 않고 그대로 받는다.</p>
+      <p class="panel-note">파티가 인원수로 나눈다. 잔돈은 의뢰를 받아 온 주인공이 갖는다.</p>
       <ul class="loot" id="guild-loot"></ul>
     </div>
 
@@ -349,9 +349,11 @@
 <!-- 분배 방식이 저장본에 남으므로 progress.js가 loot.js를 본다. 클래식 스크립트라
      순서가 곧 의존이고, 뒤에 두면 읽는 시점에 window.HealerLoot이 없다. -->
 <script src="loot.js"></script>
+<!-- 순서가 곧 의존이다. roster.js가 상점의 등급 규칙(`Shop.tierFor`)을
+     쓰므로 shop.js가 먼저 온다. -->
+<script src="shop.js"></script>
 <script src="roster.js"></script>
 <script src="progress.js"></script>
-<script src="shop.js"></script>
 <script src="quests.js"></script>
 <script src="ai.js"></script>
 <script src="logic.js"></script>

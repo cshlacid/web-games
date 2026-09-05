@@ -197,7 +197,10 @@ function renderQuests() {
     const meta = el('div', 'quest-meta');
     meta.append(text('span', 'tag place', Scenes.SCENES[quest.scene].name));
     for (const label of enemyCounts(quest)) meta.append(text('span', 'tag', label));
-    meta.append(text('span', 'tag gold', `${quest.guildReward.gold} 골드 · ${quest.guildReward.exp} exp`));
+    // **적힌 골드는 파티가 나눌 몫이다.** 그냥 숫자만 두면 그만큼이 지갑에
+    // 들어오는 것으로 읽힌다.
+    meta.append(text('span', 'tag gold',
+      `파티 ${quest.guildReward.gold} 골드 · ${quest.guildReward.exp} exp`));
     // 전리품 목록은 미리 알 수 없다 — 쓰러뜨린 적에게서 굴려진다. 게시판이
     // 말할 수 있는 것은 어떤 적이 나오는가까지다.
     meta.append(text('span', `tag rank-${quest.rank}`, `${D.RANKS[quest.rank].name} 출현`));
@@ -785,7 +788,7 @@ function renderBrief() {
   brief.append(head);
   brief.append(text('p', 'panel-note',
     `${Scenes.SCENES[quest.scene].name} · ${quest.waves.length}개 무리 · `
-    + `완료 시 ${quest.guildReward.gold} 골드와 ${quest.guildReward.exp} exp`));
+    + `완료 시 ${quest.guildReward.exp} exp와 파티가 나눌 ${quest.guildReward.gold} 골드`));
   const meta = el('div', 'quest-meta');
   for (const label of enemyCounts(quest)) meta.append(text('span', 'tag', label));
   brief.append(meta);
@@ -1898,8 +1901,20 @@ function openResult(state) {
   app.progress.potions = Object.assign({}, state.potions);
 
   // 명부 전체가 자란다. 데려간 쪽은 전부, 남은 쪽은 다른 파티에서 일한 몫만.
-  const roster = Roster.awardExp(app.progress.roster, app.party.map((m) => m.name),
+  const joinedNames = app.party.map((m) => m.name);
+  const roster = Roster.awardExp(app.progress.roster, joinedNames,
     reward.charExp, (Math.random() * 1e9) | 0);
+
+  // **길드 골드는 파티가 나눠 갖는다.** 주인공 몫은 위에서 이미 지갑에 넣었고,
+  // 여기는 동료 몫이다. 받은 돈으로 동료가 제 장비를 갖춘다 — 쓸 데가 없으면
+  // 저장본에 숫자만 쌓이고, 나눠 갖는 것이 화면의 글자로만 남는다.
+  const purses = Roster.awardGold(app.progress.roster, joinedNames,
+    reward.share, (Math.random() * 1e9) | 0);
+  const bought = new Map();
+  for (const member of app.progress.roster) {
+    const deal = Roster.goShopping(member, (Math.random() * 1e9) | 0);
+    if (deal) bought.set(member.name, deal);
+  }
 
   const expList = $('exp-gained');
   expList.textContent = '';
@@ -1929,9 +1944,13 @@ function openResult(state) {
   if (won) {
     const guild = $('guild-loot');
     guild.textContent = '';
+    // 적힌 금액은 파티 전체 몫이라, 내 몫을 함께 적지 않으면 지갑에 들어온
+    // 숫자와 화면의 숫자가 다르다.
     const gold = el('li');
     gold.append(icon('coin'));
-    gold.append(text('span', null, `${quest.guildReward.gold} 골드`));
+    gold.append(text('span', null, `${reward.purse} 골드`));
+    gold.append(text('span', 'why', `${reward.party}명이 나눈다`));
+    gold.append(text('span', 'to', `내 몫 ${reward.gold}`));
     guild.append(gold);
 
     const method = Loot.METHODS[app.lootMethod];
@@ -1993,7 +2012,7 @@ function openResult(state) {
   }
 
   renderBattleReport(L.battleReport(state));
-  renderRosterReport(roster, joined);
+  renderRosterReport(roster, joined, purses, bought);
   persist();
   show('result', quest.name);
 }
@@ -2024,7 +2043,7 @@ function renderBattleReport(rows) {
   }
 }
 
-function renderRosterReport(report, joined) {
+function renderRosterReport(report, joined, purses, bought) {
   const list = $('roster-report');
   list.textContent = '';
 
@@ -2039,9 +2058,21 @@ function renderRosterReport(report, joined) {
     const name = el('span');
     name.append(document.createTextNode(entry.name));
     row.append(name);
-    const value = `+${entry.exp} exp${entry.levels ? ` · Lv ${member.level}` : ''}`;
+    const purse = (purses || []).find((p) => p.name === entry.name);
+    const value = `+${entry.exp} exp${purse ? ` · +${purse.gold} 골드` : ''}`
+      + `${entry.levels ? ` · Lv ${member.level}` : ''}`;
     row.append(text('b', `stat-value${entry.levels ? ' up' : ''}`, value));
     list.append(row);
+
+    // 제 몫으로 장비를 갖췄으면 그 자리에서 알린다. 편성 화면을 열어 봐야
+    // 알 수 있으면 동료가 돈을 쓴 것이 화면에 없는 일이 된다.
+    const deal = bought && bought.get(entry.name);
+    if (deal) {
+      const line = el('li', 'sub-row');
+      line.append(text('span', 'why', `${Items.def(deal.item).name} 구입`));
+      line.append(text('b', 'stat-value', `-${deal.price} 골드`));
+      list.append(line);
+    }
   }
 
   if (joined) {
