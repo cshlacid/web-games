@@ -1205,6 +1205,10 @@ function syncSheet(node, unit, state) {
   const info = Sprites.sheet(wrap.dataset.kind);
   const d = wrap.dataset;
 
+  // **쓰러진 유닛은 그림도 멈춘다.** 넘어뜨려 놓고 대기 자세를 계속 돌리면
+  // 누운 채로 숨을 쉬고, 죽기 직전에 휘두르던 공격이 그대로 이어진다.
+  if (unit.dead) { setFrame(wrap, 0, info.clips.idle.row); return; }
+
   const next = unit.nextAttackAt || 0;
   if (Number(d.next || 0) < next) { d.next = next; d.swing = state.t; }
 
@@ -1226,15 +1230,15 @@ function syncSheet(node, unit, state) {
   const swung = state.t - Number(d.swing === undefined ? -99 : d.swing);
   let name = 'idle';
   // 외우는 동안은 준비 자세로 선다. 시전 막대만으로는 무엇을 하는지 안 보인다.
-  if (!unit.dead && unit.cast) name = 'attack';
-  else if (!unit.dead && swung < atk.frames / atk.fps) name = 'attack';
+  if (unit.cast) name = 'attack';
+  else if (swung < atk.frames / atk.fps) name = 'attack';
   // **무리 사이에는 좌표가 움직이지 않는데도 걷는 중이다.** 대열은 이미 제자리라
   // x가 그대로고, 흘러가는 것은 배경이다. 좌표만 보면 다른 동료가 흔들리며 가는
   // 옆에서 주인공만 선 채로 미끄러진다.
-  else if (!unit.dead && state.marching && unit.side === 'ally') name = 'walkRight';
-  // **대열을 벌리는 힘(separate)은 걷는 것이 아니다.** 문턱이 없으면 가만히 선
-  // 유닛이 걷는 자세로 떤다.
-  else if (!unit.dead && walking) name = Number(d.dir) > 0 ? 'walkRight' : 'walkLeft';
+  else if (state.marching && unit.side === 'ally') name = 'walkRight';
+  // **비켜서는 걸음이 달리기로 읽히지 않게 문턱을 둔다.** 문턱이 없으면 가만히
+  // 선 유닛이 걷는 자세로 떤다.
+  else if (walking) name = Number(d.dir) > 0 ? 'walkRight' : 'walkLeft';
 
   const clip = info.clips[name];
   let frame = 0;
