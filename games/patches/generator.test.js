@@ -24,7 +24,7 @@ const ROUNDS = 15;
 
 const problems = {
   none: 0, shape: 0, notUnique: 0, notLogical: 0,
-  oversized: 0, tooFew: 0, orderBroken: 0, clueOutside: 0,
+  oversized: 0, tooFew: 0, orderBroken: 0, clueOutside: 0, single: 0,
 };
 
 for (const size of G.SIZES) {
@@ -42,6 +42,7 @@ for (const size of G.SIZES) {
       if (rect.w > G.MAX_SIDE || rect.h > G.MAX_SIDE || rect.w * rect.h > G.MAX_AREA) {
         problems.oversized++;
       }
+      if (rect.w * rect.h < G.MIN_AREA) problems.single++;
     }
     if (puzzle.solution.length < size + 2) problems.tooFew++;
 
@@ -65,6 +66,7 @@ check('조각이 격자를 남김없이 나눈다', problems.shape, 0);
 check('모든 판이 유일해다', problems.notUnique, 0);
 check('찍지 않고 논리만으로 풀린다', problems.notLogical, 0);
 check('조각이 상한을 넘지 않는다', problems.oversized, 0);
+check('한 칸짜리 조각이 없다', problems.single, 0);
 check('조각이 너무 적은 판은 없다', problems.tooFew, 0);
 check('단서가 제 조각 안에 있다', problems.clueOutside, 0);
 check('힌트 순서가 정답 조각만 담는다', problems.orderBroken, 0);
