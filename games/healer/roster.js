@@ -171,9 +171,13 @@ function awardExp(members, joinedNames, exp, seed) {
   return report;
 }
 
-// 의뢰 골드의 제 몫. **경험치와 같은 규칙으로 나눈다** — 데려간 동료는 몫 전부,
-// 남은 동료는 다른 파티에서 번 몫만 받는다. 규칙을 둘로 두면 한쪽만 고치게 된다.
-function awardGold(members, joinedNames, share, seed) {
+// 의뢰 골드의 제 몫. 남은 동료는 다른 파티에서 번 몫만 받는다 — **나누는 규칙은
+// 경험치와 같다**(`idleExpRate`). 규칙을 둘로 두면 한쪽만 고치게 된다.
+//
+// **데려간 동료의 몫은 `paid`가 정한다** — 그쪽은 나누는 것이 아니라 모집할 때
+// 약속한 삯이고(hire.js), 동료마다 부른 값이 다르다. 안 넘기면 예전처럼
+// `share`를 그대로 준다.
+function awardGold(members, joinedNames, share, seed, paid) {
   const rng = createRng(seed == null ? (Math.random() * 1e9) | 0 : seed);
   const joined = new Set(joinedNames);
   const [lo, hi] = D.LEVEL.idleExpRate;
@@ -181,7 +185,8 @@ function awardGold(members, joinedNames, share, seed) {
 
   for (const member of members) {
     const here = joined.has(member.name);
-    const got = here ? share : Math.round(share * (lo + rng() * (hi - lo)));
+    const wage = paid ? Math.max(0, Math.round(paid[member.name] || 0)) : share;
+    const got = here ? wage : Math.round(share * (lo + rng() * (hi - lo)));
     member.gold = (member.gold || 0) + got;
     report.push({ name: member.name, joined: here, gold: got });
   }

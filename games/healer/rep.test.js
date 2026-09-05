@@ -76,6 +76,17 @@ const nameWithTrait = (want) => {
   check('전투불능은 평판을 조금만 깎는다',
     Math.abs(downed.delta - Rep.repDelta(quest(5), 5, true, 0).delta) < Math.abs(D.TRUST.down),
     true);
+  // 진 판에서는 세지 않는다 — 전멸이 곧 실패라 한 사건을 두 번 깎게 된다.
+  check('진 판에서는 전투불능을 따로 세지 않는다',
+    Rep.repDelta(quest(5), 5, false, 4).delta, Rep.repDelta(quest(5), 5, false, 0).delta);
+
+  // **이기는 판이 지는 판보다 많으면 평판이 자란다.** 이 게임은 벅찬 의뢰를
+  // 힐이 들어가도 만만치 않게 잡아 두어 지는 판이 적지 않은데, 실패가 성공만큼
+  // 깎으면 평판이 0에 붙어 단계 표가 뜻을 잃는다.
+  const per = (wins, plays) => (Rep.repDelta(quest(5), 5, true, 1).delta * wins
+    + Rep.repDelta(quest(5), 5, false, 0).delta * (plays - wins)) / plays;
+  check('반쯤 이기면 평판이 자란다', per(13, 25) > 0, true);
+  check('셋에 하나만 이기면 제자리다', per(8, 25) < per(13, 25) / 2, true);
 }
 
 // --- 평판 더하기 --------------------------------------------------------
@@ -179,8 +190,46 @@ const nameWithTrait = (want) => {
   check('무리한 일은 실패해도 덜 깎인다',
     Rep.trustDelta(fit, quest(8), { won: false }).delta
       > Rep.trustDelta(fit, quest(5), { won: false }).delta, true);
-  check('전투불능이 가장 크다',
-    Rep.trustDelta(fit, quest(8), { won: true, downed: true }).delta < 0, true);
+
+  // **전투불능이 가장 크다.** 다만 각오하고 따라나선 판일수록 덜 원망한다 —
+  // 기획서의 -50은 "쓰러지면 퀘스트가 끝난다"를 전제한 값인데 이 게임은
+  // 이어지므로 쓰러지는 일이 훨씬 잦다.
+  check('이긴 판의 전투불능은 크게 깎는다',
+    Rep.trustDelta(fit, quest(5), { won: true, downed: true }).delta
+      < Rep.trustDelta(fit, quest(5), { won: true }).delta - 30, true);
+  check('시시한 판에서 죽으면 그대로 -50이다',
+    Rep.trustDelta(fit, quest(3), { won: true, downed: true }).parts
+      .find((part) => part.why === '전투불능').delta, D.TRUST.down);
+  check('위험한 판에서 죽으면 덜 원망한다',
+    Rep.trustDelta(fit, quest(8), { won: true, downed: true }).delta
+      > Rep.trustDelta(fit, quest(5), { won: true, downed: true }).delta, true);
+
+  // **진 판에서는 전투불능을 따로 세지 않는다.** 전멸이 곧 실패라 한 사건을
+  // 두 번 깎게 된다.
+  check('진 판의 전투불능은 실패 몫에 들어 있다',
+    Rep.trustDelta(fit, quest(5), { won: false, downed: true }).delta,
+    Rep.trustDelta(fit, quest(5), { won: false }).delta);
+}
+
+// --- 쉬는 동안 앙금이 가라앉는다 ----------------------------------------
+//
+// 회복 수단이 없으면 신뢰도는 한 방향으로만 간다. 이 게임은 아군이 자주
+// 쓰러지므로 몇 판 만에 명부 전원이 관계 단절에 닿았다.
+{
+  const cold = member('시험 동료 8', 5, -40);
+  Rep.rest(cold);
+  check('불신은 0 쪽으로 돌아온다', cold.trust, -40 + D.TRUST_REST);
+
+  const warm = member('시험 동료 9', 5, 40);
+  Rep.rest(warm);
+  check('호감도 0 쪽으로 돌아온다', warm.trust, 40 - D.TRUST_REST);
+
+  // **0을 지나치지 않는다.** 쉬게 두는 것만으로 신뢰가 쌓이면 명부에 넣어 두고
+  // 안 쓰는 것이 최선이 된다.
+  const near = member('시험 동료 10', 5, 1);
+  Rep.rest(near);
+  check('0을 지나치지 않는다', near.trust, 0);
+  check('0이면 아무것도 하지 않는다', Rep.rest(member('시험 동료 11', 5, 0)), null);
 }
 
 // --- 삯 만족도(기획서 14장) --------------------------------------------
@@ -191,6 +240,11 @@ const nameWithTrait = (want) => {
   const less = Rep.trustDelta(m, quest(5), { won: true, asked: 200, paid: 100 }).delta;
   check('더 주면 더 오른다', more > same, true);
   check('덜 주면 깎인다', less < same, true);
+  // 실패하면 길드가 내지 않아 아무도 못 받는다. 그것을 "약속보다 덜 받았다"로
+  // 세면 실패가 두 번 깎인다.
+  check('진 판에서는 삯을 따지지 않는다',
+    Rep.trustDelta(m, quest(5), { won: false, asked: 200, paid: 0 }).delta,
+    Rep.trustDelta(m, quest(5), { won: false }).delta);
   // 돈으로 관계를 사는 것이 어려운 의뢰를 함께 깨는 것보다 싸면 안 된다.
   const huge = Rep.trustDelta(m, quest(5), { won: true, asked: 200, paid: 20000 }).delta;
   check('돈으로 살 수 있는 폭에는 천장이 있다', huge - same, D.TRUST_PAY.cap);
@@ -219,7 +273,11 @@ const nameWithTrait = (want) => {
 {
   const q = quest(5);
   const base = Hire.baseWage(q);
-  check('기준은 의뢰 골드의 1인 몫', base, Math.round(q.guildReward.gold / D.PARTY_MAX));
+  // 1인 몫에서 조금 뗀 값이다. 그대로 두면 배수가 조금만 1을 넘어도 넷의 삯이
+  // 길드가 내는 돈을 넘어, 가진 돈이 없는 초반에 넷을 못 데려간다.
+  check('기준은 의뢰 골드의 1인 몫에서 조금 뗀 값',
+    base, Math.round((q.guildReward.gold / D.PARTY_MAX) * D.WAGE_BASE));
+  check('1인 몫보다 싸다', base < q.guildReward.gold / D.PARTY_MAX, true);
 
   const name = nameWithTrait('coin');
   const wageAt = (trust, rep, method) =>

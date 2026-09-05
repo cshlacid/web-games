@@ -15,10 +15,11 @@ const Rep = node ? require('./reputation.js') : root.HealerRep;
 // 순서가 곧 의존이고, `index.html`에서 loot.js가 앞에 온다.
 const Loot = node ? require('./loot.js') : root.HealerLoot;
 
-// 삯의 기준은 **의뢰 골드의 1인 몫**이다. 게시판에 적힌 금액이 이미 파티 전체
-// 몫이므로(quests.js), 가득 채워 나가고 모두가 기준값만 부르면 예전의 균등
-// 분배와 같은 자리에 선다 — 거기서 신뢰도와 난이도가 값을 흔든다.
-const baseWage = (quest) => Math.max(1, Math.round(quest.guildReward.gold / D.PARTY_MAX));
+// 삯의 기준은 **의뢰 골드의 1인 몫에서 조금 뗀 값**이다(`WAGE_BASE`). 게시판에
+// 적힌 금액이 이미 파티 전체 몫이므로(quests.js) 1인 몫이 자연스러운 기준이지만,
+// 그대로 두면 배수가 조금만 1을 넘어도 넷의 삯이 길드가 내는 돈을 넘는다.
+const baseWage = (quest) =>
+  Math.max(1, Math.round((quest.guildReward.gold / D.PARTY_MAX) * D.WAGE_BASE));
 
 // 신뢰도가 삯에 미치는 배수(기획서 13장). **아래쪽이 가파르다** — 믿는 사람에게
 // 깎아 주는 폭보다 못 믿는 사람에게 얹는 폭이 커야, 사고를 낸 뒤가 아프다.

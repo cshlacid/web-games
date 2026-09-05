@@ -1792,14 +1792,19 @@ const REPUTATION = {
 //
 // **동료 전투불능은 평판보다 신뢰도를 깎는다**(기획서 2.3). 여기서 -4이고
 // 신뢰도는 -50이라, 사고가 나면 세상보다 그 동료가 먼저 등을 돌린다.
+// **오르내리는 폭은 이 게임의 승률을 보고 정했다.** 벅찬 의뢰는 힐이 들어가도
+// 만만치 않게 잡혀 있어(logic.test의 난이도 확인) 지는 판이 적지 않은데, 실패가
+// 성공만큼 깎으면 평판이 0에 붙어 단계 표가 뜻을 잃는다 — 재 보니 스물다섯 판에
+// 열다섯을 이기고도 평판이 0이었다. 지금은 적정 난이도에서 예닐곱 판을 이기고
+// 서너 판을 지면 한 단계씩 오른다.
 const REP_CHANGE = {
-  clear: 14,        // 완료 기본
-  perGap: 7,        // 적정 레벨이 내 레벨보다 하나 높을 때마다
+  clear: 20,        // 완료 기본
+  perGap: 8,        // 적정 레벨이 내 레벨보다 하나 높을 때마다
   gapCap: 5,        // 그 이상은 세지 않는다 — 무모한 한 판이 평판을 통째로 사지 않게
   easyGap: -2,      // 이만큼 아래인 의뢰는
-  easyClear: 3,     //   완료해도 이것만 오른다
-  fail: -20,
-  down: -4,         // 동료 하나가 쓰러질 때마다
+  easyClear: 4,     //   완료해도 이것만 오른다
+  fail: -8,
+  down: -3,         // 동료 하나가 쓰러질 때마다 (이긴 판에서만 센다)
 };
 
 // 신뢰도. **범위와 초기값은 기획서에 확정으로 적힌 것이다**(-100~+100, 초면 0).
@@ -1828,17 +1833,30 @@ const TRUST = {
 // **쉬운 쪽이 마이너스인 것이 기획서 8.1이다** — 시시한 일을 반복해 신뢰를
 // 쌓는 노가다를 막는다. `wage`가 양쪽 끝에서 다 오르는 것은 12장이다:
 // 시간을 낭비할 정도로 쉬워도 싫고 목숨을 걸 정도로 어려워도 싫다.
+// `downRelief`는 그 판에서 쓰러졌을 때 -50에서 덜어 내는 몫이다. **기획서의
+// -50은 "동료가 쓰러지면 퀘스트가 끝난다"를 전제한 값인데** 이 게임은 그래도
+// 이어지므로, 쓰러지는 일이 훨씬 잦다 — 그대로 두면 스물다섯 판에 명부 전원이
+// 관계 단절에 닿았다. 각오하고 따라나선 판일수록 덜 원망한다고 보고 덜어 낸다:
+// 위험한 의뢰를 깨고 쓰러진 것은 거의 상쇄되고, 시시한 판에서 죽으면 그대로 -50이다.
 const TRUST_FEEL = [
-  { upTo: -2,       id: 'trivial', name: '시시하다', trust: -10, wage: 1.20 },
-  { upTo: -1,       id: 'easy',    name: '쉽다',    trust: -3,  wage: 1.06 },
-  { upTo: 0,        id: 'fit',     name: '알맞다',  trust: 8,   wage: 1.00 },
-  { upTo: 2,        id: 'hard',    name: '벅차다',  trust: 15,  wage: 1.15 },
-  { upTo: Infinity, id: 'deadly',  name: '위험하다', trust: 22,  wage: 1.42 },
+  { upTo: -2,       id: 'trivial', name: '시시하다', trust: -10, wage: 1.20, downRelief: 0 },
+  { upTo: -1,       id: 'easy',    name: '쉽다',    trust: -3,  wage: 1.06, downRelief: 4 },
+  { upTo: 0,        id: 'fit',     name: '알맞다',  trust: 8,   wage: 1.00, downRelief: 10 },
+  { upTo: 2,        id: 'hard',    name: '벅차다',  trust: 15,  wage: 1.15, downRelief: 20 },
+  { upTo: Infinity, id: 'deadly',  name: '위험하다', trust: 22,  wage: 1.42, downRelief: 30 },
 ];
 
 // 실패한 의뢰. 성공했을 때의 표와 나란히 두지 않은 것은, 실패는 난이도가 무엇이든
 // 신뢰를 깎기 때문이다 — 다만 애초에 무리한 일이었다면 덜 깎인다.
-const TRUST_FAIL = { base: -14, hardRelief: 6 };
+const TRUST_FAIL = { base: -10, hardRelief: 6 };
+
+// 데려가지 않은 동료는 판이 하나 지날 때마다 이만큼 0 쪽으로 돌아온다.
+// **회복 수단이 없으면 신뢰도는 한 방향으로만 간다** — 이 게임은 아군이 자주
+// 쓰러지므로(전멸이 곧 실패다) 몇 판 만에 명부 전원이 관계 단절에 닿는다.
+// 데려가지 않은 동료가 다른 파티에서 일하고 온다는 규칙이 이미 있으니(roster.js),
+// 그동안 앙금도 가라앉는다고 본다. 데려간 동료에게는 걸리지 않는다 — 그쪽은
+// 이번 판의 결과가 정한다.
+const TRUST_REST = 4;
 
 // 받은 삯이 부른 값과 다를 때(기획서 14장). 요구보다 많이 받으면 만족하고 적게
 // 받으면 상한다. **위쪽 폭이 좁은 것은** 돈으로 관계를 사는 것이 어려운 의뢰를
@@ -1849,6 +1867,14 @@ const TRUST_PAY = { per: 24, cap: 10, shortPer: 40, shortCap: -25 };
 // 배로 뛰므로 선형으로 두면 좋은 물건 하나가 관계를 통째로 산다.
 // 유료 선물은 보류라 여기에 없다.
 const GIFT = { div: 3, cap: 25, likedMul: 1.5 };
+
+// 삯의 기준값이 의뢰 골드의 1인 몫에서 차지하는 몫. **1이 아니다** — 1로 두면
+// 넷을 데려가는 순간 배수가 조금만 1을 넘어도 삯 합계가 길드가 내는 돈을 넘어,
+// 가진 돈이 없는 초반에 넷을 못 데려간다. 그러면 둘만 데리고 나가 지고, 지면
+// 돈이 안 들어와 다음 판에는 더 못 데려가는 내리막이 생긴다(재 보니 스무 판
+// 만에 파티가 하나까지 줄었다). 기획서 11장의 예도 이쪽이다 — 1,000G에서 셋이
+// 450G를 가져가고 주인공이 550G를 남긴다.
+const WAGE_BASE = 0.85;
 
 // 동료의 경제적 성격(기획서 16장). **차이를 좁게 둔다** — 벌리면 특정 성격만
 // 데려가는 것이 정답이 되어, 전투 능력과 의뢰 적합도가 판단에서 밀려난다.
@@ -1882,7 +1908,7 @@ const api = {
   SKILL, skillAt, skillEffect, skillLevelOf,
   POTIONS, JOB_POTIONS, POTION_MAX, ENEMIES,
   PARTY_MAX, SKILL_MAX,
-  REPUTATION, REP_CHANGE, TRUST, TRUST_FEEL, TRUST_FAIL, TRUST_PAY, GIFT, TRAITS,
+  REPUTATION, REP_CHANGE, WAGE_BASE, TRUST, TRUST_FEEL, TRUST_FAIL, TRUST_REST, TRUST_PAY, GIFT, TRAITS,
   potionPrice,
 };
 

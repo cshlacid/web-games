@@ -43,10 +43,14 @@ function repProgress(rep) {
 // 이번 의뢰가 평판을 얼마나 움직이는가. **어려운 의뢰일수록 크게 오른다** —
 // 쉬운 것을 반복해 이름을 사는 길을 막는 것이 이 시스템의 목적이다.
 // `downed`는 이번 판에 쓰러진 동료 수다.
+// **진 판에서는 전투불능을 따로 세지 않는다.** 기획서의 전투불능은 "그 때문에
+// 퀘스트가 끝났다"는 사건인데, 이 게임에서 파티가 다 쓰러지면 그것이 곧 실패다 —
+// 실패로 한 번 세고 전투불능으로 또 세면 한 사건을 두 번 깎는 것이 된다.
+// 이긴 판에서 누가 쓰러진 것만 사고로 센다.
 function repDelta(quest, playerLevel, won, downed) {
   const C = D.REP_CHANGE;
   const fallen = Math.max(0, downed | 0);
-  if (!won) return { delta: C.fail + C.down * fallen, gap: 0, easy: false };
+  if (!won) return { delta: C.fail, gap: 0, easy: false };
 
   const gap = quest.level - playerLevel;
   const easy = gap <= C.easyGap;
@@ -136,12 +140,21 @@ function trustDelta(member, quest, outcome) {
     parts.push({ why: '의뢰 실패', delta: D.TRUST_FAIL.base + relief });
   }
 
-  if (outcome.downed) parts.push({ why: '전투불능', delta: D.TRUST.down });
+  // 진 판의 전투불능은 실패 몫에 이미 들어 있다. 둘을 다 세면 전멸한 판마다
+  // -64가 되어, 두 판이면 어떤 동료와도 관계가 끊어진다.
+  if (outcome.downed && outcome.won) {
+    parts.push({ why: '전투불능', delta: D.TRUST.down + feel.downRelief });
+  }
 
   // 받은 삯이 부른 값과 다를 때. 부른 값이 0이면 견줄 것이 없다.
+  //
+  // **진 판은 보지 않는다.** 실패하면 길드가 내지 않아 아무도 못 받는데, 그것을
+  // "약속보다 덜 받았다"로 세면 실패가 두 번 깎인다 — 재 보니 실패마다 -8이
+  // 아니라 -33이 되어 열 판이면 명부 전원이 관계 단절에 닿았다. 기획서 14장의
+  // 만족도는 일을 마치고 나눌 때의 이야기다.
   const asked = Math.max(0, outcome.asked | 0);
   const paid = Math.max(0, outcome.paid | 0);
-  if (asked > 0 && paid !== asked) {
+  if (outcome.won && asked > 0 && paid !== asked) {
     const ratio = paid / asked;
     const delta = paid > asked
       ? Math.min(D.TRUST_PAY.cap, Math.round((ratio - 1) * D.TRUST_PAY.per))
@@ -150,6 +163,15 @@ function trustDelta(member, quest, outcome) {
   }
 
   return { feel, parts, delta: parts.reduce((sum, part) => sum + part.delta, 0) };
+}
+
+// 데려가지 않은 동료의 앙금이 가라앉는다. **0을 지나치지 않는다** — 쉬게 두는
+// 것만으로 신뢰가 쌓이면 명부에 넣어 두고 안 쓰는 것이 최선이 된다.
+function rest(member) {
+  const trust = trustOf(member);
+  if (trust === 0) return null;
+  const step = Math.min(D.TRUST_REST, Math.abs(trust)) * (trust > 0 ? -1 : 1);
+  return addTrust(member, step);
 }
 
 // --- 선물 ---------------------------------------------------------------
@@ -175,7 +197,7 @@ const api = {
   clamp,
   repValue, repStage, repProgress, repDelta, addRep, questGap,
   trustOf, trustStage, addTrust,
-  traitOf, tasteOf, feelOf, trustDelta,
+  traitOf, tasteOf, feelOf, trustDelta, rest,
   giftValue, liked,
 };
 

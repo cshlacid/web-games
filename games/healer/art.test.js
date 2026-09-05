@@ -326,7 +326,8 @@ function check(name, actual, expected) {
 
   // 화면이 이름만 보고 부르는 것들. 자료에 없으므로 여기서 따로 챙긴다.
   check('화면이 쓰는 아이콘도 있다',
-    ['lock', 'coin', 'scroll', 'cart'].filter((name) => !Icons.has(name)), []);
+    ['lock', 'coin', 'scroll', 'cart', 'crest', 'trust', 'gift']
+      .filter((name) => !Icons.has(name)), []);
 
   // 이모지가 남아 있으면 그 자리만 글꼴이 그린다.
   const emoji = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}]/u;

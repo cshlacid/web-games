@@ -13,6 +13,8 @@ const P = window.HealerProgress;
 const Q = window.HealerQuests;
 const Items = window.HealerItems;
 const Roster = window.HealerRoster;
+const Rep = window.HealerRep;
+const Hire = window.HealerHire;
 const Shop = window.HealerShop;
 const Sprites = window.HealerSprites;
 const Icons = window.HealerIcons;
@@ -51,6 +53,13 @@ const app = {
   party: [],
   skills: [],
   lootMethod: 'even',
+  // 이번 편성의 계약. 후보 전원에 대해 한 번에 내고(이름 → 계약), 데려간
+  // 동료의 것만 전투 뒤 정산에 쓴다. 전투가 시작할 때 굳는다 — 결과 화면에서
+  // 다시 계산하면 부른 값과 준 값이 갈린다.
+  wages: new Map(),
+  // 부른 값에 얹어 주기로 한 몫(이름 → 골드). 기획서 14장의 만족도가 여기서 온다.
+  tips: {},
+  contracts: [],
   battle: null,
   aiming: null,
   paused: false,
@@ -156,7 +165,36 @@ for (const slot of document.querySelectorAll('[data-icon]')) {
 // --- 퀘스트 게시판 -----------------------------------------------------
 
 function refreshQuests() {
-  app.quests = Q.generate(app.progress.charLevel, app.progress.questSeed);
+  // **게시판의 상한을 평판이 정한다.** 무명인 힐러에게 길드가 영웅급 의뢰를
+  // 내주지 않는다는 것이 기획서의 뜻이고, 이 게임에서 "상위 콘텐츠"라고 부를 수
+  // 있는 것은 의뢰의 난이도뿐이다.
+  app.quests = Q.generate(app.progress.charLevel, app.progress.questSeed,
+    Rep.questGap(Rep.repValue(app.progress)));
+}
+
+// 평판 한 줄. **막대까지 그리는 것은** 숫자만 두면 지금이 어디쯤인지가 단계
+// 표를 외운 사람에게만 보이기 때문이다. 다음 단계에서 무엇이 열리는지도 함께
+// 적는다 — 평판을 올릴 이유가 화면에 없으면 그냥 지나가는 숫자가 된다.
+function renderRep(box, rep) {
+  box.textContent = '';
+  const at = Rep.repProgress(rep);
+
+  const head = el('div', 'rep-head');
+  head.append(icon('crest'));
+  head.append(text('b', null, at.stage.name));
+  head.append(text('span', 'why', `${rep}`));
+  box.append(head);
+
+  const bar = el('div', 'rep-bar');
+  const fill = el('span');
+  // 마지막 단계에는 다음이 없다. 나눌 것이 없으므로 가득 채운다.
+  fill.style.width = `${at.need ? Math.round((at.have / at.need) * 100) : 100}%`;
+  bar.append(fill);
+  box.append(bar);
+
+  box.append(text('p', 'rep-note', at.next
+    ? `${at.next.name}까지 ${at.need - at.have} · 지금은 적정 레벨 +${at.stage.questGap}까지 걸린다`
+    : `게시판이 다 열렸다 · 적정 레벨 +${at.stage.questGap}까지`));
 }
 
 function enemyCounts(quest) {
@@ -179,6 +217,7 @@ function difficultyOf(quest) {
 
 function renderQuests() {
   if (!app.quests.length) refreshQuests();
+  renderRep($('rep'), Rep.repValue(app.progress));
   const list = $('quests');
   list.textContent = '';
 
@@ -794,6 +833,72 @@ function renderBrief() {
   brief.append(meta);
 }
 
+// --- 삯과 계약 ----------------------------------------------------------
+
+// 후보 전원의 계약을 한 번에 낸다. **하나씩 부르지 않는 것은** 분배 방식을
+// 바꿨을 때 일부만 갱신되는 일을 막기 위해서다 — 방식이 삯을 흔든다.
+function refreshWages() {
+  const ctx = { rep: Rep.repValue(app.progress), method: app.lootMethod };
+  app.wages = new Map(Hire.contractsFor(app.candidates, app.quest, ctx)
+    .map((contract) => [contract.name, contract]));
+  // 응하지 않는 동료는 파티에서 빠진다. 방식을 바꾸다 거부로 넘어가는 일은
+  // 없지만, 명부가 자라며 신뢰도가 바뀐 뒤 같은 화면을 다시 열 수 있다.
+  app.party = app.party.filter((member) => (app.wages.get(member.name) || {}).ok);
+}
+
+const wageOf = (member) => app.wages.get(member.name) || null;
+
+// 데려간 동료의 계약만. 정산과 합계가 같은 목록을 봐야 화면의 숫자와 지갑이 맞다.
+const partyContracts = () => app.party.map((member) => wageOf(member)).filter(Boolean);
+
+const tipFor = (name) => Math.max(0, Math.round(app.tips[name] || 0));
+
+// 얹어 주는 단위. 부른 값의 비율로 두는 것은, 고정 금액이면 초반에는 큰돈이고
+// 후반에는 있으나 마나가 되기 때문이다.
+const TIP_STEP = 0.1;
+
+function renderDeal() {
+  const list = $('deal');
+  list.textContent = '';
+  const contracts = partyContracts();
+  const tips = {};
+  for (const contract of contracts) tips[contract.name] = tipFor(contract.name);
+  const deal = Hire.settle(app.quest, contracts, true, tips);
+
+  for (const row of deal.paid) {
+    const line = el('li');
+    line.append(text('span', 'rname', row.name));
+    const value = text('b', 'stat-value', `${row.gold}`);
+    // 얹어 준 몫은 따로 적는다. 합쳐 두면 부른 값이 얼마였는지 사라진다.
+    if (row.tip) value.append(text('small', 'why', ` +${row.tip}`));
+    line.append(value);
+    list.append(line);
+  }
+  if (!contracts.length) {
+    const none = el('li');
+    none.append(text('span', 'rname', '혼자 간다'));
+    none.append(text('b', 'stat-value', '0'));
+    list.append(none);
+  }
+
+  // **주인공 몫은 음수가 될 수 있다**(기획서 확정). 그때는 제 돈을 보태는 것이라
+  // 지갑에서 빠지고, 가진 돈으로도 못 메우면 전투를 시작할 수 없다.
+  const afford = Hire.canAfford(app.progress.gold, app.quest, contracts, tips);
+  const head = $('deal-hero');
+  head.textContent = `내 몫 ${deal.hero}`;
+  head.className = `count${deal.hero < 0 ? ' short' : ''}`;
+
+  const note = $('deal-panel').querySelector('.panel-note');
+  // 조사를 붙이지 않고 값만 늘어놓는다 — 숫자 뒤의 을/를은 끝자리마다 갈려,
+  // 붙이려면 숫자를 읽는 규칙이 화면 코드에 하나 더 생긴다.
+  note.textContent = afford.ok
+    ? (deal.hero < 0
+      ? `길드 ${deal.purse} 골드로는 모자란다 · 내 돈 ${-deal.hero} 골드를 보탠다`
+      : `길드 ${deal.purse} 골드 · 삯 ${deal.spent}`)
+    : `${afford.short} 골드가 모자라 이 편성으로는 계약할 수 없다`;
+  return afford;
+}
+
 function memberSummary(member) {
   const def = Roster.defOf(member);
   const gear = Roster.gearOf(member);
@@ -852,6 +957,21 @@ function renderRoster() {
     body.append(text('div', 'pick-name', member.name));
     // 카드에는 종족을 적지 않는다. 셋을 다 적으면 좁은 칸에서 줄이 늘어난다.
     body.append(specTag(member));
+    // **삯과 신뢰도는 카드에 있어야 한다.** 상세를 열어야만 보이면 열 명의
+    // 값을 견주는 데 열 번을 열어야 한다. 왜 그 값인지는 상세에서 본다.
+    const contract = wageOf(member);
+    if (contract) {
+      const deal = el('div', 'pick-deal');
+      const stage = Rep.trustStage(contract.trust);
+      deal.append(text('span', `trust-tag t-${stage.id}`, `${contract.trust > 0 ? '+' : ''}${contract.trust}`));
+      if (contract.ok) {
+        deal.append(icon('coin'));
+        deal.append(text('span', 'wage', String(contract.gold)));
+      } else {
+        deal.append(text('span', 'wage no', '거절'));
+      }
+      body.append(deal);
+    }
     open.append(body);
     open.addEventListener('click', () => openMember(member));
     row.append(open);
@@ -860,7 +980,7 @@ function renderRoster() {
     take.type = 'button';
     take.setAttribute('aria-pressed', String(picked));
     take.setAttribute('aria-label', `${member.name} ${picked ? '빼기' : '데려가기'}`);
-    take.disabled = !picked && full;
+    take.disabled = !picked && (full || !(contract && contract.ok));
     take.append(icon('check'));
     take.addEventListener('click', () => toggleMember(member));
     row.append(take);
@@ -874,7 +994,11 @@ function renderRoster() {
 
 function toggleMember(member) {
   const picked = app.party.includes(member);
+  const contract = wageOf(member);
   if (!picked && app.party.length >= D.PARTY_MAX - 1) { sound.play('deny'); return; }
+  // 응하지 않는 동료는 얼마를 준다 해도 따라나서지 않는다. 이유를 알리지 않으면
+  // 단추가 고장 난 것으로 보인다.
+  if (!picked && contract && !contract.ok) { sound.play('deny'); note(contract.line); return; }
   sound.play('click');
   if (picked) app.party = app.party.filter((entry) => entry !== member);
   else app.party.push(member);
@@ -937,12 +1061,16 @@ function openMember(member) {
   if (!chips.children.length) chips.append(text('span', 'pick-sub', '들고 오는 것이 없다'));
   hideChip();
 
+  renderTrust(member);
   renderSpecSwap(member);
+  renderFavor(member);
 
   const picked = app.party.includes(member);
+  const contract = wageOf(member);
   const take = $('member-take');
   take.textContent = picked ? '파티에서 뺀다' : '데려간다';
-  take.disabled = !picked && app.party.length >= D.PARTY_MAX - 1;
+  take.disabled = !picked
+    && (app.party.length >= D.PARTY_MAX - 1 || !(contract && contract.ok));
   sheet.hidden = false;
 }
 
@@ -988,6 +1116,121 @@ function renderSpecSwap(member) {
     box.append(text('div', 'pick-sub dim',
       `다른 계열에서 배운 것: ${borrowed.map((id) => D.UNIT_SKILLS[id].name).join(', ')}`));
   }
+}
+
+// 신뢰도와 이번 의뢰의 삯. **카드에는 숫자만 있고 이유는 여기에만 있다** —
+// 열 명의 카드에 이유를 다 적으면 카드가 다시 네 줄이 된다.
+function renderTrust(member) {
+  const box = $('member-trust');
+  box.textContent = '';
+  const contract = wageOf(member);
+  const trust = Rep.trustOf(member);
+  const stage = Rep.trustStage(trust);
+  const trait = Rep.traitOf(member);
+
+  const head = el('div', 'trust-head');
+  head.append(icon('trust'));
+  head.append(text('b', null, stage.name));
+  head.append(text('span', `trust-tag t-${stage.id}`, `${trust > 0 ? '+' : ''}${trust}`));
+  box.append(head);
+  // 단계마다의 한 마디. 숫자만으로는 -40과 -60이 어떻게 다른지 읽히지 않는다.
+  box.append(text('p', 'trust-line', stage.line));
+  box.append(text('p', 'pick-sub dim', `${trait.name} · ${trait.note}`));
+
+  if (!contract) return;
+  if (!contract.ok) {
+    box.append(text('p', 'trust-line no', '이번 의뢰에는 응하지 않는다.'));
+    return;
+  }
+
+  // **값을 이룬 배수를 그대로 보여 준다.** 왜 이 동료가 비싼지 알 수 없으면
+  // 신뢰도를 관리할 이유가 화면에 없다. 1에서 멀리 있는 것부터 적는다.
+  const why = contract.scales
+    .filter((scale) => Math.abs(scale.mul - 1) > 0.001)
+    .sort((a, b) => Math.abs(b.mul - 1) - Math.abs(a.mul - 1))
+    .map((scale) => `${scale.why} ${scale.mul > 1 ? '+' : '−'}${Math.round(Math.abs(scale.mul - 1) * 100)}%`);
+
+  const wage = el('div', 'trust-wage');
+  wage.append(icon('coin'));
+  wage.append(text('b', null, `${contract.gold} 골드`));
+  wage.append(text('span', 'why', `기준 ${contract.base}`));
+  box.append(wage);
+  box.append(text('p', 'pick-sub dim', why.length ? why.join(' · ') : '기준 그대로 부른다'));
+  // 이 동료가 이번 의뢰를 어떻게 보는가. 게시판의 난이도는 주인공 기준이라
+  // 여기 값과 갈린다 — 그래서 적정 레벨을 함께 적는다.
+  box.append(text('p', 'pick-sub dim',
+    `이 의뢰를 ${contract.feel.name}고 본다 (알맞다고 보는 레벨 ${Rep.tasteOf(member)})`));
+}
+
+// 얹어 주기와 선물. **둘 다 신뢰도를 사는 수단이라 한자리에 둔다** — 갈라 두면
+// 관계를 고치는 방법이 화면 두 곳에 흩어진다.
+function renderFavor(member) {
+  const box = $('member-favor');
+  box.textContent = '';
+  const contract = wageOf(member);
+  box.hidden = !contract || !contract.ok;
+  if (box.hidden) return;
+
+  const tip = tipFor(member.name);
+  const row = el('div', 'favor-row');
+  row.append(text('span', 'pick-sub', `삯에 얹기 +${tip}`));
+  const step = Math.max(1, Math.round(contract.gold * TIP_STEP));
+  row.append(chipButton('chip', 'coin', `+${step}`, () => {
+    app.tips[member.name] = tip + step;
+    renderFavor(member);
+    renderRoster();
+    updateStart();
+  }));
+  if (tip > 0) {
+    row.append(chipButton('chip dim', 'restart', '되돌리기', () => {
+      delete app.tips[member.name];
+      renderFavor(member);
+      renderRoster();
+      updateStart();
+    }));
+  }
+  box.append(row);
+  box.append(text('p', 'pick-sub dim',
+    '부른 값보다 많이 받으면 신뢰도가 더 오른다. 실패하면 아무도 받지 못한다.'));
+
+  // 선물. **인벤토리의 물건을 그대로 준다** — 선물용 물건을 따로 두면 상점에
+  // 줄이 하나 더 늘고, 쓸모없는 장비를 처분할 자리도 사라진다.
+  const job = Roster.jobOf(member);
+  const gifts = app.progress.inventory.slice();
+  const list = el('div', 'favor-row');
+  list.append(text('span', 'pick-sub', '선물'));
+  if (!gifts.length) {
+    list.append(text('span', 'pick-sub dim', '줄 물건이 없다'));
+  }
+  for (const item of gifts.slice(0, 8)) {
+    const value = Rep.giftValue(member, item, job);
+    const chip = chipButton(`chip gear tier-${Items.tier(item).css}`, D.GEAR[item.defId].icon,
+      `${Items.name(item)} +${value.trust}`, () => giveGift(member, item));
+    // 쓸 수 있는 물건이면 더 기뻐한다. 표시가 없으면 왜 값이 다른지 알 수 없다.
+    if (value.liked) chip.classList.add('liked');
+    list.append(chip);
+  }
+  box.append(list);
+  if (gifts.length > 8) {
+    box.append(text('p', 'pick-sub dim', `인벤토리의 앞 여덟 개만 보여 준다 (${gifts.length}개 중)`));
+  }
+}
+
+// 선물을 준다. **바로 신뢰도가 오르고 삯이 다시 매겨진다** — 값이 그대로면
+// 선물이 이번 편성에 아무것도 하지 않는 것으로 보인다.
+function giveGift(member, item) {
+  const index = P.findItem(app.progress, item.uid);
+  if (index < 0) { sound.play('deny'); return; }
+  const value = Rep.giftValue(member, item, Roster.jobOf(member));
+  app.progress.inventory.splice(index, 1);
+  const moved = Rep.addTrust(member, value.trust);
+  sound.play('click');
+  persist();
+  refreshWages();
+  renderRoster();
+  updateStart();
+  openMember(member);
+  note(`${member.name} 신뢰도 ${moved.delta > 0 ? '+' : ''}${moved.delta} → ${moved.after}`);
 }
 
 function chipButton(cls, iconName, label, run) {
@@ -1138,7 +1381,12 @@ function renderMethods() {
       // 스킬 등록과 같다 — 고르는 순간 저장한다.
       app.progress.lootMethod = method.id;
       persist();
+      // **방식이 삯을 흔든다**(기획서 15.1). 값을 다시 내지 않으면 편성 화면의
+      // 숫자가 실제 계약과 갈린다.
+      refreshWages();
       renderMethods();
+      renderRoster();
+      updateStart();
     });
     box.append(button);
   }
@@ -1152,13 +1400,19 @@ function rememberSkills() {
 }
 
 function updateStart() {
-  $('start').disabled = app.skills.length === 0;
+  // 삯을 감당할 수 있는지도 여기서 본다. 계약을 확정하는 단추가 이것 하나라,
+  // 다른 곳에서 막으면 눌러 놓고 전투 화면에서 튕기는 일이 난다.
+  const afford = renderDeal();
+  $('start').disabled = app.skills.length === 0 || !afford.ok;
 }
 
 function openParty(quest) {
   app.quest = quest;
   app.candidates = Q.companionsFor(quest, app.progress.roster, app.progress.questSeed + quest.level);
   app.party = [];
+  // 얹어 주기는 이번 편성에만 남는다. 다음 의뢰까지 끌고 가면 값이 다른 판의
+  // 것이 되어, 부른 값과 얹은 값의 비가 뜻을 잃는다.
+  app.tips = {};
   // 지난번에 등록해 둔 것이 저장본에 남아 있다. 처음이면 열린 것을 앞에서부터
   // 채워 준다 — 빈 채로 두면 "전투 시작"이 꺼져 있는 이유를 알 수 없다.
   app.lootMethod = Loot.METHODS[app.progress.lootMethod] ? app.progress.lootMethod : 'even';
@@ -1168,6 +1422,8 @@ function openParty(quest) {
     : P.learnedSkills(app.progress).map((def) => def.id));
   rememberSkills();
 
+  // 삯이 먼저다 — 목록도 요약도 계약을 보고 그린다.
+  refreshWages();
   renderBrief();
   renderRoster();
   renderSkillPicks();
@@ -1830,6 +2086,9 @@ function startBattle() {
     seed: (Math.random() * 1e9) | 0,
   });
   app.lootSeed = (Math.random() * 1e9) | 0;
+  // **계약은 여기서 굳는다.** 결과 화면에서 다시 계산하면 그사이 신뢰도가
+  // 움직여 부른 값과 준 값이 갈린다 — 그 차이가 곧 다음 신뢰도라 조용히 어긋난다.
+  app.contracts = partyContracts();
 
   setAiming(null);
   app.danger = false;
@@ -1894,7 +2153,12 @@ function openResult(state) {
   const before = { char: app.progress.charLevel, job: P.jobLevel(app.progress) };
   const job = D.heroJob(app.progress.job);
   const gained = P.addExp(app.progress, reward.charExp, reward.jobExp);
-  app.progress.gold += reward.gold;
+
+  // **삯을 내고 남는 것이 주인공 몫이다.** 계약은 전투가 시작할 때 굳었고
+  // (`app.contracts`), 여기서는 그대로 지불만 한다. 실패하면 길드가 내지
+  // 않으므로 아무도 받지 못한다 — 대신 신뢰도로 갚는다.
+  const deal = Hire.settle(quest, app.contracts, won, app.tips);
+  app.progress.gold += deal.hero;
 
   // 전투에서 마신 물약은 돌아오지 않는다. 상점에서 사는 것이 뜻을 가지려면
   // 쓴 만큼 줄어야 한다.
@@ -1905,11 +2169,13 @@ function openResult(state) {
   const roster = Roster.awardExp(app.progress.roster, joinedNames,
     reward.charExp, (Math.random() * 1e9) | 0);
 
-  // **길드 골드는 파티가 나눠 갖는다.** 주인공 몫은 위에서 이미 지갑에 넣었고,
-  // 여기는 동료 몫이다. 받은 돈으로 동료가 제 장비를 갖춘다 — 쓸 데가 없으면
-  // 저장본에 숫자만 쌓이고, 나눠 갖는 것이 화면의 글자로만 남는다.
+  // **데려간 동료는 약속한 삯을, 남은 동료는 다른 파티에서 번 몫을 받는다.**
+  // 받은 돈으로 동료가 제 장비를 갖춘다 — 쓸 데가 없으면 저장본에 숫자만 쌓이고,
+  // 삯을 흥정한 것이 화면의 글자로만 남는다.
+  const paid = {};
+  for (const row of deal.paid) paid[row.name] = row.gold;
   const purses = Roster.awardGold(app.progress.roster, joinedNames,
-    reward.share, (Math.random() * 1e9) | 0);
+    won ? Hire.baseWage(quest) : 0, (Math.random() * 1e9) | 0, paid);
   const bought = new Map();
   for (const member of app.progress.roster) {
     const deal = Roster.goShopping(member, (Math.random() * 1e9) | 0);
@@ -1944,13 +2210,13 @@ function openResult(state) {
   if (won) {
     const guild = $('guild-loot');
     guild.textContent = '';
-    // 적힌 금액은 파티 전체 몫이라, 내 몫을 함께 적지 않으면 지갑에 들어온
-    // 숫자와 화면의 숫자가 다르다.
+    // 적힌 금액에서 삯이 빠진 것이 내 몫이라, 셋을 함께 적지 않으면 지갑에
+    // 들어온 숫자와 화면의 숫자가 다르다.
     const gold = el('li');
     gold.append(icon('coin'));
-    gold.append(text('span', null, `${reward.purse} 골드`));
-    gold.append(text('span', 'why', `${reward.party}명이 나눈다`));
-    gold.append(text('span', 'to', `내 몫 ${reward.gold}`));
+    gold.append(text('span', null, `${deal.purse} 골드`));
+    gold.append(text('span', 'why', deal.spent ? `삯 ${deal.spent}` : '삯 없음'));
+    gold.append(text('span', 'to', `내 몫 ${deal.hero}`));
     guild.append(gold);
 
     const method = Loot.METHODS[app.lootMethod];
@@ -2001,6 +2267,42 @@ function openResult(state) {
     }
   }
 
+  // --- 평판과 신뢰도 ---------------------------------------------------
+  //
+  // **순서가 있다.** 신뢰도를 먼저 굴리고 평판을 나중에 올린다 — 평판이 오르면
+  // 게시판을 다시 만드는데(`refreshQuests`), 그전에 동료 쪽 정산이 끝나 있어야
+  // 이번 판의 계약과 결과가 같은 자리에서 맺어진다.
+  const downedNames = new Set(members.filter((m) => AI.byUid(state, m.id).dead)
+    .map((m) => m.name));
+  const asked = {};
+  for (const contract of app.contracts) asked[contract.name] = contract.gold;
+
+  const trustMoves = [];
+  for (const member of app.party) {
+    const change = Rep.trustDelta(member, quest, {
+      won,
+      downed: downedNames.has(member.name),
+      asked: asked[member.name] || 0,
+      paid: (deal.paid.find((row) => row.name === member.name) || {}).gold || 0,
+    });
+    trustMoves.push(Object.assign(Rep.addTrust(member, change.delta), { parts: change.parts }));
+  }
+
+  // 주인공이 쓰러진 것은 세지 않는다. 평판이 재는 것은 의뢰를 어떻게 마쳤는가고,
+  // 주인공이 쓰러져도 전투는 이어지므로 결과에 이미 반영돼 있다.
+  const downedAllies = [...downedNames].filter((name) => name !== D.HERO.name).length;
+  const repMove = Rep.addRep(app.progress,
+    Rep.repDelta(quest, app.progress.charLevel, won, downedAllies).delta);
+  renderRepResult(repMove, won ? downedAllies : 0);
+
+  // 데려가지 않은 동료는 앙금이 가라앉는다. **결과 화면에는 적지 않는다** —
+  // 이 화면은 방금 끝난 전투를 읽는 자리고, 나가지도 않은 이름을 다 적으면
+  // 정작 데려간 넷이 묻힌다(명부 보고와 같은 이유다).
+  const joinedSet = new Set(joinedNames);
+  for (const member of app.progress.roster) {
+    if (!joinedSet.has(member.name)) Rep.rest(member);
+  }
+
   // 깬 의뢰는 게시판에서 사라지고 새 의뢰가 걸린다. 상점 진열대도 함께 바뀐다.
   let joined = null;
   if (won) {
@@ -2012,7 +2314,7 @@ function openResult(state) {
   }
 
   renderBattleReport(L.battleReport(state));
-  renderRosterReport(roster, joined, purses, bought);
+  renderRosterReport(roster, joined, purses, bought, trustMoves);
   persist();
   show('result', quest.name);
 }
@@ -2043,7 +2345,22 @@ function renderBattleReport(rows) {
   }
 }
 
-function renderRosterReport(report, joined, purses, bought) {
+// 평판이 얼마나 움직였는가. **실패해도 보여 준다** — 실패한 판에서 평판이
+// 깎이는 것이 이 시스템의 절반이라, 이겼을 때만 뜨면 내려간 것을 아무도 못 본다.
+function renderRepResult(move, downed) {
+  const delta = $('rep-delta');
+  delta.textContent = `${move.delta > 0 ? '+' : ''}${move.delta}`;
+  delta.className = `count ${move.delta >= 0 ? 'up' : 'short'}`;
+
+  renderRep($('rep-after'), move.after);
+
+  const lines = [];
+  if (move.moved) lines.push(`평판이 ${move.stage.name}으로 올라섰다 — 게시판에 걸리는 의뢰가 바뀐다`);
+  if (downed) lines.push(`동료 ${downed}명 전투불능 — 평판보다 그 동료의 신뢰도가 크게 깎인다`);
+  $('rep-note').textContent = lines.join(' · ');
+}
+
+function renderRosterReport(report, joined, purses, bought, trustMoves) {
   const list = $('roster-report');
   list.textContent = '';
 
@@ -2063,6 +2380,22 @@ function renderRosterReport(report, joined, purses, bought) {
       + `${entry.levels ? ` · Lv ${member.level}` : ''}`;
     row.append(text('b', `stat-value${entry.levels ? ' up' : ''}`, value));
     list.append(row);
+
+    // **신뢰도는 이유와 함께 적는다.** 숫자만 뜨면 왜 깎였는지 알 수 없어,
+    // 다음 판에 무엇을 다르게 해야 하는지가 화면에 없다.
+    const move = (trustMoves || []).find((m) => m.name === entry.name);
+    if (move) {
+      const line = el('li', 'sub-row');
+      line.append(text('span', 'why',
+        `신뢰도 · ${move.parts.map((part) => part.why).join(' · ')}`));
+      const shown = text('b', `stat-value ${move.delta >= 0 ? 'up' : 'short'}`,
+        `${move.delta > 0 ? '+' : ''}${move.delta} → ${move.after}`);
+      // 단계가 넘어간 것은 따로 알린다 — 관계가 끊어지면 다음 의뢰에서 아예
+      // 응하지 않으므로, 조용히 넘어가면 편성 화면에서 처음 알게 된다.
+      if (move.moved) shown.append(text('small', 'why', ` ${move.stage.name}`));
+      line.append(shown);
+      list.append(line);
+    }
 
     // 제 몫으로 장비를 갖췄으면 그 자리에서 알린다. 편성 화면을 열어 봐야
     // 알 수 있으면 동료가 돈을 쓴 것이 화면에 없는 일이 된다.

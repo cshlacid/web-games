@@ -1585,15 +1585,11 @@ function cast(state, skillId, target) {
   check('처치 경험치가 들어간다', reward.kills > 0, true);
   check('길드 몫을 그대로 받는다', reward.guild, quest().guildReward.exp);
 
-  // **골드는 파티가 나눠 갖는다.** 게시판에 적힌 금액은 판 전체의 값이고,
-  // 주인공이 지갑에 넣는 것은 제 몫과 잔돈이다.
-  const party = AI.alive(reward.won ? state : state, 'ally').length;
-  check('적힌 금액이 파티 전체 몫이다', reward.purse, quest().guildReward.gold);
-  check('인원수로 나눈다', reward.share, Math.floor(reward.purse / party));
-  check('잔돈은 주인공이 갖는다',
-    reward.gold, reward.share + (reward.purse - reward.share * party));
-  check('나눈 몫을 다 합치면 적힌 금액이다',
-    reward.gold + reward.share * (party - 1), reward.purse);
+  // **골드는 전투가 나누지 않는다.** 모집할 때 부른 삯이 정해져 있고(hire.js),
+  // 그것을 내고 남는 것이 주인공 몫이다 — 같은 일을 하는 규칙을 둘로 두면
+  // 한쪽만 고치게 된다.
+  check('전투는 골드를 세지 않는다',
+    ['purse', 'share', 'gold', 'party'].filter((key) => key in reward), []);
 
   // 힐로도 직업 경험치가 쌓인다. 흘린 힐은 세지 않는다 — 마나를 아껴 쓸 이유를
   // 경험치가 무너뜨리면 안 된다.
@@ -1618,7 +1614,6 @@ function cast(state, skillId, target) {
   const failure = L.rewardOf(lost);
   check('졌다', failure.won, false);
   check('길드 몫의 절반', failure.guild, Math.round(quest().guildReward.exp * 0.5));
-  check('골드는 없다', failure.gold, 0);
 }
 
 // --- 스킬 레벨 ----------------------------------------------------------
