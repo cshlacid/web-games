@@ -18,8 +18,10 @@ const START_SIZE = 9;
 // **명부의 상한.** 열넷이던 때에는 한 번에 보여 주는 수(열)와 거의 같아, 새로
 // 고쳐도 같은 얼굴이 돌아왔다 — 뽑는 것이 아니라 순서만 섞는 셈이었다. 스물넷이면
 // 열 자리를 채우는 방법이 훨씬 많다. **화면이 길어지지는 않는다**: 편성 목록은
-// 여전히 열까지만 세우고, 명부 전체를 훑는 화면은 없다.
-const MAX_SIZE = 24;
+// 여전히 열까지만 세우고, 명부 전체를 훑는 화면은 없다. 마을에 오가는 사람이
+// 많아 보이게 쉰까지 열어 두었고, 안 데려간 동료는 떠나므로(`tickIdle`) 실제로
+// 상한에 눌러앉는 일은 드물다.
+const MAX_SIZE = 50;
 
 // 길드에 새로 등록하는 모험가의 레벨. **주인공 레벨을 보지 않는다** — 길드는
 // 주인공을 중심으로 돌지 않고, 갓 등록한 초심자가 가장 많은 곳이다. 한 단계
@@ -79,6 +81,8 @@ function makeMember(rng, taken, level, defId) {
     // 자라는 것이 경험치·장비만이 아니라는 뜻이고, 계산 규칙은 reputation.js에
     // 있다 — 여기에는 자리만 둔다.
     trust: D.TRUST.start,
+    // 연속으로 안 데려간 판 수. 이것이 쌓이면 마을을 떠난다(`tickIdle`).
+    idle: 0,
     gear: { weapon: null, armor: null, trinket: null },
   };
 }
@@ -283,6 +287,51 @@ function toParty(member) {
   };
 }
 
+// --- 마을을 떠난다 --------------------------------------------------------
+//
+// **안 데려간 판이 이어지면 확률적으로 명부에서 사라진다.** 모험가는 주인공을
+// 기다리며 마을에 머무는 사람들이 아니라, 일이 없으면 다른 마을로 가는 사람들이다.
+// 이것이 없으면 명부가 쌓이기만 해서, 상한을 올린 것이 그대로 "훑을 목록이 길어짐"이
+// 된다 — 새 얼굴이 들어올 자리를 만드는 것이 이 규칙의 실제 값이다.
+//
+// **몇 판은 봐 준다**(`IDLE_GRACE`). 한 판 걸렀다고 사라지면 편성을 바꿔 볼 수가
+// 없다. 그 뒤로는 한 판 지날 때마다 확률이 `IDLE_STEP`씩 오르고 `IDLE_CAP`에서
+// 멈춘다 — 100%로 두면 "몇 판 뒤 반드시"가 되어 확률로 둔 뜻이 없다.
+//
+// **값은 마을 인구가 어디에서 멈추는지로 정했다.** 처음 잡은 값(유예 4 · 걸음
+// 0.12 · 상한 0.5)은 너무 매워서, 예순 판을 굴리니 인구가 열 언저리에 눌러앉았다 —
+// 한 번에 보여 주는 수와 같아지면 새로 고쳐도 같은 얼굴이 돌아온다. 지금 값은
+// 한 판에 새로 고침을 한 번 누르면 열여섯, 세 번 누르면 스물여덟에서 멈춘다.
+const IDLE_GRACE = 8;
+const IDLE_STEP = 0.03;
+const IDLE_CAP = 0.25;
+// 이 아래로는 내보내지 않는다. 명부가 파티를 짤 수 없을 만큼 줄면 게임이 멈춘다.
+const KEEP_MIN = 6;
+
+const leaveChance = (member) =>
+  Math.min(IDLE_CAP, Math.max(0, ((member.idle || 0) - IDLE_GRACE) * IDLE_STEP));
+
+// 판이 하나 지났다. 데려간 쪽은 0으로 돌아가고, 나머지는 하나씩 쌓인다.
+//
+// **친구는 떠나지 않는다**(신뢰도 마지막 단계). 공들여 쌓은 관계가 안 데려간
+// 판 몇 번으로 사라지면, 친구를 만든 것이 손해가 된다.
+function tickIdle(members, joinedNames, seed, isFriend) {
+  const rng = createRng(seed == null ? (Math.random() * 1e9) | 0 : seed);
+  const joined = new Set(joinedNames);
+  const left = [];
+
+  for (const member of members) {
+    if (joined.has(member.name)) { member.idle = 0; continue; }
+    member.idle = (member.idle || 0) + 1;
+    if (isFriend && isFriend(member)) continue;
+    if (members.length - left.length <= KEEP_MIN) continue;
+    if (rng() < leaveChance(member)) left.push(member);
+  }
+
+  for (const member of left) members.splice(members.indexOf(member), 1);
+  return left;
+}
+
 // --- 새 동료 ------------------------------------------------------------
 
 // 의뢰를 깰 때마다, 그리고 편성 화면에서 목록을 새로 고칠 때마다 명부에 새 얼굴이
@@ -330,6 +379,7 @@ function adopt(saved) {
       level: Math.max(1, Math.min(D.LEVEL.maxLevel, entry.level | 0 || 1)),
       exp: Math.max(0, entry.exp | 0),
       gold: Math.max(0, entry.gold | 0),
+      idle: Math.max(0, entry.idle | 0),
       // 신뢰도는 범위 밖으로 나갈 수 없다. 저장본을 손대서 +999가 되면 보수가
       // 1골드로 굳어 모집이 뜻을 잃는다.
       trust: Math.max(D.TRUST.min, Math.min(D.TRUST.max, entry.trust | 0)),
@@ -350,11 +400,12 @@ function adopt(saved) {
 }
 
 const api = {
-  START_SIZE, MAX_SIZE, JOIN_CHANCE,
+  START_SIZE, MAX_SIZE,
   create, adopt, makeMember, jobOf, specOf, baseSpecOf, spriteOf, defOf, skillsOf,
   specChoices, canChangeSpec, changeSpec, remember,
   gainExp, awardExp, awardGold, goShopping, offerGear, gearOf, bonusOf, potionsOf, toParty, maybeJoin,
   JOIN_CHANCE, REDRAW_JOIN_CHANCE, GUILD_LEVEL_STEP, guildLevel,
+  IDLE_GRACE, IDLE_STEP, IDLE_CAP, KEEP_MIN, leaveChance, tickIdle,
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
