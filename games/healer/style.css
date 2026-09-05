@@ -1077,9 +1077,21 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .t-high { color: var(--heal); }
 .t-bond { color: var(--kind-boon); }
 
-/* 편성 카드의 아랫줄. 신뢰도와 삯 둘뿐이라 한 줄에 들어간다 — 이유까지 적으면
-   카드가 다시 네 줄이 되어 격자로 바꾼 뜻이 사라진다. */
+/* 편성 카드의 아랫줄. 신뢰도와 보수, 그리고 난이도가 맞는 동료의 표뿐이라 한
+   줄에 들어간다 — 이유까지 적으면 카드가 다시 네 줄이 되어 격자로 바꾼 뜻이
+   사라진다. */
 .pick-deal { display: flex; align-items: center; gap: 5px; margin-top: 3px; }
+
+/* 계열 이름표와 난이도 표가 함께 서는 줄. */
+.pick-tags { display: flex; align-items: center; gap: 4px; min-width: 0; }
+
+/* 이 의뢰를 제 레벨에 맞다고 보는 동료의 표. **게시판의 "알맞음"과 같은 색을
+   쓴다**(`.level.fair`) — 같은 판단을 두 화면이 다른 색으로 알리면 색이 뜻을
+   잃는다. 색만으로 가르지 않도록 글자로도 적는다(등급 색과 같은 잣대다). */
+.feel-tag {
+  flex: none; font-size: 10.5px; font-weight: 700; color: var(--hp);
+  border: 1px solid currentColor; border-radius: 999px; padding: 0 5px;
+}
 .pick-deal .ico-box svg { width: 12px; height: 12px; }
 .pick-deal .wage {
   font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums;
