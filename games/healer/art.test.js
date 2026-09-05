@@ -53,11 +53,14 @@ function check(name, actual, expected) {
       Sprites.size(kind), { w: sprite.w + 2, h: sprite.h + 2 });
   }
 
-  // 주인공만 그림 파일이고 나머지 열하나가 도형이다. 시안이 주인공 하나뿐이라
-  // 화풍이 섞이는 것을 감수했다 — 나머지 시안이 오면 여기부터 바뀐다.
-  check('도형 그림 열하나', Object.keys(Sprites.SPRITES).length, 11);
-  check('그림 파일 하나', Object.keys(Sprites.SHEETS).length, 1);
-  check('주인공은 도형이 아니다', Boolean(Sprites.SPRITES.hero), false);
+  // 시안을 받은 둘(주인공·수호자)만 그림 파일이고 나머지 열이 도형이다. 화풍이
+  // 섞이는 것은 시안이 오는 대로 하나씩 갈아 끼우기 때문이다 — 남은 시안이 오면
+  // 여기부터 바뀐다.
+  check('도형 그림 열', Object.keys(Sprites.SPRITES).length, 10);
+  check('그림 파일 둘', Object.keys(Sprites.SHEETS).length, 2);
+  // 한쪽에만 있어야 한다. 양쪽에 두면 화면이 분기를 놓쳤을 때 조용히 도형이 나온다.
+  const both = Object.keys(Sprites.SHEETS).filter((k) => Sprites.SPRITES[k]);
+  check('그림 파일은 도형으로 겹치지 않는다', both, []);
 
   // **계열마다 제 그림이 있어야 한다.** 궁수와 마법사가 같은 그림을 쓰던 때에는
   // 편성 화면에서 이름을 읽어야 어느 쪽인지 알 수 있었고, 전장에서는 아예
