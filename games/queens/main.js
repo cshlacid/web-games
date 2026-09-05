@@ -185,6 +185,9 @@ function buildBoard() {
   outline.setAttribute('height', size - inset * 2);
   // 모서리는 네모다. 둥글게 두면 네모난 칸과 곡률이 어긋나 그 사이로 칸 색이 한
   // 픽셀 비어져 나온다 — 판의 `border-radius`를 없앤 것도 같은 이유다.
+
+  // 칸과 선이 같은 픽셀 격자에 놓이도록 판을 정수 자리에 앉힌다.
+  window.SharedSnap.snap(el.board);
 }
 
 function paint() {

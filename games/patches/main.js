@@ -169,6 +169,9 @@ function buildBoard() {
 
   svg.appendChild(game.ink.cursor);
   svg.appendChild(game.ink.ghost);
+
+  // 칸과 선이 같은 픽셀 격자에 놓이도록 판을 정수 자리에 앉힌다.
+  window.SharedSnap.snap(el.board);
 }
 
 function outline(rect) {

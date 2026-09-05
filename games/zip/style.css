@@ -240,11 +240,13 @@ h1 {
   stroke-width: 0.07;
 }
 
+/* 끝은 네모로 끊는다. 둥근 마감은 굵기의 절반만큼 더 나가며 부풀어, 곧게 그은
+   벽의 끝만 볼록해 보인다. 아래의 여백은 그 튀어나오던 만큼을 뺀 값이다. */
 .ink .wall {
   fill: none;
   stroke: var(--wall);
   stroke-width: 0.14;
-  stroke-linecap: round;
+  stroke-linecap: butt;
 }
 
 .veil {
