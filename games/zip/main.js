@@ -118,8 +118,10 @@ function buildBoard() {
   }
 
   // 벽은 칸 모서리에 닿지 않게 양 끝을 조금씩 들인다. 벽 하나가 어느 칸과 어느
-  // 칸 사이를 막는지가 그 여백으로 읽힌다.
-  const INSET = 0.08;
+  // 칸 사이를 막는지가 그 여백으로 읽힌다. 둥근 마감을 쓸 때는 끝이 굵기의 절반
+  // (0.07)만큼 더 나가 실제로 보이던 여백은 0.01이었다. 마감을 네모로 바꾸면서
+  // 그만큼을 값에서 뺐다 — 0.08 그대로 두면 벽이 갑자기 짧아 보인다.
+  const INSET = 0.02;
 
   // 잇달아 놓인 벽은 한 구간으로 잇는다. 칸마다 토막을 내면 토막 사이가 그
   // 여백 두 개만큼 비어 한 줄로 막힌 곳이 끊겨 보인다.
@@ -163,6 +165,9 @@ function buildBoard() {
   svg.appendChild(game.head);
 
   el.board.appendChild(svg);
+
+  // 칸과 선이 같은 픽셀 격자에 놓이도록 판을 정수 자리에 앉힌다.
+  window.SharedSnap.snap(el.board);
 }
 
 function paint() {
