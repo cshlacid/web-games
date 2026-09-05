@@ -21,11 +21,17 @@ const Loot = node ? require('./loot.js') : root.HealerLoot;
 const baseWage = (quest) =>
   Math.max(1, Math.round((quest.guildReward.gold / D.PARTY_MAX) * D.WAGE_BASE));
 
-// 신뢰도가 보수에 미치는 배수(기획서 13장). **아래쪽이 가파르다** — 믿는 사람에게
-// 깎아 주는 폭보다 못 믿는 사람에게 얹는 폭이 커야, 사고를 낸 뒤가 아프다.
+// 신뢰도가 보수에 미치는 배수(기획서 13장). **한쪽으로만 걸린다** — 못 믿는
+// 사람은 비싸게 부르고, 믿는 사람이라고 깎아 주지는 않는다.
+//
+// 예전에는 신뢰가 쌓일수록 30%까지 깎아 주었는데, **주인공 몫이 길드 돈에서
+// 보수를 뺀 나머지라 그 할인 넷이 통째로 주인공에게 쌓인다.** 관계가 좋아질수록
+// 주인공이 동료의 두 배, 세 배를 가져갔다(재 보니 후반에 2.4배·길드 돈의 38%).
+// 깎아 주는 폭이 곧 주인공이 얼마나 더 가져가는가라, 그 폭을 0으로 두었다.
+// 신뢰가 값에 남기는 것은 **못 믿을수록 비싸다** 한 방향뿐이고, 나머지는 모집
+// 가부와 거절로 간다.
 function trustScale(trust) {
-  return trust >= 0 ? 1 - (trust / D.TRUST.max) * 0.30
-                    : 1 + (trust / D.TRUST.min) * 0.50;
+  return trust >= 0 ? 1 : 1 + (trust / D.TRUST.min) * 0.50;
 }
 
 // 이 동료가 이번 의뢰에 부르는 값. `ctx`는 { rep, method }다.

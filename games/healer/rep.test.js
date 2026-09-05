@@ -338,10 +338,13 @@ const nameWithTrait = (want) => {
   const wageAt = (trust, rep, method) =>
     Hire.wageOf(member(name, 5, trust), q, { rep, method: method || 'even' }).gold;
 
-  check('신뢰가 높으면 싸게 부른다', wageAt(80, 0) < wageAt(0, 0), true);
+  // **신뢰는 한쪽으로만 값에 걸린다.** 깎아 주는 폭이 곧 주인공이 동료보다 얼마나
+  // 더 가져가는가라(주인공 몫이 나머지다), 30%까지 깎아 주던 동안에는 관계가
+  // 좋아질수록 주인공이 동료의 두세 배를 챙겼다.
+  check('믿는 사이라고 깎아 주지는 않는다', wageAt(80, 0), wageAt(0, 0));
   check('불신하면 비싸게 부른다', wageAt(-40, 0) > wageAt(0, 0), true);
   check('평판이 높으면 싸게 부른다', wageAt(0, D.REPUTATION.max) < wageAt(0, 0), true);
-  check('아래쪽이 더 가파르다',
+  check('아래쪽만 가파르다',
     wageAt(-100, 0) - wageAt(0, 0) > wageAt(0, 0) - wageAt(100, 0), true);
 
   // **12장**: 시시해도 비싸고 위험해도 비싸다. **값이 아니라 난이도가 거는
@@ -392,6 +395,32 @@ const nameWithTrait = (want) => {
   // "적게 데려가기"만 남는다.
   check('알맞은 의뢰를 가득 채워도 주인공 몫이 남는다', deal.hero > 0, true);
 
+  // **주인공은 동료보다 조금 더 가져가는 데서 그친다.** 주인공 몫이 나머지라
+  // 동료 넷에게 걸린 배수 1%가 주인공에게는 4% 가까이로 돌아온다 — 신뢰가
+  // 30%까지 깎아 주던 동안에는 진행할수록 그 할인이 통째로 주인공에게 쌓여,
+  // 후반에 동료의 4.7배(길드 돈의 54%)를 챙겼다. 성격마다 부르는 값이 다르므로
+  // 한 편성이 아니라 여러 명부에서 잰 가운데값으로 본다.
+  const ratioAt = (trust, rep) => {
+    const each = [];
+    for (let seed = 1; seed <= 21; seed++) {
+      const party = Roster.create(seed).slice(0, D.PARTY_MAX - 1)
+        .map((m) => Object.assign({}, m, { level: q.level, trust }));
+      const settled = Hire.settle(q, Hire.contractsFor(party, q, { rep, method: 'even' }), true);
+      each.push(settled.hero / (settled.spent / party.length));
+    }
+    return each.sort((a, b) => a - b)[(each.length - 1) / 2];
+  };
+  // 여기서 재는 것은 전원이 의뢰 레벨에 딱 맞는 편성이라 배수가 가장 잘 나오는
+  // 쪽이다(1.36). 실제 게시판에는 그 의뢰를 벅차다·위험하다고 보는 동료가 섞여
+  // 값이 올라가므로, 판을 예순 번 이어서 돌린 가운데값은 1.1~1.2다.
+  const plain = ratioAt(0, 0);
+  check('가득 채우면 동료 한 사람 몫보다 조금 더 가져간다',
+    plain > 1.0 && plain < 1.45, true);
+  // 관계와 이름값이 벌이를 부풀리지 않는다. 여기가 무너지면 진행할수록 주인공만
+  // 부자가 된다 — 그것이 이 수치들을 다시 잡은 이유다.
+  check('신뢰가 쌓여도 몫이 뛰지 않는다', ratioAt(100, 0), plain);
+  check('평판이 올라도 몫이 조금만 는다', ratioAt(0, D.REPUTATION.max) - plain < 0.2, true);
+
   const lost = Hire.settle(q, contracts, false);
   check('실패하면 길드가 내지 않는다', lost.purse, 0);
   check('실패하면 아무도 못 받는다', lost.paid.map((row) => row.gold), [0, 0, 0, 0]);
@@ -405,11 +434,19 @@ const nameWithTrait = (want) => {
 
   // 감당할 수 없는 계약은 막는다. 주인공 몫이 음수인 것 자체는 기획서가 허락한
   // 자리라, 막는 것은 가진 돈으로도 못 메울 때뿐이다.
+  //
+  // **음수가 되려면 이제 관계가 나빠야 한다.** 난이도 배수의 폭을 좁히면서
+  // 위험한 의뢰만으로는 길드 돈을 넘지 않게 됐다 — 남은 길은 불신하는 동료를
+  // 넷이나 데리고 나가는 편성이고, 값이 그렇게 부풀어 보이는 것이 이 규칙의 뜻이다.
   const rich = Hire.canAfford(100000, q, contracts);
   check('돈이 있으면 감당할 수 있다', rich.ok, true);
-  const hard = Hire.contractsFor(four, quest(20, 1000), { rep: 0, method: 'even' });
-  check('가진 돈으로 못 메우면 막는다', Hire.canAfford(0, quest(20, 1000), hard).ok, false);
-  check('얼마가 모자라는지 알린다', Hire.canAfford(0, quest(20, 1000), hard).short > 0, true);
+  const cold = ['시험 동료 4', '시험 동료 5', '시험 동료 6', '시험 동료 7']
+    .map((name) => member(name, 5, -70));
+  const rough = quest(6, 1000);
+  const hard = Hire.contractsFor(cold, rough, { rep: 0, method: 'even' });
+  check('그래도 응하기는 한다', hard.every((c) => c.ok), true);
+  check('가진 돈으로 못 메우면 막는다', Hire.canAfford(0, rough, hard).ok, false);
+  check('얼마가 모자라는지 알린다', Hire.canAfford(0, rough, hard).short > 0, true);
 }
 
 // --- 명부와 저장본 ------------------------------------------------------
