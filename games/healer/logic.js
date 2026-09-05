@@ -94,8 +94,11 @@ function makeUnit(def, side, uid, x, y, level, override, bonus, potions, name, h
 
   return {
     uid, defId: def.id, name: name || def.name, job: def.job,
-    // 그림도 계열을 따라간다 — 궁수가 마법사가 되면 손에 든 것이 바뀐다.
-    sprite: D.spriteFor(spec), side, level,
+    // **계열을 바꾼 동료만 그림이 따라간다** — 궁수가 마법사가 되면 손에 든 것이
+    // 바뀐다. 그 밖에는 정의에 적힌 그림을 그대로 쓴다: 적의 계열 이름과 그림
+    // 이름이 같지 않고(잡졸은 고블린, 우두머리는 boss), 주인공은 아예 그림
+    // 파일이라, 계열에서 그림을 지어내면 고블린이 전사로 그려진다.
+    sprite: hand && hand.spec ? D.spriteFor(spec) : def.sprite, side, level,
     x, y, attrs,
     hp: stats.hp, maxHp: stats.hp,
     mp: stats.mp, maxMp: stats.mp,

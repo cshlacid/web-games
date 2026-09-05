@@ -122,6 +122,24 @@ function check(name, actual, expected) {
   check('활은 선으로만 긋는다', Sprites.shape(bow).includes('fill="none"'), true);
 }
 
+// **정의에 적힌 그림 이름과 계열 이름은 같지 않다.** 계열에서 그림을 지어내던
+// 때에는 고블린(계열 `grunt`)이 전사로, 주인공(계열 `priest`)이 사제로 그려졌다.
+// 계열에서 그림을 만드는 것은 계열을 바꾼 동료뿐이므로, 그때 나올 이름이 전부
+// 실제로 있는 그림인지 여기서 본다.
+{
+  const D2 = require('./data.js');
+  const kinds = new Set(Object.keys(Sprites.SPRITES).concat(Object.keys(Sprites.SHEETS)));
+  const swap = [];
+  for (const list of Object.values(D2.SPEC_CHOICES)) {
+    for (const spec of list) {
+      for (const at of [spec, D2.specAt(spec, D2.SPEC_UP_LEVEL)]) {
+        if (!kinds.has(D2.spriteFor(at))) swap.push(at);
+      }
+    }
+  }
+  check('계열을 바꿔도 나올 그림이 다 있다', swap, []);
+}
+
 // --- 그림 파일로 그리는 유닛 --------------------------------------------
 //
 // 주인공만 시안을 그대로 쓴다. 도형과 달리 자료를 눈으로 훑어 틀린 곳을 찾을 수
@@ -166,8 +184,9 @@ function check(name, actual, expected) {
     // 들어가 있는 것이다.
     check(`${kind}: 초상화가 전신보다 좁다`,
       s.crops.head.w < s.crops.list.w && s.crops.head.h < s.crops.list.h, true);
-    // 머리는 칸 위쪽에 있다. 아래 절반까지 잡으면 몸통이 따라 들어온다.
-    check(`${kind}: 초상화가 칸 위쪽이다`, s.crops.head.y + s.crops.head.h <= 0.65, true);
+    // 머리는 칸 위쪽에 있다. 아래 절반까지 잡으면 몸통이 따라 들어온다. 문턱이
+    // 반이 아니라 0.7인 것은 SD 비율이라 머리가 키의 삼분의 일을 넘기 때문이다.
+    check(`${kind}: 초상화가 칸 위쪽이다`, s.crops.head.y + s.crops.head.h <= 0.7, true);
 
     // 상자는 칸의 가로세로비에서 나온다. 여기가 어긋나면 인물이 납작해진다.
     const box = Sprites.size(kind);
