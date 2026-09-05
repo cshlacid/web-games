@@ -219,6 +219,18 @@ const SEEDS = [1, 5, 77, 4242, 20260825];
 
 // --- 새 동료 ------------------------------------------------------------
 {
+  // **확률을 밖에서 받는다.** 편성 화면의 새로 고침은 연달아 누를 수 있어 의뢰를
+  // 깼을 때와 같은 확률을 쓰면 명부가 몇 번에 상한까지 찬다(재 보니 여덟 번에
+  // 9 → 14였다).
+  check('새로 고침 확률이 더 낮다', R.REDRAW_JOIN_CHANCE < R.JOIN_CHANCE, true);
+  const never = R.create(21);
+  let added = 0;
+  for (let i = 0; i < 50; i++) if (R.maybeJoin(never, 5, i, 0)) added++;
+  check('확률 0이면 아무도 안 들어온다', added, 0);
+  const always = R.create(21);
+  check('확률 1이면 들어온다', Boolean(R.maybeJoin(always, 5, 1, 1)), true);
+}
+{
   // 확률이라 한 번으로는 알 수 없다. 여러 씨앗으로 들어오기도 하고 안 들어오기도
   // 하는지를 본다.
   let joins = 0;

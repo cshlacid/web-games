@@ -87,6 +87,15 @@ function trustStage(trust) {
   return stages[0];
 }
 
+// 친구. **새 문턱을 만들지 않고 신뢰도의 마지막 단계를 그대로 쓴다** — 그 단계의
+// 대사가 "당신이라면 함께하겠습니다"라, 그것이 곧 친구다. 숫자를 따로 두면 화면에
+// 단계와 친구 두 가지를 설명해야 하고 둘이 어긋날 자리가 생긴다.
+//
+// **친구는 이번 의뢰에 안 뽑혀도 편성 화면에 선다**(`companionsFor`의 `always`).
+// 명부에서 한 번에 열만 보여 주므로, 공들여 키운 동료가 목록에 없어서 못 데려가는
+// 일이 실제로 났다.
+const isFriend = (member) => trustStage(trustOf(member)).id === 'bond';
+
 function addTrust(member, delta) {
   const before = trustOf(member);
   member.trust = clamp(before + Math.round(delta), D.TRUST.min, D.TRUST.max);
@@ -196,7 +205,7 @@ function giftValue(member, item, job) {
 const api = {
   clamp,
   repValue, repStage, repProgress, repDelta, addRep, questGap,
-  trustOf, trustStage, addTrust,
+  trustOf, trustStage, addTrust, isFriend,
   traitOf, tasteOf, feelOf, trustDelta, rest,
   giftValue, liked,
 };

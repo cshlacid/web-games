@@ -189,20 +189,31 @@ function generate(playerLevel, seed, gap) {
 //
 // **탱커와 힐러는 반드시 하나씩 넣는다.** 없는 목록은 편성을 고민할 의뢰가
 // 아니라 그냥 못 깨는 의뢰다.
-function companionsFor(quest, roster, seed) {
+// `always`는 뽑기와 상관없이 목록에 서는 동료다 — 친구(신뢰도 마지막 단계)와
+// 지금 데려가기로 눌러 둔 동료가 여기로 온다. **뽑기 자리를 먹지 않는다**:
+// 공들여 키운 동료가 목록에 없어서 못 데려가는 것을 막는 것이 이 인자의 목적인데,
+// 자리를 먹으면 친구가 늘수록 고를 수 있는 폭이 줄어 목적과 반대가 된다.
+function companionsFor(quest, roster, seed, always) {
   const rng = createRng((seed ^ 0x9e3779b9) >>> 0);
-  const byJob = (job) => roster.filter((member) => D.COMPANIONS[member.defId].job === job);
+  const fixed = (always || []).filter((member) => roster.includes(member));
+  const pool = roster.filter((member) => !fixed.includes(member));
+  const byJob = (job) => pool.filter((member) => D.COMPANIONS[member.defId].job === job);
 
   const chosen = [];
+  // 탱커와 힐러는 반드시 하나씩 넣는다. **이미 서 있는 쪽이 맡고 있으면 다시 넣지
+  // 않는다** — 없는 목록은 고민할 편성이 아니라 그냥 못 깨는 의뢰라서 두는 규칙이지,
+  // 직업마다 둘씩 세우려는 것이 아니다.
   for (const job of ['tank', 'healer']) {
-    const pool = byJob(job);
-    if (pool.length) chosen.push(pick(rng, pool));
+    if (fixed.some((member) => D.COMPANIONS[member.defId].job === job)) continue;
+    const list = byJob(job);
+    if (list.length) chosen.push(pick(rng, list));
   }
 
-  const rest = roster.filter((member) => !chosen.includes(member));
+  const rest = pool.filter((member) => !chosen.includes(member));
   while (chosen.length < COMPANION_COUNT && rest.length) {
     chosen.push(rest.splice((rng() * rest.length) | 0, 1)[0]);
   }
+  chosen.push(...fixed);
 
   const order = { tank: 0, dealer: 1, healer: 2 };
   return chosen.sort((a, b) =>
