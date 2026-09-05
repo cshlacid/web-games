@@ -228,6 +228,20 @@ const nameWithTrait = (want) => {
   check('진 판의 전투불능은 실패 몫에 들어 있다',
     Rep.trustDelta(fit, quest(5), { won: false, downed: true }).delta,
     Rep.trustDelta(fit, quest(5), { won: false }).delta);
+
+  // **난이도 판단은 계약과 함께 굳는다.** 결과 화면은 경험치를 준 다음에 신뢰도를
+  // 굴리므로, 거기서 다시 재면 방금 오른 레벨이 기준이 된다 — 알맞다고 보고
+  // 따라나선 동료가 끝나서는 "쉬웠다"며 신뢰도를 깎았다. 데려가서 키운 것이
+  // 그대로 손해가 되는 자리라, 보수와 같이 계약 때 값으로 정산한다.
+  const contracted = Rep.feelOf(fit, quest(5));
+  const grown = member(fit.name, 8, 0);
+  check('레벨이 오르면 같은 의뢰가 쉬워 보인다', Rep.feelOf(grown, quest(5)).id, 'easy');
+  check('굳은 판단으로 재면 계약할 때와 같다',
+    Rep.trustDelta(grown, quest(5), { won: true, feel: contracted }).delta,
+    Rep.trustDelta(fit, quest(5), { won: true }).delta);
+  check('굳은 판단이 없으면 오른 레벨로 잰다',
+    Rep.trustDelta(grown, quest(5), { won: true }).delta
+      < Rep.trustDelta(grown, quest(5), { won: true, feel: contracted }).delta, true);
 }
 
 // --- 쉬는 동안 앙금이 가라앉는다 ----------------------------------------

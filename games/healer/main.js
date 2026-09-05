@@ -2334,13 +2334,21 @@ function openResult(state) {
   // 이번 판의 계약과 결과가 같은 자리에서 맺어진다.
   const downedNames = new Set(members.filter((m) => AI.byUid(state, m.id).dead)
     .map((m) => m.name));
+  // **난이도 판단도 계약에서 꺼낸다.** 여기서 다시 재면 방금 준 경험치로 올라간
+  // 레벨이 기준이 되어, 알맞다고 보고 따라나선 동료가 끝나서는 쉬웠다며 신뢰도를
+  // 깎는다 — 부른 값을 계약 때 값으로 지불하는 것과 같은 규칙이다.
   const asked = {};
-  for (const contract of app.contracts) asked[contract.name] = contract.gold;
+  const feels = {};
+  for (const contract of app.contracts) {
+    asked[contract.name] = contract.gold;
+    feels[contract.name] = contract.feel;
+  }
 
   const trustMoves = [];
   for (const member of app.party) {
     const change = Rep.trustDelta(member, quest, {
       won,
+      feel: feels[member.name],
       downed: downedNames.has(member.name),
       asked: asked[member.name] || 0,
       paid: (deal.paid.find((row) => row.name === member.name) || {}).gold || 0,

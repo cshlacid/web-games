@@ -65,10 +65,15 @@ function settle(progress, state, party, method, lootSeed, dropsOverride, contrac
 
   // 신뢰도와 평판. 화면과 같은 순서로 — 신뢰도를 먼저 굴리고 평판을 올린다.
   const downed = new Set(members.filter((m) => AI.byUid(state, m.id).dead).map((m) => m.name));
+  // **난이도 판단도 계약에서 꺼낸다.** 바로 위에서 경험치를 주었으므로 여기서
+  // 다시 재면 오른 레벨이 기준이 되어, 알맞다고 보고 따라나선 판이 쉽다로 바뀐다.
+  const feels = {};
+  for (const contract of contracts || []) feels[contract.name] = contract.feel;
   const trustMoves = party.map((member) => {
     const row = deal.paid.find((entry) => entry.name === member.name) || {};
     const change = Rep.trustDelta(member, quest, {
-      won, downed: downed.has(member.name), asked: row.asked || 0, paid: row.gold || 0,
+      won, feel: feels[member.name],
+      downed: downed.has(member.name), asked: row.asked || 0, paid: row.gold || 0,
     });
     return Object.assign(Rep.addTrust(member, change.delta), { parts: change.parts });
   });
@@ -228,6 +233,12 @@ function runQuest(progress, seed, autoHeal, questOver) {
   check('데려간 동료의 신뢰도가 움직인다', out.trustMoves.length, party.length);
   check('신뢰도 변화에는 이유가 붙는다',
     out.trustMoves.every((move) => move.parts.length > 0), true);
+  // **경험치를 준 뒤에 신뢰도를 굴리므로 여기서 다시 재면 안 된다.** 레벨이
+  // 오르면 같은 의뢰가 쉬워 보여, 알맞다고 보고 따라나선 동료가 끝나서는
+  // 신뢰도를 깎았다. 계약 때의 판단이 그대로 이유에 적혀야 한다.
+  check('계약할 때의 난이도로 잰다',
+    out.trustMoves.map((move) => move.parts[0].why),
+    contracts.map((contract) => `${contract.feel.name} 의뢰 완료`));
 
   // 캐릭터 창에서 올린 스킬이 전투에 그대로 들어간다. 창과 전투가 다른 값을
   // 보면 점수를 넣은 것이 화면의 글자로만 남는다.
