@@ -5,7 +5,7 @@
 // 합치면 "세상에는 이름이 났지만 저 사람과는 못 하겠다"가 표현되지 않는다.
 //
 // 수치 규칙만 두고 화면을 모른다. 편성 화면과 결과 화면 두 곳에서 같은 계산을
-// 하게 되면 부른 삯과 실제로 준 삯이 갈린다.
+// 하게 되면 부른 보수와 실제로 준 보수가 갈린다.
 (function (root) {
 
 const node = typeof module !== 'undefined' && module.exports;
@@ -155,7 +155,7 @@ function trustDelta(member, quest, outcome) {
     parts.push({ why: '전투불능', delta: D.TRUST.down + feel.downRelief });
   }
 
-  // 받은 삯이 부른 값과 다를 때. 부른 값이 0이면 견줄 것이 없다.
+  // 받은 보수가 부른 값과 다를 때. 부른 값이 0이면 견줄 것이 없다.
   //
   // **진 판은 보지 않는다.** 실패하면 길드가 내지 않아 아무도 못 받는데, 그것을
   // "약속보다 덜 받았다"로 세면 실패가 두 번 깎인다 — 재 보니 실패마다 -8이
@@ -168,7 +168,7 @@ function trustDelta(member, quest, outcome) {
     const delta = paid > asked
       ? Math.min(D.TRUST_PAY.cap, Math.round((ratio - 1) * D.TRUST_PAY.per))
       : Math.max(D.TRUST_PAY.shortCap, Math.round((ratio - 1) * D.TRUST_PAY.shortPer));
-    if (delta) parts.push({ why: paid > asked ? '삯을 더 받았다' : '삯이 모자랐다', delta });
+    if (delta) parts.push({ why: paid > asked ? '보수를 더 받았다' : '보수가 모자랐다', delta });
   }
 
   return { feel, parts, delta: parts.reduce((sum, part) => sum + part.delta, 0) };

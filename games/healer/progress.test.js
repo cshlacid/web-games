@@ -7,6 +7,7 @@ const D = require('./data.js');
 const P = require('./progress.js');
 const Items = require('./items.js');
 const Roster = require('./roster.js');
+const Loot = require('./loot.js');
 
 let passed = 0;
 let failed = 0;
@@ -317,7 +318,7 @@ const gear = (defId, tier) => Items.make(defId, tier || 0, 3);
   // 넘어가서는 안 된다.
   saved.lootMethod = '없는방식';
   P.save(saved);
-  check('모르는 분배 방식은 기본값으로', P.load().lootMethod, 'even');
+  check('모르는 분배 방식은 기본값으로', P.load().lootMethod, Loot.DEFAULT);
 
   global.localStorage.setItem('x', JSON.stringify({ version: 999, charLevel: 20 }));
   check('판이 다르면 새로 시작', P.load().charLevel, 1);

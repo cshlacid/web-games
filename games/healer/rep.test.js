@@ -1,7 +1,7 @@
 'use strict';
 
 // 실행: node games/healer/rep.test.js
-// 평판과 신뢰도, 그리고 거기서 나오는 삯(기획서 평판·신뢰도편). 유료 선물은
+// 평판과 신뢰도, 그리고 거기서 나오는 보수(기획서 평판·신뢰도편). 유료 선물은
 // 보류라 여기 없다.
 const D = require('./data.js');
 const Rep = require('./reputation.js');
@@ -50,9 +50,9 @@ const nameWithTrait = (want) => {
   const mins = D.REPUTATION.stages.map((s) => s.min);
   check('단계는 오름차순', mins.slice().sort((a, b) => a - b), mins);
 
-  // 삯 배수는 위로 갈수록 싸야 평판이 뜻을 가진다.
+  // 보수 배수는 위로 갈수록 싸야 평판이 뜻을 가진다.
   const wages = D.REPUTATION.stages.map((s) => s.wage);
-  check('평판이 높을수록 삯이 싸다',
+  check('평판이 높을수록 보수가 싸다',
     wages.every((w, i) => i === 0 || w < wages[i - 1]), true);
   // 상한도 함께 열린다 — 이것이 기획서가 말하는 상위 콘텐츠다.
   const gaps = D.REPUTATION.stages.map((s) => s.questGap);
@@ -177,7 +177,7 @@ const nameWithTrait = (want) => {
 
   // **차이를 좁게 둔다**(기획서 16장). 벌리면 특정 성격만 데려가는 것이 정답이 된다.
   const wages = Object.values(D.TRAITS).map((t) => t.wage);
-  check('성격이 삯을 크게 흔들지 않는다',
+  check('성격이 보수를 크게 흔들지 않는다',
     Math.max(...wages) / Math.min(...wages) < 1.25, true);
 }
 
@@ -251,7 +251,7 @@ const nameWithTrait = (want) => {
   check('0이면 아무것도 하지 않는다', Rep.rest(member('시험 동료 11', 5, 0)), null);
 }
 
-// --- 삯 만족도(기획서 14장) --------------------------------------------
+// --- 보수 만족도(기획서 14장) --------------------------------------------
 {
   const m = member(nameWithTrait('coin'), 5, 0);
   const same = Rep.trustDelta(m, quest(5), { won: true, asked: 200, paid: 200 }).delta;
@@ -261,7 +261,7 @@ const nameWithTrait = (want) => {
   check('덜 주면 깎인다', less < same, true);
   // 실패하면 길드가 내지 않아 아무도 못 받는다. 그것을 "약속보다 덜 받았다"로
   // 세면 실패가 두 번 깎인다.
-  check('진 판에서는 삯을 따지지 않는다',
+  check('진 판에서는 보수를 따지지 않는다',
     Rep.trustDelta(m, quest(5), { won: false, asked: 200, paid: 0 }).delta,
     Rep.trustDelta(m, quest(5), { won: false }).delta);
   // 돈으로 관계를 사는 것이 어려운 의뢰를 함께 깨는 것보다 싸면 안 된다.
@@ -288,11 +288,11 @@ const nameWithTrait = (want) => {
     Rep.giftValue(m, staff, 'healer').trust > Rep.giftValue(m, staff, 'tank').trust, true);
 }
 
-// --- 삯 계산(기획서 11~13장) --------------------------------------------
+// --- 보수 계산(기획서 11~13장) --------------------------------------------
 {
   const q = quest(5);
   const base = Hire.baseWage(q);
-  // 1인 몫에서 조금 뗀 값이다. 그대로 두면 배수가 조금만 1을 넘어도 넷의 삯이
+  // 1인 몫에서 조금 뗀 값이다. 그대로 두면 배수가 조금만 1을 넘어도 넷의 보수가
   // 길드가 내는 돈을 넘어, 가진 돈이 없는 초반에 넷을 못 데려간다.
   check('기준은 의뢰 골드의 1인 몫에서 조금 뗀 값',
     base, Math.round((q.guildReward.gold / D.PARTY_MAX) * D.WAGE_BASE));
@@ -309,7 +309,7 @@ const nameWithTrait = (want) => {
     wageAt(-100, 0) - wageAt(0, 0) > wageAt(0, 0) - wageAt(100, 0), true);
 
   // **12장**: 시시해도 비싸고 위험해도 비싸다. **값이 아니라 난이도가 거는
-  // 배수를 본다** — 삯의 기준은 의뢰 골드라 레벨이 낮으면 그만큼 싸고, 그 몫이
+  // 배수를 본다** — 보수의 기준은 의뢰 골드라 레벨이 낮으면 그만큼 싸고, 그 몫이
   // 섞이면 무엇을 보고 있는지가 흐려진다.
   const feelMul = (level) =>
     Hire.wageOf(member(name, 5, 0), quest(level), { rep: 0, method: 'even' }).feel.wage;
@@ -323,7 +323,7 @@ const nameWithTrait = (want) => {
     .map((id) => Hire.wageOf(member(gearer, 5, 0), q, { rep: 0, method: id }).gold);
   check('장비광은 직업 우선을 반긴다', byMethod[1] < byMethod[0], true);
 
-  check('삯은 1골드보다 아래로 안 간다',
+  check('보수는 1골드보다 아래로 안 간다',
     Hire.wageOf(member(name, 5, 100), quest(1, 1), { rep: D.REPUTATION.max, method: 'even' }).gold >= 1,
     true);
 }

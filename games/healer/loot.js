@@ -92,9 +92,17 @@ const METHODS = {
   dice: { id: 'dice', name: '주사위', desc: '굴려서 가장 높은 사람이 가져간다', run: dice },
 };
 
+// **기본값은 직업 우선이다.** 균등이 기본이던 때에는 탱커 방패가 마법사에게
+// 가는 판이 그냥 지나갔다 — 세 방식 중 파티가 실제로 세지는 것은 이쪽뿐이고,
+// 나머지 둘은 그것을 포기하는 대신 다른 것(고르게 나눔·운)을 얻는 선택이다.
+//
+// **기본값을 한 곳에만 둔다.** 처음 진행·저장본 읽기·모르는 방식의 대체가 저마다
+// 값을 적고 있으면 하나만 고치는 일이 난다.
+const DEFAULT = 'job';
+
 // members: [{ id, name, job }] — 주인공을 포함한 참여자
 function distribute(drops, members, methodId, seed) {
-  const method = METHODS[methodId] || METHODS.even;
+  const method = METHODS[methodId] || METHODS[DEFAULT];
   const awards = method.run(drops, members, createRng(seed));
 
   const byMember = {};
@@ -104,7 +112,7 @@ function distribute(drops, members, methodId, seed) {
   return { method: method.id, awards, byMember };
 }
 
-const api = { METHODS, distribute, createRng };
+const api = { METHODS, DEFAULT, distribute, createRng };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 root.HealerLoot = api;

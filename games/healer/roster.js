@@ -175,7 +175,7 @@ function awardExp(members, joinedNames, exp, seed) {
 // 경험치와 같다**(`idleExpRate`). 규칙을 둘로 두면 한쪽만 고치게 된다.
 //
 // **데려간 동료의 몫은 `paid`가 정한다** — 그쪽은 나누는 것이 아니라 모집할 때
-// 약속한 삯이고(hire.js), 동료마다 부른 값이 다르다. 안 넘기면 예전처럼
+// 약속한 보수고(hire.js), 동료마다 부른 값이 다르다. 안 넘기면 예전처럼
 // `share`를 그대로 준다.
 function awardGold(members, joinedNames, share, seed, paid) {
   const rng = createRng(seed == null ? (Math.random() * 1e9) | 0 : seed);
@@ -311,7 +311,7 @@ function adopt(saved) {
       level: Math.max(1, Math.min(D.LEVEL.maxLevel, entry.level | 0 || 1)),
       exp: Math.max(0, entry.exp | 0),
       gold: Math.max(0, entry.gold | 0),
-      // 신뢰도는 범위 밖으로 나갈 수 없다. 저장본을 손대서 +999가 되면 삯이
+      // 신뢰도는 범위 밖으로 나갈 수 없다. 저장본을 손대서 +999가 되면 보수가
       // 1골드로 굳어 모집이 뜻을 잃는다.
       trust: Math.max(D.TRUST.min, Math.min(D.TRUST.max, entry.trust | 0)),
       gear,

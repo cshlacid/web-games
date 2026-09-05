@@ -151,9 +151,13 @@ const names = (list) => list.map((item) => Items.name(item));
     result.awards.every((a) => small.some((m) => m.id === a.toId)), true);
   check('빠진 사람에게는 가지 않는다', result.byMember.mira, undefined);
 
-  // 모르는 방식을 넘기면 균등으로 떨어진다 — 화면이 잘못 불러도 보상이 사라지면 안 된다.
+  // 모르는 방식을 넘기면 기본값으로 떨어진다 — 화면이 잘못 불러도 보상이 사라지면
+  // 안 된다. **기본값을 여기 적지 않는 것은** 그 값을 정하는 곳이 `Loot.DEFAULT`
+  // 하나여야 하기 때문이다.
   const fallback = Loot.distribute([gear('fang')], MEMBERS, '경매', 2);
-  check('모르는 방식은 균등으로', fallback.method, 'even');
+  check('모르는 방식은 기본값으로', fallback.method, Loot.DEFAULT);
+  check('기본값은 아는 방식이다', Boolean(Loot.METHODS[Loot.DEFAULT]), true);
+  check('기본값은 직업 우선이다', Loot.DEFAULT, 'job');
 }
 
 // --- 이름 표시 ----------------------------------------------------------
