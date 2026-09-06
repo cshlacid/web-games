@@ -1013,18 +1013,29 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .float.skill.boon { color: var(--kind-boon); }
 .float.skill.wilt { color: var(--kind-wilt); }
 
-/* 걸려 있는 강화·약화. 초상화 위에 작은 점으로만 둔다 — 아이콘까지 늘어놓으면
-   다섯 칸짜리 초상화 줄이 그것으로 덮인다. 색이 좋은 쪽인지 나쁜 쪽인지를 알린다. */
-.auras {
-  position: absolute; top: 2px; right: 3px;
-  display: flex; gap: 2px; pointer-events: none;
+/* 걸려 있는 것 — 지속 피해·지속 회복·기절·도발·혼란·강화·약화. 초상화 오른쪽
+   위에 작게 붙는다. 예전에는 색 점이었는데, 점은 좋은 쪽인지 나쁜 쪽인지만 알리고
+   무엇이 걸렸는지는 알리지 않았다. 색은 스킬 종류 색을 그대로 쓴다 — 스킬 카드에서
+   본 색이 그 스킬이 남긴 상태에도 걸려야 둘이 같은 것으로 읽힌다.
+   접어 내리게 두는 것은, 일곱 가지가 한꺼번에 걸리면 가로로는 초상화를 넘기 때문이다.
+   글자 위가 아니라 그림 위로 접히도록 폭을 절반으로 묶는다. */
+.status {
+  position: absolute; top: 2px; right: 2px;
+  display: flex; flex-wrap: wrap; justify-content: flex-end;
+  max-width: 60%; gap: 1px; pointer-events: none;
+  /* 두 줄까지만 보인다. 일곱 가지가 한꺼번에 걸리면 세로로 흘러넘쳐 초상화 밖까지
+     내려가는데, 목록은 급한 것부터 순서가 잡혀 있으므로(`logic.STATUS_KINDS`)
+     잘리는 것은 늘 강화·약화 쪽이다. */
+  max-height: 23px; overflow: hidden;
 }
-.aura-dot {
-  width: 5px; height: 5px; border-radius: 50%;
-  background: var(--kind-wilt);
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
-}
-.aura-dot.boon { background: var(--kind-boon); }
+.status .ico-box svg { width: 11px; height: 11px; }
+.status .bane { color: var(--kind-bane); }
+.status .mend { color: var(--kind-mend); }
+.status .pull { color: var(--kind-pull); }
+.status .stun { color: var(--kind-stun); }
+.status .daze { color: var(--kind-daze); }
+.status .boon { color: var(--kind-boon); }
+.status .wilt { color: var(--kind-wilt); }
 
 @keyframes pop-rise {
   from { opacity: 1; transform: translate(-50%, 0); }

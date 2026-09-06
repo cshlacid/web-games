@@ -7,6 +7,7 @@ const D = require('./data.js');
 const Sprites = require('./sprites.js');
 const Icons = require('./icons.js');
 const Scenes = require('./scenes.js');
+const L = require('./logic.js');
 
 let passed = 0;
 let failed = 0;
@@ -328,6 +329,14 @@ function check(name, actual, expected) {
   check('화면이 쓰는 아이콘도 있다',
     ['lock', 'coin', 'scroll', 'cart', 'crest', 'trust', 'gift']
       .filter((name) => !Icons.has(name)), []);
+
+  // 초상화에 붙는 상태 표시. 하나라도 빠지면 그 자리만 대신 그린 동그라미가 되어
+  // 지속 피해와 기절이 같은 그림으로 보인다.
+  check('상태 표시 아이콘이 전부 그려져 있다',
+    Object.values(L.STATUS_KINDS).map((st) => st.icon).filter((name) => !Icons.has(name)), []);
+  const statusIcons = Object.values(L.STATUS_KINDS).map((st) => st.icon);
+  check('상태끼리 같은 그림을 쓰지 않는다',
+    statusIcons.filter((name, i) => statusIcons.indexOf(name) !== i), []);
 
   // 이모지가 남아 있으면 그 자리만 글꼴이 그린다.
   const emoji = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}]/u;
