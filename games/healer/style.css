@@ -297,6 +297,17 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
   .pick-face .lv { font-size: 9px; }
   .pick-take { width: 28px; }
   .pick-open { padding: 7px 6px; }
+  /* **데려가기 단추를 아래로 내린다.** 오른쪽에 세워 두면 그 폭(28px)이 그대로
+     글자 자리에서 빠져, 이름이 두 줄로 감기고 계열이 잘린다 — 재 보니 본문이
+     84px에서 118px로 넓어져 웬만한 이름은 한 줄에 들어간다. 손가락으로 누르기도
+     아래쪽 넓은 띠가 낫다. */
+  .pick.card { flex-direction: column; align-items: stretch; }
+  /* 아래 기본 규칙보다 뒤에 오지 않으므로 마디를 하나 더 얹어 이긴다 —
+     같은 무게면 파일에서 나중에 적힌 쪽이 이기는데, 여기가 앞이다. */
+  .pick.card .pick-take {
+    width: auto; align-self: stretch; min-height: 26px;
+    border-left: 0; border-top: 1px solid var(--line);
+  }
   /* 아랫줄도 함께 줄인다. 신뢰도 값표가 네 자리(+100)고 보수도 네 자리라, 줄이지
      않으면 카드가 잘라 낸다 — 잘린 숫자는 틀린 숫자로 읽힌다. */
   .pick.card .trust-tag { font-size: 10px; padding: 0 3px; }
@@ -306,13 +317,14 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
   .pick.card .feel-tag { font-size: 9.5px; padding: 0 3px; }
   .pick-tags { gap: 3px; }
 }
-/* 아주 좁은 기기(320px 언저리)에서는 이름도 한 단 줄인다. 그대로 두면 두 줄로도
-   모자라 "별을 읽는…"처럼 잘려 나가는데, 이름은 곧 그 동료의 신원이라 계열보다
-   먼저 지켜야 한다. **칸 수는 줄이지 않는다** — 한 줄에 하나로 접으면 격자로
-   바꾼 뜻이 그 화면에서만 사라진다. */
+/* 아주 좁은 기기(320px 언저리)에서는 이름을 세 줄까지 연다. 두 줄로 자르면
+   "별을 읽는…"처럼 이름이 통째로 사라지는데, **이름은 곧 그 동료의 신원이라
+   계열보다 먼저 지킨다.** 글자도 한 단 줄인다 — 여기서는 일곱 자짜리 이름이
+   7px 모자라 두 줄로 감기고, 그 줄만 카드가 17px 높아진다.
+   **칸 수는 줄이지 않는다**: 한 줄에 하나로 접으면 격자로 바꾼 뜻이 그 화면에서만
+   사라진다. */
 @media (max-width: 340px) {
   .pick.card .pick-name { font-size: 12.5px; -webkit-line-clamp: 3; }
-  .pick.card .job { font-size: 9px; }
 }
 
 /* **모자라면 자르지 말고 접는다.** 두 줄은 보기에 성기지만 잘린 숫자·이름보다
@@ -1116,6 +1128,9 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
    줄에 들어간다 — 이유까지 적으면 카드가 다시 네 줄이 되어 격자로 바꾼 뜻이
    사라진다. */
 .pick-deal { display: flex; align-items: center; gap: 5px; margin-top: 3px; }
+/* **동전과 금액은 한 덩어리다.** 따로 두었더니 줄이 접히는 좁은 화면에서 동전만
+   윗줄에 남아, 값이 아니라 장식으로 보였다. */
+.pick-deal .wage-box { display: inline-flex; align-items: center; gap: 4px; flex: none; }
 
 /* 계열 이름표와 난이도 표가 함께 서는 줄. */
 .pick-tags { display: flex; align-items: center; gap: 4px; min-width: 0; }

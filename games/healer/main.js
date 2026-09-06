@@ -1037,8 +1037,12 @@ function renderRoster() {
       const stage = Rep.trustStage(contract.trust);
       deal.append(text('span', `trust-tag t-${stage.id}`, `${contract.trust > 0 ? '+' : ''}${contract.trust}`));
       if (contract.ok) {
-        deal.append(icon('coin'));
-        deal.append(text('span', 'wage', String(contract.gold)));
+        // **동전과 금액은 한 덩어리로 묶는다.** 따로 두었더니 좁은 화면에서 줄이
+        // 접힐 때 동전만 윗줄에, 숫자만 아랫줄에 남았다.
+        const paid = el('span', 'wage-box');
+        paid.append(icon('coin'));
+        paid.append(text('span', 'wage', String(contract.gold)));
+        deal.append(paid);
       } else {
         deal.append(text('span', 'wage no', '거절'));
       }
