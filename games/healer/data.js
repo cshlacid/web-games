@@ -1600,6 +1600,13 @@ function potionPrice(potionId, charLevel) {
   return Math.round(potion.price * (1 + (Math.max(1, charLevel) - 1) * 0.35));
 }
 
+// 새로 고침 값. 물약과 같은 기울기로 주인공 레벨을 따라간다 — 정액이면 후반에는
+// 원하는 것이 나올 때까지 누르는 일이 아무 대가 없는 짓이 된다. **곡선을 한 곳에
+// 두는 것은** 진열대와 동료 목록이 서로 다른 속도로 비싸지면 한쪽만 쓸모없어지기
+// 때문이다. 기준값만 저마다 다르다(`shop.REFRESH_COST`, `roster.REDRAW_COST`).
+const refreshPrice = (base, charLevel) =>
+  Math.round(base * (1 + (Math.max(1, charLevel) - 1) * 0.35));
+
 // 직업에 따라 자동으로 들고 들어간다. 탱커는 맞는 쪽이라 체력, 마나를 쓰는
 // 직업은 마나 위주다. 하나씩은 반대쪽도 들려 보낸다 — 탱커도 도발할 마나는 있어야 한다.
 const JOB_POTIONS = {
@@ -1933,7 +1940,7 @@ const api = {
   SPEC_CHOICES, SPEC_CHANGE_LEVEL, spriteFor, SKILL_KINDS, skillKind, AURA_STATS, SPEC_SKILLS, UNIT_SKILL_MAX, skillsFor, skillSeed,
   PLAYER_SKILLS, HERO_JOBS, HERO_JOB_START, heroSkillsOf, heroJob, jobMaxLevel,
   SKILL, skillAt, skillEffect, skillLevelOf,
-  POTIONS, JOB_POTIONS, POTION_MAX, ENEMIES,
+  POTIONS, JOB_POTIONS, POTION_MAX, ENEMIES, refreshPrice,
   PARTY_MAX, SKILL_MAX,
   REPUTATION, REP_CHANGE, WAGE_BASE, TRUST, TRUST_FEEL, TRUST_FAIL, TRUST_REST, TRUST_PAY, GIFT, TRAITS,
   potionPrice,

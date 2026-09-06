@@ -73,10 +73,9 @@ function canBuy(gold, cost) {
   return gold >= cost ? { ok: true } : { ok: false, reason: '골드가 모자란다' };
 }
 
-// 갱신 값도 레벨을 따라간다. 정액이면 후반에는 원하는 옵션이 나올 때까지
-// 누르는 것이 아무 대가 없는 일이 된다.
-const refreshCost = (charLevel) =>
-  Math.round(REFRESH_COST * (1 + (Math.max(1, charLevel) - 1) * 0.35));
+// 갱신 값도 레벨을 따라간다. 곡선은 동료 목록 새로 고침과 같은 것을 쓴다
+// (`D.refreshPrice`) — 둘이 서로 다른 속도로 비싸지면 한쪽만 쓸모없어진다.
+const refreshCost = (charLevel) => D.refreshPrice(REFRESH_COST, charLevel);
 
 const buyGear = (gold, item) => canBuy(gold, Items.price(item));
 const buyPotion = (gold, potionId, charLevel) =>

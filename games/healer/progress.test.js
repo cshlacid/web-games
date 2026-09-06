@@ -404,5 +404,54 @@ const gear = (defId, tier) => Items.make(defId, tier || 0, 3);
   check('한 개씩 는다', potions.potions.health, 1);
 }
 
+// --- 재련 ---------------------------------------------------------------
+//
+// 골드의 쓸 곳이다. **장착 중인 것도 굴린다** — 지금 끼고 있는 것을 손보는 것이
+// 이 자리를 쓰는 첫 번째 이유라, 팔기처럼 인벤토리만 보면 정작 굴리고 싶은
+// 물건이 목록에 없다.
+{
+  const progress = P.create();
+  progress.gold = 100000;
+  const item = Items.make('robe', 3, 5);
+  P.addItem(progress, item);
+  P.equip(progress, item.uid);
+  const slot = D.GEAR.robe.slot;
+  check('장착했다', progress.equipped[slot].uid, item.uid);
+
+  const before = JSON.stringify(progress.equipped[slot].affixes);
+  const goldBefore = progress.gold;
+  // 값은 굴리기 전의 물건으로 매긴다 — 굴린 뒤에는 옵션이 달라져 값도 달라진다.
+  const asked = Items.reforgePrice(progress.equipped[slot]);
+  const rolled = P.reforge(progress, item.uid);
+  check('장착 중인 것도 재련한다', rolled.ok, true);
+  check('값을 낸다', goldBefore - progress.gold, rolled.cost);
+  check('값은 그 물건 값을 따라간다', rolled.cost, asked);
+  check('옵션이 바뀐다', JSON.stringify(progress.equipped[slot].affixes) !== before, true);
+  // uid가 바뀌면 슬롯이 가리키던 물건이 사라진다.
+  check('같은 물건으로 남는다', progress.equipped[slot].uid, item.uid);
+  check('등급도 그대로다', progress.equipped[slot].tier, 3);
+  check('인벤토리로 돌아오지 않는다',
+    progress.inventory.some((entry) => entry.uid === item.uid), false);
+
+  // 인벤토리에 있는 것도 같은 규칙이다.
+  const spare = Items.make('mail', 2, 9);
+  P.addItem(progress, spare);
+  check('인벤토리 물건도 재련한다', P.reforge(progress, spare.uid).ok, true);
+
+  check('없는 물건은 재련할 수 없다', P.reforge(progress, '없는uid').ok, false);
+
+  // 골드가 모자라면 굴리지 않는다. 값만 빠지고 옵션이 그대로면 화면이 고장 난
+  // 것으로 보인다.
+  const broke = P.create();
+  broke.gold = 0;
+  const owned = Items.make('robe', 5, 4);
+  P.addItem(broke, owned);
+  const kept = JSON.stringify(owned.affixes);
+  const failedRoll = P.reforge(broke, owned.uid);
+  check('골드가 모자라면 막힌다', failedRoll.ok, false);
+  check('막히면 옵션도 그대로다', JSON.stringify(owned.affixes), kept);
+  check('막히면 골드도 그대로다', broke.gold, 0);
+}
+
 console.log(`${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);

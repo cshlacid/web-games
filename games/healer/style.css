@@ -230,6 +230,9 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 #char-job { margin-right: auto; }
 .count { color: var(--muted); font-size: 13px; font-weight: 600; }
 .panel-note { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+/* 방금 무슨 일이 있었는지 알리는 줄. 설명문과 같은 자리에 서므로 색으로 가른다 —
+   전투 화면의 로그는 다른 화면에서 보이지 않는다. */
+.panel-note.said { color: var(--hero); font-weight: 600; }
 
 .skill-picks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 
