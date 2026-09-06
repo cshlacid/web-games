@@ -54,11 +54,11 @@ function check(name, actual, expected) {
       Sprites.size(kind), { w: sprite.w + 2, h: sprite.h + 2 });
   }
 
-  // 시안을 받은 둘(주인공·수호자)만 그림 파일이고 나머지 열이 도형이다. 화풍이
-  // 섞이는 것은 시안이 오는 대로 하나씩 갈아 끼우기 때문이다 — 남은 시안이 오면
-  // 여기부터 바뀐다.
-  check('도형 그림 열', Object.keys(Sprites.SPRITES).length, 10);
-  check('그림 파일 둘', Object.keys(Sprites.SHEETS).length, 2);
+  // 시안을 받은 셋(주인공·수호자·궁수)만 그림 파일이고 나머지 아홉이 도형이다.
+  // 화풍이 섞이는 것은 시안이 오는 대로 하나씩 갈아 끼우기 때문이다 — 남은
+  // 시안이 오면 여기부터 바뀐다.
+  check('도형 그림 아홉', Object.keys(Sprites.SPRITES).length, 9);
+  check('그림 파일 셋', Object.keys(Sprites.SHEETS).length, 3);
   // 한쪽에만 있어야 한다. 양쪽에 두면 화면이 분기를 놓쳤을 때 조용히 도형이 나온다.
   const both = Object.keys(Sprites.SHEETS).filter((k) => Sprites.SPRITES[k]);
   check('그림 파일은 도형으로 겹치지 않는다', both, []);
@@ -120,10 +120,6 @@ function check(name, actual, expected) {
   const inner = Object.values(Sprites.SPRITES)
     .flatMap((sprite) => sprite.parts).filter((part) => part.o === 0);
   check('안에 들어가는 도형은 테두리가 없다', inner.length > 0, true);
-
-  // 활은 채우지 않는다 — 채우면 방패로 보인다.
-  const bow = Sprites.SPRITES.archer.parts.find((part) => part.arc);
-  check('활은 선으로만 긋는다', Sprites.shape(bow).includes('fill="none"'), true);
 }
 
 // **정의에 적힌 그림 이름과 계열 이름은 같지 않다.** 계열에서 그림을 지어내던
