@@ -77,6 +77,39 @@ const THREAT = { trash: 1, elite: 2.2, boss: 6 };
 // 정예가 든 무리의 머릿수가 줄어 전체가 헐거워졌고, 이 배수로 되돌렸다 —
 // 난이도 확인의 세 승률이 등급을 나누기 전 수치로 돌아오는 자리다.
 const threatOf = (id) => THREAT[D.rankOf(D.ENEMIES[id]).id] || 1;
+// 한 무리의 머릿수 상한. 전장의 세로 줄이 다섯이라(`laneY`) 그 위로는 설 자리가
+// 없다. 예산이 남아도 여기서 멈춘다.
+const WAVE_MAX = 5;
+// **우두머리는 레벨을 따라 는다.** 하나로 고정해 두면 12레벨의 우두머리 무리와
+// 20레벨의 것이 같은 그림이고, 파티만 자라므로 뒤로 갈수록 저절로 쉬워진다.
+// 무리 상한이 다섯이라 셋에서 멈춘다 — 그 위는 데리고 나올 쫄이 없어진다.
+// **여섯 레벨마다에서 여덟로 늘렸다.** 셋이 서는 판이 20레벨에 걸리자 파티가
+// 여섯 레벨 위여도 한 판도 못 깼다 — 셋은 아주 뒤에만 서는 그림이다.
+const BOSS_STEP = 8;
+const bossCount = (region, level) =>
+  Math.max(1, Math.min(3, 1 + Math.floor((level - (region.minLevel + 2)) / BOSS_STEP)));
+
+// **우두머리는 혼자 나오지 않는다.** 뒤에 하나만 붙여 두었을 때에는 파티 다섯이
+// 한 대상에 화력을 모아 도발도 어그로도 뜻이 없었다 — 등급이 정한 위협이 수치로만
+// 남고 화면에서는 오래 걸리는 한 대상이었다. 남은 자리를 그 지역의 적으로 채운다.
+// **데리고 나오는 것은 쫄이다.** 자리가 남는 대로 지역의 적을 채웠더니 절반이
+// 정예라, 우두머리 무리가 아니라 정예 무리에 우두머리가 낀 것이 됐다(재 보니
+// 이길 수 있는 판이 아니었다 — 승률 0%).
+const BOSS_ESCORT_MAX = 3;
+function bossWave(region, level, rng) {
+  const bosses = bossCount(region, level);
+  const wave = [];
+  for (let i = 0; i < bosses; i++) wave.push(region.boss);
+  // **적 힐러는 붙이지 않는다.** 다른 무리에서는 하나까지 두지만, 우두머리를
+  // 계속 살리는 힐러가 옆에 서면 파티의 화력으로는 아무도 죽일 수 없는 무리가
+  // 된다 — 여기만 예외로 둔다.
+  const others = region.enemies.filter((id) => D.ENEMIES[id].job !== 'healer');
+  const trash = others.filter((id) => D.rankOf(D.ENEMIES[id]).id === 'trash');
+  const pool = (trash.length ? trash : others);
+  const escort = Math.min(WAVE_MAX - bosses, BOSS_ESCORT_MAX);
+  for (let i = 0; i < escort; i++) wave.push(pick(rng, pool.length ? pool : region.enemies));
+  return wave;
+}
 
 function buildWaves(region, level, rng) {
   const count = level < 3 ? 2 : range(rng, 2, 3);
@@ -92,8 +125,7 @@ function buildWaves(region, level, rng) {
     // 아무도 죽일 수 없는 웨이브가 나온다.
     const wave = [];
     let spent = 0;
-    // 다섯을 넘기지 않는 것은 전장의 세로 줄 수다(laneY). 예산이 남아도 여기서 멈춘다.
-    while (spent < budget && wave.length < 5) {
+    while (spent < budget && wave.length < WAVE_MAX) {
       const id = pick(rng, others.length ? others : region.enemies);
       wave.push(id);
       spent += threatOf(id);
@@ -104,7 +136,7 @@ function buildWaves(region, level, rng) {
   }
   // 마지막 웨이브의 우두머리. 지역에 우두머리가 있고 적정 레벨이 충분할 때만 나온다.
   if (region.boss && level >= region.minLevel + 2) {
-    waves.push([region.boss, pick(rng, region.enemies)]);
+    waves.push(bossWave(region, level, rng));
   }
   return waves;
 }
