@@ -1802,13 +1802,21 @@ function cast(state, skillId, target) {
 // `ai.holdLine`으로 밀리지 않게 한 뒤로는 중앙값이 x 48이다.
 {
   const spots = [];
+  const starts = [];
   let left = 0;
   let ticks = 0;
   for (const seed of [1, 2, 3, 4, 5, 6]) {
     const state = battle({ seed, quest: quest({ level: 6 }),
       party: PARTY.map((p) => ({ defId: p.defId, level: 6 })) });
+    let wasMarching = false;
     for (let i = 0; i < 90 / L.TICK && state.status === 'fighting'; i++) {
       L.step(state, L.TICK);
+      // 무리 사이 이동이 끝난 순간의 대열 자리. 여기가 다음 무리의 출발선이다.
+      if (wasMarching && !state.marching) {
+        const allies = state.units.filter((u) => !u.dead && u.side === 'ally');
+        if (allies.length) starts.push(allies.reduce((sum, u) => sum + u.x, 0) / allies.length);
+      }
+      wasMarching = state.marching;
       if (state.marching) continue;
       const live = state.units.filter((u) => !u.dead);
       const allies = live.filter((u) => u.side === 'ally');
@@ -1822,6 +1830,11 @@ function cast(state, skillId, target) {
   }
   const mid = spots.slice().sort((a, b) => a - b)[Math.floor(spots.length / 2)];
   check('싸움이 전장 가운데 근처에서 벌어진다', mid > 40 && mid < 62, true);
+  // **다음 무리는 왼쪽 4분의 1에서 시작한다.** 대열을 가운데에 세워 두었더니
+  // 무리가 바뀔 때마다 아군이 적 코앞에 서 있어, 걸어가서 만나는 장면이 사라졌다.
+  check('무리가 바뀌면 아군이 왼쪽 4분의 1에서 다시 선다',
+    starts.every((x) => x > D.FIELD.w * 0.15 && x < D.FIELD.w * 0.35), true);
+  check('다시 서는 자리를 실제로 봤다', starts.length > 0, true);
   // 벽에 붙는 일이 아예 없어야 한다는 뜻은 아니다 — 마지막 하나가 물러설 자리는
   // 남겨 두었다(`ai.LINE_GIVE`). 그것이 전투의 기본이 되지 않는지를 본다.
   check('왼쪽 끝에서 싸우는 시간은 드물다', left / ticks < 0.1, true);

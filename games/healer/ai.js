@@ -481,14 +481,24 @@ function anchorOf(unit, state) {
 // 걸어가는 일이 쌓이지 않는다 — 밀리는 자리가 기준선에서 재는 절대 위치라
 // 그렇다.
 //
+// **버티는 선은 출발선이 아니라 그보다 앞이다**(`LINE_PUSH`). 양쪽이 제자리에서
+// 버티면 걸어와 붙는 쪽이 상대의 출발선까지 들어가므로, 싸움이 둘 중 한쪽의
+// 자리에서만 열린다 — 아군 대열을 가운데에 세워 두었더니 이번에는 무리가 바뀔
+// 때마다 아군이 적 코앞에서 시작했다. 출발선을 왼쪽 4분의 1로 물리고 버티는
+// 선만 앞에 두면, 양쪽이 저마다 앞으로 나와 **가운데에서 만난다.**
+//
 // **편을 가리는 분기가 아니다** — 앞이 어느 쪽인지만 `forward`로 물어보는, 이
 // 파일의 다른 자리와 같은 방식이다.
+// 버티는 선은 유닛마다 하나씩 들고 있다(`unit.lineX`, `logic.js`가 세울 때
+// 계산한다). 여기서 출발선으로부터 다시 재지 않는 것은, 어디에 세울지는 배치의
+// 일이고 여기는 그 선을 지키는 일만 하기 때문이다.
+const LINE_PUSH = 38;
 const LINE_GIVE = 12;
 
 function holdLine(unit, spot) {
-  if (unit.homeX == null) return spot;
+  if (unit.lineX == null) return spot;
   const forward = unit.side === 'ally' ? 1 : -1;
-  const limit = unit.homeX - forward * LINE_GIVE;
+  const limit = unit.lineX - forward * LINE_GIVE;
   return { x: forward > 0 ? Math.max(spot.x, limit) : Math.min(spot.x, limit), y: spot.y };
 }
 
@@ -602,7 +612,7 @@ const api = {
   tauntReserve, manaTarget, freeSpot, SPACING, CLOSE,
   attackersOf, endangered, healReach,
   chooseTarget, healTarget, chooseSkill, choosePotion, chooseMove, decide,
-  POTION_HP, POTION_MP, STICK, RETREAT, SPREAD, LINE_GIVE, holdLine,
+  POTION_HP, POTION_MP, STICK, RETREAT, SPREAD, LINE_PUSH, LINE_GIVE, holdLine,
   hasAura, buffTarget, carriesHeal,
   EFFICIENT, EMERGENCY,
 };
