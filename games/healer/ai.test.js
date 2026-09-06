@@ -612,5 +612,26 @@ function gather(state) {
   check('그리고 때린다', AI.decide(healer, state).attack, foe.uid);
 }
 
+// --- 혼란 ---------------------------------------------------------------
+{
+  // 광역 혼란은 광역 도발·광역 약화와 같은 잣대다 — 새로 걸릴 적이 둘 이상일
+  // 때만 쓴다. 쿨타임이 길어 하나에게 쓰면 그 판에서 다시 못 부른다.
+  const state = battle({ party: [{ defId: 'bran', level: 1 }, { defId: 'lyle', level: 1 },
+    { defId: 'mira', level: 1 }, { defId: 'finn', level: 5 }] });
+  gather(state);
+  const bard = AI.alive(state, 'ally').find((u) => u.spec === 'bard');
+  bard.skills = [{ id: 'dissonance', readyAt: 0 }];
+  check('셋이 모여 있으면 불협화음', AI.chooseSkill(bard, state, null).id, 'dissonance');
+
+  const rest = enemies(state).slice(1);
+  rest.forEach((u) => { u.dead = true; });
+  check('하나뿐이면 아낀다', AI.chooseSkill(bard, state, null), null);
+
+  // 이미 혼란인 적은 세지 않는다. 겹쳐 걸면 긴 쿨타임만 버린다 — 기절과 같다.
+  rest.forEach((u) => { u.dead = false; });
+  rest.forEach((u) => { u.confusedUntil = state.t + 3; });
+  check('이미 걸린 적은 세지 않는다', AI.chooseSkill(bard, state, null), null);
+}
+
 console.log(`${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);

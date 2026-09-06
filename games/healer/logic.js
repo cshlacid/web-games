@@ -125,6 +125,8 @@ function makeUnit(def, side, uid, x, y, level, override, bonus, potions, name, h
     cast: null,
     // 기절이 풀리는 시각. 이 시각까지는 판단도 이동도 기본 공격도 없다.
     stunUntil: 0,
+    // 혼란이 풀리는 시각. 그때까지는 제 편을 적으로 본다(`ai.foesOf`).
+    confusedUntil: 0,
     exp: Math.round((def.exp || 0) * (1 + 0.25 * (level - 1))),
     // 계열의 목록 중 레벨이 되는 것을 앞에서부터 넷. 편성 화면이 보여 준 것과
     // 전투에서 실제로 쓰는 것이 같아야 하므로 같은 함수를 쓴다.
@@ -514,6 +516,15 @@ function runUnitSkill(state, unit, choice) {
     stun(state, unit, target, def.duration);
     return;
   }
+  // 혼란. **거는 순간 외우던 것을 끊지 않는다** — 기절과 달리 굳는 것이 아니라
+  // 편이 뒤집히는 것이라, 외우던 스킬은 그대로 제 편에게 나간다.
+  if (def.kind === 'confuse') {
+    const on = def.radius
+      ? alive(state, AI.opposite(unit.side)).filter((foe) => dist(foe, target) <= def.radius)
+      : [target];
+    for (const foe of on) confuse(state, unit, foe, def.duration);
+    return;
+  }
   // 강화와 약화. 거는 쪽만 다르고 나머지는 같아, 대상 목록을 고르는 데서 갈린다.
   if (def.kind === 'buff' || def.kind === 'buff-area') {
     // 사거리 0은 자기에게 거는 것이다(전사의 굳히기). 대상 고르기를 따로 두지
@@ -565,6 +576,24 @@ function stun(state, caster, target, duration) {
 }
 
 const stunned = (state, unit) => state.t < (unit.stunUntil || 0);
+
+// 혼란시킨다. 기절과 같은 꼴이라 남은 시간이 긴 쪽을 남긴다 — 짧은 것으로 덮으면
+// 두 번째가 오히려 상대를 제정신으로 돌려놓는다.
+//
+// **대상이 지금 노리던 것을 지운다.** 안 지우면 다음 판단까지 제 편이 아니라
+// 원래 표적을 계속 때려, 걸린 순간에는 아무 일도 하지 않은 것으로 보인다.
+function confuse(state, caster, target, duration) {
+  if (!target || target.dead) return 0;
+  const until = state.t + duration;
+  if (until <= target.confusedUntil) return 0;
+  target.confusedUntil = until;
+  target.targetUid = null;
+  emit(state, { type: 'confuse', uid: target.uid, until,
+    text: `${caster.name} → ${target.name}: 혼란` });
+  return duration;
+}
+
+const confused = (state, unit) => state.t < (unit.confusedUntil || 0);
 
 // 마나를 채우고 화면에 알린다. 회복과 달리 넘치는 몫을 따로 세지 않는 것은,
 // 마나에는 "흘린 힐"에 해당하는 판단(EFFICIENT)이 시전 전에 이미 걸리기 때문이다.
@@ -746,6 +775,14 @@ function resolvePlayerSkill(state, def, spot) {
   if (def.kind === 'stun') {
     if (def.damage) applyDamage(state, caster, unit, harm(def.damage));
     stun(state, caster, unit, def.duration);
+    return;
+  }
+  // 혼란도 동료 쪽과 같은 함수를 부른다. 규칙이 둘이 되면 한쪽만 고치게 된다.
+  if (def.kind === 'confuse') {
+    const on = def.radius
+      ? alive(state, 'enemy').filter((foe) => dist(foe, point) <= def.radius)
+      : [unit];
+    for (const foe of on) confuse(state, caster, foe, def.duration);
     return;
   }
   if (def.kind === 'mana-ally') { giveMana(state, caster, unit, def.mana); return; }
@@ -1052,7 +1089,7 @@ const api = {
   createRng, createBattle, advance, step, drainEvents,
   castSkill, playerSkill, usePotion, drink, magicPowerOf, rollCrit, applyDamage, applyHeal, addDot, addZone, addAura,
   hero, skillSlot, resolveTarget, moveToward, giveMana, zoneX, knockback,
-  startCast, tickCast, cancelCast, runUnitSkill, resolvePlayerSkill, stun, stunned,
+  startCast, tickCast, cancelCast, runUnitSkill, resolvePlayerSkill, stun, stunned, confuse, confused,
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
