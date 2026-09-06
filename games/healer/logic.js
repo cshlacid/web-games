@@ -628,7 +628,9 @@ function moveToward(state, unit, point, dt) {
   const d = Math.sqrt(dx * dx + dy * dy);
   if (d < 0.4) return;
   cancelCast(state, unit);
-  const step = Math.min(d, unit.speed * dt);
+  // **둔화가 걸리는 자리가 여기 하나다**(`speed` 오라). 걸음을 계산하는 곳이
+  // 여기뿐이라, 대열을 다시 짜는 무리 사이 이동에도 그대로 걸린다.
+  const step = Math.min(d, unit.speed * auraMul(state, unit, 'speed') * dt);
   unit.x += (dx / d) * step;
   unit.y += (dy / d) * step;
 }

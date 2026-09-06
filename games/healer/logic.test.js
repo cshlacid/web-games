@@ -286,6 +286,59 @@ function cast(state, skillId, target) {
       .filter((id) => D.UNIT_SKILLS[id].minLevel <= level).slice(0, D.UNIT_SKILL_MAX));
 }
 
+// --- 둔화 ---------------------------------------------------------------
+//
+// **딜러가 적에게 거는 상태 이상이다.** 기절과 달리 아무것도 못 하게 만들지는
+// 않고 걸음만 늦추므로, 멀리서 거는 계열(마법사)에게도 줄 수 있다 — 기절을
+// 근접 셋으로 묶어 둔 이유(후열이 아무것도 못 하는 판)가 여기에는 걸리지 않는다.
+{
+  const state = battle({ party: [{ defId: 'yuri', level: 8 }] });
+  const mage = unit(state, '마법사 유리');
+  const foe = AI.alive(state, 'enemy')[0];
+  const def = D.UNIT_SKILLS.frostbind;
+
+  // 걸리기 전후로 같은 시간 동안 얼마나 걷는지 잰다. 걸음을 계산하는 자리가
+  // `moveToward` 하나이므로, 거기만 보면 모든 이동에 걸린 것이다.
+  const walk = (u, seconds) => {
+    const from = u.x;
+    L.moveToward(state, u, { x: u.x - 100, y: u.y }, seconds);
+    const moved = from - u.x;
+    u.x = from;
+    return moved;
+  };
+  const plain = walk(foe, 1);
+  L.runUnitSkill(state, mage, { id: 'frostbind', targetUid: foe.uid });
+  const slowed = walk(foe, 1);
+  check('둔화가 걸리면 걸음이 느려진다', Math.round((slowed / plain) * 100) / 100, def.mul);
+  check('굳어 있는 것과는 다르다', L.stunned(state, foe), false);
+
+  // 시간이 지나면 풀린다. 오라이므로 같은 것을 다시 걸면 시간이 새로 시작할
+  // 뿐이고, 쌓이지 않는다.
+  L.runUnitSkill(state, mage, { id: 'frostbind', targetUid: foe.uid });
+  check('겹쳐 쌓이지 않는다',
+    Math.round((walk(foe, 1) / plain) * 100) / 100, def.mul);
+  state.t += def.duration + 0.1;
+  check('시간이 지나면 제 속도로 돌아온다', Math.round(walk(foe, 1)), Math.round(plain));
+}
+
+// 전사의 밀쳐내기는 미는 것과 늦추는 것을 함께 한다. **밀기만 하면 표가 나지
+// 않는다** — 밀어 놓자마자 걸어 돌아오기 때문이고, 그래서 수호자의 방패 밀치기는
+// 굳히기와 한 몸이다. 전사 쪽은 굳히는 대신 늦춘다(같은 스킬이 둘이 되지 않게).
+{
+  const state = battle({ party: [{ defId: 'lyle', level: 8 }] });
+  const warrior = unit(state, '검사 라일');
+  const foe = AI.alive(state, 'enemy')[0];
+  foe.x = warrior.x + 6; foe.y = warrior.y;
+  const before = foe.x;
+  L.runUnitSkill(state, warrior, { id: 'shove', targetUid: foe.uid });
+  check('민다', foe.x > before, true);
+  check('밀린 거리가 적혀 있는 만큼이다',
+    Math.round(foe.x - before), D.UNIT_SKILLS.shove.knock);
+  const slow = (foe.auras || []).find((aura) => aura.stat === 'speed');
+  check('늦추기도 한다', slow ? slow.mul : null, D.UNIT_SKILLS.shove.mul);
+  check('굳히지는 않는다', L.stunned(state, foe), false);
+}
+
 // --- 기절 ---------------------------------------------------------------
 //
 // 근접 세 계열만 갖는 수단이다. 굳어 있는 동안에는 판단도 이동도 기본 공격도 없다.
