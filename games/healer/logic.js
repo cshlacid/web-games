@@ -153,17 +153,17 @@ function makeUnit(def, side, uid, x, y, level, override, bonus, potions, name, h
 // 아군 배치. 직업에 따라 앞뒤를 나눠 세운다 — 다들 같은 자리에서 출발하면
 // 첫 몇 초 동안 힐러가 최전선에 서 있게 된다.
 //
-// **대열 전체를 전장 가운데 쪽으로 38만큼 옮겼다**(예전에는 탱커 32·딜러 22·
-// 힐러 12에 주인공 7이었다). 싸움은 아군이 선 자리에서 벌어진다 — 적이 걸어와서
-// 붙기 때문이다. 그래서 대열이 왼쪽 끝에 있으면 전투도 왼쪽 끝에서 벌어지고
-// 화면의 절반이 빈 채로 남는다: 재 보니 전투 위치의 중앙값이 x 25였고, 전투
-// 시간의 절반이 전장 왼쪽 3할 안에서 지나갔다. 지금은 중앙값이 x 48이고 왼쪽
-// 3할에서 보내는 시간이 0이다.
+// **여기는 출발선이고, 버티는 선은 그보다 앞이다**(`ai.LINE_PUSH`). 무리가
+// 바뀔 때마다 아군이 이 자리로 대열을 다시 짜므로(`march`), 이 값이 곧 "무리
+// 사이 이동이 끝났을 때 아군이 서 있는 자리"다. 전장 왼쪽 4분의 1에 둔다 —
+// 여기를 가운데로 밀었더니 다음 무리가 적 코앞에서 시작해, 걸어가서 만나는
+// 장면이 사라졌다.
 //
-// **옮긴 만큼이 그대로 반영되는 것은 `ai.holdLine`이 이 자리를 지켜 주기
-// 때문이다.** 그 규칙이 없을 때에는 대열을 앞으로 밀어도 싸움이 다시 왼쪽으로
-// 흘러내려, x 34 언저리에서 더 나아가지 않았다.
-const ALLY_LANE = { tank: 70, dealer: 60, healer: 50 };
+// **싸움이 벌어지는 자리는 이 값이 아니라 버티는 선이 정한다.** 예전에는 이 값이
+// 곧 싸움터라 전투 위치의 중앙값이 x 25였고(전투 시간의 절반이 전장 왼쪽 3할),
+// 대열을 앞으로 밀어도 x 34에서 더 나아가지 않았다 — 뒤로 흘러내리는 길이 따로
+// 있었기 때문이다(`ai.holdLine`).
+const ALLY_LANE = { tank: 40, dealer: 30, healer: 20 };
 
 // 줄 세우기. 위아래로 FIELD.top~bottom 안에서만 세운다 — 그 밖은 유닛의 몸통이
 // 화면을 벗어나는 자리다.
@@ -178,12 +178,15 @@ function placeAllies(state, members) {
     const def = member.def;
     const hero = def.id === D.HERO.id;
     const unit = makeUnit(def, 'ally', hero ? HERO_UID : `a${i}`,
-      hero ? 45 : ALLY_LANE[def.job], laneY(i, members.length),
+      hero ? 15 : ALLY_LANE[def.job], laneY(i, members.length),
       member.level, member.stats, member.bonus, member.potions, member.name,
       { spec: member.spec, learned: member.learned });
     // 웨이브 사이에 되돌아갈 자리. 다음 무리를 만나러 갈 때 대열을 다시 짠다.
     unit.homeX = unit.x;
     unit.homeY = unit.y;
+    // 버티는 선은 출발선보다 앞이다(`ai.holdLine`). 여기서 한 번 계산해 들려
+    // 보내는 것은, 어디에 세울지는 배치의 일이기 때문이다.
+    unit.lineX = unit.x + AI.LINE_PUSH;
     state.units.push(unit);
   });
 }
@@ -204,6 +207,7 @@ function spawnWave(state, index) {
     // 아군만 돌아가므로 여기에 걸리지 않는다.
     unit.homeX = unit.x;
     unit.homeY = unit.y;
+    unit.lineX = unit.x - AI.LINE_PUSH;
     state.units.push(unit);
   });
   emit(state, { type: 'wave', index, total: state.quest.waves.length,
