@@ -603,9 +603,13 @@ const UNIT_SKILLS = {
   cleave: { id: 'cleave', icon: 'cleave', name: '강타', spec: 'warrior', cd: 7, mp: 16, kind: 'damage',
             mul: 2.6, range: 8, cast: 0, minLevel: 1,
             desc: '한 번에 크게 넣는다' },
-  overpower: { id: 'overpower', icon: 'overpower', name: '힘으로 누르기', spec: 'warrior', cd: 4, mp: 8,
-            kind: 'damage', mul: 1.4, range: 8, cast: 0, minLevel: 1,
-            desc: '싸게 계속 때린다' },
+  // **밀쳐내기.** 전사가 적에게 거는 상태 이상이다. 수호자의 방패 밀치기와
+  // 갈라 두려고 굳히기 대신 둔화를 얹었다 — 밀어 놓고 아무것도 안 걸면 걸어
+  // 돌아와 민 표가 나지 않고, 굳히기를 얹으면 방패 밀치기와 같은 스킬이 된다.
+  shove: { id: 'shove', icon: 'shove', name: '밀쳐내기', spec: 'warrior', cd: 15, mp: 18,
+           kind: 'debuff', stat: 'speed', mul: 0.55, duration: 4, knock: 12,
+           range: 8, cast: 0, minLevel: 3, core: 1,
+           desc: '어깨로 밀쳐 내고 비틀거리게 한다' },
   stagger: { id: 'stagger', icon: 'stagger', name: '어깨치기', spec: 'warrior', cd: 15, mp: 20, kind: 'stun',
             duration: 1.8, range: 8, cast: 0, minLevel: 3,
             desc: '어깨로 들이받아 잠시 멈춰 세운다' },
@@ -642,8 +646,11 @@ const UNIT_SKILLS = {
   stab:   { id: 'stab', icon: 'stab', name: '기습', spec: 'rogue', cd: 4, mp: 10, kind: 'damage',
             mul: 1.8, range: 8, cast: 0, minLevel: 1,
             desc: '짧은 쿨타임으로 계속 찌른다' },
+  // **도적의 상태 이상은 늘 들고 나간다**(`core`). 계열마다 넷만 들고 가므로
+  // 취향에 맡겨 두었을 때에는 기절을 안 든 도적이 흔했다 — 있는데 안 나오는 것은
+  // 없는 것과 같다.
   kidney: { id: 'kidney', icon: 'kidney', name: '급소 치기', spec: 'rogue', cd: 14, mp: 18, kind: 'stun',
-            duration: 1.6, range: 8, cast: 0, minLevel: 4,
+            duration: 1.6, range: 8, cast: 0, minLevel: 4, core: 1,
             desc: '급소를 쳐 숨을 막는다' },
   ambush: { id: 'ambush', icon: 'ambush', name: '매복', spec: 'rogue', cd: 14, mp: 22, kind: 'damage',
             mul: 3.9, range: 8, cast: 1.0, minLevel: 7,
@@ -720,9 +727,13 @@ const UNIT_SKILLS = {
   chill:  { id: 'chill', icon: 'chill', name: '서리 손길', spec: 'mage', cd: 8, mp: 14, kind: 'dot',
             tick: 14, interval: 1, duration: 6, range: 36, cast: 0, minLevel: 3,
             desc: '얼어붙은 자리가 계속 아프다' },
-  spark:  { id: 'spark', icon: 'spark', name: '불티', spec: 'mage', cd: 2.8, mp: 7, kind: 'damage',
-            mul: 0.85, range: 36, cast: 0, minLevel: 1,
-            desc: '싸게 계속 흘려보낸다' },
+  // **서리 결박.** 마법사가 거는 상태 이상이다. 얼린다고 해서 굳히기로 두지
+  // 않은 것은, 기절이 근접 세 계열만 갖는 수단이기 때문이다(멀리서 거는 수단까지
+  // 있으면 후열이 아무것도 못 하는 판이 나온다). 걸음만 묶는다.
+  frostbind: { id: 'frostbind', icon: 'frostbind', name: '서리 결박', spec: 'mage', cd: 15, mp: 20,
+           kind: 'debuff', stat: 'speed', mul: 0.5, duration: 5,
+           range: 34, cast: 0, minLevel: 3, core: 1,
+           desc: '발밑을 얼려 걸음을 묶는다' },
 
   // --- 사제 ---
   // 동료 힐러는 보조다. 물약까지 들고 나면서 주인공이 손을 놓아도 파티가 버티기
@@ -888,6 +899,11 @@ const AURA_STATS = {
   atk:   '공격력',
   armor: '받는 피해',
   heal:  '회복량',
+  // **이동 속도만 캐릭터 창에 없는 수치다.** 위 셋은 창에 적힌 숫자가 움직이는
+  // 것이지만, 이쪽은 전장에서 걸음이 느려지는 것으로 읽는다 — 딜러가 적에게 걸
+  // 상태 이상을 넣으면서 들어왔고, 기절과 달리 아무것도 못 하게 만들지는 않으므로
+  // 멀리서 거는 계열(마법사)에게도 줄 수 있다.
+  speed: '이동 속도',
 };
 
 const skillKind = (def) => SKILL_KINDS[def && def.kind] || SKILL_KINDS.damage;
@@ -1033,7 +1049,7 @@ const SPEC_SKILLS = {
   // **전사는 딜이 본업이고 탱은 보조다.** 그래서 도발이 때리는 것보다 뒤에
   // 온다 — 수호자와 정반대다. 앞의 둘이 쿨타임일 때 도발과 굳히기가 나오므로,
   // 탱커가 놓친 적을 받아 주면서도 딜이 멈추지 않는다.
-  warrior: ['execute', 'whirl', 'breather', 'challenge', 'bracing', 'sunder', 'stagger', 'rend', 'cleave', 'overpower'],
+  warrior: ['execute', 'whirl', 'breather', 'challenge', 'bracing', 'sunder', 'stagger', 'rend', 'cleave', 'shove'],
   rogue:   ['smoke', 'backstab', 'catchBreath', 'kidney', 'ambush', 'caltrops', 'flurry', 'venom', 'stab', 'quickCut'],
   // **궁수는 단일이 본업이고 광역이 보조, 마법사는 그 반대다.** 순서만 뒤집은
   // 것이 아니라 수치도 갈라 두었다 — 궁수의 한 발이 마법사의 한 발보다 세고,
@@ -1047,7 +1063,7 @@ const SPEC_SKILLS = {
   // **비인간형은 물약을 못 마시므로 이것이 유일한 길이다.** 고블린 주술사에게
   // 마력 흡수가 2레벨부터였을 때에는, 1레벨 주술사가 마나를 다 쓰고 나면 남은
   // 전투 내내 아무것도 못 했다.
-  mage:    ['blizzard', 'frost', 'channel', 'arcane', 'inferno', 'flare', 'ember', 'chill', 'bolt', 'spark'],
+  mage:    ['blizzard', 'frost', 'channel', 'arcane', 'inferno', 'flare', 'ember', 'chill', 'bolt', 'frostbind'],
   priest:  ['wave', 'greaterMend', 'meditate', 'blessing', 'purify', 'judgement', 'mend', 'renew', 'chastise', 'smite'],
   shaman:  ['curse', 'mendEnemy', 'drain', 'hex', 'spirit'],
   // 음유시인은 **아군의 마나를 채우는 유일한 계열이다.** 마나 회복 스킬은 지금까지
