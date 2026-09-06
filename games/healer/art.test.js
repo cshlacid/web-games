@@ -54,11 +54,11 @@ function check(name, actual, expected) {
       Sprites.size(kind), { w: sprite.w + 2, h: sprite.h + 2 });
   }
 
-  // 시안을 받은 셋(주인공·수호자·궁수)만 그림 파일이고 나머지 아홉이 도형이다.
-  // 화풍이 섞이는 것은 시안이 오는 대로 하나씩 갈아 끼우기 때문이다 — 남은
-  // 시안이 오면 여기부터 바뀐다.
-  check('도형 그림 아홉', Object.keys(Sprites.SPRITES).length, 9);
-  check('그림 파일 셋', Object.keys(Sprites.SHEETS).length, 3);
+  // 시안을 받은 넷(주인공·수호자·궁수·마법사)만 그림 파일이고 나머지 여덟이
+  // 도형이다. 화풍이 섞이는 것은 시안이 오는 대로 하나씩 갈아 끼우기 때문이다 —
+  // 남은 시안이 오면 여기부터 바뀐다.
+  check('도형 그림 여덟', Object.keys(Sprites.SPRITES).length, 8);
+  check('그림 파일 넷', Object.keys(Sprites.SHEETS).length, 4);
   // 한쪽에만 있어야 한다. 양쪽에 두면 화면이 분기를 놓쳤을 때 조용히 도형이 나온다.
   const both = Object.keys(Sprites.SHEETS).filter((k) => Sprites.SPRITES[k]);
   check('그림 파일은 도형으로 겹치지 않는다', both, []);
