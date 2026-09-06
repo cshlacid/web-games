@@ -22,6 +22,10 @@ const Scenes = window.HealerScenes;
 const sound = window.HealerSound;
 
 const $ = (id) => document.getElementById(id);
+// **화면에 나오는 숫자는 전부 여기를 거친다**(천 단위 쉼표). 규칙은 `data.js`에
+// 있다 — 아이템 옵션 글자(`STATS`의 `fmt`)와 전투가 내보내는 글자도 같은 것을
+// 쓰므로, 화면마다 다른 모양의 숫자가 생기지 않는다.
+const num = D.num;
 const el = (tag, cls) => {
   const node = document.createElement(tag);
   if (cls) node.className = cls;
@@ -147,7 +151,7 @@ function openHome(tab) {
   const notes = {
     quest: '의뢰 게시판',
     character: `캐릭터 Lv ${app.progress.charLevel}`,
-    shop: `${app.progress.gold} 골드`,
+    shop: `${num(app.progress.gold)} 골드`,
   };
   show('home', notes[app.tab]);
 }
@@ -242,7 +246,7 @@ function renderQuests() {
     // **적힌 골드는 파티가 나눌 몫이다.** 그냥 숫자만 두면 그만큼이 지갑에
     // 들어오는 것으로 읽힌다.
     meta.append(text('span', 'tag gold',
-      `파티 ${quest.guildReward.gold} 골드 · ${quest.guildReward.exp} exp`));
+      `파티 ${num(quest.guildReward.gold)} 골드 · ${num(quest.guildReward.exp)} exp`));
     // 전리품 목록은 미리 알 수 없다 — 쓰러뜨린 적에게서 굴려진다. 게시판이
     // 말할 수 있는 것은 어떤 적이 나오는가까지다.
     meta.append(text('span', `tag rank-${quest.rank}`, `${D.RANKS[quest.rank].name} 출현`));
@@ -278,7 +282,7 @@ function levelRow(label, level, exp, toNext) {
   fill.style.width = `${toNext ? Math.min(100, (exp / toNext) * 100) : 100}%`;
   bar.append(fill);
   row.append(bar);
-  row.append(text('small', null, toNext ? `${exp} / ${toNext}` : '최대'));
+  row.append(text('small', null, toNext ? `${num(exp)} / ${num(toNext)}` : '최대'));
   return row;
 }
 
@@ -305,7 +309,7 @@ function statText(key, value) {
     return `×${value.toFixed(2)}`;
   }
   if (key === 'dodge' || key === 'crit') return `${(value * 100).toFixed(1)}%`;
-  return String(Math.round(value));
+  return num(Math.round(value));
 }
 
 // 능력치 한 줄. 남은 점수가 있으면 오른쪽에 넣는 단추가 붙는다.
@@ -328,13 +332,13 @@ function renderAttrs() {
     // 자동으로 오른 몫과 내가 넣은 몫을 나눠 보여 준다. 합쳐서 보여 주면
     // 점수를 어디에 넣었는지 알 수 없다.
     const put = progress.spent[attr.id] || 0;
-    if (put) name.append(text('span', 'job', `투자 +${put}`));
+    if (put) name.append(text('span', 'job', `투자 +${num(put)}`));
     const worn = Math.round(gear[attr.id] || 0);
-    if (worn) name.append(text('span', 'job gear', `장비 +${worn}`));
+    if (worn) name.append(text('span', 'job gear', `장비 +${num(worn)}`));
     body.append(name);
     body.append(text('div', 'pick-sub', attr.effect));
     row.append(body);
-    row.append(text('b', 'attr-value', String(own[attr.id] + worn)));
+    row.append(text('b', 'attr-value', num(own[attr.id] + worn)));
 
     const add = el('button', 'attr-add');
     add.type = 'button';
@@ -363,7 +367,7 @@ function renderCharacter() {
   jobSlot.textContent = '';
   jobSlot.append(jobTag('healer', job.spec, D.HERO.race));
 
-  $('char-gold').textContent = `${progress.gold} 골드`;
+  $('char-gold').textContent = `${num(progress.gold)} 골드`;
 
   const levels = $('char-levels');
   levels.textContent = '';
@@ -557,8 +561,8 @@ function diffSummary(compare) {
   if (!compare.current) return '빈 슬롯';
   const parts = Object.entries(compare.diff).map(([key, value]) => {
     const size = key === 'hp' || key === 'mp'
-      ? Math.round(Math.abs(value))
-      : `${Math.round(Math.abs(value) * 100)}%`;
+      ? num(Math.round(Math.abs(value)))
+      : `${num(Math.round(Math.abs(value) * 100))}%`;
     return `${D.STATS[key].name} ${value > 0 ? '+' : '−'}${size}`;
   });
   return parts.length ? `지금 낀 것과 ${parts.join(' · ')}` : '지금 낀 것과 차이 없음';
@@ -645,8 +649,8 @@ function shopStock() {
 function renderShop() {
   const progress = app.progress;
   const stock = shopStock();
-  $('shop-gold').textContent = `${progress.gold} 골드`;
-  $('shop-refresh').textContent = `진열대 바꾸기 · ${stock.refreshCost} 골드`;
+  $('shop-gold').textContent = `${num(progress.gold)} 골드`;
+  $('shop-refresh').textContent = `진열대 바꾸기 · ${num(stock.refreshCost)} 골드`;
   $('shop-refresh').disabled = progress.gold < stock.refreshCost;
 
   const potions = $('shop-potions');
@@ -669,7 +673,7 @@ function renderShop() {
       `최대 ${D.STATS[potion.restore === 'hp' ? 'hp' : 'mp'].name}의 ${Math.round(potion.ratio * 100)}% 회복`
       + ` · 쿨 ${potion.cd}초`));
     button.append(body);
-    button.append(text('span', 'pick-cost', full ? '가득' : `${entry.price} 골드`));
+    button.append(text('span', 'pick-cost', full ? '가득' : `${num(entry.price)} 골드`));
     button.addEventListener('click', () => {
       const bought = P.buyPotion(progress, entry.id);
       sound.play(bought.ok ? 'click' : 'deny');
@@ -689,7 +693,7 @@ function renderShop() {
     const price = Items.price(item);
     const row = el('li');
     const button = itemButton(item, {
-      label: `${price} 골드`,
+      label: `${num(price)} 골드`,
       run: () => {
         const bought = P.buyGear(progress, item);
         sound.play(bought.ok ? 'click' : 'deny');
@@ -726,7 +730,7 @@ function renderShop() {
     const cost = Items.reforgePrice(item);
     const row = el('li');
     const button = itemButton(item, {
-      label: `${cost} 골드로 재련`,
+      label: `${num(cost)} 골드로 재련`,
       run: () => {
         const before = Items.summary(item);
         const rolled = P.reforge(progress, item.uid);
@@ -751,7 +755,7 @@ function renderShop() {
   for (const item of progress.inventory) {
     const row = el('li');
     row.append(itemButton(item, {
-      label: `${Items.sellPrice(item)} 골드에 팔기`,
+      label: `${num(Items.sellPrice(item))} 골드에 팔기`,
       run: () => {
         sound.play('click');
         P.sell(progress, item.uid);
@@ -866,7 +870,7 @@ function renderBrief() {
   brief.append(head);
   brief.append(text('p', 'panel-note',
     `${Scenes.SCENES[quest.scene].name} · ${quest.waves.length}개 무리 · `
-    + `완료 시 ${quest.guildReward.exp} exp와 파티가 나눌 ${quest.guildReward.gold} 골드`));
+    + `완료 시 ${num(quest.guildReward.exp)} exp와 파티가 나눌 ${num(quest.guildReward.gold)} 골드`));
   const meta = el('div', 'quest-meta');
   for (const label of enemyCounts(quest)) meta.append(text('span', 'tag', label));
   brief.append(meta);
@@ -907,9 +911,9 @@ function renderDeal() {
   for (const row of deal.paid) {
     const line = el('li');
     line.append(text('span', 'rname', row.name));
-    const value = text('b', 'stat-value', `${row.gold}`);
+    const value = text('b', 'stat-value', num(row.gold));
     // 얹어 준 몫은 따로 적는다. 합쳐 두면 부른 값이 얼마였는지 사라진다.
-    if (row.tip) value.append(text('small', 'why', ` +${row.tip}`));
+    if (row.tip) value.append(text('small', 'why', ` +${num(row.tip)}`));
     line.append(value);
     list.append(line);
   }
@@ -924,7 +928,7 @@ function renderDeal() {
   // 지갑에서 빠지고, 가진 돈으로도 못 메우면 전투를 시작할 수 없다.
   const afford = Hire.canAfford(app.progress.gold, app.quest, contracts, tips);
   const head = $('deal-hero');
-  head.textContent = `내 몫 ${deal.hero}`;
+  head.textContent = `내 몫 ${num(deal.hero)}`;
   head.className = `count${deal.hero < 0 ? ' short' : ''}`;
 
   const note = $('deal-panel').querySelector('.panel-note');
@@ -932,9 +936,9 @@ function renderDeal() {
   // 붙이려면 숫자를 읽는 규칙이 화면 코드에 하나 더 생긴다.
   note.textContent = afford.ok
     ? (deal.hero < 0
-      ? `길드 ${deal.purse} 골드로는 모자란다 · 내 돈 ${-deal.hero} 골드를 보탠다`
-      : `길드 ${deal.purse} 골드 · 보수 ${deal.spent}`)
-    : `${afford.short} 골드가 모자라 이 편성으로는 계약할 수 없다`;
+      ? `길드 ${num(deal.purse)} 골드로는 모자란다 · 내 돈 ${num(-deal.hero)} 골드를 보탠다`
+      : `길드 ${num(deal.purse)} 골드 · 보수 ${num(deal.spent)}`)
+    : `${num(afford.short)} 골드가 모자라 이 편성으로는 계약할 수 없다`;
   return afford;
 }
 
@@ -972,7 +976,7 @@ function renderRoster() {
   heroBody.append(heroName);
   const stats = P.stats(app.progress);
   heroBody.append(text('div', 'pick-sub',
-    `체력 ${stats.hp} · 마나 ${stats.mp} · 회복력 ×${stats.heal.toFixed(2)}`));
+    `체력 ${num(stats.hp)} · 마나 ${num(stats.mp)} · 회복력 ×${stats.heal.toFixed(2)}`));
   heroRow.append(heroBody);
   const heroItem = el('li', 'wide');
   heroItem.append(heroRow);
@@ -1041,7 +1045,7 @@ function renderRoster() {
         // 접힐 때 동전만 윗줄에, 숫자만 아랫줄에 남았다.
         const paid = el('span', 'wage-box');
         paid.append(icon('coin'));
-        paid.append(text('span', 'wage', String(contract.gold)));
+        paid.append(text('span', 'wage', num(contract.gold)));
         deal.append(paid);
       } else {
         deal.append(text('span', 'wage no', '거절'));
@@ -1069,7 +1073,7 @@ function renderRoster() {
   // 값을 단추에 적는다. 눌러 보고 나서야 골드가 모자란 것을 알면 고장 난 것으로
   // 보인다 — 진열대 바꾸기와 같은 규칙이다.
   const redraw = Roster.redrawCost(app.progress.charLevel);
-  $('roster-refresh').textContent = `동료 새로 고침 · ${redraw} 골드`;
+  $('roster-refresh').textContent = `동료 새로 고침 · ${num(redraw)} 골드`;
   $('roster-refresh').disabled = app.progress.gold < redraw;
 }
 
@@ -1141,7 +1145,7 @@ function openMember(member) {
     const kind = D.skillKind(skill);
     // 아이콘이 "어떤 스킬인가"를, 색이 "무엇을 하는가"를 알린다. 이름만
     // 늘어놓았을 때에는 넷을 훑는 데 넷을 다 읽어야 했다.
-    const chip = chipButton(`chip skill ${kind.css}`, skill.icon, `${skill.name} ${skill.mp}`,
+    const chip = chipButton(`chip skill ${kind.css}`, skill.icon, `${skill.name} ${num(skill.mp)}`,
       // 종류 이름이 스킬 이름과 같으면(도발) 두 번 적지 않는다.
       () => showChip(chip, skill.name === kind.name ? skill.name : `${skill.name} · ${kind.name}`,
         skillLines(skill), skill.desc));
@@ -1257,8 +1261,8 @@ function renderTrust(member) {
 
   const wage = el('div', 'trust-wage');
   wage.append(icon('coin'));
-  wage.append(text('b', null, `${contract.gold} 골드`));
-  wage.append(text('span', 'why', `기준 ${contract.base}`));
+  wage.append(text('b', null, `${num(contract.gold)} 골드`));
+  wage.append(text('span', 'why', `기준 ${num(contract.base)}`));
   box.append(wage);
   box.append(text('p', 'pick-sub dim', why.length ? why.join(' · ') : '기준 그대로 부른다'));
   // 이 동료가 이번 의뢰를 어떻게 보는가. 게시판의 난이도는 주인공 기준이라
@@ -1278,7 +1282,7 @@ function renderFavor(member) {
 
   const tip = tipFor(member.name);
   const row = el('div', 'favor-row');
-  row.append(text('span', 'pick-sub', `보수에 얹기 +${tip}`));
+  row.append(text('span', 'pick-sub', `보수에 얹기 +${num(tip)}`));
   const step = Math.max(1, Math.round(contract.gold * TIP_STEP));
   row.append(chipButton('chip', 'coin', `+${step}`, () => {
     app.tips[member.name] = tip + step;
@@ -1310,7 +1314,7 @@ function renderFavor(member) {
   for (const item of gifts.slice(0, 8)) {
     const value = Rep.giftValue(member, item, job);
     const chip = chipButton(`chip gear tier-${Items.tier(item).css}`, D.GEAR[item.defId].icon,
-      `${Items.name(item)} +${value.trust}`, () => giveGift(member, item));
+      `${Items.name(item)} +${num(value.trust)}`, () => giveGift(member, item));
     // 쓸 수 있는 물건이면 더 기뻐한다. 표시가 없으면 왜 값이 다른지 알 수 없다.
     if (value.liked) chip.classList.add('liked');
     list.append(chip);
@@ -1376,18 +1380,18 @@ function hideChip() {
 // 적을 수 없고, 도트에 한 번의 값을 적으면 실제로 들어가는 양이 가려진다.
 function skillLines(def) {
   const lines = [];
-  if (def.heal) lines.push(`한 번에 ${def.heal} 회복`);
+  if (def.heal) lines.push(`한 번에 ${num(def.heal)} 회복`);
   if (def.mul) lines.push(`공격력의 ×${def.mul}`);
   if (def.tick) {
     const total = Math.round(def.tick * (def.duration / (def.interval || 1)));
     const what = def.kind === 'heal-dot' ? '회복' : '피해';
-    lines.push(`${def.interval || 1}초마다 ${def.tick} ${what} · ${def.duration}초 (합계 ${total})`);
+    lines.push(`${def.interval || 1}초마다 ${num(def.tick)} ${what} · ${def.duration}초 (합계 ${num(total)})`);
   }
-  if (def.mana) lines.push(def.kind === 'mana' ? `자기 마나 ${def.mana} 회복` : `아군 마나 ${def.mana} 회복`);
+  if (def.mana) lines.push(def.kind === 'mana' ? `자기 마나 ${num(def.mana)} 회복` : `아군 마나 ${num(def.mana)} 회복`);
   if (def.kind === 'stun') lines.push(`${def.duration}초 동안 굳힌다 · 외우던 스킬도 끊긴다`);
   if (def.kind === 'taunt' || def.kind === 'taunt-area') lines.push(`${def.duration}초 동안 어그로를 붙든다`);
   if (def.radius) lines.push(`반경 ${def.radius} 안을 함께 친다`);
-  lines.push(`마나 ${def.mp} · 쿨타임 ${def.cd}초 · ${castLine(def)}`);
+  lines.push(`마나 ${num(def.mp)} · 쿨타임 ${def.cd}초 · ${castLine(def)}`);
   return lines;
 }
 
@@ -1440,7 +1444,7 @@ function renderSkillPicks() {
     body.append(text('div', 'pick-sub dim', def.desc));
     button.append(body);
 
-    const cost = text('span', 'pick-cost', `${def.mp ? `마나 ${def.mp}` : '마나 없음'}\n쿨 ${def.cd}초`);
+    const cost = text('span', 'pick-cost', `${def.mp ? `마나 ${num(def.mp)}` : '마나 없음'}\n쿨 ${def.cd}초`);
     cost.style.whiteSpace = 'pre-line';
     button.append(cost);
 
@@ -1847,7 +1851,7 @@ function renderSkillbar() {
     button.setAttribute('aria-pressed', 'false');
     button.append(icon(def.icon, 'glyph'));
     button.append(text('span', 'sname', def.name));
-    button.append(text('span', 'cost', def.mp ? String(def.mp) : '－'));
+    button.append(text('span', 'cost', def.mp ? num(def.mp) : '－'));
     const cool = el('div', 'cool');
     cool.style.transform = 'scaleY(0)';
     button.append(cool);
@@ -1900,10 +1904,10 @@ function syncSkillbar(state) {
 
   const share = hero.hp / hero.maxHp;
   $('hero-hp-fill').style.width = `${Math.max(0, share) * 100}%`;
-  $('hero-hp-text').textContent = `체력 ${Math.max(0, Math.round(hero.hp))} / ${hero.maxHp}`;
+  $('hero-hp-text').textContent = `체력 ${num(Math.max(0, Math.round(hero.hp)))} / ${num(hero.maxHp)}`;
   $('hero-hp-fill').parentNode.classList.toggle('low', share <= DANGER.on);
   $('hero-mp-fill').style.width = `${(hero.mp / hero.maxMp) * 100}%`;
-  $('hero-mp-text').textContent = `마나 ${Math.round(hero.mp)} / ${hero.maxMp}`;
+  $('hero-mp-text').textContent = `마나 ${num(Math.round(hero.mp))} / ${num(hero.maxMp)}`;
 
   syncDanger(hero, share);
 }
@@ -2096,7 +2100,7 @@ function handleEvents(state, events) {
         // 치명타는 느낌표와 큰 글자로 가른다. 색만 다르게 하면 피해·회복과
         // 헷갈리고, 숫자만 크게 하면 그냥 많이 맞은 것으로 보인다.
         const kind = `${heal ? 'heal' : 'harm'}${event.crit ? ' crit' : ''}`;
-        const label = `${heal ? '+' : '−'}${event.amount}${event.crit ? '!' : ''}`;
+        const label = `${heal ? '+' : '−'}${num(event.amount)}${event.crit ? '!' : ''}`;
         floatText(unit, label, kind);
         popPortrait(unit.uid, label, kind);
       }
@@ -2260,8 +2264,8 @@ function openResult(state) {
   $('verdict').className = `verdict ${won ? 'won' : 'lost'}`;
 
   const survived = members.filter((m) => !AI.byUid(state, m.id).dead).length;
-  $('verdict-note').textContent = `${Math.round(state.t)}초 · 회복 ${Math.round(state.stats.healed)}`
-    + ` (흘린 힐 ${Math.round(state.stats.overheal)}) · 스킬 ${state.stats.casts}회`
+  $('verdict-note').textContent = `${Math.round(state.t)}초 · 회복 ${num(Math.round(state.stats.healed))}`
+    + ` (흘린 힐 ${num(Math.round(state.stats.overheal))}) · 스킬 ${state.stats.casts}회`
     + ` · 생존 ${survived}/${members.length}`;
 
   // 경험치를 먼저 넣는다. 레벨이 오른 뒤라야 아래에서 계산하는 스탯이 맞다.
@@ -2329,9 +2333,9 @@ function openResult(state) {
     // 들어온 숫자와 화면의 숫자가 다르다.
     const gold = el('li');
     gold.append(icon('coin'));
-    gold.append(text('span', null, `${deal.purse} 골드`));
+    gold.append(text('span', null, `${num(deal.purse)} 골드`));
     gold.append(text('span', 'why', deal.spent ? `보수 ${deal.spent}` : '보수 없음'));
-    gold.append(text('span', 'to', `내 몫 ${deal.hero}`));
+    gold.append(text('span', 'to', `내 몫 ${num(deal.hero)}`));
     guild.append(gold);
 
     const method = Loot.METHODS[app.lootMethod];
@@ -2466,9 +2470,9 @@ function renderBattleReport(rows) {
     name.append(document.createTextNode(row.name));
     if (row.dead) name.append(text('span', 'why', ' 쓰러짐'));
     line.append(name);
-    line.append(text('b', 'stat-value', String(row.dealt)));
-    line.append(text('b', 'stat-value', String(row.taken)));
-    const heal = text('b', 'stat-value', String(row.healed));
+    line.append(text('b', 'stat-value', num(row.dealt)));
+    line.append(text('b', 'stat-value', num(row.taken)));
+    const heal = text('b', 'stat-value', num(row.healed));
     if (row.overheal) heal.append(text('small', 'why', ` +${row.overheal}`));
     line.append(heal);
     list.append(line);
@@ -2506,7 +2510,7 @@ function renderRosterReport(report, joined, purses, bought, trustMoves, left) {
     name.append(document.createTextNode(entry.name));
     row.append(name);
     const purse = (purses || []).find((p) => p.name === entry.name);
-    const value = `+${entry.exp} exp${purse ? ` · +${purse.gold} 골드` : ''}`
+    const value = `+${num(entry.exp)} exp${purse ? ` · +${num(purse.gold)} 골드` : ''}`
       + `${entry.levels ? ` · Lv ${member.level}` : ''}`;
     row.append(text('b', `stat-value${entry.levels ? ' up' : ''}`, value));
     list.append(row);
@@ -2533,7 +2537,7 @@ function renderRosterReport(report, joined, purses, bought, trustMoves, left) {
     if (deal) {
       const line = el('li', 'sub-row');
       line.append(text('span', 'why', `${Items.def(deal.item).name} 구입`));
-      line.append(text('b', 'stat-value', `-${deal.price} 골드`));
+      line.append(text('b', 'stat-value', `-${num(deal.price)} 골드`));
       list.append(line);
     }
   }
@@ -2559,7 +2563,7 @@ function renderGained(items, sold, equipped) {
   const list = $('gained');
   list.textContent = '';
 
-  if (sold) list.append(text('li', 'empty-note', `재료를 팔아 ${sold} 골드를 받았다.`));
+  if (sold) list.append(text('li', 'empty-note', `재료를 팔아 ${num(sold)} 골드를 받았다.`));
   if (!items.length) {
     if (equipped) list.append(text('li', 'empty-note', '장착했다. 나머지는 인벤토리에 있다.'));
     else if (!sold) list.append(text('li', 'empty-note', '이번에는 내 몫이 없었다.'));
