@@ -339,6 +339,41 @@ function cast(state, skillId, target) {
   check('굳히지는 않는다', L.stunned(state, foe), false);
 }
 
+// 궁수의 발목 쏘기는 늦추면서 피도 흘린다. **둔화만 얹으면 서리 결박과 같은
+// 스킬이 되므로** 도트를 남겼고, 그것을 종류가 아니라 얹는 값(`tick`)으로 둔
+// 것은 넉백과 같은 이유다 — 종류로 두면 그 조합을 적을 수 없다.
+{
+  const state = battle({ party: [{ defId: 'mira', level: 8 }] });
+  const archer = unit(state, '궁수 미라');
+  const foe = AI.alive(state, 'enemy')[0];
+  const def = D.UNIT_SKILLS.cripple;
+  L.runUnitSkill(state, archer, { id: 'cripple', targetUid: foe.uid });
+  const slow = (foe.auras || []).find((aura) => aura.stat === 'speed');
+  check('늦춘다', slow ? slow.mul : null, def.mul);
+  check('마법사 것보다 덜 묶는다', def.mul > D.UNIT_SKILLS.frostbind.mul, true);
+  check('피도 흘린다', state.dots.some((dot) => dot.targetUid === foe.uid), true);
+  check('굳히지는 않는다', L.stunned(state, foe), false);
+}
+
+// **적에게도 상태 이상이 있다.** 아군과 적이 같은 논리로 움직인다는 규칙은 같은
+// 표를 본다는 것만이 아니라 같은 수단을 갖는다는 것이기도 하다 — 잡졸과 주술사가
+// 상태 이상을 하나도 못 걸던 동안에는 걸리기만 하는 쪽이었다.
+{
+  const kinds = (spec) => D.SPEC_SKILLS[spec].map((id) => D.UNIT_SKILLS[id])
+    .filter((def) => def.kind === 'stun' || def.kind === 'confuse'
+      || ((def.kind === 'debuff' || def.kind === 'debuff-area') && def.stat));
+  const bare = ['grunt', 'shaman', 'chieftain'].filter((spec) => !kinds(spec).length);
+  check('적 계열도 상태 이상을 하나는 든다', bare, []);
+
+  // 무리로 몰려오는 잡졸에게 기절을 주면 다섯이 돌아가며 걸어 후열이 아무것도
+  // 못 한다. 아군의 근접 셋에게만 기절을 준 것과 같은 잣대다.
+  check('잡졸의 것은 기절이 아니다',
+    kinds('grunt').every((def) => def.kind === 'debuff'), true);
+  // 멀리서 거는 계열이라 걸음도 묶지 않는다. 깎는 것은 손(공격력)이다.
+  check('주술사의 것은 약화다',
+    kinds('shaman').map((def) => def.stat), ['atk']);
+}
+
 // --- 혼란 ---------------------------------------------------------------
 //
 // **적끼리 싸우게 만든다.** 편을 가르는 자리가 `ai.foesOf` 하나뿐이라, 거기만

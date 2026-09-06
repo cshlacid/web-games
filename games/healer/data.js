@@ -608,7 +608,7 @@ const UNIT_SKILLS = {
   // 돌아와 민 표가 나지 않고, 굳히기를 얹으면 방패 밀치기와 같은 스킬이 된다.
   shove: { id: 'shove', icon: 'shove', name: '밀쳐내기', spec: 'warrior', cd: 15, mp: 18,
            kind: 'debuff', stat: 'speed', mul: 0.55, duration: 4, knock: 12,
-           range: 8, cast: 0, minLevel: 3, core: 1,
+           range: 8, cast: 0, minLevel: 3,
            desc: '어깨로 밀쳐 내고 비틀거리게 한다' },
   stagger: { id: 'stagger', icon: 'stagger', name: '어깨치기', spec: 'warrior', cd: 15, mp: 20, kind: 'stun',
             duration: 1.8, range: 8, cast: 0, minLevel: 3,
@@ -616,7 +616,7 @@ const UNIT_SKILLS = {
   // **보조 탱커의 두 손이 여기다.** 딜이 본업이라 목록 앞은 때리는 것이고,
   // 도발과 굳히기는 그 뒤에 온다 — 탱커가 놓친 것을 받아 주는 자리다.
   challenge: { id: 'challenge', icon: 'challenge', name: '도전', spec: 'warrior', cd: 8, mp: 14,
-            kind: 'taunt', duration: 5, range: 12, cast: 0, minLevel: 4,
+            kind: 'taunt', duration: 5, range: 12, cast: 0, minLevel: 4, core: 1,
             desc: '적 하나를 자기 쪽으로 끌어온다' },
   bracing: { id: 'bracing', icon: 'bracing', name: '굳히기', spec: 'warrior', cd: 20, mp: 16,
             kind: 'buff', stat: 'armor', mul: 0.8, duration: 10, range: 0, cast: 0, minLevel: 5,
@@ -687,9 +687,14 @@ const UNIT_SKILLS = {
   arrowStorm: { id: 'arrowStorm', icon: 'arrowStorm', name: '화살 폭풍', spec: 'archer', cd: 20, mp: 28,
             kind: 'zone', tick: 11, interval: 1, duration: 7, radius: 16, range: 36, cast: 1.2, minLevel: 8,
             desc: '한 자리에 화살을 계속 퍼붓는다' },
-  cripple: { id: 'cripple', icon: 'cripple', name: '발목 쏘기', spec: 'archer', cd: 9, mp: 12, kind: 'dot',
-            tick: 13, interval: 1, duration: 6, range: 34, cast: 0, minLevel: 4,
-            desc: '발목을 꿰어 계속 피가 흐르게 한다' },
+  // **발목 쏘기.** 궁수가 거는 상태 이상이다. 도트였을 때에는 갈고리 화살과 하는
+  // 일이 같아(둘 다 초당 피해) 이름값을 못 했다. 둔화만 얹으면 이번에는 서리
+  // 결박과 같은 스킬이 되므로 **피는 남긴다** — 마법사 것은 세게 묶고, 이쪽은
+  // 덜 묶는 대신 꿰인 자리가 계속 아프다.
+  cripple: { id: 'cripple', icon: 'cripple', name: '발목 쏘기', spec: 'archer', cd: 14, mp: 16,
+            kind: 'debuff', stat: 'speed', mul: 0.7, duration: 6,
+            tick: 9, interval: 1, range: 34, cast: 0, minLevel: 4, core: 1,
+            desc: '발목을 꿰어 절뚝이게 한다' },
   steadyBreath: { id: 'steadyBreath', icon: 'steadyBreath', name: '활 고르기', spec: 'archer', cd: 28, mp: 0,
             kind: 'mana', mana: 34, range: 0, cast: 1.8, minLevel: 2, core: 1,
             desc: '자기 마나를 되찾는다' },
@@ -848,6 +853,13 @@ const UNIT_SKILLS = {
   jab:    { id: 'jab', icon: 'jab', name: '찌르기', spec: 'grunt', cd: 5, mp: 8, kind: 'damage',
             mul: 1.3, range: 8, cast: 0, minLevel: 1,
             desc: '짧게 찌른다' },
+  // **잡졸의 상태 이상은 둔화다.** 무리로 몰려오는 자리라 기절을 주면 다섯이
+  // 돌아가며 걸어 후열이 아무것도 못 한다 — 아군의 근접 셋에게만 기절을 준 것과
+  // 같은 이유다. 짧고 얕게 두고, 오라라 다섯이 걸어도 하나만 걸린다.
+  trip:   { id: 'trip', icon: 'trip', name: '발 걸기', spec: 'grunt', cd: 12, mp: 10,
+            kind: 'debuff', stat: 'speed', mul: 0.72, duration: 3,
+            range: 8, cast: 0, minLevel: 1,
+            desc: '발을 걸어 넘어뜨릴 듯 붙든다' },
 
   // --- 주술사 (적) ---
   // 적 주술사의 것. 아군 사제와 표를 나눈 이유는 편성 화면에 섞여 나오면 안 되기
@@ -870,6 +882,14 @@ const UNIT_SKILLS = {
   spirit: { id: 'spirit', icon: 'spirit', name: '정령 화살', spec: 'shaman', cd: 5, mp: 12, kind: 'damage',
             mul: 1.7, range: 30, cast: 1.0, minLevel: 1,
             desc: '정령을 날려 보낸다' },
+  // **주술사의 상태 이상은 약화다.** 저주를 거는 것이 이 계열의 정체라 `core`로
+  // 두었다. 걸어 두고 때리는 쪽이 아니라 파티 전체의 딜을 깎는 쪽이라, 힐러가
+  // 미는 속도가 아니라 적을 잡는 속도를 늦춘다 — 멀리서 거는 계열에 기절이나
+  // 둔화를 주지 않는 것과 같은 자리다.
+  enfeeble: { id: 'enfeeble', icon: 'enfeeble', name: '쇠약', spec: 'shaman', cd: 16, mp: 18,
+            kind: 'debuff', stat: 'atk', mul: 0.82, duration: 8,
+            range: 30, cast: 1.2, minLevel: 2, core: 1,
+            desc: '기운을 빨아 손을 무디게 한다' },
 };
 
 // 스킬이 하는 일. **아이콘이 "어떤 스킬인가"를, 색이 "무엇을 하는가"를 알린다.**
@@ -1076,7 +1096,7 @@ const SPEC_SKILLS = {
   // 전투 내내 아무것도 못 했다.
   mage:    ['blizzard', 'frost', 'channel', 'arcane', 'inferno', 'flare', 'ember', 'chill', 'bolt', 'frostbind'],
   priest:  ['wave', 'greaterMend', 'meditate', 'blessing', 'purify', 'judgement', 'mend', 'renew', 'chastise', 'smite'],
-  shaman:  ['curse', 'mendEnemy', 'drain', 'hex', 'spirit'],
+  shaman:  ['curse', 'mendEnemy', 'drain', 'hex', 'enfeeble', 'spirit'],
   // 음유시인은 **아군의 마나를 채우는 유일한 계열이다.** 마나 회복 스킬은 지금까지
   // 전부 자기 것만 채웠고(마나 순환·명상·마력 흡수), 그래서 마나가 마른 탱커와
   // 힐러를 밖에서 도울 방법이 없었다. 광역이 단일보다 앞인 것은 쿨타임이 길어서다.
@@ -1085,10 +1105,10 @@ const SPEC_SKILLS = {
   // 회복량도 사제보다 작게 잡았다: 여기서 같은 값을 주면 "노래도 부르는 사제"가
   // 되어 둘 중 하나를 고를 이유가 사라진다.
   bard:    ['anthem', 'dissonance', 'harmony', 'lament', 'tune', 'echo', 'refrain', 'serenade', 'chord', 'finale'],
-  grunt:   ['gash', 'pounce', 'jab'],
+  grunt:   ['gash', 'pounce', 'trip', 'jab'],
   // 우두머리 전용. 새 스킬을 만들지 않고 수호와 전사의 무거운 것만 골라 묶었다 —
   // 이 계열이 하는 일은 "이미 있는 것 중 가장 아픈 것"이지 새로운 수단이 아니다.
-  chieftain: ['rupture', 'sweep', 'roar', 'slam', 'crush', 'bash'],
+  chieftain: ['rupture', 'sweep', 'roar', 'slam', 'shieldSlam', 'crush', 'bash'],
 };
 
 // 그 유닛이 이 레벨에서 전투에 들고 가는 스킬. 편성 화면과 전투가 같은 것을
@@ -1592,7 +1612,9 @@ function skillEffect(def) {
   if (def.stat) {
     const name = AURA_STATS[def.stat] || def.stat;
     const where = def.radius ? `반경 ${def.radius} 안, ` : '';
-    return `${where}${name} ×${def.mul} (${def.duration}초)`;
+    // 도트를 얹은 약화가 있다(발목 쏘기). 곱만 적으면 화면에서 피해가 사라진다.
+    const bleed = def.tick ? ` · 1초마다 ${def.tick} 피해` : '';
+    return `${where}${name} ×${def.mul} (${def.duration}초)${bleed}`;
   }
   if (def.mana && def.targeting === 'ally') return `동료의 마나 ${def.mana} 회복`;
   if (def.mana && def.radius) return `반경 ${def.radius} 안 아군의 마나 ${def.mana} 회복`;
@@ -1694,27 +1716,27 @@ const POTION_MAX = 5;
 // 적 힐러가 아무에게도 보호받지 못하고, 후열을 먼저 치는 규칙이 한쪽에서만 돈다.
 const ENEMIES = {
   scout:  { id: 'scout', race: 'goblin', rank: 'trash', exp: 10,  name: '고블린 척후병', job: 'dealer', sprite: 'goblin',
-            hp: 742, mp: 64,  atk: 25, attackCd: 1.5, range: 7,  speed: 21,
-           attrs: { str: 40, agi: 16, int: 8, vit: 59 }, growth: 'enemy',
+            hp: 826, mp: 64,  atk: 25, attackCd: 1.5, range: 7,  speed: 21,
+           attrs: { str: 45, agi: 16, int: 8, vit: 66 }, growth: 'enemy',
             armor: 0.95, spec: 'grunt' },
   shaman: { id: 'shaman', race: 'goblin', rank: 'trash', exp: 13, name: '고블린 주술사', job: 'healer', sprite: 'shaman',
-            hp: 658, mp: 120, atk: 24, attackCd: 2.2, range: 30, speed: 15,
-           attrs: { str: 12, agi: 10, int: 16, vit: 52 }, growth: 'enemy', attackType: 'magic',
+            hp: 728, mp: 120, atk: 24, attackCd: 2.2, range: 30, speed: 15,
+           attrs: { str: 13, agi: 10, int: 16, vit: 58 }, growth: 'enemy', attackType: 'magic',
             armor: 1, spec: 'shaman' },
   orc:    { id: 'orc', race: 'orc', rank: 'elite', exp: 46,    name: '오크 전사',     job: 'tank',   sprite: 'orc',
-            hp: 2254, mp: 72,  atk: 51, attackCd: 1.8, range: 7,  speed: 16,
-           attrs: { str: 58, agi: 8, int: 10, vit: 134 }, growth: 'enemy',
+            hp: 2520, mp: 72,  atk: 51, attackCd: 1.8, range: 7,  speed: 16,
+           attrs: { str: 65, agi: 8, int: 10, vit: 150 }, growth: 'enemy',
             armor: 0.7,  spec: 'tank', always: ['sweep'] },
   hexer:  { id: 'hexer', race: 'orc', rank: 'elite', exp: 42,  name: '오크 주술사',   job: 'healer', sprite: 'shaman',
-            hp: 1372, mp: 128, atk: 38, attackCd: 2.4, range: 30, speed: 14,
-           attrs: { str: 16, agi: 8, int: 19, vit: 82 }, growth: 'enemy', attackType: 'magic',
+            hp: 1540, mp: 128, atk: 38, attackCd: 2.4, range: 30, speed: 14,
+           attrs: { str: 18, agi: 8, int: 19, vit: 92 }, growth: 'enemy', attackType: 'magic',
             armor: 0.9, spec: 'shaman', always: ['curse'] },
   // **우두머리는 제 계열을 쓴다.** 오크 전사와 같은 수호 계열을 들고 있던 동안에는
   // 덩치만 큰 오크였다 — 잡는 데 오래 걸릴 뿐 무섭지는 않았다. 지금은 휩쓸기로
   // 파티 전체를 긁고 마무리로 한 명을 끊는다.
   chief:  { id: 'chief', race: 'orc', rank: 'boss', exp: 210,  name: '오크 우두머리', job: 'tank',   sprite: 'boss',
-            hp: 4858, mp: 136, atk: 67, attackCd: 2.0, range: 8,  speed: 14,
-           attrs: { str: 89, agi: 6, int: 20, vit: 289 }, growth: 'enemy',
+            hp: 5446, mp: 136, atk: 67, attackCd: 2.0, range: 8,  speed: 14,
+           attrs: { str: 100, agi: 6, int: 20, vit: 324 }, growth: 'enemy',
             armor: 0.62, spec: 'chieftain', always: ['rupture', 'sweep'] },
 };
 

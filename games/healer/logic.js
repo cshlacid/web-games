@@ -539,7 +539,12 @@ function runUnitSkill(state, unit, choice) {
     const on = def.kind === 'debuff-area'
       ? alive(state, AI.opposite(unit.side)).filter((foe) => dist(foe, target) <= def.radius)
       : [target];
-    for (const foe of on) addAura(state, unit, foe, def);
+    for (const foe of on) {
+      addAura(state, unit, foe, def);
+      // 도트도 넉백과 같이 **종류가 아니라 얹는 값이다**(`tick`). 궁수의 발목
+      // 쏘기는 늦추면서 피도 흘리는데, 종류로 두면 그 조합을 적을 수 없다.
+      if (def.tick) addDot(state, unit, foe, def, 'damage', over(def.tick));
+    }
     return;
   }
   if (def.kind === 'mana-ally') { giveMana(state, unit, target, def.mana); return; }
