@@ -429,5 +429,22 @@ const SEEDS = [1, 5, 77, 4242, 20260825];
   check('이름 조각은 아래 계열에서 나온다', named.name, member.name);
 }
 
+// --- 새로 고침 값 --------------------------------------------------------
+//
+// 공짜였을 때에는 마음에 드는 목록이 나올 때까지 누르는 것이 아무 대가 없는
+// 일이라, 뽑기가 사실상 없는 것과 같았다.
+{
+  check('새로 고치는 데 값을 낸다', R.redrawCost(1) > 0, true);
+  check('레벨을 따라 오른다', R.redrawCost(10) > R.redrawCost(1), true);
+  // 진열대 갱신과 같은 곡선을 쓰고 기준값만 낮다. 한 판에 여러 번 누를 수 있는
+  // 자리라, 같은 값이면 새로 고침 두 번이 의뢰 한 판을 먹는다.
+  const Shop = require('./shop.js');
+  check('진열대 갱신보다 싸다', R.redrawCost(8) < Shop.refreshCost(8), true);
+  // 반올림 때문에 소수점 아래가 조금 갈린다 — 곡선이 같은지만 본다.
+  const slope = (fn) => fn(12) / fn(1);
+  check('두 값이 같은 속도로 오른다',
+    Math.abs(slope(R.redrawCost) - slope(Shop.refreshCost)) < 0.05, true);
+}
+
 console.log(`${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);

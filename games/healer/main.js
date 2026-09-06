@@ -59,6 +59,9 @@ const app = {
   wages: new Map(),
   // 부른 값에 얹어 주기로 한 몫(이름 → 골드). 기획서 14장의 만족도가 여기서 온다.
   tips: {},
+  // 마지막으로 재련한 결과 한 줄. 저장본에 남기지 않는다 — 다음에 켰을 때 이어
+  // 볼 것이 아니고, 화면이 다시 그려지는 동안만 필요하다.
+  reforged: '',
   contracts: [],
   battle: null,
   aiming: null,
@@ -703,6 +706,42 @@ function renderShop() {
     gear.append(row);
   }
 
+  // **재련은 가진 물건 전부에 걸린다** — 장착 중인 것까지. 지금 끼고 있는 것을
+  // 손보는 것이 이 자리를 쓰는 첫 번째 이유라, 팔기처럼 인벤토리만 세우면
+  // 정작 굴리고 싶은 물건이 목록에 없다.
+  const owned = P.equippedItems(progress).concat(progress.inventory)
+    .filter((item) => Items.isGear(item));
+  const reforgeList = $('shop-reforge');
+  reforgeList.textContent = '';
+  // 무엇이 바뀌었는지 적는다. 목록만 다시 그리면 굴린 것이 어느 물건이었는지
+  // 눈으로 좇아야 한다. **전투 화면의 로그(`note`)는 여기서 보이지 않는다.**
+  const rolledNote = $('reforge-note');
+  rolledNote.textContent = app.reforged || '';
+  rolledNote.hidden = !app.reforged;
+  $('reforge-count').textContent = String(owned.length);
+  if (!owned.length) {
+    reforgeList.append(text('li', 'empty-note', '재련할 장비가 없다.'));
+  }
+  for (const item of owned) {
+    const cost = Items.reforgePrice(item);
+    const row = el('li');
+    const button = itemButton(item, {
+      label: `${cost} 골드로 재련`,
+      run: () => {
+        const before = Items.summary(item);
+        const rolled = P.reforge(progress, item.uid);
+        sound.play(rolled.ok ? 'click' : 'deny');
+        if (!rolled.ok) return;
+        app.reforged = `${Items.name(item)} · ${before} → ${Items.summary(item)}`;
+        persist();
+        renderShop();
+      },
+    });
+    button.disabled = progress.gold < cost;
+    row.append(button);
+    reforgeList.append(row);
+  }
+
   const sellList = $('shop-sell');
   sellList.textContent = '';
   $('sell-count').textContent = String(progress.inventory.length);
@@ -1023,23 +1062,35 @@ function renderRoster() {
     list.append(item);
   }
   $('party-count').textContent = `${app.party.length + 1} / ${D.PARTY_MAX}`;
+  // 값을 단추에 적는다. 눌러 보고 나서야 골드가 모자란 것을 알면 고장 난 것으로
+  // 보인다 — 진열대 바꾸기와 같은 규칙이다.
+  const redraw = Roster.redrawCost(app.progress.charLevel);
+  $('roster-refresh').textContent = `동료 새로 고침 · ${redraw} 골드`;
+  $('roster-refresh').disabled = app.progress.gold < redraw;
 }
 
 // **새로 고치면 길드에 새 얼굴이 들어와 있을 수 있다.** 다시 뽑기만 하면 명부
 // 아홉을 섞는 것뿐이라, 몇 번 누르면 볼 것이 없어진다. 들어오는 규칙은 의뢰를
 // 깼을 때와 같은 것을 쓴다(`maybeJoin`) — 규칙이 둘이 되면 한쪽만 고치게 된다.
 $('roster-refresh').addEventListener('click', () => {
-  sound.play('click');
+  // **값을 낸다.** 공짜였을 때에는 마음에 드는 목록이 나올 때까지 누르는 것이
+  // 아무 대가 없는 일이라, 뽑기가 사실상 없는 것과 같았다.
+  const paid = P.spend(app.progress, Roster.redrawCost(app.progress.charLevel));
+  sound.play(paid.ok ? 'click' : 'deny');
+  if (!paid.ok) return;
   app.rosterSeed = (Math.random() * 1e9) | 0;
   const joined = Roster.maybeJoin(app.progress.roster,
     (Math.random() * 1e9) | 0, Roster.REDRAW_JOIN_CHANCE);
-  if (joined) persist();
+  // 골드가 나갔으므로 새 얼굴이 없어도 저장한다.
+  persist();
   drawCandidates();
   // 새로 뽑은 뒤에는 계약도 다시 낸다 — 목록과 보수가 같은 후보를 봐야 한다.
   refreshWages();
   renderRoster();
   updateStart();
-  if (joined) note(`${joined.name} 합류`);
+  const said = $('roster-note');
+  said.textContent = joined ? `${joined.name} 합류` : '';
+  said.hidden = !joined;
 });
 
 function toggleMember(member) {

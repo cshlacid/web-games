@@ -347,5 +347,46 @@ const SEEDS = [1, 7, 42, 999, 20260825];
     Items.score(withVit, 'tank') > Items.score(plain, 'tank'), true);
 }
 
+// --- 재련 ---------------------------------------------------------------
+//
+// 골드가 쌓이기만 하는 것을 막으려고 넣은 자리다. **등급은 그대로 두고 옵션만**
+// 다시 굴린다 — 등급을 올리게 두면 "상점은 희귀까지"와 "영웅 위는 적에게서만"이
+// 함께 무너진다.
+{
+  const item = Items.make('robe', 3, 7);
+  const before = JSON.stringify(item.affixes);
+  const rolled = Items.reforge(item, 11);
+
+  check('등급은 그대로다', item.tier, 3);
+  // 등급이 정한 수에 특수 옵션이 확률로 하나 더 붙는다(`SPECIAL_CHANCE`). 다시
+  // 굴리는 것도 같은 규칙을 타므로 개수가 판마다 하나쯤 오르내린다.
+  const count = D.AFFIX_COUNT[3];
+  check('옵션 수는 등급이 정한 규칙 그대로다',
+    rolled.length >= count && rolled.length <= count + 1, true);
+  check('옵션이 실제로 달라진다', JSON.stringify(rolled) !== before, true);
+  check('물건은 건드리지 않는다', JSON.stringify(item.affixes), before);
+  check('아는 스탯만 붙는다', rolled.every((affix) => Boolean(D.STATS[affix.stat])), true);
+
+  // 굴린 것을 그대로 얹어도 그 등급의 구간을 벗어나지 않는다.
+  const [lo, hi] = [D.AFFIX_RANGE[3][0], D.AFFIX_RANGE[3][1]];
+  check('등급 구간 안에서만 흔든다',
+    rolled.every((affix) => {
+      const base = D.AFFIX_BASE[affix.stat];
+      const ratio = Math.abs(affix.value / base);
+      return ratio >= lo - 1e-6 && ratio <= hi + 1e-6;
+    }), true);
+
+  // **값이 물건 값을 따라간다.** 잘 붙은 물건일수록 다시 굴리는 값이 비싸다 —
+  // 아까운 것을 굴리는 데 값을 더 치르는 셈이라 언제 멈출지가 고르는 자리가 된다.
+  const cheap = Items.make('robe', 0, 3);
+  check('등급이 높을수록 재련이 비싸다',
+    Items.reforgePrice(item) > Items.reforgePrice(cheap), true);
+  check('재련이 그 물건을 새로 사는 것보다 싸다',
+    Items.reforgePrice(item) < Items.price(item), true);
+  check('되팔고 다시 사는 것보다도 싸다',
+    Items.reforgePrice(item) < Items.price(item) - Items.sellPrice(item), true);
+  check('재료는 재련할 수 없다', Items.reforge(Items.make('fang', 0, 1), 2), null);
+}
+
 console.log(`${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);

@@ -271,6 +271,29 @@ function buyPotion(progress, potionId) {
   return { ok: true, cost: paid.cost };
 }
 
+// 재련. 값을 내고 그 물건의 무작위 옵션만 다시 굴린다(`Items.reforge`).
+//
+// **장착 중인 것도 재련한다.** 팔기와 달리 물건이 사라지지 않고, 오히려 지금 끼고
+// 있는 것을 손보는 것이 이 기능을 쓰는 첫 번째 이유다. 그래서 인벤토리와 장착 칸을
+// 함께 뒤진다 — uid는 그대로 두므로 슬롯이 가리키던 물건이 그대로 남는다.
+//
+// **더 나빠질 수도 있고, 되돌릴 수 없다.** 좋은 쪽만 남게 두면 값이 곧 "시간을
+// 들이면 최고 옵션"이 되어, 무엇을 언제 굴릴지 고르는 자리가 사라진다.
+function reforge(progress, itemUid) {
+  const index = findItem(progress, itemUid);
+  const slot = Object.keys(progress.equipped)
+    .find((key) => progress.equipped[key] && progress.equipped[key].uid === itemUid);
+  const item = index >= 0 ? progress.inventory[index] : (slot ? progress.equipped[slot] : null);
+  if (!item) return { ok: false, reason: '없는 물건' };
+  if (!Items.isGear(item)) return { ok: false, reason: '재련할 수 없는 물건' };
+
+  const paid = spend(progress, Items.reforgePrice(item));
+  if (!paid.ok) return paid;
+  const before = item.affixes;
+  item.affixes = Items.reforge(item);
+  return { ok: true, cost: paid.cost, before, after: item.affixes };
+}
+
 // 장착 중인 것은 팔 수 없다. 팔리면 다음 전투에 빈손으로 나가는데, 그것을
 // 되돌릴 방법이 없다.
 function sell(progress, itemUid) {
@@ -499,7 +522,7 @@ const api = {
   addExp, gainLevels, stats, attrs, gearAttrs, equippedItems,
   earnedPoints, spentPoints, freePoints, spendPoint,
   addItem, findItem, equip, unequip, compare,
-  spend, buyGear, buyPotion, sell,
+  spend, buyGear, buyPotion, sell, reforge,
   jobEntry, jobLevel, jobExpOf, canChangeJob, changeJob,
   unlockedSkills, learnedSkills, jobSkills, validSkills,
   skillLevel, skillDef, skillLevels, learnSkill, raiseSkill,

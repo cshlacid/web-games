@@ -344,6 +344,14 @@ function tickIdle(members, joinedNames, seed, isFriend) {
 const JOIN_CHANCE = 0.45;
 const REDRAW_JOIN_CHANCE = 0.35;
 
+// **새로 고치는 데 값을 낸다.** 공짜였을 때에는 마음에 드는 목록이 나올 때까지
+// 누르는 것이 아무 대가 없는 일이라, 뽑기가 사실상 없는 것과 같았다. 곡선은
+// 진열대 갱신과 같은 것을 쓰고(`D.refreshPrice`) 기준값만 낮다 — 한 판에 여러 번
+// 누를 수 있는 자리라, 같은 값이면 새로 고침 두 번이 의뢰 한 판을 먹는다.
+const REDRAW_COST = 70;
+
+const redrawCost = (charLevel) => D.refreshPrice(REDRAW_COST, charLevel);
+
 function maybeJoin(members, seed, chance) {
   if (members.length >= MAX_SIZE) return null;
   const rng = createRng(seed == null ? (Math.random() * 1e9) | 0 : seed);
@@ -404,7 +412,7 @@ const api = {
   create, adopt, makeMember, jobOf, specOf, baseSpecOf, spriteOf, defOf, skillsOf,
   specChoices, canChangeSpec, changeSpec, remember,
   gainExp, awardExp, awardGold, goShopping, offerGear, gearOf, bonusOf, potionsOf, toParty, maybeJoin,
-  JOIN_CHANCE, REDRAW_JOIN_CHANCE, GUILD_LEVEL_STEP, guildLevel,
+  JOIN_CHANCE, REDRAW_JOIN_CHANCE, REDRAW_COST, redrawCost, GUILD_LEVEL_STEP, guildLevel,
   IDLE_GRACE, IDLE_STEP, IDLE_CAP, KEEP_MIN, leaveChance, tickIdle,
 };
 
