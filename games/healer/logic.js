@@ -334,6 +334,55 @@ function updateAuras(state) {
   }
 }
 
+// 초상화 오른쪽 위에 붙는 표시. **적이든 아군이든 지금 걸려 있는 것을 규칙 쪽에서
+// 모아 준다** — 도트는 `state.dots`에, 기절·혼란·도발은 유닛의 시각 필드에,
+// 강화·약화는 `auras`에 흩어져 있어 화면이 네 군데를 뒤져야 했다. 상태를 하나 더할 때
+// 고칠 자리를 하나로 두려는 것이다.
+//
+// **장판은 여기 없다.** 서 있는 자리에 따라 붙었다 떨어졌다 하는 것이라 초상화에
+// 띄우면 걸어가는 동안 깜빡이고, 어차피 전장 바닥에 그려져 있다.
+const STATUS_KINDS = {
+  stun:       { icon: 'stunned',  css: 'stun', name: '기절' },
+  confuse:    { icon: 'confused', css: 'daze', name: '혼란' },
+  taunt:      { icon: 'taunted',  css: 'pull', name: '도발' },
+  dot:        { icon: 'dotHarm',  css: 'bane', name: '지속 피해' },
+  'heal-dot': { icon: 'dotMend',  css: 'mend', name: '지속 회복' },
+  buff:       { icon: 'boonUp',   css: 'boon', name: '강화' },
+  debuff:     { icon: 'wiltDown', css: 'wilt', name: '약화' },
+};
+
+// 같은 종류가 여럿이면 하나로 묶고 남은 시간이 긴 쪽을 남긴다. 저주 셋이 걸린
+// 유닛의 초상화가 같은 아이콘 셋으로 덮이면 이름과 막대가 가려진다.
+function statusesOf(state, unit) {
+  if (!unit || unit.dead) return [];
+  const found = new Map();
+  const add = (kind, endsAt) => {
+    const prev = found.get(kind);
+    if (prev) {
+      prev.endsAt = Math.max(prev.endsAt, endsAt);
+      prev.count += 1;
+      return;
+    }
+    found.set(kind, Object.assign({ kind, endsAt, count: 1 }, STATUS_KINDS[kind]));
+  };
+
+  if (stunned(state, unit)) add('stun', unit.stunUntil);
+  if (confused(state, unit)) add('confuse', unit.confusedUntil);
+  if (unit.tauntUid && state.t < (unit.tauntUntil || 0)) add('taunt', unit.tauntUntil);
+  for (const dot of state.dots) {
+    if (dot.targetUid !== unit.uid || dot.endsAt <= state.t) continue;
+    add(dot.kind === 'heal' ? 'heal-dot' : 'dot', dot.endsAt);
+  }
+  for (const aura of unit.auras || []) {
+    if (aura.endsAt <= state.t) continue;
+    add(aura.buff ? 'buff' : 'debuff', aura.endsAt);
+  }
+
+  // 순서는 `STATUS_KINDS`에 적힌 대로 고정한다. 걸린 차례대로 늘어놓으면 하나가
+  // 풀릴 때마다 남은 것들이 자리를 옮겨, 무엇이 사라졌는지 읽히지 않는다.
+  return Object.keys(STATUS_KINDS).filter((kind) => found.has(kind)).map((kind) => found.get(kind));
+}
+
 function applyDamage(state, source, target, raw, dodgeable) {
   if (target.dead) return 0;
 
@@ -1095,6 +1144,7 @@ const api = {
   castSkill, playerSkill, usePotion, drink, magicPowerOf, rollCrit, applyDamage, applyHeal, addDot, addZone, addAura,
   hero, skillSlot, resolveTarget, moveToward, giveMana, zoneX, knockback,
   startCast, tickCast, cancelCast, runUnitSkill, resolvePlayerSkill, stun, stunned, confuse, confused,
+  STATUS_KINDS, statusesOf,
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = api;

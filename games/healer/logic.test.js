@@ -2101,5 +2101,66 @@ function cast(state, skillId, target) {
   }
 }
 
+// --- 초상화에 뜨는 상태 -------------------------------------------------
+//
+// 화면이 지속 피해·지속 회복·상태 이상을 초상화 오른쪽 위에 그리는데, 그 목록을
+// 규칙 쪽에서 모아 준다. **적과 아군을 가리지 않는다.**
+{
+  const state = battle({ skills: ['regen', 'flame', 'touch', 'quick', 'focus'] });
+  const hero = L.hero(state);
+  const tank = unit(state, '강철의 브란');
+  const foe = AI.alive(state, 'enemy')[0];
+  const kinds = (unit_) => L.statusesOf(state, unit_).map((st) => st.kind);
+
+  check('아무것도 안 걸렸으면 빈 목록', kinds(tank), []);
+
+  cast(state, 'regen', { uid: tank.uid });
+  check('아군의 지속 회복이 보인다', kinds(tank), ['heal-dot']);
+
+  L.stun(state, tank, foe, 3);
+  L.addDot(state, hero, foe, D.PLAYER_SKILLS.flame, 'damage');
+  L.addAura(state, hero, foe, D.UNIT_SKILLS.cripple);
+  check('적에게 걸린 것도 같은 목록으로 나온다', kinds(foe), ['stun', 'dot', 'debuff']);
+
+  // 도발은 걸린 쪽의 초상화에 뜬다. 거는 쪽이 아니다.
+  const brawl = battle({ party: [{ defId: 'bran', level: 8 }] });
+  const bran = unit(brawl, '강철의 브란');
+  const mob = AI.alive(brawl, 'enemy')[0];
+  L.runUnitSkill(brawl, bran, { id: 'taunt', targetUid: mob.uid });
+  check('도발은 끌려간 쪽에 붙는다', L.statusesOf(brawl, mob).map((st) => st.kind), ['taunt']);
+  check('도발한 쪽에는 아무것도 없다', L.statusesOf(brawl, bran), []);
+
+  // 저주 셋이 걸린 유닛의 초상화가 같은 아이콘 셋으로 덮이면 이름과 막대가 가려진다.
+  const many = battle();
+  const target = AI.alive(many, 'enemy')[0];
+  const caster = L.hero(many);
+  L.addDot(many, caster, target, D.PLAYER_SKILLS.flame, 'damage');
+  L.addDot(many, caster, target, D.UNIT_SKILLS.venom, 'damage');
+  const merged = L.statusesOf(many, target);
+  check('같은 종류는 하나로 묶인다', merged.map((st) => st.kind), ['dot']);
+  check('묶인 개수를 들고 있다', merged[0].count, 2);
+  check('남은 시간은 긴 쪽', merged[0].endsAt,
+    Math.max(many.t + D.PLAYER_SKILLS.flame.duration, many.t + D.UNIT_SKILLS.venom.duration));
+
+  // 시간이 지나면 목록에서 빠진다. 남겨 두면 끝난 표시가 초상화에 붙어 있는다.
+  // 전투를 굴리지 않고 시계만 밀어 두는 것은, 그동안 탱커가 이 적을 도발해
+  // 여기서 보려는 것과 다른 표시가 붙기 때문이다.
+  many.t += merged[0].endsAt + 1;
+  check('끝난 것은 빠진다', L.statusesOf(many, target), []);
+
+  // 쓰러진 유닛의 초상화는 흐려진 채 남는다. 거기에 표시가 붙어 있으면 아직
+  // 무언가 돌고 있는 것으로 읽힌다.
+  const gone = battle();
+  const victim = AI.alive(gone, 'enemy')[0];
+  L.addDot(gone, L.hero(gone), victim, D.PLAYER_SKILLS.flame, 'damage');
+  L.applyDamage(gone, null, victim, 99999);
+  check('쓰러진 유닛에는 아무것도 없다', L.statusesOf(gone, victim), []);
+
+  // 종류마다 아이콘과 색이 정해져 있어야 화면이 그릴 수 있다. 그림 자체가
+  // 있는지는 art.test.js가 본다.
+  check('모든 종류에 아이콘과 색이 있다',
+    Object.values(L.STATUS_KINDS).filter((st) => !st.icon || !st.css || !st.name), []);
+}
+
 console.log(`${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);

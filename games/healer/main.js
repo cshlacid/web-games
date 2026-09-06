@@ -1766,9 +1766,9 @@ function makePortrait(unit) {
   mp.hidden = unit.maxMp <= 0;
   button.append(mp);
 
-  // 걸려 있는 강화·약화. 아이콘까지 늘어놓으면 다섯 칸짜리 줄이 그것으로
-  // 덮이므로 점으로만 둔다 — 색이 좋은 쪽인지 나쁜 쪽인지를 알린다.
-  button.append(el('div', 'auras'));
+  // 걸려 있는 것 — 지속 피해·지속 회복·기절·도발·혼란·강화·약화. 적과 아군을
+  // 가리지 않고 같은 자리에 붙는다.
+  button.append(el('div', 'status'));
 
   // 피해와 회복이 뜨는 자리. 전장에서 유닛이 뭉쳐 있으면 누가 맞았는지 숫자가
   // 겹쳐 읽히지 않아서, 초상화 위에도 같은 숫자를 띄운다.
@@ -1803,20 +1803,26 @@ function syncPortraitList(state, id) {
     button.classList.toggle('dead', unit.dead);
     button.classList.toggle('casting', Boolean(unit.cast));
     button.classList.toggle('valid', Boolean(app.aiming) && isValidUnitTarget(state, unit));
-    syncAuras(button, unit);
+    syncStatus(button, state, unit);
   }
 }
 
 // 걸린 것과 그려진 것이 다를 때만 다시 그린다. 매 틱 통째로 갈아 끼우면
-// 초상화 다섯 개가 초당 30번 새로 만들어진다.
-function syncAuras(button, unit) {
-  const box = button.querySelector('.auras');
-  const now = (unit.auras || []).map((aura) => (aura.buff ? 'boon' : 'wilt')).join(' ');
+// 초상화 다섯 개가 초당 30번 새로 만들어진다 — 아이콘은 점보다 만드는 값이 커서
+// 이 비교가 더 중요해졌다.
+function syncStatus(button, state, unit) {
+  const box = button.querySelector('.status');
+  const list = L.statusesOf(state, unit);
+  const now = list.map((st) => st.kind).join(' ');
   if (box.dataset.on === now) return;
   box.dataset.on = now;
   box.textContent = '';
-  for (const aura of unit.auras || []) {
-    box.append(el('span', `aura-dot ${aura.buff ? 'boon' : 'wilt'}`));
+  for (const st of list) {
+    const node = icon(st.icon, st.css);
+    // 아이콘만으로는 무엇인지 물어볼 곳이 없다. 마우스가 있는 환경에서만
+    // 보이지만, 없다고 잃는 것도 없다.
+    node.title = st.name;
+    box.append(node);
   }
 }
 
