@@ -267,8 +267,16 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
   text-align: left; cursor: pointer;
 }
 .pick-open[aria-pressed="true"] { background: var(--sel); }
-/* 좁은 칸이라 이름이 두 줄로 감기면 카드 높이가 들쭉날쭉해진다. */
-.pick.card .pick-name { font-size: 14px; line-height: 1.25; }
+/* 좁은 칸이라 이름이 두 줄로 감기면 카드 높이가 들쭉날쭉해진다.
+   **어절 안에서 자르지 않는다**(`keep-all`) — 기본값으로 두었더니 "별을 읽는
+   오릭"이 "별을 읽는 오 / 릭"으로 갈렸다. 띄어쓰기가 없는 긴 이름만 마지막
+   수단으로 아무 데서나 자르고, 두 줄을 넘지 않게 잘라 낸다 — 세 줄이 되면 그
+   카드만 키가 자라 격자가 어긋난다. */
+.pick.card .pick-name {
+  font-size: 14px; line-height: 1.25;
+  word-break: keep-all; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+}
 .pick.card .pick-sub { font-size: 11px; }
 .pick.card .avatar { width: 24px; height: 31px; }
 /* 그림과 레벨을 한 칸에 세로로 쌓는다. 레벨이 글자 줄에서 빠져야 직업·계열이
@@ -278,14 +286,38 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 /* 직업·계열은 한 줄로 둔다. 감기면 카드 높이가 서로 달라진다. */
 .pick.card .job { display: block; font-size: 10.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* 좁은 기기에서는 그림과 표 단추를 줄여 글자 줄에 자리를 준다 — "딜러·음유시인"이
-   들어가지 못하면 그 동료만 계열이 잘려 나간다. */
-@media (max-width: 389px) {
+   들어가지 못하면 그 동료만 계열이 잘려 나간다.
+   **문턱이 389px일 때에는 아이폰(390~430px)이 여기에 걸리지 않았다.** 그 폭에서
+   카드 본문이 110px뿐이라 "대마법사"가 "대마…"로 잘리고 이름이 두 줄로 감겼다 —
+   재 보니 계열이 12px, 보수 줄이 1px 넘쳤다. 문턱을 올려 그 기기들도 여기를
+   타게 한다. */
+@media (max-width: 430px) {
   .pick.card .job { font-size: 9.5px; }
   .pick.card .avatar { width: 20px; height: 26px; }
   .pick-face .lv { font-size: 9px; }
   .pick-take { width: 28px; }
   .pick-open { padding: 7px 6px; }
+  /* 아랫줄도 함께 줄인다. 신뢰도 값표가 네 자리(+100)고 보수도 네 자리라, 줄이지
+     않으면 카드가 잘라 낸다 — 잘린 숫자는 틀린 숫자로 읽힌다. */
+  .pick.card .trust-tag { font-size: 10px; padding: 0 3px; }
+  .pick-deal { gap: 4px; }
+  .pick-deal .wage { font-size: 11px; }
+  .pick-deal .ico-box svg { width: 11px; height: 11px; }
+  .pick.card .feel-tag { font-size: 9.5px; padding: 0 3px; }
+  .pick-tags { gap: 3px; }
 }
+/* 아주 좁은 기기(320px 언저리)에서는 이름도 한 단 줄인다. 그대로 두면 두 줄로도
+   모자라 "별을 읽는…"처럼 잘려 나가는데, 이름은 곧 그 동료의 신원이라 계열보다
+   먼저 지켜야 한다. **칸 수는 줄이지 않는다** — 한 줄에 하나로 접으면 격자로
+   바꾼 뜻이 그 화면에서만 사라진다. */
+@media (max-width: 340px) {
+  .pick.card .pick-name { font-size: 12.5px; -webkit-line-clamp: 3; }
+  .pick.card .job { font-size: 9px; }
+}
+
+/* **모자라면 자르지 말고 접는다.** 두 줄은 보기에 성기지만 잘린 숫자·이름보다
+   낫다 — 320px 언저리 기기에서는 아무리 줄여도 한 줄에 들어가지 않는다. */
+.pick-deal, .pick-tags { flex-wrap: wrap; }
 /* 데려가기. 표만 있는 단추라 눌린 상태가 색으로 보여야 한다. */
 .pick-take {
   flex: none; width: 34px; align-self: stretch;
