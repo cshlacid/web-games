@@ -192,6 +192,45 @@ function everyQuest(fn) {
     mean(withBoss, (q) => q.exp) > mean(without, (q) => q.exp) * 1.5, true);
 }
 
+// --- 우두머리는 혼자 나오지 않는다 --------------------------------------
+//
+// 뒤에 하나만 붙여 두었을 때에는 파티 다섯이 한 대상에 화력을 모아, 도발도
+// 어그로도 뜻이 없었다. 쫄을 데리고 나오고 레벨이 오르면 제 수가 는다.
+{
+  const rankOf = (id) => D.rankOf(D.ENEMIES[id]).id;
+  const bossWaves = (level) => {
+    const out = [];
+    for (const seed of SEEDS) {
+      for (const quest of Q.generate(level, seed)) {
+        for (const wave of quest.waves) {
+          if (wave.some((id) => rankOf(id) === 'boss')) out.push(wave);
+        }
+      }
+    }
+    return out;
+  };
+  const low = bossWaves(8);
+  check('우두머리 무리가 걸린다', low.length > 0, true);
+  check('혼자 나오지 않는다',
+    low.every((wave) => wave.length > wave.filter((id) => rankOf(id) === 'boss').length), true);
+  // 데리고 나오는 것은 쫄이다. 정예를 섞으면 우두머리 무리가 아니라 정예 무리에
+  // 우두머리가 낀 것이 된다.
+  check('데리고 나오는 것은 쫄이다',
+    low.every((wave) => wave.every((id) => rankOf(id) === 'boss' || rankOf(id) === 'trash')), true);
+  // 우두머리를 계속 살리는 적 힐러가 옆에 서면 아무도 죽일 수 없는 무리가 된다.
+  check('적 힐러는 붙지 않는다',
+    low.every((wave) => wave.every((id) => D.ENEMIES[id].job !== 'healer')), true);
+
+  // 레벨이 오르면 우두머리 자신이 는다. 하나로 고정해 두면 파티만 자라므로
+  // 뒤로 갈수록 저절로 쉬워진다.
+  const most = (level) => Math.max(...bossWaves(level)
+    .map((wave) => wave.filter((id) => rankOf(id) === 'boss').length));
+  check('높은 레벨에서는 여럿이 나온다', most(20) > most(8), true);
+  // 무리 상한이 다섯이라 그 위는 설 자리가 없다.
+  check('그래도 다섯을 넘지 않는다',
+    bossWaves(30).every((wave) => wave.length <= 5), true);
+}
+
 // --- 무리는 머릿수가 아니라 위협의 몫으로 짠다 --------------------------
 //
 // 등급을 가리지 않고 세던 때에는 "잡졸 넷"이 "정예 둘"보다 위험했다. 정예가 잡졸
