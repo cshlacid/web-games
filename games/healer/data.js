@@ -269,13 +269,27 @@ const LEVEL = {
 // **최대 체력·최대 마나라고 적는다.** 능력치에도 '체력'이 있어서(그쪽은 최대
 // 체력을 만드는 능력치다) 그냥 '체력'이라고 적으면 한 물건에 '체력 +5'와
 // '체력 +72'가 나란히 붙어 무엇이 무엇인지 알 수 없다.
+// 천 단위마다 쉼표. **화면에 나오는 숫자는 여기를 거친다** — 체력·마나·골드·
+// 경험치가 네 자리를 넘는 것이 흔한데, 쉼표가 없으면 자릿수를 세어야 읽힌다.
+// 소수는 그대로 두고 정수 자리만 끊는다(회복력 ×1.30 같은 것이 있다).
+//
+// `toLocaleString`을 쓰지 않은 것은 기기의 지역 설정에 따라 구분 기호가 갈리기
+// 때문이다 — 화면의 숫자가 사람마다 달라 보일 이유가 없다.
+function num(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return String(value);
+  const [whole, frac] = Math.abs(n).toString().split('.');
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return `${n < 0 ? '-' : ''}${grouped}${frac ? `.${frac}` : ''}`;
+}
+
 const STATS = {
-  str:   { id: 'str',   name: '힘',        fmt: (v) => `+${Math.round(v)}` },
-  agi:   { id: 'agi',   name: '민첩',      fmt: (v) => `+${Math.round(v)}` },
-  int:   { id: 'int',   name: '지능',      fmt: (v) => `+${Math.round(v)}` },
-  vit:   { id: 'vit',   name: '체력',      fmt: (v) => `+${Math.round(v)}` },
-  hp:    { id: 'hp',    name: '최대 체력', fmt: (v) => `+${Math.round(v)}` },
-  mp:    { id: 'mp',    name: '최대 마나', fmt: (v) => `+${Math.round(v)}` },
+  str:   { id: 'str',   name: '힘',        fmt: (v) => `+${num(Math.round(v))}` },
+  agi:   { id: 'agi',   name: '민첩',      fmt: (v) => `+${num(Math.round(v))}` },
+  int:   { id: 'int',   name: '지능',      fmt: (v) => `+${num(Math.round(v))}` },
+  vit:   { id: 'vit',   name: '체력',      fmt: (v) => `+${num(Math.round(v))}` },
+  hp:    { id: 'hp',    name: '최대 체력', fmt: (v) => `+${num(Math.round(v))}` },
+  mp:    { id: 'mp',    name: '최대 마나', fmt: (v) => `+${num(Math.round(v))}` },
   atk:   { id: 'atk',   name: '공격력',    fmt: (v) => `+${Math.round(v * 100)}%` },
   heal:  { id: 'heal',  name: '회복력',    fmt: (v) => `+${Math.round(v * 100)}%` },
   // 받는 피해는 계수라 낮을수록 좋다. 부호를 뒤집어 적어야 읽는 사람이 헷갈리지 않는다.
@@ -1940,7 +1954,7 @@ const api = {
   SPEC_CHOICES, SPEC_CHANGE_LEVEL, spriteFor, SKILL_KINDS, skillKind, AURA_STATS, SPEC_SKILLS, UNIT_SKILL_MAX, skillsFor, skillSeed,
   PLAYER_SKILLS, HERO_JOBS, HERO_JOB_START, heroSkillsOf, heroJob, jobMaxLevel,
   SKILL, skillAt, skillEffect, skillLevelOf,
-  POTIONS, JOB_POTIONS, POTION_MAX, ENEMIES, refreshPrice,
+  POTIONS, JOB_POTIONS, POTION_MAX, ENEMIES, refreshPrice, num,
   PARTY_MAX, SKILL_MAX,
   REPUTATION, REP_CHANGE, WAGE_BASE, TRUST, TRUST_FEEL, TRUST_FAIL, TRUST_REST, TRUST_PAY, GIFT, TRAITS,
   potionPrice,

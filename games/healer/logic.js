@@ -575,7 +575,7 @@ function giveMana(state, caster, target, amount) {
   const gained = Math.round(target.mp - before);
   if (gained > 0) {
     emit(state, { type: 'mana', uid: target.uid, amount: gained,
-      text: `${caster.name} → ${target.name}: 마나 ${gained}` });
+      text: `${caster.name} → ${target.name}: 마나 ${D.num(gained)}` });
   }
   return gained;
 }
