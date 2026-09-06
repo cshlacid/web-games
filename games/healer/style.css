@@ -36,6 +36,9 @@
   --kind-stun: #8a6a2f;
   --kind-boon: #1f8f8f;
   --kind-wilt: #9c4f7a;
+  /* 혼란. 약화(자홍)와 갈라야 해서 주황 쪽으로 뺐다 — 둘 다 적에게 거는 것이라
+     색이 가까우면 무엇이 걸린 것인지 화면에서 구별되지 않는다. */
+  --kind-daze: #c2611f;
   /* 계열. 역할 색만으로는 궁수와 마법사가 같은 줄로 보인다. */
   --spec-tank: #4a72b8;
   --spec-warrior: #b4453c;
@@ -93,6 +96,7 @@
     --kind-stun: #d8b45f;
     --kind-boon: #5fd0d0;
     --kind-wilt: #e08ab4;
+    --kind-daze: #f0925a;
     --spec-tank: #7fa6e8;
     --spec-warrior: #e08a80;
     --spec-rogue: #a9b3c4;
@@ -419,6 +423,7 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .chip.skill.stun { color: var(--kind-stun); }
 .chip.skill.boon { color: var(--kind-boon); }
 .chip.skill.wilt { color: var(--kind-wilt); }
+.chip.skill.daze { color: var(--kind-daze); }
 .pick-sub { font-size: 12px; color: var(--muted); line-height: 1.45; }
 .pick-cost { font-size: 12px; color: var(--muted); flex: none; text-align: right; }
 
@@ -554,6 +559,10 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
    아무것도 못 한다"가 보여야 기절이 있다는 것을 알 수 있다. */
 .unit.stunned .sprite { filter: drop-shadow(0 0 3px var(--kind-stun)); }
 .unit.stunned .mark { box-shadow: 0 0 0 2px var(--kind-stun); }
+/* 혼란. 굳은 것과 갈라야 해서 색이 다르고, 발판까지 물들여 "편이 뒤집혔다"를
+   알린다 — 발판 색이 곧 편이라(`.mark`), 거기가 흔들리는 것이 이 상태의 뜻이다. */
+.unit.confused .sprite { filter: drop-shadow(0 0 3px var(--kind-daze)); }
+.unit.confused .mark { box-shadow: 0 0 0 2px var(--kind-daze); background: var(--kind-daze); }
 /* 유닛 이름표는 없다. 아홉 그림이 실루엣만으로 갈리도록 그렸고, 아군의 이름은
    아래 초상화 줄에 있다. 뭉쳐 싸울 때 이름표가 서로 겹쳐 읽히지도 않으면서
    화면만 덮었다 — 그림을 구분되게 그린 것이 이름표를 없애기 위해서였다. */
@@ -1082,6 +1091,9 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 
 /* 빗나간 공격. 숫자가 아니라 글자라 피해·회복과 헷갈리지 않는다. */
 .float.miss { color: var(--muted); font-size: clamp(10px, 2vw, 13px); }
+/* 혼란은 빗나감·기절과 같은 작은 글자지만 색이 다르다 — 걸린 순간이 셋 다
+   비슷하게 지나가면 무엇이 걸렸는지 못 읽는다. */
+.float.daze { color: var(--kind-daze); font-size: clamp(10px, 2vw, 13px); font-weight: 700; }
 
 /* 치명타. 색만 다르게 하면 피해·회복과 헷갈리고 숫자만 키우면 그냥 많이 맞은
    것으로 보인다 — 크기와 테두리를 함께 준다. */

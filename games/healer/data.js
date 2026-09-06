@@ -783,10 +783,18 @@ const UNIT_SKILLS = {
             kind: 'buff-area', stat: 'atk', mul: 1.28, duration: 14, radius: 22,
             range: 30, cast: 1.8, minLevel: 6,
             desc: '주변 아군의 공격이 매서워진다' },
-  dissonance: { id: 'dissonance', icon: 'dissonance', name: '불협화음', spec: 'bard', cd: 22, mp: 26,
-            kind: 'debuff-area', stat: 'atk', mul: 0.74, duration: 12, radius: 16,
-            range: 32, cast: 1.6, minLevel: 5,
-            desc: '귀를 찢는 소리에 적의 손이 무뎌진다' },
+  // **불협화음은 적끼리 싸우게 만든다.** 공격력을 깎는 약화였을 때에는 만가와
+  // 하는 일이 겹쳤고(둘 다 적의 수치를 곱으로 깎는다), 음유시인이 파티에서 하는
+  // 일이 "노래로 수치를 흔든다" 하나로만 읽혔다. 편을 뒤집는 것은 여기뿐이다.
+  //
+  // **지속을 예전 약화의 절반으로 둔다.** 걸린 적은 우리를 안 때리는 데다 제 편을
+  // 때리므로 값이 두 배로 걸린다 — 12초를 그대로 두면 광역 혼란 한 번에 판이
+  // 끝난다. 재 보니 6초/반경 16/쿨 24초에서 음유시인이 낀 판의 승률이 예전
+  // 약화와 같고(60판에 33승 → 32승), 적 하나 이상이 혼란인 시간이 9%다.
+  dissonance: { id: 'dissonance', icon: 'dissonance', name: '불협화음', spec: 'bard',
+                cd: 24, mp: 30, kind: 'confuse', duration: 6, radius: 16,
+                range: 30, cast: 1.6, minLevel: 5,
+                desc: '귀를 찢는 소리에 적이 서로를 친다' },
   harmony: { id: 'harmony', icon: 'harmony', name: '화성', spec: 'bard', cd: 16, mp: 18,
             kind: 'buff', stat: 'armor', mul: 0.78, duration: 12, range: 30, cast: 1.2,
             minLevel: 3, core: 1,
@@ -888,6 +896,9 @@ const SKILL_KINDS = {
   'buff-area':   { name: '광역 강화', css: 'boon' },
   'debuff':      { name: '약화', css: 'wilt' },
   'debuff-area': { name: '광역 약화', css: 'wilt' },
+  // **혼란은 수치를 곱하는 것이 아니라 편을 뒤집는다.** 그래서 강화·약화(오라)가
+  // 아니라 기절과 같은 꼴이고(`confusedUntil`), 색도 따로 둔다.
+  'confuse':     { name: '혼란', css: 'daze' },
 };
 
 // 강화와 약화가 건드리는 수치. **곱으로만 걸린다** — 더하기로 두면 같은 스킬이
@@ -1246,10 +1257,13 @@ const PLAYER_SKILLS = {
     mp: 18, cd: 7, tick: 24, interval: 1, duration: 8,
     desc: '동료 하나에게 걸어 두면 시간을 두고 회복된다.',
   }),
+  // **주인공 쪽도 혼란이다.** 이름·아이콘·종류는 동료 표에서 물려받고 수치만
+  // 따로 잡는다(`shared`) — 한 이름이 두 가지 일을 하면 같은 기술로 보이지 않는다.
+  // 사람이 조준해 거는 쪽이라 지속이 더 짧고 쿨타임이 길다.
   dissonance: shared('dissonance', {
-    job: 'bard', unlock: 4, range: 40, cast: 1.4, type: '광역 약화', targeting: 'area-enemy',
-    mp: 26, cd: 20, stat: 'atk', mul: 0.85, duration: 10, radius: 18,
-    desc: '기준점 주변 적의 공격력을 함께 떨어뜨린다.',
+    job: 'bard', unlock: 4, range: 40, cast: 1.4, type: '광역 혼란', targeting: 'area-enemy',
+    mp: 26, cd: 24, duration: 3.5, radius: 16,
+    desc: '기준점 주변 적이 잠시 서로를 친다.',
   }),
   echo: shared('echo', {
     job: 'bard', unlock: 5, range: 30, cast: 1.6, type: '광역 마나', targeting: 'area-ally',
@@ -1588,6 +1602,10 @@ function skillEffect(def) {
   }
   if (def.kind === 'taunt') return `${def.duration}초 동안 자신에게 끌어온다`;
   if (def.kind === 'stun') return `${def.damage} 피해 · ${def.duration}초 기절`;
+  if (def.kind === 'confuse') {
+    const where = def.radius ? `반경 ${def.radius} 안의 ` : '';
+    return `${where}적이 ${def.duration}초 동안 서로를 친다`;
+  }
   if (def.damage) {
     return def.radius ? `반경 ${def.radius} 안의 적에게 ${def.damage} 피해`
       : `${def.damage} 피해`;

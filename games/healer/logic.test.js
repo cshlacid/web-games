@@ -339,6 +339,46 @@ function cast(state, skillId, target) {
   check('굳히지는 않는다', L.stunned(state, foe), false);
 }
 
+// --- 혼란 ---------------------------------------------------------------
+//
+// **적끼리 싸우게 만든다.** 편을 가르는 자리가 `ai.foesOf` 하나뿐이라, 거기만
+// 뒤집으면 노리는 것도 붙으러 가는 것도 스킬을 거는 것도 전부 따라온다.
+{
+  const state = battle({ party: [{ defId: 'finn', level: 8 }] });
+  const bard = unit(state, '음유시인 핀');
+  const foes = AI.alive(state, 'enemy');
+  const foe = foes[0];
+  // 같은 자리에 세워 광역이 둘 다 닿게 한다.
+  for (const other of foes) { other.x = foe.x; other.y = foe.y; }
+
+  check('걸리기 전에는 아군을 노린다', AI.chooseTarget(foe, state).side, 'ally');
+  L.runUnitSkill(state, bard, { id: 'dissonance', targetUid: foe.uid });
+  check('반경 안이 함께 걸린다',
+    foes.filter((u) => L.confused(state, u)).length, foes.length);
+  check('걸린 적은 제 편을 노린다', AI.chooseTarget(foe, state).side, 'enemy');
+  check('굳지는 않는다', L.stunned(state, foe), false);
+
+  // **혼란은 도발을 이긴다.** 탱커의 도발이 전투의 7할을 덮고 있어, 도발이
+  // 이기게 두면 혼란이 걸려도 대부분 아무 일도 일어나지 않는다.
+  foe.tauntUid = bard.uid;
+  foe.tauntUntil = state.t + 5;
+  check('도발이 걸려 있어도 제 편을 노린다', AI.chooseTarget(foe, state).side, 'enemy');
+
+  // 실제로 때리는지까지 본다. 기본 공격에는 편을 가르는 조건이 없으므로,
+  // 대상만 뒤집히면 그대로 제 편에게 들어간다.
+  const victim = foes.find((u) => u.uid !== foe.uid);
+  const before = victim.hp;
+  foe.x = victim.x; foe.y = victim.y;
+  foe.nextAttackAt = 0;
+  run(state, 2);
+  check('제 편의 체력이 깎인다', victim.hp < before, true);
+
+  // 시간이 지나면 제정신으로 돌아온다.
+  state.t += D.UNIT_SKILLS.dissonance.duration + 0.1;
+  check('시간이 지나면 풀린다', L.confused(state, foe), false);
+  check('풀리면 다시 아군을 노린다', AI.chooseTarget(foe, state).side, 'ally');
+}
+
 // --- 기절 ---------------------------------------------------------------
 //
 // 근접 세 계열만 갖는 수단이다. 굳어 있는 동안에는 판단도 이동도 기본 공격도 없다.
@@ -1037,10 +1077,13 @@ function cast(state, skillId, target) {
   check('약화가 적에게 걸린다', foe.auras.map((a) => a.skillId), ['lament']);
   check('약화는 아군에게 안 걸린다', tank.auras.length, 1);
 
-  // 광역 약화: 기준점 주변 적 모두에게.
+  // **불협화음은 약화가 아니라 혼란이다.** 광역 약화 자리는 만가(단일)와 짝을
+  // 이루던 것인데, 둘 다 수치를 곱으로 깎는 일이라 음유시인이 하는 일이 하나로
+  // 읽혔다 — 지금은 편을 뒤집는다.
   L.hero(state).mp = L.hero(state).maxMp;
   cast(state, 'dissonance', { x: foe.x, y: foe.y });
-  check('광역 약화가 적에게 걸린다', foe.auras.length, 2);
+  check('혼란이 적에게 걸린다', L.confused(state, foe), true);
+  check('오라로 쌓이지는 않는다', foe.auras.length, 1);
 
   // 마나 나눔: 제 마나값보다 많이 준다(노래로 채우는 것이지 제 것을 나누는 것이 아니다).
   tank.mp = 0;

@@ -1675,6 +1675,7 @@ function syncUnits(state) {
     // 굳은 동안에는 아무것도 하지 않는다. 화면이 그것을 보여 주지 않으면 그 몇
     // 초가 "왜 가만히 있지"로만 보인다 — 기절이 있다는 것 자체를 알 수 없다.
     node.classList.toggle('stunned', !unit.dead && L.stunned(state, unit));
+    node.classList.toggle('confused', !unit.dead && L.confused(state, unit));
     syncSheet(node, unit, state);
 
     const cast = unit.cast;
@@ -2124,6 +2125,14 @@ function handleEvents(state, events) {
     if (event.type === 'stun') {
       const target = AI.byUid(state, event.uid);
       if (target) floatText(target, '기절', 'miss');
+      note(event.text);
+      continue;
+    }
+    // 혼란. 걸린 적이 제 편을 치기 시작하는데, 그 순간을 알리지 않으면 화면에서는
+    // 적이 갑자기 이상하게 구는 것으로 보인다.
+    if (event.type === 'confuse') {
+      const target = AI.byUid(state, event.uid);
+      if (target) floatText(target, '혼란', 'daze');
       note(event.text);
       continue;
     }

@@ -58,7 +58,11 @@ function bestBy(unit, list, order) {
 }
 
 const mates = (unit, state) => alive(state, unit.side).filter((u) => u.uid !== unit.uid);
-const foesOf = (unit, state) => alive(state, opposite(unit.side));
+// 혼란은 편을 뒤집는다. **편을 가르는 자리가 여기 하나뿐이라 여기만 고치면
+// 된다** — 노리는 것도, 붙으러 가는 것도, 스킬을 거는 것도 전부 이 함수를 본다.
+const confused = (state, unit) => state.t < (unit.confusedUntil || 0);
+const foesOf = (unit, state) =>
+  (confused(state, unit) ? mates(unit, state) : alive(state, opposite(unit.side)));
 
 // 이 편의 탱커. 여럿이면 앞에 선 쪽을 기준으로 본다 — 후열이 붙는 자리이자
 // 어그로를 보는 자리라 최전선이어야 나머지 규칙이 뜻대로 굴러간다.
@@ -128,8 +132,10 @@ function dealerTarget(unit, state) {
 
 function chooseTarget(unit, state) {
   // 도발은 다른 모든 판단을 이긴다. 아군이든 적이든 같다.
+  // **혼란만은 도발을 이긴다.** 탱커의 도발이 전투의 7할을 덮고 있어(재 보니 72%),
+  // 도발이 이기게 두면 혼란이 걸려도 대부분 아무 일도 일어나지 않는다.
   const forced = unit.tauntUid && state.t < unit.tauntUntil ? byUid(state, unit.tauntUid) : null;
-  if (forced && !forced.dead) return forced;
+  if (forced && !forced.dead && !confused(state, unit)) return forced;
 
   const role = roleOf(unit);
   if (role === 'tank') return tankTarget(unit, state);
@@ -341,8 +347,23 @@ function chooseSkill(unit, state, target) {
     // 것을 막지 못하는데, 목록 앞에 있다는 이유로 쓰러져 가는 탱커를 두고
     // 노래를 불렀다. 힐을 안 들고 온 유닛에게는 걸리지 않는다 — 그런 유닛이
     // 여기서 멈추면 아무것도 하지 않고 서 있게 된다.
-    if ((isBuff(def) || isDebuff(def)) && carriesHeal(unit)
+    if ((isBuff(def) || isDebuff(def) || def.kind === 'confuse') && carriesHeal(unit)
       && alive(state, unit.side).some((mate) => mate.hp / mate.maxHp <= EMERGENCY)) continue;
+
+    // 혼란. 광역 약화와 같은 잣대로 고른다 — 기준점 주변에서 **새로 걸릴 적이 둘
+    // 이상**일 때만 쓴다. 쿨타임이 길어 하나에게 쓰면 그 판에서 다시 못 부른다.
+    // 이미 걸린 적을 세지 않는 것은 기절과 같은 이유다(겹치면 시간만 버린다).
+    if (def.kind === 'confuse') {
+      const pool = foesOf(unit, state)
+        .filter((foe) => dist(unit, foe) <= reach && !confused(state, foe));
+      if (!pool.length) continue;
+      const pick = (target && pool.indexOf(target) >= 0) ? target : nearest(unit, pool);
+      if (!def.radius) return { id: def.id, targetUid: pick.uid };
+      const covered = foesOf(unit, state)
+        .filter((foe) => dist(foe, pick) <= def.radius && !confused(state, foe));
+      if (covered.length >= 2) return { id: def.id, targetUid: pick.uid };
+      continue;
+    }
 
     if (isBuff(def)) {
       // 사거리 0은 자기에게 거는 것이다(전사의 굳히기).
@@ -608,7 +629,7 @@ function decide(unit, state) {
 }
 
 const api = {
-  dist, alive, byUid, opposite, nearest, roleOf, rankOf, frontTank, anchorOf, behind,
+  dist, alive, byUid, opposite, confused, nearest, roleOf, rankOf, frontTank, anchorOf, behind,
   tauntReserve, manaTarget, freeSpot, SPACING, CLOSE,
   attackersOf, endangered, healReach,
   chooseTarget, healTarget, chooseSkill, choosePotion, chooseMove, decide,
