@@ -131,21 +131,6 @@ const SPRITES = {
     ],
   },
 
-  // 궁수. 크게 휜 활과 시위. 활이 몸 옆에 서 있어 실루엣이 세로로 길다.
-  archer: {
-    w: 16, h: 20,
-    parts: [
-      ...body({ cloth: 't', trim: 'l', boot: 'L' }),
-      // 두건 위로 깃털 하나. 사제와 색이 겹치지 않게 두건을 진하게 쓴다.
-      { p: 'M2.9 5.8 Q3.2 -0.4 8 -0.4 Q12.8 -0.4 13.1 5.8 Q10.6 3.0 8 3.0 Q5.4 3.0 2.9 5.8 Z', f: 'T' },
-      { p: 'M11.4 1.9 Q14.0 0.5 14.9 -0.6 Q14.6 1.5 12.4 2.9 Z', f: 'w' },
-      // 활. 채우지 않고 선으로만 긋는다 — 채우면 방패처럼 보인다.
-      { arc: 'M13.4 1.6 Q17.2 10.0 13.4 18.4', f: 'l', width: 1.0 },
-      { arc: 'M13.4 1.6 L13.4 18.4', f: 'i', width: 0.28 },
-      { e: [15.1, 10.0, 0.75, 0.75], f: 'g' },
-    ],
-  },
-
   // 도적. 깊게 눌러쓴 두건과 짧은 단검 둘. 전사와 같은 자리에서 싸우지만
   // 몸이 가늘고 무기가 짧아, 나란히 서 있어도 어느 쪽이 도적인지 보인다.
   rogue: {
@@ -385,6 +370,31 @@ const SHEETS = {
       head: { x: 0.30, y: 0.09, w: 0.44, h: 0.42 },
     },
   },
+
+  // 궁수. 세 번째로 받은 시안이다. 줄이 셋뿐이라(대기·이동·공격) 걷기는 한쪽을
+  // 뒤집어 만든다 — 주인공과 같은 사정인데 방향이 반대다. 시안이 오른쪽으로
+  // 걸으므로 여기서는 **왼쪽**을 뒤집어 만든다.
+  archer: {
+    src: 'archer.png',
+    cell: { w: 84, h: 87 },
+    cols: 8, rows: 4,
+    // 인물의 키를 앞의 둘과 같은 76픽셀로 맞춰 구웠다. 칸 높이가 다르므로 상자도
+    // 다른 값이어야 화면에서 셋의 키가 같다.
+    box: 25,
+    clips: {
+      idle:      { row: 0, frames: 8, fps: 6 },
+      walkLeft:  { row: 1, frames: 8, fps: 10 },
+      walkRight: { row: 2, frames: 8, fps: 10 },
+      attack:    { row: 3, frames: 8, fps: 12, once: 1 },
+    },
+    // 앞의 둘과 같은 이유로 대기 줄만 뒤집어 구웠다. 시안의 대기는 활을 왼손에
+    // 들어 왼쪽을 보는 것으로 읽히는데, 공격은 오른쪽으로 쏜다.
+    crops: {
+      full: { x: 0, y: 0, w: 1, h: 1 },
+      list: { x: 0.15, y: 0.04, w: 0.70, h: 0.94 },
+      head: { x: 0.28, y: 0.05, w: 0.44, h: 0.47 },
+    },
+  },
 };
 
 const sheet = (kind) => SHEETS[kind] || null;
@@ -400,12 +410,6 @@ const STROKE = 0.42;
 
 function shape(part) {
   const fill = color(part.f);
-  // 활처럼 채우면 안 되는 것. 선 하나로 긋고 테두리를 따로 두르지 않는다 —
-  // 두르면 활이 막대가 된다.
-  if (part.arc) {
-    return `<path d="${part.arc}" fill="none" stroke="${fill}"`
-      + ` stroke-width="${part.width}" stroke-linecap="round"/>`;
-  }
   const line = part.o === 0 ? '' : ` stroke="${OUTLINE}" stroke-width="${STROKE}"`;
   if (part.e) {
     const [cx, cy, rx, ry] = part.e.map(round);
