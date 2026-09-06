@@ -82,20 +82,27 @@ const threatOf = (id) => THREAT[D.rankOf(D.ENEMIES[id]).id] || 1;
 const WAVE_MAX = 5;
 // **우두머리는 레벨을 따라 는다.** 하나로 고정해 두면 12레벨의 우두머리 무리와
 // 20레벨의 것이 같은 그림이고, 파티만 자라므로 뒤로 갈수록 저절로 쉬워진다.
-// 무리 상한이 다섯이라 셋에서 멈춘다 — 그 위는 데리고 나올 쫄이 없어진다.
-// **여섯 레벨마다에서 여덟로 늘렸다.** 셋이 서는 판이 20레벨에 걸리자 파티가
-// 여섯 레벨 위여도 한 판도 못 깼다 — 셋은 아주 뒤에만 서는 그림이다.
+//
+// **둘에서 멈춘다.** 셋을 열어 보니 장비를 갖춘 파티로도 한 판을 못 깼다(승률 0%) —
+// 무리 상한이 다섯이라 셋을 세울 자리는 있어도 이길 자리가 없다. 여기를 더 열려면
+// 상한(`WAVE_MAX`)이 아니라 우두머리 자신의 수치부터 봐야 한다.
 const BOSS_STEP = 8;
+const BOSS_MAX = 2;
 const bossCount = (region, level) =>
-  Math.max(1, Math.min(3, 1 + Math.floor((level - (region.minLevel + 2)) / BOSS_STEP)));
+  Math.max(1, Math.min(BOSS_MAX, 1 + Math.floor((level - (region.minLevel + 2)) / BOSS_STEP)));
 
 // **우두머리는 혼자 나오지 않는다.** 뒤에 하나만 붙여 두었을 때에는 파티 다섯이
 // 한 대상에 화력을 모아 도발도 어그로도 뜻이 없었다 — 등급이 정한 위협이 수치로만
 // 남고 화면에서는 오래 걸리는 한 대상이었다. 남은 자리를 그 지역의 적으로 채운다.
 // **데리고 나오는 것은 쫄이다.** 자리가 남는 대로 지역의 적을 채웠더니 절반이
-// 정예라, 우두머리 무리가 아니라 정예 무리에 우두머리가 낀 것이 됐다(재 보니
-// 이길 수 있는 판이 아니었다 — 승률 0%).
-const BOSS_ESCORT_MAX = 3;
+// 정예라, 우두머리 무리가 아니라 정예 무리에 우두머리가 낀 것이 됐다.
+//
+// **머릿수도 위협의 몫으로 끊는다** — 다른 무리와 같은 잣대다. 우두머리가 그 몫을
+// 먹으므로 **하나면 쫄 셋을 데려오고 둘이면 저희끼리 온다.** 재 보니 벽은 우두머리
+// 수가 아니라 몸의 수였다(장비를 갖춘 파티로 잰 승률: 우두머리 둘만 13%, 거기에
+// 쫄 하나만 붙여도 2%, 셋이면 0%). 몫으로 끊으면 그 벽에 닿지 않으면서 레벨을
+// 따라 무리의 그림만 바뀐다.
+const BOSS_BUDGET = THREAT.boss + 3;
 function bossWave(region, level, rng) {
   const bosses = bossCount(region, level);
   const wave = [];
@@ -106,8 +113,12 @@ function bossWave(region, level, rng) {
   const others = region.enemies.filter((id) => D.ENEMIES[id].job !== 'healer');
   const trash = others.filter((id) => D.rankOf(D.ENEMIES[id]).id === 'trash');
   const pool = (trash.length ? trash : others);
-  const escort = Math.min(WAVE_MAX - bosses, BOSS_ESCORT_MAX);
-  for (let i = 0; i < escort; i++) wave.push(pick(rng, pool.length ? pool : region.enemies));
+  let spent = bosses * THREAT.boss;
+  while (spent < BOSS_BUDGET && wave.length < WAVE_MAX) {
+    const id = pick(rng, pool.length ? pool : region.enemies);
+    wave.push(id);
+    spent += threatOf(id);
+  }
   return wave;
 }
 
