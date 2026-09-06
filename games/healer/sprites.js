@@ -382,8 +382,13 @@ const SHEETS = {
     box: 25,
     clips: {
       idle:      { row: 0, frames: 8, fps: 6 },
-      walkLeft:  { row: 1, frames: 8, fps: 10 },
-      walkRight: { row: 2, frames: 8, fps: 10 },
+      // **이 시트만 걷기 두 줄의 차례가 반대다.** 다른 시트는 시안이 왼쪽으로
+      // 걸어 원본이 1행에 그대로 들어가고 뒤집은 것이 2행이 됐는데, 궁수는 시안이
+      // 오른쪽으로 걸으므로 같은 순서로 구우면 1행이 오른쪽, 2행이 왼쪽이 된다.
+      // 다시 굽는 대신 여기서 줄을 가리켜 맞춘다 — 시트는 사람이 그린 것이라
+      // 자료 한 줄로 끝날 일에 그림을 건드리지 않는다.
+      walkLeft:  { row: 2, frames: 8, fps: 10 },
+      walkRight: { row: 1, frames: 8, fps: 10 },
       attack:    { row: 3, frames: 8, fps: 12, once: 1 },
     },
     // 앞의 둘과 같은 이유로 대기 줄만 뒤집어 구웠다. 시안의 대기는 활을 왼손에
