@@ -563,7 +563,7 @@ function wantedMove(unit, state, target) {
 
   if (!target) return null;
   const want = unit.range * 0.85;
-  return dist(unit, target) > want ? standoff(unit, target, want) : null;
+  return dist(unit, target) > want ? approach(unit, state, target, want) : null;
 }
 
 // 겹쳐 서면 화면에서 누가 누구인지 알 수 없고, 장판을 어디에 깔지 고르는 의미도
@@ -603,6 +603,54 @@ function freeSpot(unit, state, spot) {
   return { x: spot.x, y: Math.min(D.FIELD.bottom, Math.max(D.FIELD.top, y)) };
 }
 
+// **동료가 길을 막으면 돌아서 붙는다.** 비켜서기(`freeSpot`)는 세로로만 옮기는데,
+// 같은 편끼리 벌리는 거리(`SPACING` 10)가 근접 사거리(7~9)보다 넓어 한 적을 둘이
+// 치려 하면 뒤에 선 쪽이 사거리 밖으로 밀려난다. 그 자리는 스스로 풀리지 않는다 —
+// 재 보니 근접이 대상을 두고도 사거리 밖에 머문 시간이 전투의 9.5%였고, 한 유닛은
+// 50초를 그렇게 서 있었다.
+//
+// 그래서 **대상 둘레를 돌며 빈자리를 찾는다.** 지금 선 쪽에서 가까운 각도부터
+// 보므로 굳이 멀리 돌지 않고, 어느 각도도 비어 있지 않으면 가장 덜 겹치는 자리를
+// 고른다("최대한 가깝게").
+//
+// **비켜서기와 같은 잣대로 잰다.** 여기서 다른 자로 재면 골라 놓은 자리를
+// `freeSpot`이 다시 밀어내, 돌아서 온 것이 헛일이 된다. 손아래(uid가 큰 쪽)에게
+// 자리를 비켜 줄 이유가 없다는 것까지 같다.
+const APPROACH_ANGLES = 24;
+
+function clearance(unit, state, spot) {
+  let room = Infinity;
+  for (const other of alive(state, 'ally').concat(alive(state, 'enemy'))) {
+    if (other.uid >= unit.uid) continue;
+    const box = Math.max(Math.abs(other.x - spot.x), Math.abs(other.y - spot.y));
+    room = Math.min(room, box - gapTo(unit, other));
+  }
+  return room;
+}
+
+function approach(unit, state, target, want) {
+  const direct = standoff(unit, target, want);
+  // 막히지 않았으면 하던 대로 곧장 간다. 둘러보는 값은 막혔을 때만 치른다.
+  if (clearance(unit, state, direct) >= 0) return direct;
+
+  // **둘러보는 반지름은 사거리 끝이다.** 평소 붙는 거리(`want`, 사거리의 85%)로
+  // 돌면 대각선 자리가 대상과의 간격(`CLOSE` 6)에 걸려 전부 막힌 것으로 나온다 —
+  // 사거리 끝까지 나가야 대상의 위아래에 설 자리가 열린다.
+  const reach = unit.range * 0.95;
+  const base = Math.atan2(unit.y - target.y, unit.x - target.x);
+  let best = null;
+  for (let i = 0; i < APPROACH_ANGLES; i++) {
+    const step = Math.ceil(i / 2) * (i % 2 ? 1 : -1);
+    const angle = base + step * ((2 * Math.PI) / APPROACH_ANGLES);
+    const spot = { x: target.x + Math.cos(angle) * reach, y: target.y + Math.sin(angle) * reach };
+    if (spot.y < D.FIELD.top || spot.y > D.FIELD.bottom) continue;
+    const room = clearance(unit, state, spot);
+    if (room >= 0) return spot;
+    if (!best || room > best.room) best = { spot, room };
+  }
+  return best ? best.spot : direct;
+}
+
 function chooseMove(unit, state, target) {
   if (!unit.speed) return null;
   const wanted = wantedMove(unit, state, target);
@@ -630,7 +678,7 @@ function decide(unit, state) {
 
 const api = {
   dist, alive, byUid, opposite, confused, nearest, roleOf, rankOf, frontTank, anchorOf, behind,
-  tauntReserve, manaTarget, freeSpot, SPACING, CLOSE,
+  tauntReserve, manaTarget, freeSpot, approach, clearance, SPACING, CLOSE,
   attackersOf, endangered, healReach,
   chooseTarget, healTarget, chooseSkill, choosePotion, chooseMove, decide,
   POTION_HP, POTION_MP, STICK, RETREAT, SPREAD, LINE_PUSH, LINE_GIVE, holdLine,

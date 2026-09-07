@@ -635,5 +635,41 @@ function gather(state) {
   check('이미 걸린 적은 세지 않는다', AI.chooseSkill(bard, state, null), null);
 }
 
+// --- 동료가 길을 막으면 돌아서 붙는다 -----------------------------------
+//
+// 비켜서기는 세로로만 옮기는데, 같은 편끼리 벌리는 거리(10)가 근접 사거리(7~9)보다
+// 넓어 한 적을 둘이 치려 하면 뒤에 선 쪽이 사거리 밖으로 밀려난다. 그 자리는
+// 스스로 풀리지 않아, 재 보니 근접이 대상을 두고도 사거리 밖에 머문 시간이
+// 전투의 9.5%였고 한 유닛은 50초를 그렇게 서 있었다.
+{
+  const state = battle({ party: [{ defId: 'bran', level: 4 }, { defId: 'lyle', level: 4 }] });
+  const foe = enemyOf(state, 'tank');
+  const [first, second] = AI.alive(state, 'ally')
+    .filter((u) => AI.roleOf(u) === 'melee' || AI.roleOf(u) === 'tank')
+    .sort((a, b) => (a.uid < b.uid ? -1 : 1));
+  check('근접 둘이 있다', Boolean(first && second), true);
+
+  // 손위가 적의 정면을 차지하고, 손아래는 그 뒤에서 다가온다.
+  foe.x = 60; foe.y = 28;
+  first.x = foe.x - second.range * 0.85; first.y = foe.y;
+  second.x = first.x - 6; second.y = foe.y;
+  for (const u of AI.alive(state, 'enemy')) { if (u.uid !== foe.uid) u.dead = true; }
+  for (const u of AI.alive(state, 'ally')) {
+    if (u.uid !== first.uid && u.uid !== second.uid) u.dead = true;
+  }
+
+  const spot = AI.chooseMove(second, state, foe);
+  check('갈 자리가 있다', Boolean(spot), true);
+  const reach = Math.hypot(spot.x - foe.x, spot.y - foe.y);
+  check('사거리 안까지 간다', reach <= second.range, true);
+  // 비켜서기와 같은 잣대로 골랐으므로, 그 자리는 다시 밀려나지 않는다.
+  const after = AI.freeSpot(second, state, spot);
+  check('비켜서기가 다시 밀어내지 않는다',
+    Math.round(after.y * 10) === Math.round(spot.y * 10), true);
+  // 손위의 자리를 빼앗지도 않는다.
+  check('손위와는 벌어져 선다',
+    Math.max(Math.abs(spot.x - first.x), Math.abs(spot.y - first.y)) >= AI.SPACING, true);
+}
+
 console.log(`${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);

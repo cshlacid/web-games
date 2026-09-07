@@ -1716,27 +1716,27 @@ const POTION_MAX = 5;
 // 적 힐러가 아무에게도 보호받지 못하고, 후열을 먼저 치는 규칙이 한쪽에서만 돈다.
 const ENEMIES = {
   scout:  { id: 'scout', race: 'goblin', rank: 'trash', exp: 10,  name: '고블린 척후병', job: 'dealer', sprite: 'goblin',
-            hp: 826, mp: 64,  atk: 25, attackCd: 1.5, range: 7,  speed: 21,
-           attrs: { str: 45, agi: 16, int: 8, vit: 66 }, growth: 'enemy',
+            hp: 798, mp: 64,  atk: 25, attackCd: 1.5, range: 7,  speed: 21,
+           attrs: { str: 45, agi: 16, int: 8, vit: 63 }, growth: 'enemy',
             armor: 0.95, spec: 'grunt' },
   shaman: { id: 'shaman', race: 'goblin', rank: 'trash', exp: 13, name: '고블린 주술사', job: 'healer', sprite: 'shaman',
-            hp: 728, mp: 120, atk: 24, attackCd: 2.2, range: 30, speed: 15,
-           attrs: { str: 13, agi: 10, int: 16, vit: 58 }, growth: 'enemy', attackType: 'magic',
+            hp: 700, mp: 120, atk: 24, attackCd: 2.2, range: 30, speed: 15,
+           attrs: { str: 13, agi: 10, int: 16, vit: 56 }, growth: 'enemy', attackType: 'magic',
             armor: 1, spec: 'shaman' },
   orc:    { id: 'orc', race: 'orc', rank: 'elite', exp: 46,    name: '오크 전사',     job: 'tank',   sprite: 'orc',
-            hp: 2520, mp: 72,  atk: 51, attackCd: 1.8, range: 7,  speed: 16,
-           attrs: { str: 65, agi: 8, int: 10, vit: 150 }, growth: 'enemy',
+            hp: 2422, mp: 72,  atk: 51, attackCd: 1.8, range: 7,  speed: 16,
+           attrs: { str: 65, agi: 8, int: 10, vit: 144 }, growth: 'enemy',
             armor: 0.7,  spec: 'tank', always: ['sweep'] },
   hexer:  { id: 'hexer', race: 'orc', rank: 'elite', exp: 42,  name: '오크 주술사',   job: 'healer', sprite: 'shaman',
-            hp: 1540, mp: 128, atk: 38, attackCd: 2.4, range: 30, speed: 14,
-           attrs: { str: 18, agi: 8, int: 19, vit: 92 }, growth: 'enemy', attackType: 'magic',
+            hp: 1484, mp: 128, atk: 38, attackCd: 2.4, range: 30, speed: 14,
+           attrs: { str: 18, agi: 8, int: 19, vit: 88 }, growth: 'enemy', attackType: 'magic',
             armor: 0.9, spec: 'shaman', always: ['curse'] },
   // **우두머리는 제 계열을 쓴다.** 오크 전사와 같은 수호 계열을 들고 있던 동안에는
   // 덩치만 큰 오크였다 — 잡는 데 오래 걸릴 뿐 무섭지는 않았다. 지금은 휩쓸기로
   // 파티 전체를 긁고 마무리로 한 명을 끊는다.
   chief:  { id: 'chief', race: 'orc', rank: 'boss', exp: 210,  name: '오크 우두머리', job: 'tank',   sprite: 'boss',
-            hp: 5446, mp: 136, atk: 67, attackCd: 2.0, range: 8,  speed: 14,
-           attrs: { str: 100, agi: 6, int: 20, vit: 324 }, growth: 'enemy',
+            hp: 5222, mp: 136, atk: 67, attackCd: 2.0, range: 8,  speed: 14,
+           attrs: { str: 100, agi: 6, int: 20, vit: 311 }, growth: 'enemy',
             armor: 0.62, spec: 'chieftain', always: ['rupture', 'sweep'] },
 };
 
