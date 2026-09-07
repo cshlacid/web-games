@@ -471,11 +471,15 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .scene { display: block; width: 50%; height: 100%; flex: none; }
 .field.aiming { cursor: crosshair; }
 .field.aiming::after {
-  content: ""; position: absolute; inset: 0;
+  content: ""; position: absolute; inset: 0; z-index: 90;
   border: 2px dashed #f0e2a8; border-radius: 13px; opacity: 0.75;
   pointer-events: none;
 }
 
+/* 앞뒤는 발이 놓인 높이가 정한다(z-index를 main.js가 준다). 전장이 비스듬히
+   내려다본 자리라 아래에 선 쪽이 앞이고, 그것이 없으면 노드가 만들어진 차례가
+   앞뒤가 되어 뒤에 선 적이 앞의 아군을 덮었다. 장판은 바닥에 놓인 것이라 그
+   아래, 뜨는 숫자와 조준 테두리는 그 위에 둔다 — 층을 여기 한 곳에 모아 둔다. */
 .unit {
   position: absolute;
   /* 폭은 그림마다 다르므로 main.js가 정한다. */
@@ -574,7 +578,7 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .field.aiming .unit:not(.valid) { opacity: 0.4; }
 
 .zone {
-  position: absolute; border-radius: 50%;
+  position: absolute; border-radius: 50%; z-index: 1;
   transform: translate(-50%, -50%);
   pointer-events: none;
   border: 2px solid var(--zone-heal);
@@ -585,14 +589,14 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 /* 주인공의 사거리. 눌러 보고 나서 "사거리 밖"을 듣는 것보다 먼저 보이는 것이
    낫다 — 그동안 다른 스킬의 쿨타임이 돈다. */
 .reach {
-  position: absolute; border-radius: 50%;
+  position: absolute; border-radius: 50%; z-index: 1;
   transform: translate(-50%, -50%);
   border: 1px dashed rgba(240, 226, 168, 0.5);
   pointer-events: none;
 }
 
 .aim {
-  position: absolute; border-radius: 50%;
+  position: absolute; border-radius: 50%; z-index: 1;
   transform: translate(-50%, -50%);
   border: 2px dashed #f0e2a8;
   background: rgba(240, 226, 168, 0.12);
@@ -600,7 +604,7 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 }
 
 .float {
-  position: absolute; transform: translate(-50%, -50%);
+  position: absolute; transform: translate(-50%, -50%); z-index: 80;
   font-size: clamp(11px, 2.2vw, 15px); font-weight: 800;
   pointer-events: none;
   animation: rise 0.9s ease-out forwards;
@@ -615,7 +619,7 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 }
 
 .pulse {
-  position: absolute; border-radius: 50%;
+  position: absolute; border-radius: 50%; z-index: 80;
   transform: translate(-50%, -50%);
   border: 2px solid var(--heal);
   pointer-events: none;

@@ -1668,6 +1668,9 @@ function syncUnits(state) {
     const node = unitNodes.get(unit.uid) || makeUnitNode(unit);
     node.style.left = `${pctX(unit.x)}%`;
     node.style.top = `${pctY(unit.y)}%`;
+    // 발이 아래인 쪽이 앞이다. 격자 한 칸 단위로 끊는 것은 매 프레임 값이
+    // 바뀌면 앞뒤가 소수점 흔들림으로 뒤집혀 깜빡이기 때문이다.
+    node.style.zIndex = String(Math.round(unit.y));
     node.classList.toggle('dead', unit.dead);
     node.classList.toggle('low', unit.hp / unit.maxHp <= 0.3);
     node.querySelector('.hpbar span').style.width = `${(unit.hp / unit.maxHp) * 100}%`;
