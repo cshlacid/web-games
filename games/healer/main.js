@@ -820,12 +820,7 @@ function setFrame(wrap, col, row) {
 // crop은 칸의 어디를 보여 줄지다. 전투 초상화는 머리만('head'), 편성 화면은
 // 서 있기 그림에 맞춰 좁힌 전신('list')이다.
 function avatar(kind, crop) {
-  if (Sprites.sheet(kind)) {
-    return sheetBody(kind, 'avatar', crop || 'list');
-  }
-  const wrap = el('span', 'avatar');
-  wrap.innerHTML = Sprites.svg(kind);
-  return wrap;
+  return sheetBody(kind, 'avatar', crop || 'list');
 }
 
 // 역할과 계열을 함께 적는다. 역할만 적으면 궁수와 마법사가 같은 줄로 보이고,
@@ -1577,14 +1572,7 @@ function makeUnitNode(unit) {
   // 도트 그림이 제 색을 가지므로 파랑·빨강으로 물들여 편을 가를 수 없다.
   // 발밑에 색 있는 발판을 깔아 그 일을 대신한다 — 그림자 노릇도 같이 한다.
   node.append(el('div', 'mark'));
-  if (Sprites.sheet(unit.sprite)) {
-    // 걷는 그림이 따로 있는 유닛이라는 표시. 무리 사이 흔들기(`trudge`)를
-    // 여기에 걸면 제 걸음 위에 흔들림이 겹쳐 두 번 걷는 것처럼 보인다.
-    node.classList.add('is-sheet');
-    node.append(sheetBody(unit.sprite, 'sprite'));
-  } else {
-    node.insertAdjacentHTML('beforeend', Sprites.svg(unit.sprite));
-  }
+  node.append(sheetBody(unit.sprite, 'sprite'));
   node.style.width = `${(UNIT_WIDTH * Sprites.size(unit.sprite).w) / 18}%`;
 
   const bar = el('div', 'hpbar');

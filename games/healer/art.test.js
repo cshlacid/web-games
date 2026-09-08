@@ -25,43 +25,27 @@ function check(name, actual, expected) {
 
 // --- 그림 자료 ----------------------------------------------------------
 //
-// 도형 하나가 빠지거나 팔레트에 없는 색을 쓴 것은 눈으로 잘 안 보인다 —
-// 화면에서는 팔 하나가 사라진 정도로만 나타난다.
+// 도형을 손으로 적던 때에는 도형 하나가 빠지거나 팔레트에 없는 색을 쓴 것을
+// 여기서 봤다. **지금은 전부 구운 그림 파일이라 그 검사가 통째로 사라졌다** —
+// 자료를 손으로 적는 자리가 없어졌기 때문이고, 대신 시트가 서로 어긋나지
+// 않는지(칸·프레임 수·크기 사다리)를 본다.
 {
-  const KINDS = ['e', 'r', 'p', 'arc'];
-  for (const [kind, sprite] of Object.entries(Sprites.SPRITES)) {
-    check(`${kind}: 크기가 적혀 있다`, sprite.w > 0 && sprite.h > 0, true);
-    check(`${kind}: 도형이 들어 있다`, sprite.parts.length > 0, true);
+  // 열넷 전부가 시안을 구운 그림 파일이다. 도형은 하나도 남지 않았다.
+  check('그림 파일 열넷', Object.keys(Sprites.SHEETS).length, 14);
 
-    // 도형은 타원·둥근 사각형·곡선·선 중 하나다. 둘을 함께 적으면 하나만 그려진다.
-    const shapeless = sprite.parts
-      .map((part, i) => (KINDS.filter((k) => part[k]).length === 1 ? null : i))
-      .filter((i) => i !== null);
-    check(`${kind}: 도형 종류가 하나씩이다`, shapeless, []);
-
-    const unknown = new Set();
-    for (const part of sprite.parts) if (!Sprites.PALETTE[part.f]) unknown.add(part.f);
-    check(`${kind}: 팔레트에 있는 색만 쓴다`, [...unknown], []);
-
-    // 선으로만 긋는 것에는 굵기가 있어야 한다. 없으면 브라우저가 1을 쓰는데,
-    // 이 격자에서 1은 활이 아니라 기둥이다.
-    const thin = sprite.parts.filter((part) => part.arc);
-    check(`${kind}: 선에는 굵기가 있다`, thin.filter((part) => !(part.width > 0)).length, 0);
-
-    // 가장자리에 여유 한 칸을 두지 않으면 테두리와 뿔이 잘린다. 렌더러가 그만큼
-    // 넓혀 그리므로 실제 크기는 자료보다 2칸 크다.
-    check(`${kind}: 크기를 밖에서도 같은 값으로 본다`,
-      Sprites.size(kind), { w: sprite.w + 2, h: sprite.h + 2 });
+  // **시트가 저마다 성립해야 한다.** 칸·줄·프레임 수가 어긋나면 화면에서는
+  // 엉뚱한 칸이 잘려 나오거나 프레임이 사라진다.
+  for (const [kind, sheet] of Object.entries(Sprites.SHEETS)) {
+    check(`${kind}: 칸 크기가 적혀 있다`, sheet.cell.w > 0 && sheet.cell.h > 0, true);
+    const over = Object.entries(sheet.clips)
+      .filter(([, clip]) => clip.frames > sheet.cols || clip.row >= sheet.rows)
+      .map(([name]) => name);
+    check(`${kind}: 프레임이 격자 안에 들어간다`, over, []);
+    const bad = Object.entries(sheet.crops)
+      .filter(([, c]) => c.x < 0 || c.y < 0 || c.x + c.w > 1.001 || c.y + c.h > 1.001)
+      .map(([name]) => name);
+    check(`${kind}: 잘라 내는 자리가 칸 안이다`, bad, []);
   }
-
-  // 시안을 받은 열셋만 그림 파일이고 고블린 주술사 하나만 도형으로 남았다.
-  // 화풍이 섞이는 것은 시안이 오는 대로 하나씩 갈아 끼우기 때문이다 — 남은
-  // 시안이 오면 여기부터 바뀐다.
-  check('도형 그림 하나', Object.keys(Sprites.SPRITES).length, 1);
-  check('그림 파일 열셋', Object.keys(Sprites.SHEETS).length, 13);
-  // 한쪽에만 있어야 한다. 양쪽에 두면 화면이 분기를 놓쳤을 때 조용히 도형이 나온다.
-  const both = Object.keys(Sprites.SHEETS).filter((k) => Sprites.SPRITES[k]);
-  check('그림 파일은 도형으로 겹치지 않는다', both, []);
 
   // **계열마다 제 그림이 있어야 한다.** 궁수와 마법사가 같은 그림을 쓰던 때에는
   // 편성 화면에서 이름을 읽어야 어느 쪽인지 알 수 있었고, 전장에서는 아예
@@ -101,34 +85,14 @@ function check(name, actual, expected) {
 
 // --- 자료가 가리키는 그림이 실제로 있는가 -------------------------------
 {
-  const kinds = new Set(Object.keys(Sprites.SPRITES).concat(Object.keys(Sprites.SHEETS)));
+  const kinds = new Set(Object.keys(Sprites.SHEETS));
   const used = [D.HERO, ...Object.values(D.COMPANIONS), ...Object.values(D.ENEMIES)];
   const missing = used.filter((def) => !kinds.has(def.sprite)).map((def) => def.name);
   check('모든 유닛의 그림이 있다', missing, []);
 
-  // 없는 이름을 넘겨도 화면이 비지 않아야 한다 — 그림 하나가 빠졌다고 전투가
-  // 안 보이면 곤란하다.
-  check('모르는 이름은 대신 그린다', Sprites.svg('없는그림').startsWith('<svg'), true);
-}
-
-// --- 그려 낸 결과 -------------------------------------------------------
-{
-  const markup = Sprites.svg('priest');
-  check('여유 한 칸을 두고 그린다', markup.includes('viewBox="-1 -1 18 22"'), true);
-  check('같은 그림을 다시 만들지 않는다', Sprites.svg('priest') === markup, true);
-
-  // **도트를 걷어냈다.** 픽셀을 각지게 그리라는 지시가 남아 있으면 곡선이
-  // 계단으로 나온다.
-  check('각지게 그리지 않는다', markup.includes('crispEdges'), false);
-  check('사각형만으로 그리지 않는다', markup.includes('<ellipse') || markup.includes('<path'), true);
-
-  // 배경이 밝든 어둡든 실루엣이 남아야 한다.
-  check('테두리를 두른다', markup.includes(`stroke="${Sprites.OUTLINE}"`), true);
-
-  // 그늘과 눈에는 테두리를 두르지 않는다. 거기까지 두르면 얼굴이 지저분해진다.
-  const inner = Object.values(Sprites.SPRITES)
-    .flatMap((sprite) => sprite.parts).filter((part) => part.o === 0);
-  check('안에 들어가는 도형은 테두리가 없다', inner.length > 0, true);
+  // **대신 그릴 것이 없다.** 도형 렌더러를 걷어내면서 모르는 이름은 빈 상자가
+  // 되므로, 위의 검사가 그만큼 더 중요해졌다 — 자료에 적힌 이름이 곧 파일이다.
+  check('모르는 이름에는 시트가 없다', Sprites.sheet('없는그림'), null);
 }
 
 // **정의에 적힌 그림 이름과 계열 이름은 같지 않다.** 계열에서 그림을 지어내던
@@ -137,7 +101,7 @@ function check(name, actual, expected) {
 // 실제로 있는 그림인지 여기서 본다.
 {
   const D2 = require('./data.js');
-  const kinds = new Set(Object.keys(Sprites.SPRITES).concat(Object.keys(Sprites.SHEETS)));
+  const kinds = new Set(Object.keys(Sprites.SHEETS));
   const swap = [];
   for (const list of Object.values(D2.SPEC_CHOICES)) {
     for (const spec of list) {
@@ -206,77 +170,6 @@ function check(name, actual, expected) {
 
 // --- 상자 밖으로 나가지 않는다 ------------------------------------------
 //
-// 그려 낸 SVG는 `viewBox` 밖을 잘라 낸다. 도형 하나가 상자를 넘으면 그만큼이
-// 조용히 사라지는데, 실제로 오크 우두머리의 머리와 마법사의 모자 끝이 그렇게
-// 잘려 있었다. 좌표를 손으로 적는 한 다시 일어나므로 여기서 본다.
-{
-  // 곡선은 조종점이 아니라 실제로 지나가는 자리를 봐야 한다. 조종점까지 상자
-  // 안에 넣으라고 하면 궁수의 활처럼 크게 휜 것이 헛되이 걸린다.
-  function quadExtremes(a, c, b) {
-    const out = [a, b];
-    const denom = a - 2 * c + b;
-    if (Math.abs(denom) > 1e-9) {
-      const t = (a - c) / denom;
-      if (t > 0 && t < 1) {
-        out.push((1 - t) * (1 - t) * a + 2 * (1 - t) * t * c + t * t * b);
-      }
-    }
-    return out;
-  }
-
-  // `M x y`, `L x y`, `Q cx cy x y`, `Z`만 쓴다.
-  function pathBox(d) {
-    const tokens = d.match(/[MLQZ]|-?\d*\.?\d+/g) || [];
-    const xs = [];
-    const ys = [];
-    let i = 0;
-    let cx = 0;
-    let cy = 0;
-    while (i < tokens.length) {
-      const cmd = tokens[i++];
-      const num = () => Number(tokens[i++]);
-      if (cmd === 'M' || cmd === 'L') {
-        cx = num(); cy = num();
-        xs.push(cx); ys.push(cy);
-      } else if (cmd === 'Q') {
-        const qx = num();
-        const qy = num();
-        const ex = num();
-        const ey = num();
-        xs.push(...quadExtremes(cx, qx, ex));
-        ys.push(...quadExtremes(cy, qy, ey));
-        cx = ex; cy = ey;
-      }
-    }
-    return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
-  }
-
-  function partBox(part) {
-    if (part.e) {
-      const [x, y, rx, ry] = part.e;
-      return [x - rx, y - ry, x + rx, y + ry];
-    }
-    if (part.r) {
-      const [x, y, w, h] = part.r;
-      return [x, y, x + w, y + h];
-    }
-    return pathBox(part.p || part.arc);
-  }
-
-  const clipped = [];
-  for (const [kind, sprite] of Object.entries(Sprites.SPRITES)) {
-    for (const part of sprite.parts) {
-      // 선은 좌표를 가운데 두고 양옆으로 반씩 번진다.
-      const half = part.arc ? part.width / 2 : (part.o === 0 ? 0 : Sprites.STROKE / 2);
-      const [x0, y0, x1, y1] = partBox(part);
-      if (x0 - half < -1 || y0 - half < -1
-        || x1 + half > sprite.w + 1 || y1 + half > sprite.h + 1) {
-        clipped.push(`${kind} [${x0 - half}, ${y0 - half}, ${x1 + half}, ${y1 + half}]`);
-      }
-    }
-  }
-  check('모든 도형이 상자 안에 있다', clipped, []);
-}
 
 // --- 스킬도 눈으로 갈린다 -----------------------------------------------
 //
