@@ -209,6 +209,27 @@ const SHEETS = {
     },
   },
 
+  // 좀비. 언데드 계열의 첫 적이다. **잡졸인데 고블린보다 크다**(인물 22.1칸,
+  // 고블린 21.3·고블린 주술사 21.5). 사람 크기의 시체라 그렇고, 정예인 오크
+  // (23.6)보다는 작아 등급 순서는 지켜진다.
+  zombie: {
+    src: 'zombie.png',
+    cell: { w: 99, h: 103 },
+    cols: 8, rows: 4,
+    box: 30,
+    clips: {
+      idle:      { row: 0, frames: 8, fps: 6 },
+      walkLeft:  { row: 1, frames: 8, fps: 10 },
+      walkRight: { row: 2, frames: 8, fps: 10 },
+      attack:    { row: 3, frames: 8, fps: 12, once: 1 },
+    },
+    crops: {
+      full: { x: 0, y: 0, w: 1, h: 1 },
+      list: { x: 0.15, y: 0.17, w: 0.68, h: 0.83 },
+      head: { x: 0.34, y: 0.17, w: 0.38, h: 0.34 },
+    },
+  },
+
   // 전사. 여덟 번째로 받은 시안이다. 공격의 붉은 참격이 옆으로 길지만 칸이 다른
   // 시트와 비슷한 것은, 이 시안의 인물이 그만큼 야무지게 서 있기 때문이다.
   warrior: {

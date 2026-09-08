@@ -2101,6 +2101,48 @@ function cast(state, skillId, target) {
   }
 }
 
+// --- 언데드는 신성에 약하다 ---------------------------------------------
+//
+// **종족이 정하고 곱하는 자리는 `applyDamage` 하나다.** 스킬마다 곱하면 새
+// 신성 스킬을 넣을 때마다 잊고, 유닛마다 분기를 두면 언데드를 하나 더할 때마다
+// 규칙이 는다. 앞으로 들일 언데드가 전부 같은 약점을 갖는 것이 이 표의 값이다.
+{
+  const zombie = D.ENEMIES.zombie;
+  const scout = D.ENEMIES.scout;
+  check('언데드만 신성에 약하다',
+    [D.schoolMul(D.weakOf(zombie), 'holy'), D.schoolMul(D.weakOf(scout), 'holy')],
+    [1.6, 1]);
+  // 갈래를 적지 않은 피해는 언데드에게도 그대로다 — 표에 없는 것은 1이다.
+  check('갈래 없는 피해는 그대로다', D.schoolMul(D.weakOf(zombie), null), 1);
+
+  // 표에 적은 종족과 갈래가 실제로 있는 것이어야 한다. 오타가 나면 조용히
+  // 아무 일도 일어나지 않는다 — 없는 종족의 약점은 아무에게도 안 걸린다.
+  const schools = new Set();
+  for (const def of Object.values(D.UNIT_SKILLS)) if (def.school) schools.add(def.school);
+  for (const def of Object.values(D.PLAYER_SKILLS)) if (def.school) schools.add(def.school);
+  const badRace = Object.keys(D.RACE_WEAK).filter((id) => !D.RACES[id]);
+  check('약점 표의 종족이 실제로 있다', badRace, []);
+  const badSchool = Object.values(D.RACE_WEAK)
+    .flatMap((row) => Object.keys(row)).filter((id) => !schools.has(id));
+  check('약점 표의 갈래를 쓰는 스킬이 있다', badSchool, []);
+
+  // **같은 기술은 주인공 손에서도 신성이다.** 동료 표에서 물려받으므로
+  // 여기가 갈리면 `shared`가 갈래를 빠뜨린 것이다.
+  check('심판은 양쪽 다 신성',
+    [D.UNIT_SKILLS.smite.school, D.PLAYER_SKILLS.smite.school], ['holy', 'holy']);
+
+  // 실제로 전투에서 더 아픈지 본다. 같은 피해를 좀비와 고블린에게 넣어 견준다.
+  const state = battle({ quest: quest({ waves: [['zombie'], ['scout']] }) });
+  const zed = state.units.find((u) => u.defId === 'zombie');
+  const before = zed.hp;
+  L.applyDamage(state, null, zed, 100, false, 'holy');
+  const holy = before - zed.hp;
+  zed.hp = before;
+  L.applyDamage(state, null, zed, 100, false, null);
+  const plain = before - zed.hp;
+  check('좀비는 신성을 더 아프게 맞는다', Math.round((holy / plain) * 10) / 10, 1.6);
+}
+
 // --- 초상화에 뜨는 상태 -------------------------------------------------
 //
 // 화면이 지속 피해·지속 회복·상태 이상을 초상화 오른쪽 위에 그리는데, 그 목록을

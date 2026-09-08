@@ -124,6 +124,43 @@ const SCENES = {
     },
   },
 
+  // 납골당. 갱도와 같이 하늘이 없지만 **차가운 쪽으로 민다** — 폐광이 흙과 나무의
+  // 갈색이라, 같은 "안쪽"이라도 여기가 돌과 뼈의 회청색이어야 두 곳이 갈린다.
+  // 불빛도 홰가 아니라 초록 도깨비불이다(`gg`).
+  crypt: {
+    name: '납골당',
+    build(out, rng) {
+      out.push(box(0, 0, W, HORIZON, '#232a30'));
+      stoneWall(out, 0, HORIZON, 8, 4, ['#2f3a42', '#38434b', '#2a343b'], rng);
+      out.push(box(0, 0, W, 2.4, '#171c21'));          // 천장의 어둠
+
+      // 벽감. 안쪽이 뚫려 있고 그 안에 뼈가 쌓여 있다 — 검은 구멍만 파면 창으로
+      // 보여서, 안에 밝은 조각을 몇 개 놓아 뼈로 읽히게 했다.
+      for (const x of [11, 33, 55, 77]) {
+        out.push(box(x, 2.4, 9, HORIZON - 2.4, '#1b2126'));
+        out.push(box(x + 0.8, 3.2, 7.4, HORIZON - 4, '#12171b'));
+        for (let i = 0; i < 3; i++) {
+          out.push(box(x + 1.6 + rng() * 5, 5 + rng() * 5, 2.6, 0.9, '#7f8579'));
+        }
+      }
+
+      out.push(box(0, HORIZON, W, 1.4, '#12171b'));
+      out.push(box(0, HORIZON + 1.4, W, H - HORIZON - 1.4, '#3b444a'));
+      grain(out, HORIZON + 2, H, 44, ['#333c42', '#454f55', '#4d5860'], rng);
+
+      // 바닥에 눕힌 석관 둘. 뚜껑을 한 칸 밝게 두어 덮개로 읽힌다.
+      for (const [x, t] of [[19, 0.46], [62, 0.66]]) {
+        const y = floorY(t);
+        out.push(box(x, y, 17, 5.4, '#2c343a'));
+        out.push(box(x + 1, y + 0.8, 15, 3.4, '#525d64'));
+        out.push(box(x + 4, y + 1.8, 9, 1.2, '#39424a'));
+      }
+
+      glow(out, 25, 5.2, 12, 'gg');
+      glow(out, 71, 5.2, 12, 'gg');
+    },
+  },
+
   // 무너진 초소. 셋 중 유일하게 바깥이라 하늘이 있고 뒤에 탑이 선다.
   // 벽·바닥을 같은 회색으로 깔았더니 화면 전체가 돌 한 덩어리가 되어, 바닥은
   // 따뜻한 쪽으로 밀고 사이에 그늘을 넣어 갈랐다.
@@ -219,6 +256,12 @@ function svg(sceneId, seed) {
     + '<stop offset="0%" stop-color="#ffc266" stop-opacity="0.34"/>'
     + '<stop offset="60%" stop-color="#ffab4a" stop-opacity="0.11"/>'
     + '<stop offset="100%" stop-color="#ff9a3c" stop-opacity="0"/>'
+    + '</radialGradient>'
+    // 납골당의 도깨비불. 홰의 주황과 갈라야 같은 "안쪽"인 폐광과 구별된다.
+    + '<radialGradient id="gg">'
+    + '<stop offset="0%" stop-color="#8ff0b4" stop-opacity="0.26"/>'
+    + '<stop offset="60%" stop-color="#5fd39a" stop-opacity="0.09"/>'
+    + '<stop offset="100%" stop-color="#3fae82" stop-opacity="0"/>'
     + '</radialGradient></defs>';
   return `<svg class="scene" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"`
     + ` shape-rendering="crispEdges" aria-hidden="true">${defs}${out.join('')}</svg>`;

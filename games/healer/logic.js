@@ -127,6 +127,9 @@ function makeUnit(def, side, uid, x, y, level, override, bonus, potions, name, h
     stunUntil: 0,
     // 혼란이 풀리는 시각. 그때까지는 제 편을 적으로 본다(`ai.foesOf`).
     confusedUntil: 0,
+    // 갈래별로 얼마나 더 아픈가(`D.weakOf`). 종족이 정하므로 유닛을 만들 때
+    // 한 번만 보고, 매 타격마다 표를 다시 뒤지지 않는다.
+    weak: D.weakOf(def),
     exp: Math.round((def.exp || 0) * (1 + 0.25 * (level - 1))),
     // 계열의 목록 중 레벨이 되는 것을 앞에서부터 넷. 편성 화면이 보여 준 것과
     // 전투에서 실제로 쓰는 것이 같아야 하므로 같은 함수를 쓴다.
@@ -383,7 +386,10 @@ function statusesOf(state, unit) {
   return Object.keys(STATUS_KINDS).filter((kind) => found.has(kind)).map((kind) => found.get(kind));
 }
 
-function applyDamage(state, source, target, raw, dodgeable) {
+// `school`은 피해의 갈래다(지금은 신성 하나). 적지 않으면 아무 배수도 타지
+// 않으므로 대부분의 호출은 그대로다 — **곱하는 자리를 여기 하나로 둔 것**은
+// 강화·약화와 같은 이유다: 기본 공격·스킬·도트·장판이 같은 규칙을 타야 한다.
+function applyDamage(state, source, target, raw, dodgeable, school) {
   if (target.dead) return 0;
 
   if (dodgeable && target.dodge > 0 && state.rng() < target.dodge) {
@@ -396,7 +402,8 @@ function applyDamage(state, source, target, raw, dodgeable) {
   // 스킬마다 곱하지 않고 이 한 곳에 둔 것은, 기본 공격과 도트와 장판까지 같은
   // 규칙을 타야 하기 때문이다.
   const boost = auraMul(state, source, 'atk') * auraMul(state, target, 'armor');
-  const amount = Math.max(1, Math.round(raw * boost * crit * target.armor));
+  const weak = D.schoolMul(target.weak, school);
+  const amount = Math.max(1, Math.round(raw * boost * crit * target.armor * weak));
   target.hp = Math.max(0, target.hp - amount);
   state.stats.damage += source && source.side === 'ally' ? amount : 0;
   if (source) source.tally.dealt += amount;
@@ -446,6 +453,7 @@ function addDot(state, source, target, def, kind, amount) {
   dot.kind = kind;
   dot.amount = amount == null ? def.tick : amount;
   dot.interval = def.interval;
+  dot.school = def.school;
   dot.endsAt = state.t + def.duration;
   dot.nextAt = state.t + def.interval;
   if (!existing) state.dots.push(dot);
@@ -462,7 +470,7 @@ function addZone(state, source, def, x, y, kind, amount) {
     x, y, radius: def.radius, amount: amount == null ? def.tick : amount,
     interval: def.interval,
     endsAt: state.t + def.duration, nextAt: state.t + def.interval,
-    bornAt: state.t, scrollAt: state.scroll, skillId: def.id,
+    bornAt: state.t, scrollAt: state.scroll, skillId: def.id, school: def.school,
   });
 }
 
@@ -473,7 +481,7 @@ function updateDots(state) {
     while (dot.nextAt <= state.t && dot.nextAt <= dot.endsAt + 1e-6) {
       const source = dot.sourceUid ? byUid(state, dot.sourceUid) : null;
       if (dot.kind === 'heal') applyHeal(state, source, target, dot.amount);
-      else applyDamage(state, source, target, dot.amount);
+      else applyDamage(state, source, target, dot.amount, false, dot.school);
       dot.nextAt += dot.interval;
     }
   }
@@ -497,7 +505,7 @@ function updateZones(state) {
       for (const unit of alive(state, zone.side)) {
         if (dist(unit, spot) > zone.radius) continue;
         if (zone.kind === 'heal') applyHeal(state, source, unit, zone.amount);
-        else applyDamage(state, source, unit, zone.amount);
+        else applyDamage(state, source, unit, zone.amount, false, zone.school);
       }
       zone.nextAt += zone.interval;
     }
@@ -608,10 +616,10 @@ function runUnitSkill(state, unit, choice) {
     addZone(state, unit, def, target.x, target.y, 'damage', over(def.tick));
     return;
   }
-  if (def.kind === 'damage') { applyDamage(state, unit, target, unit.atk * def.mul, true); return; }
+  if (def.kind === 'damage') { applyDamage(state, unit, target, unit.atk * def.mul, true, def.school); return; }
   if (def.kind === 'damage-area') {
     for (const foe of alive(state, AI.opposite(unit.side))) {
-      if (dist(foe, target) <= def.radius) applyDamage(state, unit, foe, unit.atk * def.mul);
+      if (dist(foe, target) <= def.radius) applyDamage(state, unit, foe, unit.atk * def.mul, false, def.school);
     }
   }
 }
@@ -827,7 +835,7 @@ function resolvePlayerSkill(state, def, spot) {
   // 기절은 때리면서 굳힌다. 피해를 먼저 넣는 것은, 기절이 외우던 것을 끊으므로
   // 순서를 뒤집으면 같은 틱에 죽은 적에게 기절이 걸린 것으로 남기 때문이다.
   if (def.kind === 'stun') {
-    if (def.damage) applyDamage(state, caster, unit, harm(def.damage));
+    if (def.damage) applyDamage(state, caster, unit, harm(def.damage), false, def.school);
     stun(state, caster, unit, def.duration);
     return;
   }
@@ -850,9 +858,9 @@ function resolvePlayerSkill(state, def, spot) {
   if (def.mana) caster.mp = Math.min(caster.maxMp, caster.mp + def.mana);
   else if (def.damage && def.targeting === 'area-enemy') {
     for (const foe of alive(state, 'enemy')) {
-      if (dist(foe, point) <= def.radius) applyDamage(state, caster, foe, harm(def.damage));
+      if (dist(foe, point) <= def.radius) applyDamage(state, caster, foe, harm(def.damage), false, def.school);
     }
-  } else if (def.damage) applyDamage(state, caster, unit, harm(def.damage));
+  } else if (def.damage) applyDamage(state, caster, unit, harm(def.damage), false, def.school);
   else if (def.targeting === 'ally' && def.heal) {
     // **정화는 회복하면서 약화를 걷어낸다.** 거는 것과 반대되는 일이라 오라를
     // 만드는 자리가 아니라 지우는 자리를 따로 두지 않고, 걸린 목록에서 강화가

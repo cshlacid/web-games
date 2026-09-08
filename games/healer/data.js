@@ -71,6 +71,23 @@ const RACES = {
 
 const raceOf = (def) => RACES[(def && def.race) || 'human'] || RACES.human;
 
+// **피해에 갈래가 있고, 종족마다 잘 듣는 갈래가 다르다.** 지금 갈래는 신성
+// (`school: 'holy'`) 하나뿐이고 그것을 타는 종족도 언데드 하나뿐이지만, 표로
+// 둔 것은 **언데드 계열을 더 들일 자리**이기 때문이다 — 유닛마다 분기를 쓰면
+// 적을 하나 더할 때마다 규칙이 는다.
+//
+// **표에 없으면 1이다.** 갈래를 적지 않은 피해(기본 공격과 대부분의 스킬)는
+// 아무 배수도 타지 않으므로, 새 갈래를 만들지 않는 한 여기는 조용하다.
+// **곱하는 자리는 `applyDamage` 하나다** — 강화·약화가 그러는 것과 같은 이유로,
+// 기본 공격·스킬·도트·장판이 전부 같은 규칙을 타야 한다.
+const RACE_WEAK = {
+  undead: { holy: 1.6 },
+};
+
+// 그 유닛이 갈래마다 얼마나 더 아픈가. 없으면 null이라 전투가 아무것도 하지 않는다.
+const weakOf = (def) => RACE_WEAK[raceOf(def).id] || null;
+const schoolMul = (weak, school) => (school && weak && weak[school]) || 1;
+
 // **물약은 인간형만 마신다.** 직업이 무엇을 들고 가는지는 JOB_POTIONS가 정하고,
 // 종족이 마실 수 있는지를 정한다.
 const potionsFor = (def) => (raceOf(def).humanoid
@@ -765,13 +782,13 @@ const UNIT_SKILLS = {
             heal: 190, range: 30, cast: 1.8, minLevel: 3,
             desc: '치유술과 대치유술 사이' },
   judgement: { id: 'judgement', icon: 'judgement', name: '신벌', spec: 'priest', cd: 12, mp: 24,
-            kind: 'damage-area', mul: 1.3, radius: 16, range: 30, cast: 1.2, minLevel: 5,
+            kind: 'damage-area', mul: 1.3, radius: 16, range: 30, cast: 1.2, minLevel: 5, school: 'holy',
             desc: '빛을 내려 여럿을 친다' },
   chastise: { id: 'chastise', icon: 'chastise', name: '응징', spec: 'priest', cd: 9, mp: 14, kind: 'dot',
-            tick: 15, interval: 1, duration: 6, range: 30, cast: 0, minLevel: 2,
+            tick: 15, interval: 1, duration: 6, range: 30, cast: 0, minLevel: 2, school: 'holy',
             desc: '지워지지 않는 낙인을 남긴다' },
   smite:  { id: 'smite', icon: 'smite', name: '심판', spec: 'priest', cd: 7, mp: 12, kind: 'damage',
-            mul: 1.6, range: 30, cast: 1.0, minLevel: 1,
+            mul: 1.6, range: 30, cast: 1.0, minLevel: 1, school: 'holy',
             desc: '힐할 곳이 없으면 때린다' },
 
   // --- 음유시인 ---
@@ -1106,6 +1123,11 @@ const SPEC_SKILLS = {
   // 되어 둘 중 하나를 고를 이유가 사라진다.
   bard:    ['anthem', 'dissonance', 'harmony', 'lament', 'tune', 'echo', 'refrain', 'serenade', 'chord', 'finale'],
   grunt:   ['gash', 'pounce', 'trip', 'jab'],
+  // **좀비도 적 전용 계열이고 목록이 넷뿐이다**(잡졸과 같은 이유로 뽑는 자리가
+  // 없다). 새 스킬을 만들지 않고 이미 있는 것 중 시안의 넷에 가까운 것을 골랐다 —
+  // 밀쳐내기가 시안의 돌진이고, 나머지는 손으로 할퀴고 덮치는 것이다. 순서가 곧
+  // 우선순위라 미는 것을 앞에 두었다: 느린 대신 후열을 밀어내며 붙는 쪽이다.
+  zombie:  ['shove', 'gash', 'pounce', 'jab'],
   // 우두머리 전용. 새 스킬을 만들지 않고 수호와 전사의 무거운 것만 골라 묶었다 —
   // 이 계열이 하는 일은 "이미 있는 것 중 가장 아픈 것"이지 새로운 수단이 아니다.
   chieftain: ['rupture', 'sweep', 'roar', 'slam', 'shieldSlam', 'crush', 'bash'],
@@ -1209,7 +1231,10 @@ function skillsFor(spec, level, seed, always, learned) {
 function shared(id, over) {
   const twin = UNIT_SKILLS[id];
   if (!twin) throw new Error(`동료 표에 없는 스킬: ${id}`);
-  return Object.assign({ id, name: twin.name, icon: twin.icon, kind: twin.kind }, over);
+  // **피해의 갈래도 물려받는다.** 이름·아이콘과 같은 이유다 — 심판이 동료
+  // 쪽에서만 신성이면, 같은 기술이 주인공 손에서는 언데드에게 덜 아프다.
+  return Object.assign(
+    { id, name: twin.name, icon: twin.icon, kind: twin.kind, school: twin.school }, over);
 }
 
 const PLAYER_SKILLS = {
@@ -1336,7 +1361,7 @@ const PLAYER_SKILLS = {
   },
   hammer: {
     id: 'hammer', job: 'paladin', unlock: 5, kind: 'damage-area', range: 24, cast: 1.0, name: '심판의 망치', type: '광역', targeting: 'area-enemy',
-    mp: 28, cd: 12, damage: 84, radius: 16, icon: 'hammer',
+    mp: 28, cd: 12, damage: 84, radius: 16, icon: 'hammer', school: 'holy',
     desc: '기준점 주변의 적을 한 번에 내리친다.',
   },
   devotion: {
@@ -1731,6 +1756,24 @@ const ENEMIES = {
             hp: 1484, mp: 128, atk: 38, attackCd: 2.4, range: 30, speed: 14,
            attrs: { str: 18, agi: 8, int: 19, vit: 88 }, growth: 'enemy', attackType: 'magic',
             armor: 0.9, spec: 'shaman', always: ['curse'] },
+  // 좀비. **언데드 종족을 처음 쓴다.** 표에만 있고 아무도 쓰지 않던 자리다.
+  //
+  // **신성 피해를 1.6배로 받는다**(`RACE_WEAK`). 종족이 정하므로 앞으로 들일
+  // 언데드가 전부 같은 약점을 갖는다 — 파티에 신성을 드는 계열(사제·성기사·주교)이
+  // 있는지가 이 지역에서 값을 갖는 자리다.
+  //
+  // 시안의 "느린 움직임에도 끈질긴 생명력"을 수치로 옮겼다: 고블린 척후병보다
+  // 체력이 1.5배인데 걸음은 절반 아래고(9 대 21) 때리는 사이도 길다(2.2 대 1.5).
+  // **등급은 잡졸이다** — 무리로 몰려오는 쪽이라 하나하나가 세면 안 된다.
+  //
+  // **체력으로만 맞췄다.** 납골당은 지금 좀비 하나뿐이라 정예도 적 힐러도 없어
+  // 다른 지역보다 헐거웠는데(장비 파티로 재니 89% 대 82~86%), 공격력을 30에서
+  // 38로 올리자 이번에는 34~44%로 떨어졌다 — 잡졸이 다섯씩 나오는 자리라 한 방이
+  // 다섯 배로 걸린다. 체력만 1,106 → 1,218로 올려 83~87%에 맞췄다.
+  zombie: { id: 'zombie', race: 'undead', rank: 'trash', exp: 14, name: '좀비',       job: 'dealer', sprite: 'zombie',
+            hp: 1218, mp: 72,  atk: 30, attackCd: 2.2, range: 7,  speed: 9,
+           attrs: { str: 30, agi: 6, int: 8, vit: 76 }, growth: 'enemy',
+            armor: 0.9,  spec: 'zombie' },
   // 오우거 전사. **오크와 같은 등급인데 하는 일이 다르다** — 오크는 수호 계열이라
   // 도발로 붙들고 버티고, 이쪽은 전사 계열이라 한 방이 크다(공격력 63 대 51).
   // 대신 때리는 사이가 길고(2.2초) 걸음이 느리다(10 대 16). 같은 값을 다르게
@@ -1809,6 +1852,19 @@ const REGIONS = {
     boss: null,
     drops: ['pelt', 'ore', 'helm', 'bow', 'robe', 'shield', 'charm', 'crystal', 'band'],
     minLevel: 3,
+  },
+  // **언데드의 자리를 따로 뒀다.** 좀비를 초소나 야영지에 섞으면 오크 무리에
+  // 시체가 낀 그림이 되고, 무엇보다 **신성이 값을 갖는 자리가 흩어진다** —
+  // 앞으로 들일 언데드가 여기로 모이면 "이 지역에는 사제를 데려간다"가 한 판의
+  // 판단이 된다. 문턱을 5로 둔 것은 그때쯤 명부에 사제 계열이 서기 때문이다.
+  crypt: {
+    id: 'crypt', scene: 'crypt', name: '납골당',
+    prefix: ['오래된', '무너진', '잊힌', '축축한'],
+    task: ['정화', '수색', '봉인'],
+    enemies: ['zombie'],
+    boss: null,
+    drops: ['ore', 'charm', 'crystal', 'robe', 'rod', 'chalice', 'band', 'staff', 'pelt'],
+    minLevel: 5,
   },
   camp: {
     id: 'camp', scene: 'camp', name: '야영지',
@@ -2024,7 +2080,7 @@ const PARTY_MAX = 5;   // 주인공을 포함한 수
 const SKILL_MAX = 5;   // 전투에 등록할 수 있는 주인공 스킬 수
 
 const api = {
-  FIELD, JOBS, SPECS, RACES, raceOf, raceAttrs, potionsFor, MELEE_RANGE, roleOf, ATTACK_ORDER, HEAL_ORDER, PULL_ORDER, LEVEL, ATTRS, ATTR, ATTR_GROWTH, attrsAt, derive, STATS, LOWER_IS_BETTER, TIERS, AFFIX_COUNT, AFFIX_BASE, AFFIX_POOL,
+  FIELD, JOBS, SPECS, RACES, raceOf, raceAttrs, RACE_WEAK, weakOf, schoolMul, potionsFor, MELEE_RANGE, roleOf, ATTACK_ORDER, HEAL_ORDER, PULL_ORDER, LEVEL, ATTRS, ATTR, ATTR_GROWTH, attrsAt, derive, STATS, LOWER_IS_BETTER, TIERS, AFFIX_COUNT, AFFIX_BASE, AFFIX_POOL,
   tierName, tierFloor, tierRoll, tierCeiling, TIER_POWER, AFFIX_RANGE, SHOP_MAX_TIER,
   RANKS, rankOf,
   SLOTS, GEAR, MATERIALS, REGIONS, NAMES, SPECIAL_POOL, SPECIAL_CHANCE,
