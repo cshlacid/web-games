@@ -533,6 +533,20 @@ const COMPANIONS = {
   // 음유시인은 딜러로 둔다. 힐러로 두면 편성이 "힐러 둘"이 되어 적 딜러의
   // 힐러 우선 규칙이 이쪽으로 몰리는데, 이 계열이 하는 일은 살리는 것이 아니라
   // 남을 계속 쓰게 하는 것이다.
+  // **성기사도 힐러 역할이다.** 주인공 쪽에서 회복을 맡는 계열 셋(사제·음유시인·
+  // 성기사) 중 이쪽만 동료에 없어 편성에서 고를 수 없었다. 앞에 서서 버티지만
+  // 역할은 힐러로 두는 것은 주인공 쪽과 같은 잣대다 — 하는 일이 아니라 파티에서
+  // 앉는 자리가 역할이고, 도발을 든 힐러라는 것이 이 계열의 값이다.
+  garin: { id: 'garin', race: 'dwarf',  name: '맹세한 가린', job: 'healer', sprite: 'paladin',
+           hp: 952, mp: 72,  atk: 24, attackCd: 1.7, range: 8,  speed: 16,
+           attrs: { str: 18, agi: 8, int: 11, vit: 54 },
+           armor: 0.7, spec: 'paladin',
+           note: '앞에 서서 버티고 조금 회복한다' },
+  ilsa:  { id: 'ilsa', race: 'human',  name: '빛나는 일사', job: 'healer', sprite: 'paladin',
+           hp: 700, mp: 104, atk: 20, attackCd: 1.9, range: 10, speed: 18,
+           attrs: { str: 14, agi: 10, int: 13, vit: 50 }, attackType: 'magic',
+           armor: 0.78, spec: 'paladin',
+           note: '덜 단단한 대신 회복과 신성 피해가 크다' },
   finn:  { id: 'finn', race: 'human',  name: '음유시인 핀', job: 'healer', sprite: 'bard',
            hp: 490, mp: 160, atk: 36, attackCd: 1.6, range: 32, speed: 18,
            attrs: { str: 13, agi: 16, int: 20, vit: 35 }, attackType: 'magic',
@@ -791,6 +805,42 @@ const UNIT_SKILLS = {
             mul: 1.6, range: 30, cast: 1.0, minLevel: 1, school: 'holy',
             desc: '힐할 곳이 없으면 때린다' },
 
+  // --- 성기사 -----------------------------------------------------------
+  //
+  // **주인공 표에만 있던 여덟을 여기로 내렸다.** 성기사는 주인공 전용 계열이라
+  // 동료 쪽에 자료가 아예 없었는데, 같은 계열을 동료도 맡게 되면서 "같은 기술을
+  // 두 표에 따로 적지 않는다"는 규칙이 걸린다 — 이름·아이콘·종류·피해 갈래를
+  // 여기 두고 주인공 쪽이 `shared`로 물려받는다. **수치는 주인공 것과 다르다**:
+  // 사람이 조작하는 쪽은 쿨타임이 짧고 사거리가 길다.
+  //
+  // **사제보다 회복이 작고 사거리가 짧다**(신성한 손길 78 대 치유술 145, 20 대 30).
+  // 앞에 서서 버티는 것이 이 계열의 본업이고 회복은 보조라, 같은 값을 주면
+  // "도발도 하는 사제"가 되어 둘 중 하나를 고를 이유가 사라진다.
+  layHands: { id: 'layHands', icon: 'layHands', name: '신성한 손길', spec: 'paladin', cd: 3, mp: 16,
+            kind: 'heal', heal: 78, range: 20, cast: 0.8, minLevel: 1, core: 1,
+            desc: '가까운 동료를 조금 회복한다' },
+  oath:   { id: 'oath', icon: 'oath', name: '서약', spec: 'paladin', cd: 30, mp: 0, kind: 'mana',
+            mana: 48, range: 0, cast: 2.2, minLevel: 1,
+            desc: '무릎 꿇어 제 마나를 되찾는다' },
+  holyShield: { id: 'holyShield', icon: 'holyShield', name: '성스러운 방패', spec: 'paladin', cd: 20, mp: 24,
+            kind: 'buff', stat: 'armor', mul: 0.86, duration: 12, range: 20, cast: 0, minLevel: 3,
+            desc: '동료 하나가 받는 피해를 줄인다' },
+  radiance: { id: 'radiance', icon: 'radiance', name: '광휘', spec: 'paladin', cd: 12, mp: 30,
+            kind: 'heal-area', heal: 52, radius: 18, range: 24, cast: 1.4, minLevel: 4,
+            desc: '주변 동료를 조금씩 채운다' },
+  flame:  { id: 'flame', icon: 'flame', name: '심판의 불꽃', spec: 'paladin', cd: 10, mp: 16, kind: 'dot',
+            tick: 18, interval: 1, duration: 6, range: 22, cast: 1.0, minLevel: 4, school: 'holy',
+            desc: '거룩한 불이 붙어 계속 태운다' },
+  hammer: { id: 'hammer', icon: 'hammer', name: '심판의 망치', spec: 'paladin', cd: 13, mp: 26,
+            kind: 'damage-area', mul: 1.2, radius: 16, range: 10, cast: 1.0, minLevel: 5, school: 'holy',
+            desc: '붙어 있는 적을 한 번에 내리친다' },
+  devotion: { id: 'devotion', icon: 'devotion', name: '헌신', spec: 'paladin', cd: 26, mp: 32,
+            kind: 'buff-area', stat: 'armor', mul: 0.92, duration: 10, radius: 20, range: 20, cast: 1.4, minLevel: 7,
+            desc: '주변 동료가 받는 피해를 함께 줄인다' },
+  pyre:   { id: 'pyre', icon: 'pyre', name: '성스러운 불길', spec: 'paladin', cd: 20, mp: 34, kind: 'zone',
+            tick: 20, interval: 1, duration: 8, radius: 18, range: 24, cast: 1.6, minLevel: 8, school: 'holy',
+            desc: '그 자리를 거룩한 불로 태운다' },
+
   // --- 음유시인 ---
   // **아군의 마나를 채우는 유일한 계열.** 자기 마나만 채우는 것(kind 'mana')과
   // 달라서 종류를 둘 더 두었다 — 'mana-ally'는 하나에게, 'mana-area'는 기준점
@@ -967,6 +1017,7 @@ const SPECS = {
   priest:  '사제',
   shaman:  '주술사',
   bard:    '음유시인',
+  paladin: '성기사',
   // 상위 계열. 레벨이 오르면 여기로 올라간다(SPEC_UP).
   bulwark:   '철벽',
   berserker: '광전사',
@@ -1058,7 +1109,7 @@ const SPEC_UP = {
 const SPEC_CHOICES = {
   tank: ['tank', 'warrior'],
   dealer: ['warrior', 'rogue', 'archer', 'mage'],
-  healer: ['priest', 'bard'],
+  healer: ['priest', 'bard', 'paladin'],
 };
 
 // 바꿀 수 있게 되는 레벨. 1레벨부터 바꿀 수 있으면 명부를 받자마자 전부 갈아
@@ -1122,6 +1173,12 @@ const SPEC_SKILLS = {
   // 회복량도 사제보다 작게 잡았다: 여기서 같은 값을 주면 "노래도 부르는 사제"가
   // 되어 둘 중 하나를 고를 이유가 사라진다.
   bard:    ['anthem', 'dissonance', 'harmony', 'lament', 'tune', 'echo', 'refrain', 'serenade', 'chord', 'finale'],
+  // **성기사는 버티는 것이 본업이고 회복이 보조다.** 그래서 도발이 회복보다
+  // 앞이다 — 수호자와 같고 사제와 반대다. 마나 회복(서약)을 앞쪽에 둔 것은 다른
+  // 계열과 같은 이유이고, 때리는 셋은 맨 뒤라 앞의 것들이 쿨타임일 때 나간다.
+  // **`core`가 도발과 신성한 손길이다**: 도발 없는 성기사는 수호자와 갈리지
+  // 않고, 회복 없는 성기사는 힐러 역할에 세울 수 없다.
+  paladin: ['taunt', 'oath', 'layHands', 'radiance', 'holyShield', 'devotion', 'hammer', 'flame', 'smite', 'pyre'],
   grunt:   ['gash', 'pounce', 'trip', 'jab'],
   // **좀비도 적 전용 계열이고 목록이 넷뿐이다**(잡졸과 같은 이유로 뽑는 자리가
   // 없다). 새 스킬을 만들지 않고 이미 있는 것 중 시안의 넷에 가까운 것을 골랐다 —
@@ -1334,55 +1391,55 @@ const PLAYER_SKILLS = {
     mp: 14, cd: 3.5, damage: 110,
     desc: '붙어서 내리친다. 즉시 나가고 세지만 사거리가 짧다.',
   }),
-  layHands: {
-    id: 'layHands', job: 'paladin', unlock: 1, kind: 'heal', range: 30, cast: 0.6, name: '신성한 손길', type: '개별 대상', targeting: 'ally',
-    mp: 14, cd: 2.2, heal: 64, icon: 'layHands',
+  layHands: shared('layHands', {
+    job: 'paladin', unlock: 1, range: 30, cast: 0.6, type: '개별 대상', targeting: 'ally',
+    mp: 14, cd: 2.2, heal: 64,
     desc: '동료 하나를 조금 회복한다. 사제의 손길보다 훨씬 작다.',
-  },
+  }),
   taunt: shared('taunt', {
     job: 'paladin', unlock: 2, range: 28, cast: 0, type: '도발', targeting: 'enemy',
     mp: 16, cd: 9, duration: 6,
     desc: '적 하나를 자신에게 끌어온다. 주인공이 어그로를 옮기는 유일한 수단이다.',
   }),
-  holyShield: {
-    id: 'holyShield', job: 'paladin', unlock: 3, kind: 'buff', range: 26, cast: 0, name: '성스러운 방패', type: '강화', targeting: 'ally',
-    mp: 20, cd: 18, stat: 'armor', mul: 0.84, duration: 12, icon: 'holyShield',
+  holyShield: shared('holyShield', {
+    job: 'paladin', unlock: 3, range: 26, cast: 0, type: '강화', targeting: 'ally',
+    mp: 20, cd: 18, stat: 'armor', mul: 0.84, duration: 12,
     desc: '동료 하나가 받는 피해를 줄인다. 자신에게도 걸 수 있다.',
-  },
-  oath: {
-    id: 'oath', job: 'paladin', unlock: 3, kind: 'mana', range: 0, cast: 1.6, name: '서약', type: '마나 회복', targeting: 'self',
-    mp: 0, cd: 26, mana: 66, icon: 'oath',
+  }),
+  oath: shared('oath', {
+    job: 'paladin', unlock: 3, range: 0, cast: 1.6, type: '마나 회복', targeting: 'self',
+    mp: 0, cd: 26, mana: 66,
     desc: '무릎 꿇어 맹세하며 자신의 마나를 되찾는다.',
-  },
-  radiance: {
-    id: 'radiance', job: 'paladin', unlock: 4, kind: 'heal-area', range: 32, cast: 1.2, name: '광휘', type: '범위', targeting: 'area-ally',
-    mp: 26, cd: 9, heal: 48, radius: 18, icon: 'radiance',
+  }),
+  radiance: shared('radiance', {
+    job: 'paladin', unlock: 4, range: 32, cast: 1.2, type: '범위', targeting: 'area-ally',
+    mp: 26, cd: 9, heal: 48, radius: 18,
     desc: '기준점 주변의 아군을 조금씩 회복한다.',
-  },
-  hammer: {
-    id: 'hammer', job: 'paladin', unlock: 5, kind: 'damage-area', range: 24, cast: 1.0, name: '심판의 망치', type: '광역', targeting: 'area-enemy',
-    mp: 28, cd: 12, damage: 84, radius: 16, icon: 'hammer', school: 'holy',
+  }),
+  hammer: shared('hammer', {
+    job: 'paladin', unlock: 5, range: 24, cast: 1.0, type: '광역', targeting: 'area-enemy',
+    mp: 28, cd: 12, damage: 84, radius: 16,
     desc: '기준점 주변의 적을 한 번에 내리친다.',
-  },
-  devotion: {
-    id: 'devotion', job: 'paladin', unlock: 6, kind: 'buff-area', range: 24, cast: 1.4, name: '헌신', type: '광역 강화', targeting: 'area-ally',
-    mp: 30, cd: 24, stat: 'armor', mul: 0.9, duration: 10, radius: 20, icon: 'devotion',
+  }),
+  devotion: shared('devotion', {
+    job: 'paladin', unlock: 6, range: 24, cast: 1.4, type: '광역 강화', targeting: 'area-ally',
+    mp: 30, cd: 24, stat: 'armor', mul: 0.9, duration: 10, radius: 20,
     desc: '기준점 주변 아군이 받는 피해를 함께 줄인다.',
-  },
+  }),
   // **사제에게 있던 공격 둘을 여기로 옮겼다.** 사제는 회복만 하는 계열이고,
   // 때리는 것은 앞에 서는 성기사의 일이다 — 힐러 게임에서 "회복만 하는 계열"이
   // 하나도 없으면 회복이 본업이라는 말이 수치에 없는 말이 된다. 사거리도 성기사에
   // 맞춰 줄였다(40 → 26, 44 → 30).
-  flame: {
-    id: 'flame', job: 'paladin', unlock: 4, kind: 'dot', range: 26, cast: 1.0, name: '심판의 불꽃', type: '도트', targeting: 'enemy',
-    mp: 16, cd: 9, tick: 22, interval: 1, duration: 6, icon: 'flame',
+  flame: shared('flame', {
+    job: 'paladin', unlock: 4, range: 26, cast: 1.0, type: '도트', targeting: 'enemy',
+    mp: 16, cd: 9, tick: 22, interval: 1, duration: 6,
     desc: '적 하나를 태운다. 어그로를 끌 수 있다.',
-  },
-  pyre: {
-    id: 'pyre', job: 'paladin', unlock: 6, kind: 'zone', range: 30, cast: 1.8, name: '성스러운 불길', type: '장판', targeting: 'area-enemy',
-    mp: 34, cd: 18, tick: 26, interval: 1, duration: 8, radius: 18, icon: 'pyre',
+  }),
+  pyre: shared('pyre', {
+    job: 'paladin', unlock: 6, range: 30, cast: 1.8, type: '장판', targeting: 'area-enemy',
+    mp: 34, cd: 18, tick: 26, interval: 1, duration: 8, radius: 18,
     desc: '바닥에 남는 장판. 안에 선 적이 계속 탄다.',
-  },
+  }),
 
   // --- 주교 -------------------------------------------------------------
   //
@@ -1824,6 +1881,7 @@ const NAMES = {
     mage: ['마법사', '불꽃의', '서리의', '주문사', '푸른 불', '늙은', '별을 읽는'],
     priest: ['사제', '수도사', '고요한', '푸른', '치유사', '기도하는', '견습'],
     bard: ['음유시인', '악사', '노래하는', '떠도는', '거리의', '흥겨운', '금빛'],
+    paladin: ['성기사', '맹세한', '방패의', '빛나는', '경건한', '순례하는', '흰 갑옷'],
   },
   given: ['브란', '코린', '라일', '세라', '미라', '유리', '노아', '딘',
           '카엘', '테오', '린', '하나', '오릭', '베라', '단', '이샤',

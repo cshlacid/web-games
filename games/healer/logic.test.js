@@ -262,7 +262,7 @@ function cast(state, skillId, target) {
   // 그 계열이 아니다.
   const core = (spec) => D.SPEC_SKILLS[spec].filter((id) => D.UNIT_SKILLS[id].core);
   const missing = [];
-  for (const spec of ['tank', 'warrior', 'rogue', 'archer', 'mage', 'priest', 'bard']) {
+  for (const spec of ['tank', 'warrior', 'rogue', 'archer', 'mage', 'priest', 'bard', 'paladin']) {
     for (const name of ['가', '나', '다', '라', '마', '바', '사', '아']) {
       const hand = D.skillsFor(spec, level, seedOf(`${spec}-${name}`));
       for (const id of core(spec)) {

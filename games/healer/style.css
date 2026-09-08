@@ -48,6 +48,7 @@
   --spec-priest: #2f8a8a;
   --spec-shaman: #9a5fb8;
   --spec-bard: #c07a2f;
+  --spec-paladin: #b8912f;
   --spec-grunt: #7a8a4a;
   --spec-chieftain: #a83b2c;
   /* 상위 계열. 아래 계열과 **같은 계통이되 한 단 진하다** — 다른 색을 주면 같은
@@ -105,6 +106,7 @@
     --spec-priest: #5fc4c4;
     --spec-shaman: #c79ae0;
     --spec-bard: #e8a95f;
+    --spec-paladin: #e0c46a;
     --spec-grunt: #b3c47a;
     --spec-chieftain: #e2705c;
     --spec-bulwark: #9dbdf2;
