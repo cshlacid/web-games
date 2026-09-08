@@ -1727,7 +1727,7 @@ const ENEMIES = {
             hp: 2422, mp: 72,  atk: 51, attackCd: 1.8, range: 7,  speed: 16,
            attrs: { str: 65, agi: 8, int: 10, vit: 144 }, growth: 'enemy',
             armor: 0.7,  spec: 'tank', always: ['sweep'] },
-  hexer:  { id: 'hexer', race: 'orc', rank: 'elite', exp: 42,  name: '오크 주술사',   job: 'healer', sprite: 'shaman',
+  hexer:  { id: 'hexer', race: 'orc', rank: 'elite', exp: 42,  name: '오크 주술사',   job: 'healer', sprite: 'hexer',
             hp: 1484, mp: 128, atk: 38, attackCd: 2.4, range: 30, speed: 14,
            attrs: { str: 18, agi: 8, int: 19, vit: 88 }, growth: 'enemy', attackType: 'magic',
             armor: 0.9, spec: 'shaman', always: ['curse'] },
