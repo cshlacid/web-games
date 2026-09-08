@@ -54,11 +54,11 @@ function check(name, actual, expected) {
       Sprites.size(kind), { w: sprite.w + 2, h: sprite.h + 2 });
   }
 
-  // 시안을 받은 열둘만 그림 파일이고 나머지 둘(고블린 주술사·우두머리)이 도형이다.
+  // 시안을 받은 열셋만 그림 파일이고 고블린 주술사 하나만 도형으로 남았다.
   // 화풍이 섞이는 것은 시안이 오는 대로 하나씩 갈아 끼우기 때문이다 — 남은
   // 시안이 오면 여기부터 바뀐다.
-  check('도형 그림 둘', Object.keys(Sprites.SPRITES).length, 2);
-  check('그림 파일 열둘', Object.keys(Sprites.SHEETS).length, 12);
+  check('도형 그림 하나', Object.keys(Sprites.SPRITES).length, 1);
+  check('그림 파일 열셋', Object.keys(Sprites.SHEETS).length, 13);
   // 한쪽에만 있어야 한다. 양쪽에 두면 화면이 분기를 놓쳤을 때 조용히 도형이 나온다.
   const both = Object.keys(Sprites.SHEETS).filter((k) => Sprites.SPRITES[k]);
   check('그림 파일은 도형으로 겹치지 않는다', both, []);
@@ -82,12 +82,21 @@ function check(name, actual, expected) {
   check('한 그림을 두 계열이 나눠 쓰지 않는다',
     Object.entries(byPic).filter(([, set]) => set.size > 1).map(([pic]) => pic), []);
 
-  // 우두머리는 상자가 넓다. 화면 크기를 이 폭으로 정하므로 이것이 곧 "크다"이다.
-  // **도형 그림끼리만 견준다** — 주인공의 상자가 넓은 것은 인물이 커서가 아니라
-  // 지팡이가 좌우로 흔들려서다.
-  check('우두머리가 도형 중 가장 크다',
-    Object.keys(Sprites.SPRITES).every((kind) => kind === 'boss'
-      || Sprites.size(kind).w < Sprites.size('boss').w), true);
+  // **적은 등급 순으로 커야 한다.** 상자 폭으로 견주던 검사를 여기로 옮겼다 —
+  // 그쪽은 무기가 좌우로 흔들리는 폭까지 재서, 지팡이를 든 쪽이 덩치와 무관하게
+  // 넓게 나온다. 지금은 인물 키로 잰다: 그림 파일은 `box`에서 칸의 빈자리를 덜어
+  // 낸 값(시안끼리 맞춘 인물 키 76px), 도형은 상자 높이 그대로다.
+  const personH = (kind) => {
+    const sheet = Sprites.SHEETS[kind];
+    return sheet ? (sheet.box * 76) / sheet.cell.h : Sprites.size(kind).h;
+  };
+  const ladder = ['goblin', 'orc', 'ogre', 'chief'];
+  check('적은 등급 순으로 커진다',
+    ladder.every((kind, i) => i === 0 || personH(kind) > personH(ladder[i - 1])), true);
+  // 같은 종족·같은 등급인 둘은 키가 같아야 한다. 크기로 읽히는 것은 등급이지
+  // 계열이 아니다.
+  check('오크 전사와 오크 주술사는 키가 같다',
+    Math.abs(personH('orc') - personH('hexer')) < 0.5, true);
 }
 
 // --- 자료가 가리키는 그림이 실제로 있는가 -------------------------------

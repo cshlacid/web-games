@@ -1757,7 +1757,7 @@ const ENEMIES = {
   // **우두머리는 제 계열을 쓴다.** 오크 전사와 같은 수호 계열을 들고 있던 동안에는
   // 덩치만 큰 오크였다 — 잡는 데 오래 걸릴 뿐 무섭지는 않았다. 지금은 휩쓸기로
   // 파티 전체를 긁고 마무리로 한 명을 끊는다.
-  chief:  { id: 'chief', race: 'orc', rank: 'boss', exp: 210,  name: '오크 우두머리', job: 'tank',   sprite: 'boss',
+  chief:  { id: 'chief', race: 'orc', rank: 'boss', exp: 210,  name: '오크 우두머리', job: 'tank',   sprite: 'chief',
             hp: 5222, mp: 136, atk: 67, attackCd: 2.0, range: 8,  speed: 14,
            attrs: { str: 100, agi: 6, int: 20, vit: 311 }, growth: 'enemy',
             armor: 0.62, spec: 'chieftain', always: ['rupture', 'sweep'] },
