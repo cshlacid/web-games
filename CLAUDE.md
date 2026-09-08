@@ -111,7 +111,7 @@
   구조를 유지하기 위해서다.
 - **예외가 하나 있다: 힐러에서 시안을 받은 캐릭터의 그림**(`games/healer/hero.png`,
   `tank.png`, `archer.png`, `mage.png`, `rogue.png`, `bard.png`, `priest.png`,
-  `warrior.png`, `goblin.png`, `orc.png`). 사람이 그린 시안을 그대로 쓰기로 하면서 도형을 포기한
+  `warrior.png`, `goblin.png`, `orc.png`, `ogre.png`). 사람이 그린 시안을 그대로 쓰기로 하면서 도형을 포기한
   자리다. 규칙을 없앤 것이 아니라 **시안을 받은 캐릭터만 그림 파일을
   쓴다** — 나머지는 여전히 도형이고, 새 그림을 도형으로 그릴 수 없을 때에만 여기에
   더한다. 그림 파일을 들일 때 지키는 것: 프레임을 격자 한 장에 담아 요청을 하나로
