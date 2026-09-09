@@ -209,6 +209,50 @@ const SHEETS = {
     },
   },
 
+  // 성기사. **아직 제 시안이 없어 수호자 그림을 빌린다.** 동료 계열로 열면서
+  // 그림이 필요해졌는데, 도형 렌더러를 걷어낸 뒤라 대신 그릴 것이 없다 — 방패와
+  // 검을 든 기사라 열넷 중 가장 가깝다. **한 그림을 두 계열이 나눠 쓰는 것은
+  // 규칙을 어기는 자리이므로**(편성 화면에서 이름을 읽어야 갈린다) `art.test.js`가
+  // 이 한 쌍을 못 박아 둔다: 성기사 시안이 오면 그 검사가 먼저 깨진다.
+  paladin: {
+    src: 'tank.png',
+    cell: { w: 92, h: 91 },
+    cols: 8, rows: 4,
+    box: 26,
+    clips: {
+      idle:      { row: 0, frames: 8, fps: 6 },
+      walkLeft:  { row: 1, frames: 8, fps: 10 },
+      walkRight: { row: 2, frames: 8, fps: 10 },
+      attack:    { row: 3, frames: 8, fps: 12, once: 1 },
+    },
+    crops: {
+      full: { x: 0, y: 0, w: 1, h: 1 },
+      list: { x: 0.15, y: 0.06, w: 0.78, h: 0.92 },
+      head: { x: 0.30, y: 0.09, w: 0.44, h: 0.42 },
+    },
+  },
+
+  // 좀비. 언데드 계열의 첫 적이다. **잡졸인데 고블린보다 크다**(인물 22.1칸,
+  // 고블린 21.3·고블린 주술사 21.5). 사람 크기의 시체라 그렇고, 정예인 오크
+  // (23.6)보다는 작아 등급 순서는 지켜진다.
+  zombie: {
+    src: 'zombie.png',
+    cell: { w: 99, h: 103 },
+    cols: 8, rows: 4,
+    box: 30,
+    clips: {
+      idle:      { row: 0, frames: 8, fps: 6 },
+      walkLeft:  { row: 1, frames: 8, fps: 10 },
+      walkRight: { row: 2, frames: 8, fps: 10 },
+      attack:    { row: 3, frames: 8, fps: 12, once: 1 },
+    },
+    crops: {
+      full: { x: 0, y: 0, w: 1, h: 1 },
+      list: { x: 0.15, y: 0.17, w: 0.68, h: 0.83 },
+      head: { x: 0.34, y: 0.17, w: 0.38, h: 0.34 },
+    },
+  },
+
   // 전사. 여덟 번째로 받은 시안이다. 공격의 붉은 참격이 옆으로 길지만 칸이 다른
   // 시트와 비슷한 것은, 이 시안의 인물이 그만큼 야무지게 서 있기 때문이다.
   warrior: {

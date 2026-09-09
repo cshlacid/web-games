@@ -382,6 +382,13 @@ function renderCharacter() {
 
   const statList = $('char-stats');
   statList.textContent = '';
+  // **전투력이 맨 위다.** 아래 아홉 줄을 머리로 접은 값이라, 아래에 두면 다 읽고
+  // 나서야 나온다. 역할 안에서 읽는 값이므로 역할 이름을 옆에 적는다 — 그것이
+  // 없으면 동료의 숫자와 그냥 견주게 된다.
+  const powerRow = el('li', 'power-row');
+  powerRow.append(text('span', null, `전투력 (${D.JOBS[D.HERO.job].name} 기준)`));
+  powerRow.append(text('b', 'stat-value', num(P.power(progress))));
+  statList.append(powerRow);
   for (const [key, label] of Object.entries(STAT_LABELS)) {
     const row = el('li');
     row.append(text('span', null, label));
@@ -568,6 +575,15 @@ function diffSummary(compare) {
   return parts.length ? `지금 낀 것과 ${parts.join(' · ')}` : '지금 낀 것과 차이 없음';
 }
 
+// **전투력 증감이 옵션 줄의 결론이다.** "최대 체력 +33 · 회피 +2%"가 나은 것인지
+// 매번 머리로 계산해야 했는데, 그 계산이 곧 전투력이다. 옵션 줄을 없애지 않는
+// 것은 왜 그렇게 되는지가 거기 있기 때문이다.
+function powerSummary(compare) {
+  const d = compare.powerDiff;
+  if (!d) return null;
+  return `전투력 ${d > 0 ? '+' : '−'}${num(Math.abs(d))}`;
+}
+
 // 인벤토리·상점·결과 화면이 같은 줄 모양을 쓴다. action은 오른쪽에 붙는 글자와
 // 눌렀을 때 할 일이다 — 장착이든 구매든 판매든 줄 생김새는 같아야 한다.
 function itemButton(item, action) {
@@ -586,6 +602,8 @@ function itemButton(item, action) {
   body.append(text('div', 'pick-sub', Items.summary(item)));
   // 지금 낀 것과의 차이. 이걸 보여 주지 않으면 갈아 끼울지를 매번 머리로
   // 계산해야 하고, 결국 아무도 계산하지 않는다.
+  const power = powerSummary(compare);
+  if (power) body.append(text('div', `pick-sub power-diff ${compare.powerDiff > 0 ? 'up' : 'down'}`, power));
   body.append(text('div', 'pick-sub diff', diffSummary(compare)));
   button.append(body);
 
@@ -940,7 +958,9 @@ function renderDeal() {
 function memberSummary(member) {
   const def = Roster.defOf(member);
   const gear = Roster.gearOf(member);
-  const parts = [def.note];
+  // **카드의 금빛 숫자가 무엇인지는 여기서 밝힌다.** 카드에는 이름을 적을 자리가
+  // 없어 숫자만 서 있다.
+  const parts = [`전투력 ${num(Roster.powerOf(member))}`, def.note];
   if (gear.length) parts.push(`장비 ${gear.length}`);
   // **떠날 만큼 쉰 동료는 그 사실을 적는다.** 결과 화면이 떠난 뒤에 알려 주는
   // 것만으로는 늦다 — 미리 보이지 않으면 규칙이 아니라 사고로 읽힌다.
@@ -1010,6 +1030,10 @@ function renderRoster() {
     const face = el('span', 'pick-face');
     face.append(avatar(Roster.spriteOf(member)));
     face.append(text('span', 'lv', `Lv ${member.level}`));
+    // **전투력은 레벨 아래에 둔다.** 신뢰도·보수 줄에 끼우면 320px에서 그 줄이
+    // 세 칸으로 늘어 접히는데, 이 칸은 폭이 고정이라 이름·계열과 자리를 다투지
+    // 않는다. 무엇을 재는 값인지는 상세와 도움말에 있다.
+    face.append(text('span', 'power', num(Roster.powerOf(member))));
     open.append(face);
 
     const body = el('div', 'pick-body');

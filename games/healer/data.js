@@ -71,6 +71,28 @@ const RACES = {
 
 const raceOf = (def) => RACES[(def && def.race) || 'human'] || RACES.human;
 
+// 싸우는 동안 초당 되찾는 마나(지능 하나당). **최대 마나의 비율이 아니라 지능에
+// 비례한다** — 지능이 마나를 쓰는 능력치이므로 되찾는 속도도 거기서 나와야,
+// 장비로 최대 마나만 올린 캐릭터가 회복까지 덤으로 얻지 않는다.
+const MANA_REGEN_PER_INT = 0.02;
+
+// **피해에 갈래가 있고, 종족마다 잘 듣는 갈래가 다르다.** 지금 갈래는 신성
+// (`school: 'holy'`) 하나뿐이고 그것을 타는 종족도 언데드 하나뿐이지만, 표로
+// 둔 것은 **언데드 계열을 더 들일 자리**이기 때문이다 — 유닛마다 분기를 쓰면
+// 적을 하나 더할 때마다 규칙이 는다.
+//
+// **표에 없으면 1이다.** 갈래를 적지 않은 피해(기본 공격과 대부분의 스킬)는
+// 아무 배수도 타지 않으므로, 새 갈래를 만들지 않는 한 여기는 조용하다.
+// **곱하는 자리는 `applyDamage` 하나다** — 강화·약화가 그러는 것과 같은 이유로,
+// 기본 공격·스킬·도트·장판이 전부 같은 규칙을 타야 한다.
+const RACE_WEAK = {
+  undead: { holy: 1.6 },
+};
+
+// 그 유닛이 갈래마다 얼마나 더 아픈가. 없으면 null이라 전투가 아무것도 하지 않는다.
+const weakOf = (def) => RACE_WEAK[raceOf(def).id] || null;
+const schoolMul = (weak, school) => (school && weak && weak[school]) || 1;
+
 // **물약은 인간형만 마신다.** 직업이 무엇을 들고 가는지는 JOB_POTIONS가 정하고,
 // 종족이 마실 수 있는지를 정한다.
 const potionsFor = (def) => (raceOf(def).humanoid
@@ -226,6 +248,101 @@ function withGear(base, gear, armorBase) {
     // 넘지 못하는 바닥을 둔다.
     armor: Math.max(0.35, armorBase + (g.armor || 0)),
   };
+}
+
+// --- 전투력 --------------------------------------------------------------
+//
+// **역할이 다른 캐릭터를 한 축에 세우지 않는다.** 탱커의 체력과 딜러의 공격력을
+// 같은 저울에 올리면 어느 쪽으로 기울여도 거짓말이 된다 — 그래서 **역할마다 제
+// 잣대로 재고, 그 결과만 같은 단위로 환산한다.** 화면에 뜨는 숫자는 하나지만
+// **같은 역할끼리 견주라고 적어 둔다.**
+//
+// 재 보고 정한 것이다. 장비를 갖춘 고정 파티의 네 번째 자리에 후보를 앉히고
+// 10레벨 의뢰를 돌리니, 탱커는 받아 낸 피해가, 딜러는 넣은 피해가, 힐러는
+// 회복량이 그 캐릭터의 값이었다. **한 잣대로 접으면 그것이 사라진다** — 실제로
+// 역할을 안 가리고 접었을 때 궁수(전투력 304)가 성기사(426)보다 승률이 높았다.
+//
+// **음유시인은 이 수치가 실제보다 낮게 나온다.** 강화와 마나 나눔은 남을 세게
+// 만드는 일이라 제 수치에 안 잡힌다. 파티 기여를 재려면 전투를 굴려야 하고,
+// 그것은 화면에서 할 수 없다 — 여기서 재는 것은 **혼자 있을 때의 값**이다.
+const POWER = {
+  // 축마다 자릿수가 달라 그대로 더할 수 없다. 나눠서 비슷한 크기로 맞춘다.
+  ehpUnit: 40,
+  // 역할마다 무엇을 보는가(합이 1이라 가중치를 옮기면 무엇을 포기하는지가 보인다)와,
+  // 그 축의 눈금(`scale`).
+  //
+  // **눈금이 역할마다 다르다.** 회복은 피해보다 자릿수가 작아, 같은 눈금으로 적으면
+  // 힐러가 탱커의 3분의 1로 나온다 — 역할을 넘어 견주지 말라고 적어 두어도 나란히
+  // 놓인 숫자를 눈이 먼저 읽는다. **지금 값은 그 역할의 동료 정의들이 10레벨 맨몸에서
+  // 1,000 언저리가 되도록 잡았다**: 1,000이 "제 역할의 보통"이고 거기서 얼마나
+  // 오르내리는지가 이 숫자가 말하는 전부다.
+  weights: {
+    tank:   { ehp: 0.60, hit: 0.30, mend: 0.10, scale: 7 },
+    dealer: { ehp: 0.25, hit: 0.70, mend: 0.05, scale: 7 },
+    healer: { ehp: 0.30, hit: 0.20, mend: 0.50, scale: 19 },
+  },
+  // 광역기가 몇에게 닿는다고 볼 것인가. 무리 상한이 다섯이라 그 절반쯤이다.
+  foes: 3,
+  // 마나가 버티는지 재는 시간. 한 무리를 치는 데 걸리는 시간쯤이다.
+  seconds: 60,
+};
+
+// 그 손으로 낼 수 있는 초당 피해·회복과, 마나가 그것을 얼마나 버티는가.
+// **스킬까지 보는 것이 핵심이다** — 능력치만 보면 사제와 성기사의 회복력이
+// 똑같이 나온다(둘 다 제 기준 대비 비율이라 같은 레벨이면 같은 값이다).
+// `skills`는 스킬 정의의 배열이다. **이름이 아니라 정의를 받는 것은** 동료는
+// `UNIT_SKILLS`, 주인공은 레벨을 얹은 `PLAYER_SKILLS`를 보기 때문이다 — 여기서
+// 표를 고르게 하면 두 표를 아는 자리가 하나 더 는다.
+function throughput(def, stats, skills, level) {
+  const base = derive(def, attrsAt(def, level, null));
+  const power = base.atk / (def.atk || 1);
+  // 치명타는 평균으로 녹여 넣는다. 터지는 맛은 전투의 것이고, 여기서 재는 것은
+  // 같은 시간에 얼마나 나가는가다.
+  const crit = 1 + stats.crit * (stats.critDamage - 1);
+  let hit = (stats.atk * crit) / def.attackCd;
+  let mend = 0;
+  let cost = 0;
+  let gain = 0;
+  for (const skill of skills || []) {
+    if (!skill) continue;
+    // **시전 시간도 주기에 넣는다.** 외우는 동안은 아무것도 못 하므로, 넣지
+    // 않으면 캐스팅 스킬이 공짜로 강해 보인다.
+    const cycle = skill.cd + (skill.cast || 0);
+    const many = (skill.kind || '').indexOf('area') >= 0 || skill.kind === 'zone';
+    const hits = many ? POWER.foes : 1;
+    // 동료는 공격력의 배수(`mul`), 주인공은 정액(`damage`)에 마법 공격력을 곱한다.
+    if (skill.mul) hit += (stats.atk * crit * skill.mul * hits) / cycle;
+    if (skill.damage) hit += (skill.damage * stats.spell * crit * hits) / cycle;
+    if (skill.tick) {
+      const total = skill.tick * power * (skill.duration / (skill.interval || 1)) * hits;
+      if (skill.kind === 'heal-dot') mend += (total * stats.heal) / cycle;
+      else hit += total / cycle;
+    }
+    if (skill.heal) mend += (skill.heal * stats.heal * (many ? POWER.foes : 1)) / cycle;
+    if (skill.mana) gain += skill.mana / cycle;
+    cost += (skill.mp || 0) / cycle;
+  }
+  return { hit, mend, gain, need: cost * POWER.seconds };
+}
+
+// 화면에 적는 전투력. `stats`는 장비까지 얹은 값(`withGear`)이라 **옵션이 그대로
+// 걸린다** — 능력치 옵션은 그 앞(`attrsWithGear`)에서 이미 녹아 있다.
+function combatPower(def, stats, skills, level, attrs) {
+  const t = throughput(def, stats, skills, level);
+  // **마나가 못 버티면 스킬 몫을 그만큼 깎는다.** 마나를 다 쓴 유닛은 기본
+  // 공격만 하므로, 최대 마나와 마나 회복 스킬이 전투력에 걸리는 자리가 여기다 —
+  // 장비의 마나 옵션이 아무 데도 안 걸리면 "장비가 반영된다"가 반쪽이 된다.
+  const regen = (attrs ? attrs.int : 0) * MANA_REGEN_PER_INT;
+  const supply = stats.mp + (t.gain + regen) * POWER.seconds;
+  // 기본 공격은 마나를 안 먹으므로 깎이지 않는다. 스킬 몫만 버티는 만큼 센다.
+  const plain = (stats.atk * (1 + stats.crit * (stats.critDamage - 1))) / def.attackCd;
+  const ratio = t.need > 0 ? Math.min(1, supply / t.need) : 1;
+  const hit = plain + (t.hit - plain) * ratio;
+  const mend = t.mend * ratio;
+  const ehp = stats.hp / stats.armor / (1 - Math.min(ATTR.dodgeCap, stats.dodge));
+  const w = POWER.weights[def.job] || POWER.weights.dealer;
+  return Math.round(w.scale
+    * (w.ehp * (ehp / POWER.ehpUnit) + w.hit * hit + w.mend * mend));
 }
 
 // 레벨과 경험치. 캐릭터 레벨과 직업 레벨을 따로 두는 것은 둘이 오르는 이유가
@@ -516,6 +633,20 @@ const COMPANIONS = {
   // 음유시인은 딜러로 둔다. 힐러로 두면 편성이 "힐러 둘"이 되어 적 딜러의
   // 힐러 우선 규칙이 이쪽으로 몰리는데, 이 계열이 하는 일은 살리는 것이 아니라
   // 남을 계속 쓰게 하는 것이다.
+  // **성기사도 힐러 역할이다.** 주인공 쪽에서 회복을 맡는 계열 셋(사제·음유시인·
+  // 성기사) 중 이쪽만 동료에 없어 편성에서 고를 수 없었다. 앞에 서서 버티지만
+  // 역할은 힐러로 두는 것은 주인공 쪽과 같은 잣대다 — 하는 일이 아니라 파티에서
+  // 앉는 자리가 역할이고, 도발을 든 힐러라는 것이 이 계열의 값이다.
+  garin: { id: 'garin', race: 'dwarf',  name: '맹세한 가린', job: 'healer', sprite: 'paladin',
+           hp: 952, mp: 72,  atk: 24, attackCd: 1.7, range: 8,  speed: 16,
+           attrs: { str: 18, agi: 8, int: 11, vit: 54 },
+           armor: 0.7, spec: 'paladin',
+           note: '앞에 서서 버티고 조금 회복한다' },
+  ilsa:  { id: 'ilsa', race: 'human',  name: '빛나는 일사', job: 'healer', sprite: 'paladin',
+           hp: 700, mp: 104, atk: 20, attackCd: 1.9, range: 10, speed: 18,
+           attrs: { str: 14, agi: 10, int: 13, vit: 50 }, attackType: 'magic',
+           armor: 0.78, spec: 'paladin',
+           note: '덜 단단한 대신 회복과 신성 피해가 크다' },
   finn:  { id: 'finn', race: 'human',  name: '음유시인 핀', job: 'healer', sprite: 'bard',
            hp: 490, mp: 160, atk: 36, attackCd: 1.6, range: 32, speed: 18,
            attrs: { str: 13, agi: 16, int: 20, vit: 35 }, attackType: 'magic',
@@ -765,14 +896,50 @@ const UNIT_SKILLS = {
             heal: 190, range: 30, cast: 1.8, minLevel: 3,
             desc: '치유술과 대치유술 사이' },
   judgement: { id: 'judgement', icon: 'judgement', name: '신벌', spec: 'priest', cd: 12, mp: 24,
-            kind: 'damage-area', mul: 1.3, radius: 16, range: 30, cast: 1.2, minLevel: 5,
+            kind: 'damage-area', mul: 1.3, radius: 16, range: 30, cast: 1.2, minLevel: 5, school: 'holy',
             desc: '빛을 내려 여럿을 친다' },
   chastise: { id: 'chastise', icon: 'chastise', name: '응징', spec: 'priest', cd: 9, mp: 14, kind: 'dot',
-            tick: 15, interval: 1, duration: 6, range: 30, cast: 0, minLevel: 2,
+            tick: 15, interval: 1, duration: 6, range: 30, cast: 0, minLevel: 2, school: 'holy',
             desc: '지워지지 않는 낙인을 남긴다' },
   smite:  { id: 'smite', icon: 'smite', name: '심판', spec: 'priest', cd: 7, mp: 12, kind: 'damage',
-            mul: 1.6, range: 30, cast: 1.0, minLevel: 1,
+            mul: 1.6, range: 30, cast: 1.0, minLevel: 1, school: 'holy',
             desc: '힐할 곳이 없으면 때린다' },
+
+  // --- 성기사 -----------------------------------------------------------
+  //
+  // **주인공 표에만 있던 여덟을 여기로 내렸다.** 성기사는 주인공 전용 계열이라
+  // 동료 쪽에 자료가 아예 없었는데, 같은 계열을 동료도 맡게 되면서 "같은 기술을
+  // 두 표에 따로 적지 않는다"는 규칙이 걸린다 — 이름·아이콘·종류·피해 갈래를
+  // 여기 두고 주인공 쪽이 `shared`로 물려받는다. **수치는 주인공 것과 다르다**:
+  // 사람이 조작하는 쪽은 쿨타임이 짧고 사거리가 길다.
+  //
+  // **사제보다 회복이 작고 사거리가 짧다**(신성한 손길 78 대 치유술 145, 20 대 30).
+  // 앞에 서서 버티는 것이 이 계열의 본업이고 회복은 보조라, 같은 값을 주면
+  // "도발도 하는 사제"가 되어 둘 중 하나를 고를 이유가 사라진다.
+  layHands: { id: 'layHands', icon: 'layHands', name: '신성한 손길', spec: 'paladin', cd: 3, mp: 16,
+            kind: 'heal', heal: 78, range: 20, cast: 0.8, minLevel: 1, core: 1,
+            desc: '가까운 동료를 조금 회복한다' },
+  oath:   { id: 'oath', icon: 'oath', name: '서약', spec: 'paladin', cd: 30, mp: 0, kind: 'mana',
+            mana: 48, range: 0, cast: 2.2, minLevel: 1,
+            desc: '무릎 꿇어 제 마나를 되찾는다' },
+  holyShield: { id: 'holyShield', icon: 'holyShield', name: '성스러운 방패', spec: 'paladin', cd: 20, mp: 24,
+            kind: 'buff', stat: 'armor', mul: 0.86, duration: 12, range: 20, cast: 0, minLevel: 3,
+            desc: '동료 하나가 받는 피해를 줄인다' },
+  radiance: { id: 'radiance', icon: 'radiance', name: '광휘', spec: 'paladin', cd: 12, mp: 30,
+            kind: 'heal-area', heal: 52, radius: 18, range: 24, cast: 1.4, minLevel: 4,
+            desc: '주변 동료를 조금씩 채운다' },
+  flame:  { id: 'flame', icon: 'flame', name: '심판의 불꽃', spec: 'paladin', cd: 10, mp: 16, kind: 'dot',
+            tick: 18, interval: 1, duration: 6, range: 22, cast: 1.0, minLevel: 4, school: 'holy',
+            desc: '거룩한 불이 붙어 계속 태운다' },
+  hammer: { id: 'hammer', icon: 'hammer', name: '심판의 망치', spec: 'paladin', cd: 13, mp: 26,
+            kind: 'damage-area', mul: 1.2, radius: 16, range: 10, cast: 1.0, minLevel: 5, school: 'holy',
+            desc: '붙어 있는 적을 한 번에 내리친다' },
+  devotion: { id: 'devotion', icon: 'devotion', name: '헌신', spec: 'paladin', cd: 26, mp: 32,
+            kind: 'buff-area', stat: 'armor', mul: 0.92, duration: 10, radius: 20, range: 20, cast: 1.4, minLevel: 7,
+            desc: '주변 동료가 받는 피해를 함께 줄인다' },
+  pyre:   { id: 'pyre', icon: 'pyre', name: '성스러운 불길', spec: 'paladin', cd: 20, mp: 34, kind: 'zone',
+            tick: 20, interval: 1, duration: 8, radius: 18, range: 24, cast: 1.6, minLevel: 8, school: 'holy',
+            desc: '그 자리를 거룩한 불로 태운다' },
 
   // --- 음유시인 ---
   // **아군의 마나를 채우는 유일한 계열.** 자기 마나만 채우는 것(kind 'mana')과
@@ -950,6 +1117,7 @@ const SPECS = {
   priest:  '사제',
   shaman:  '주술사',
   bard:    '음유시인',
+  paladin: '성기사',
   // 상위 계열. 레벨이 오르면 여기로 올라간다(SPEC_UP).
   bulwark:   '철벽',
   berserker: '광전사',
@@ -1041,7 +1209,7 @@ const SPEC_UP = {
 const SPEC_CHOICES = {
   tank: ['tank', 'warrior'],
   dealer: ['warrior', 'rogue', 'archer', 'mage'],
-  healer: ['priest', 'bard'],
+  healer: ['priest', 'bard', 'paladin'],
 };
 
 // 바꿀 수 있게 되는 레벨. 1레벨부터 바꿀 수 있으면 명부를 받자마자 전부 갈아
@@ -1105,7 +1273,18 @@ const SPEC_SKILLS = {
   // 회복량도 사제보다 작게 잡았다: 여기서 같은 값을 주면 "노래도 부르는 사제"가
   // 되어 둘 중 하나를 고를 이유가 사라진다.
   bard:    ['anthem', 'dissonance', 'harmony', 'lament', 'tune', 'echo', 'refrain', 'serenade', 'chord', 'finale'],
+  // **성기사는 버티는 것이 본업이고 회복이 보조다.** 그래서 도발이 회복보다
+  // 앞이다 — 수호자와 같고 사제와 반대다. 마나 회복(서약)을 앞쪽에 둔 것은 다른
+  // 계열과 같은 이유이고, 때리는 셋은 맨 뒤라 앞의 것들이 쿨타임일 때 나간다.
+  // **`core`가 도발과 신성한 손길이다**: 도발 없는 성기사는 수호자와 갈리지
+  // 않고, 회복 없는 성기사는 힐러 역할에 세울 수 없다.
+  paladin: ['taunt', 'oath', 'layHands', 'radiance', 'holyShield', 'devotion', 'hammer', 'flame', 'smite', 'pyre'],
   grunt:   ['gash', 'pounce', 'trip', 'jab'],
+  // **좀비도 적 전용 계열이고 목록이 넷뿐이다**(잡졸과 같은 이유로 뽑는 자리가
+  // 없다). 새 스킬을 만들지 않고 이미 있는 것 중 시안의 넷에 가까운 것을 골랐다 —
+  // 밀쳐내기가 시안의 돌진이고, 나머지는 손으로 할퀴고 덮치는 것이다. 순서가 곧
+  // 우선순위라 미는 것을 앞에 두었다: 느린 대신 후열을 밀어내며 붙는 쪽이다.
+  zombie:  ['shove', 'gash', 'pounce', 'jab'],
   // 우두머리 전용. 새 스킬을 만들지 않고 수호와 전사의 무거운 것만 골라 묶었다 —
   // 이 계열이 하는 일은 "이미 있는 것 중 가장 아픈 것"이지 새로운 수단이 아니다.
   chieftain: ['rupture', 'sweep', 'roar', 'slam', 'shieldSlam', 'crush', 'bash'],
@@ -1209,7 +1388,10 @@ function skillsFor(spec, level, seed, always, learned) {
 function shared(id, over) {
   const twin = UNIT_SKILLS[id];
   if (!twin) throw new Error(`동료 표에 없는 스킬: ${id}`);
-  return Object.assign({ id, name: twin.name, icon: twin.icon, kind: twin.kind }, over);
+  // **피해의 갈래도 물려받는다.** 이름·아이콘과 같은 이유다 — 심판이 동료
+  // 쪽에서만 신성이면, 같은 기술이 주인공 손에서는 언데드에게 덜 아프다.
+  return Object.assign(
+    { id, name: twin.name, icon: twin.icon, kind: twin.kind, school: twin.school }, over);
 }
 
 const PLAYER_SKILLS = {
@@ -1309,55 +1491,55 @@ const PLAYER_SKILLS = {
     mp: 14, cd: 3.5, damage: 110,
     desc: '붙어서 내리친다. 즉시 나가고 세지만 사거리가 짧다.',
   }),
-  layHands: {
-    id: 'layHands', job: 'paladin', unlock: 1, kind: 'heal', range: 30, cast: 0.6, name: '신성한 손길', type: '개별 대상', targeting: 'ally',
-    mp: 14, cd: 2.2, heal: 64, icon: 'layHands',
+  layHands: shared('layHands', {
+    job: 'paladin', unlock: 1, range: 30, cast: 0.6, type: '개별 대상', targeting: 'ally',
+    mp: 14, cd: 2.2, heal: 64,
     desc: '동료 하나를 조금 회복한다. 사제의 손길보다 훨씬 작다.',
-  },
+  }),
   taunt: shared('taunt', {
     job: 'paladin', unlock: 2, range: 28, cast: 0, type: '도발', targeting: 'enemy',
     mp: 16, cd: 9, duration: 6,
     desc: '적 하나를 자신에게 끌어온다. 주인공이 어그로를 옮기는 유일한 수단이다.',
   }),
-  holyShield: {
-    id: 'holyShield', job: 'paladin', unlock: 3, kind: 'buff', range: 26, cast: 0, name: '성스러운 방패', type: '강화', targeting: 'ally',
-    mp: 20, cd: 18, stat: 'armor', mul: 0.84, duration: 12, icon: 'holyShield',
+  holyShield: shared('holyShield', {
+    job: 'paladin', unlock: 3, range: 26, cast: 0, type: '강화', targeting: 'ally',
+    mp: 20, cd: 18, stat: 'armor', mul: 0.84, duration: 12,
     desc: '동료 하나가 받는 피해를 줄인다. 자신에게도 걸 수 있다.',
-  },
-  oath: {
-    id: 'oath', job: 'paladin', unlock: 3, kind: 'mana', range: 0, cast: 1.6, name: '서약', type: '마나 회복', targeting: 'self',
-    mp: 0, cd: 26, mana: 66, icon: 'oath',
+  }),
+  oath: shared('oath', {
+    job: 'paladin', unlock: 3, range: 0, cast: 1.6, type: '마나 회복', targeting: 'self',
+    mp: 0, cd: 26, mana: 66,
     desc: '무릎 꿇어 맹세하며 자신의 마나를 되찾는다.',
-  },
-  radiance: {
-    id: 'radiance', job: 'paladin', unlock: 4, kind: 'heal-area', range: 32, cast: 1.2, name: '광휘', type: '범위', targeting: 'area-ally',
-    mp: 26, cd: 9, heal: 48, radius: 18, icon: 'radiance',
+  }),
+  radiance: shared('radiance', {
+    job: 'paladin', unlock: 4, range: 32, cast: 1.2, type: '범위', targeting: 'area-ally',
+    mp: 26, cd: 9, heal: 48, radius: 18,
     desc: '기준점 주변의 아군을 조금씩 회복한다.',
-  },
-  hammer: {
-    id: 'hammer', job: 'paladin', unlock: 5, kind: 'damage-area', range: 24, cast: 1.0, name: '심판의 망치', type: '광역', targeting: 'area-enemy',
-    mp: 28, cd: 12, damage: 84, radius: 16, icon: 'hammer',
+  }),
+  hammer: shared('hammer', {
+    job: 'paladin', unlock: 5, range: 24, cast: 1.0, type: '광역', targeting: 'area-enemy',
+    mp: 28, cd: 12, damage: 84, radius: 16,
     desc: '기준점 주변의 적을 한 번에 내리친다.',
-  },
-  devotion: {
-    id: 'devotion', job: 'paladin', unlock: 6, kind: 'buff-area', range: 24, cast: 1.4, name: '헌신', type: '광역 강화', targeting: 'area-ally',
-    mp: 30, cd: 24, stat: 'armor', mul: 0.9, duration: 10, radius: 20, icon: 'devotion',
+  }),
+  devotion: shared('devotion', {
+    job: 'paladin', unlock: 6, range: 24, cast: 1.4, type: '광역 강화', targeting: 'area-ally',
+    mp: 30, cd: 24, stat: 'armor', mul: 0.9, duration: 10, radius: 20,
     desc: '기준점 주변 아군이 받는 피해를 함께 줄인다.',
-  },
+  }),
   // **사제에게 있던 공격 둘을 여기로 옮겼다.** 사제는 회복만 하는 계열이고,
   // 때리는 것은 앞에 서는 성기사의 일이다 — 힐러 게임에서 "회복만 하는 계열"이
   // 하나도 없으면 회복이 본업이라는 말이 수치에 없는 말이 된다. 사거리도 성기사에
   // 맞춰 줄였다(40 → 26, 44 → 30).
-  flame: {
-    id: 'flame', job: 'paladin', unlock: 4, kind: 'dot', range: 26, cast: 1.0, name: '심판의 불꽃', type: '도트', targeting: 'enemy',
-    mp: 16, cd: 9, tick: 22, interval: 1, duration: 6, icon: 'flame',
+  flame: shared('flame', {
+    job: 'paladin', unlock: 4, range: 26, cast: 1.0, type: '도트', targeting: 'enemy',
+    mp: 16, cd: 9, tick: 22, interval: 1, duration: 6,
     desc: '적 하나를 태운다. 어그로를 끌 수 있다.',
-  },
-  pyre: {
-    id: 'pyre', job: 'paladin', unlock: 6, kind: 'zone', range: 30, cast: 1.8, name: '성스러운 불길', type: '장판', targeting: 'area-enemy',
-    mp: 34, cd: 18, tick: 26, interval: 1, duration: 8, radius: 18, icon: 'pyre',
+  }),
+  pyre: shared('pyre', {
+    job: 'paladin', unlock: 6, range: 30, cast: 1.8, type: '장판', targeting: 'area-enemy',
+    mp: 34, cd: 18, tick: 26, interval: 1, duration: 8, radius: 18,
     desc: '바닥에 남는 장판. 안에 선 적이 계속 탄다.',
-  },
+  }),
 
   // --- 주교 -------------------------------------------------------------
   //
@@ -1731,6 +1913,24 @@ const ENEMIES = {
             hp: 1484, mp: 128, atk: 38, attackCd: 2.4, range: 30, speed: 14,
            attrs: { str: 18, agi: 8, int: 19, vit: 88 }, growth: 'enemy', attackType: 'magic',
             armor: 0.9, spec: 'shaman', always: ['curse'] },
+  // 좀비. **언데드 종족을 처음 쓴다.** 표에만 있고 아무도 쓰지 않던 자리다.
+  //
+  // **신성 피해를 1.6배로 받는다**(`RACE_WEAK`). 종족이 정하므로 앞으로 들일
+  // 언데드가 전부 같은 약점을 갖는다 — 파티에 신성을 드는 계열(사제·성기사·주교)이
+  // 있는지가 이 지역에서 값을 갖는 자리다.
+  //
+  // 시안의 "느린 움직임에도 끈질긴 생명력"을 수치로 옮겼다: 고블린 척후병보다
+  // 체력이 1.5배인데 걸음은 절반 아래고(9 대 21) 때리는 사이도 길다(2.2 대 1.5).
+  // **등급은 잡졸이다** — 무리로 몰려오는 쪽이라 하나하나가 세면 안 된다.
+  //
+  // **체력으로만 맞췄다.** 납골당은 지금 좀비 하나뿐이라 정예도 적 힐러도 없어
+  // 다른 지역보다 헐거웠는데(장비 파티로 재니 89% 대 82~86%), 공격력을 30에서
+  // 38로 올리자 이번에는 34~44%로 떨어졌다 — 잡졸이 다섯씩 나오는 자리라 한 방이
+  // 다섯 배로 걸린다. 체력만 1,106 → 1,218로 올려 83~87%에 맞췄다.
+  zombie: { id: 'zombie', race: 'undead', rank: 'trash', exp: 14, name: '좀비',       job: 'dealer', sprite: 'zombie',
+            hp: 1218, mp: 72,  atk: 30, attackCd: 2.2, range: 7,  speed: 9,
+           attrs: { str: 30, agi: 6, int: 8, vit: 76 }, growth: 'enemy',
+            armor: 0.9,  spec: 'zombie' },
   // 오우거 전사. **오크와 같은 등급인데 하는 일이 다르다** — 오크는 수호 계열이라
   // 도발로 붙들고 버티고, 이쪽은 전사 계열이라 한 방이 크다(공격력 63 대 51).
   // 대신 때리는 사이가 길고(2.2초) 걸음이 느리다(10 대 16). 같은 값을 다르게
@@ -1781,6 +1981,7 @@ const NAMES = {
     mage: ['마법사', '불꽃의', '서리의', '주문사', '푸른 불', '늙은', '별을 읽는'],
     priest: ['사제', '수도사', '고요한', '푸른', '치유사', '기도하는', '견습'],
     bard: ['음유시인', '악사', '노래하는', '떠도는', '거리의', '흥겨운', '금빛'],
+    paladin: ['성기사', '맹세한', '방패의', '빛나는', '경건한', '순례하는', '흰 갑옷'],
   },
   given: ['브란', '코린', '라일', '세라', '미라', '유리', '노아', '딘',
           '카엘', '테오', '린', '하나', '오릭', '베라', '단', '이샤',
@@ -1809,6 +2010,19 @@ const REGIONS = {
     boss: null,
     drops: ['pelt', 'ore', 'helm', 'bow', 'robe', 'shield', 'charm', 'crystal', 'band'],
     minLevel: 3,
+  },
+  // **언데드의 자리를 따로 뒀다.** 좀비를 초소나 야영지에 섞으면 오크 무리에
+  // 시체가 낀 그림이 되고, 무엇보다 **신성이 값을 갖는 자리가 흩어진다** —
+  // 앞으로 들일 언데드가 여기로 모이면 "이 지역에는 사제를 데려간다"가 한 판의
+  // 판단이 된다. 문턱을 5로 둔 것은 그때쯤 명부에 사제 계열이 서기 때문이다.
+  crypt: {
+    id: 'crypt', scene: 'crypt', name: '납골당',
+    prefix: ['오래된', '무너진', '잊힌', '축축한'],
+    task: ['정화', '수색', '봉인'],
+    enemies: ['zombie'],
+    boss: null,
+    drops: ['ore', 'charm', 'crystal', 'robe', 'rod', 'chalice', 'band', 'staff', 'pelt'],
+    minLevel: 5,
   },
   camp: {
     id: 'camp', scene: 'camp', name: '야영지',
@@ -2024,7 +2238,8 @@ const PARTY_MAX = 5;   // 주인공을 포함한 수
 const SKILL_MAX = 5;   // 전투에 등록할 수 있는 주인공 스킬 수
 
 const api = {
-  FIELD, JOBS, SPECS, RACES, raceOf, raceAttrs, potionsFor, MELEE_RANGE, roleOf, ATTACK_ORDER, HEAL_ORDER, PULL_ORDER, LEVEL, ATTRS, ATTR, ATTR_GROWTH, attrsAt, derive, STATS, LOWER_IS_BETTER, TIERS, AFFIX_COUNT, AFFIX_BASE, AFFIX_POOL,
+  FIELD, JOBS, SPECS, RACES, raceOf, raceAttrs, RACE_WEAK, weakOf, schoolMul, potionsFor,
+  MANA_REGEN_PER_INT, POWER, combatPower, MELEE_RANGE, roleOf, ATTACK_ORDER, HEAL_ORDER, PULL_ORDER, LEVEL, ATTRS, ATTR, ATTR_GROWTH, attrsAt, derive, STATS, LOWER_IS_BETTER, TIERS, AFFIX_COUNT, AFFIX_BASE, AFFIX_POOL,
   tierName, tierFloor, tierRoll, tierCeiling, TIER_POWER, AFFIX_RANGE, SHOP_MAX_TIER,
   RANKS, rankOf,
   SLOTS, GEAR, MATERIALS, REGIONS, NAMES, SPECIAL_POOL, SPECIAL_CHANCE,

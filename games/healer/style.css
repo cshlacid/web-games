@@ -48,6 +48,7 @@
   --spec-priest: #2f8a8a;
   --spec-shaman: #9a5fb8;
   --spec-bard: #c07a2f;
+  --spec-paladin: #b8912f;
   --spec-grunt: #7a8a4a;
   --spec-chieftain: #a83b2c;
   /* 상위 계열. 아래 계열과 **같은 계통이되 한 단 진하다** — 다른 색을 주면 같은
@@ -105,6 +106,7 @@
     --spec-priest: #5fc4c4;
     --spec-shaman: #c79ae0;
     --spec-bard: #e8a95f;
+    --spec-paladin: #e0c46a;
     --spec-grunt: #b3c47a;
     --spec-chieftain: #e2705c;
     --spec-bulwark: #9dbdf2;
@@ -287,6 +289,12 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
    한 줄에 들어간다. */
 .pick-face { display: flex; flex-direction: column; align-items: center; gap: 1px; flex: none; }
 .pick-face .lv { font-size: 10px; font-weight: 700; color: var(--muted); }
+.pick-face .power { font-size: 10px; font-weight: 800; color: var(--hero); }
+/* 장비 줄의 전투력 증감. 오르내림을 색으로 갈라 두어야 옵션 줄을 읽기 전에
+   결론이 먼저 보인다. */
+.pick-sub.power-diff { font-weight: 800; }
+.pick-sub.power-diff.up { color: var(--heal); }
+.pick-sub.power-diff.down { color: var(--harm); }
 /* 직업·계열은 한 줄로 둔다. 감기면 카드 높이가 서로 달라진다. */
 .pick.card .job { display: block; font-size: 10.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* 좁은 기기에서는 그림과 표 단추를 줄여 글자 줄에 자리를 준다 — "딜러·음유시인"이
@@ -299,6 +307,7 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
   .pick.card .job { font-size: 9.5px; }
   .pick.card .avatar { width: 20px; height: 26px; }
   .pick-face .lv { font-size: 9px; }
+  .pick-face .power { font-size: 9px; }
   .pick-take { width: 28px; }
   .pick-open { padding: 7px 6px; }
   /* **데려가기 단추를 아래로 내린다.** 오른쪽에 세워 두면 그 폭(28px)이 그대로

@@ -30,8 +30,19 @@ function check(name, actual, expected) {
 // 자료를 손으로 적는 자리가 없어졌기 때문이고, 대신 시트가 서로 어긋나지
 // 않는지(칸·프레임 수·크기 사다리)를 본다.
 {
-  // 열넷 전부가 시안을 구운 그림 파일이다. 도형은 하나도 남지 않았다.
-  check('그림 파일 열넷', Object.keys(Sprites.SHEETS).length, 14);
+  // 열여섯 전부가 시안을 구운 그림 파일이다. 도형은 하나도 남지 않았다.
+  check('그림 파일 열여섯', Object.keys(Sprites.SHEETS).length, 16);
+
+  // **한 그림을 두 시트가 나눠 쓰는 것은 지금 한 쌍뿐이다.** 성기사는 아직 제
+  // 시안이 없어 수호자 것을 빌린다 — 도형 렌더러를 걷어낸 뒤라 대신 그릴 것이
+  // 없었다. 여기에 못 박아 두는 것은 **성기사 시안이 오는 날 이 검사가 먼저
+  // 깨지게** 하려는 것이다.
+  const byFile = {};
+  for (const [kind, sheet] of Object.entries(Sprites.SHEETS)) {
+    (byFile[sheet.src] = byFile[sheet.src] || []).push(kind);
+  }
+  check('그림을 빌려 쓰는 것은 성기사뿐이다',
+    Object.values(byFile).filter((list) => list.length > 1), [['tank', 'paladin']]);
 
   // **시트가 저마다 성립해야 한다.** 칸·줄·프레임 수가 어긋나면 화면에서는
   // 엉뚱한 칸이 잘려 나오거나 프레임이 사라진다.
@@ -81,6 +92,9 @@ function check(name, actual, expected) {
   // 계열이 아니다.
   check('오크 전사와 오크 주술사는 키가 같다',
     Math.abs(personH('orc') - personH('hexer')) < 0.5, true);
+  // 좀비는 사람 크기의 시체라 고블린보다 크지만, 잡졸이므로 정예를 넘지 않는다.
+  check('좀비는 고블린보다 크고 오크보다 작다',
+    personH('goblin') < personH('zombie') && personH('zombie') < personH('orc'), true);
 }
 
 // --- 자료가 가리키는 그림이 실제로 있는가 -------------------------------

@@ -198,6 +198,22 @@ function stats(progress) {
     D.withGear(D.derive(D.HERO, own), bonus, D.HERO.armor));
 }
 
+// 주인공의 전투력. **등록해 둔 다섯이 아니라 배운 것 전부로 재지 않는다** —
+// 전투에 들고 가는 것이 다섯이고, 화면의 숫자는 지금 나가면 얼마나 하는가다.
+// `stats`가 장비까지 얹은 값이라 옵션이 그대로 걸린다.
+function power(progress, over) {
+  const worn = over || stats(progress);
+  const level = progress.charLevel;
+  // **등록이 비어 있으면 배운 것을 앞에서부터 채워 본다.** 화면이 편성에서 하는
+  // 것과 같은 규칙이다(`main.js`) — 여기서 빈 손으로 재면 힐러의 전투력에 회복이
+  // 하나도 안 잡혀, 회복력 옵션이 붙은 장비가 "전투력 +0"으로 뜬다.
+  const listed = validSkills(progress, progress.skills || []);
+  const ids = listed.length ? listed
+    : validSkills(progress, learnedSkills(progress).map((def) => def.id));
+  const skills = ids.map((id) => D.skillAt(D.PLAYER_SKILLS[id], skillLevel(progress, id)));
+  return D.combatPower(D.HERO, worn, skills, level, worn.attrs);
+}
+
 // 장비가 얹어 준 능력치만. 캐릭터 창이 "나눠 준 것"과 "장비가 준 것"을 갈라
 // 보여 주는 데 쓴다 — 합쳐 놓으면 점수를 어디에 넣었는지 알 수 없다.
 function gearAttrs(progress) {
@@ -209,6 +225,14 @@ function gearAttrs(progress) {
 
 function equippedItems(progress) {
   return Object.values(progress.equipped).filter(Boolean);
+}
+
+// 지금 낀 것 대신 넘긴 목록을 낀 셈 치고 잰다. 장비 비교가 이것을 쓴다.
+function statsWith(progress, items) {
+  const bonus = Items.sum(items);
+  const own = D.attrsWithGear(attrs(progress), bonus);
+  return Object.assign({ attrs: own },
+    D.withGear(D.derive(D.HERO, own), bonus, D.HERO.armor));
 }
 
 // --- 인벤토리와 장착 ----------------------------------------------------
@@ -320,11 +344,20 @@ function compare(progress, item) {
   const def = D.GEAR[item.defId];
   if (!def) return null;
   const current = progress.equipped[def.slot];
+  // **전투력으로도 견준다.** 옵션 줄만 적어 두면 "최대 체력 +33 · 회피 +2%"가
+  // 나은 것인지 매번 머리로 계산해야 하는데, 그 계산이 곧 이 수치다. 슬롯의
+  // 물건만 갈아 끼운 채 다시 재는 것은 능력치 옵션이 `derive` 앞단에 얹혀
+  // 결과 수치를 통째로 흔들기 때문이다 — 옵션 차이를 더해서는 나오지 않는다.
+  const now = power(progress);
+  const worn = Object.assign({}, progress.equipped, { [def.slot]: item });
+  const after = power(progress, statsWith(progress, Object.values(worn).filter(Boolean)));
   return {
     slot: def.slot,
     current,
     diff: Items.diff(item, current),
     upgrade: Items.isUpgrade(item, current),
+    power: after,
+    powerDiff: after - now,
   };
 }
 
@@ -521,7 +554,7 @@ const api = {
   STORAGE_KEY, VERSION, create, load, save, reset,
   addExp, gainLevels, stats, attrs, gearAttrs, equippedItems,
   earnedPoints, spentPoints, freePoints, spendPoint,
-  addItem, findItem, equip, unequip, compare,
+  addItem, findItem, equip, unequip, compare, power,
   spend, buyGear, buyPotion, sell, reforge,
   jobEntry, jobLevel, jobExpOf, canChangeJob, changeJob,
   unlockedSkills, learnedSkills, jobSkills, validSkills,

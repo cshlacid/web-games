@@ -277,22 +277,31 @@ function everyQuest(fn) {
 
   // **탱커·힐러를 억지로 끼워 넣지 않는다.** 없는 목록은 못 깨는 의뢰라서 두던
   // 규칙인데, 편성 화면의 "동료 새로 고침"이 그 자리를 대신한다. 대신 **잦으면
-  // 안 된다** — 매번 새로 고쳐야 하면 그것은 단추가 아니라 절차다. 명부가
-  // 상한까지 자란 최악의 경우로 재면 탱커 없는 목록이 12%, 힐러 없는 목록이
-  // 0.5%다(길드에 탱커 계열이 둘뿐이라 탱커 쪽이 잦다).
+  // 안 된다** — 매번 새로 고쳐야 하면 그것은 단추가 아니라 절차다.
+  //
+  // **재는 것은 역할이 아니라 "앞에 설 사람이 있는가"다.** 성기사가 동료 계열로
+  // 들어오면서 역할은 힐러인데 도발을 들고 앞에 서는 동료가 생겼다 — `SPEC_CHOICES`가
+  // 전사를 탱커의 선택지로 두는 것과 같은 이야기다. 명부가 상한까지 자란 최악의
+  // 경우로 재면 앞에 설 사람이 없는 목록이 2%, 힐러 없는 목록이 0.5%다.
+  // **탱커 역할만 세면 15%인데**, 그것은 길드 뽑기가 정의마다 고르게 걸려 계열이
+  // 늘수록 탱커 정의 둘의 몫이 줄기 때문이다 — 성기사가 그 자리를 메운다.
   let noTank = 0;
+  let noFront = 0;
   let noHealer = 0;
   let boards = 0;
   for (let seed = 1; seed <= 200; seed++) {
     const roster = R.create(seed);
     while (roster.length < R.MAX_SIZE) R.maybeJoin(roster, roster.length * 7 + seed, 1);
-    const jobs = Q.companionsFor(Q.generate(8, seed)[0], roster, seed * 13)
-      .map((c) => D.COMPANIONS[c.defId].job);
+    const list = Q.companionsFor(Q.generate(8, seed)[0], roster, seed * 13);
+    const jobs = list.map((c) => D.COMPANIONS[c.defId].job);
+    const specs = list.map((c) => R.specOf(c));
     if (!jobs.includes('tank')) noTank++;
+    if (!jobs.includes('tank') && !specs.includes('paladin')) noFront++;
     if (!jobs.includes('healer')) noHealer++;
     boards++;
   }
-  check('탱커 없는 목록은 잦지 않다', noTank / boards < 0.15, true);
+  check('앞에 설 사람이 없는 목록은 드물다', noFront / boards < 0.06, true);
+  check('탱커 없는 목록이 흔하지는 않다', noTank / boards < 0.22, true);
   check('힐러 없는 목록은 더 드물다', noHealer / boards < 0.05, true);
   // 명부가 목록보다 작으면 전원이 서므로 빠질 수가 없다.
   const small = Q.companionsFor(Q.generate(5, 9)[0], R.create(9), 9)

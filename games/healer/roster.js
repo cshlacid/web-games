@@ -259,6 +259,19 @@ function offerGear(member, item) {
 
 const gearOf = (member) => Object.values(member.gear).filter(Boolean);
 
+// 그 동료의 전투력. **장비까지 얹은 수치로 잰다** — 능력치 옵션은 `attrsWithGear`
+// 앞단에서, 나머지 옵션은 `withGear`에서 녹으므로 옵션 하나를 바꾸면 여기가 움직인다.
+function powerOf(member) {
+  const def = D.COMPANIONS[member.defId];
+  if (!def) return 0;
+  const bonus = Items.sum(gearOf(member));
+  const attrs = D.attrsWithGear(D.attrsAt(def, member.level, null), bonus);
+  const stats = D.withGear(D.derive(def, attrs), bonus, def.armor);
+  const hands = D.skillsFor(specOf(member), member.level, D.skillSeed(member.name),
+    null, member.learned);
+  return D.combatPower(def, stats, hands.map((id) => D.UNIT_SKILLS[id]), member.level, attrs);
+}
+
 // 전투에 넘길 수치. 레벨 배수는 전투 쪽(logic.js)이 곱하므로 여기서는 장비 몫만 낸다.
 function bonusOf(member) {
   return Items.sum(gearOf(member));
@@ -412,6 +425,7 @@ const api = {
   create, adopt, makeMember, jobOf, specOf, baseSpecOf, spriteOf, defOf, skillsOf,
   specChoices, canChangeSpec, changeSpec, remember,
   gainExp, awardExp, awardGold, goShopping, offerGear, gearOf, bonusOf, potionsOf, toParty, maybeJoin,
+  powerOf,
   JOIN_CHANCE, REDRAW_JOIN_CHANCE, REDRAW_COST, redrawCost, GUILD_LEVEL_STEP, guildLevel,
   IDLE_GRACE, IDLE_STEP, IDLE_CAP, KEEP_MIN, leaveChance, tickIdle,
 };
