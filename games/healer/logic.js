@@ -40,7 +40,9 @@ const MARCH_RECOVER_MP = 0.20;
 // 이것이 없을 때에는 전투가 3분인데 마나가 1분 만에 말라, 남은 시간에는 힐도
 // 도발도 나가지 않고 파티가 서서히 깎이기만 했다. 아군과 적이 같은 규칙을
 // 쓰므로 여기서도 편을 가르지 않는다.
-const MANA_REGEN_PER_INT = 0.02;
+// **수치는 `data.js`에 있다**(`D.MANA_REGEN_PER_INT`). 전투력 계산이 같은 값을
+// 봐야 해서 옮겼다 — 두 곳에 적으면 한쪽만 고치는 일이 난다.
+const MANA_REGEN_PER_INT = D.MANA_REGEN_PER_INT;
 const EVENT_CAP = 400;        // 화면이 안 가져가도 무한히 쌓이지 않게
 
 function createRng(seed) {

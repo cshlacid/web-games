@@ -71,6 +71,11 @@ const RACES = {
 
 const raceOf = (def) => RACES[(def && def.race) || 'human'] || RACES.human;
 
+// 싸우는 동안 초당 되찾는 마나(지능 하나당). **최대 마나의 비율이 아니라 지능에
+// 비례한다** — 지능이 마나를 쓰는 능력치이므로 되찾는 속도도 거기서 나와야,
+// 장비로 최대 마나만 올린 캐릭터가 회복까지 덤으로 얻지 않는다.
+const MANA_REGEN_PER_INT = 0.02;
+
 // **피해에 갈래가 있고, 종족마다 잘 듣는 갈래가 다르다.** 지금 갈래는 신성
 // (`school: 'holy'`) 하나뿐이고 그것을 타는 종족도 언데드 하나뿐이지만, 표로
 // 둔 것은 **언데드 계열을 더 들일 자리**이기 때문이다 — 유닛마다 분기를 쓰면
@@ -243,6 +248,101 @@ function withGear(base, gear, armorBase) {
     // 넘지 못하는 바닥을 둔다.
     armor: Math.max(0.35, armorBase + (g.armor || 0)),
   };
+}
+
+// --- 전투력 --------------------------------------------------------------
+//
+// **역할이 다른 캐릭터를 한 축에 세우지 않는다.** 탱커의 체력과 딜러의 공격력을
+// 같은 저울에 올리면 어느 쪽으로 기울여도 거짓말이 된다 — 그래서 **역할마다 제
+// 잣대로 재고, 그 결과만 같은 단위로 환산한다.** 화면에 뜨는 숫자는 하나지만
+// **같은 역할끼리 견주라고 적어 둔다.**
+//
+// 재 보고 정한 것이다. 장비를 갖춘 고정 파티의 네 번째 자리에 후보를 앉히고
+// 10레벨 의뢰를 돌리니, 탱커는 받아 낸 피해가, 딜러는 넣은 피해가, 힐러는
+// 회복량이 그 캐릭터의 값이었다. **한 잣대로 접으면 그것이 사라진다** — 실제로
+// 역할을 안 가리고 접었을 때 궁수(전투력 304)가 성기사(426)보다 승률이 높았다.
+//
+// **음유시인은 이 수치가 실제보다 낮게 나온다.** 강화와 마나 나눔은 남을 세게
+// 만드는 일이라 제 수치에 안 잡힌다. 파티 기여를 재려면 전투를 굴려야 하고,
+// 그것은 화면에서 할 수 없다 — 여기서 재는 것은 **혼자 있을 때의 값**이다.
+const POWER = {
+  // 축마다 자릿수가 달라 그대로 더할 수 없다. 나눠서 비슷한 크기로 맞춘다.
+  ehpUnit: 40,
+  // 역할마다 무엇을 보는가(합이 1이라 가중치를 옮기면 무엇을 포기하는지가 보인다)와,
+  // 그 축의 눈금(`scale`).
+  //
+  // **눈금이 역할마다 다르다.** 회복은 피해보다 자릿수가 작아, 같은 눈금으로 적으면
+  // 힐러가 탱커의 3분의 1로 나온다 — 역할을 넘어 견주지 말라고 적어 두어도 나란히
+  // 놓인 숫자를 눈이 먼저 읽는다. **지금 값은 그 역할의 동료 정의들이 10레벨 맨몸에서
+  // 1,000 언저리가 되도록 잡았다**: 1,000이 "제 역할의 보통"이고 거기서 얼마나
+  // 오르내리는지가 이 숫자가 말하는 전부다.
+  weights: {
+    tank:   { ehp: 0.60, hit: 0.30, mend: 0.10, scale: 7 },
+    dealer: { ehp: 0.25, hit: 0.70, mend: 0.05, scale: 7 },
+    healer: { ehp: 0.30, hit: 0.20, mend: 0.50, scale: 19 },
+  },
+  // 광역기가 몇에게 닿는다고 볼 것인가. 무리 상한이 다섯이라 그 절반쯤이다.
+  foes: 3,
+  // 마나가 버티는지 재는 시간. 한 무리를 치는 데 걸리는 시간쯤이다.
+  seconds: 60,
+};
+
+// 그 손으로 낼 수 있는 초당 피해·회복과, 마나가 그것을 얼마나 버티는가.
+// **스킬까지 보는 것이 핵심이다** — 능력치만 보면 사제와 성기사의 회복력이
+// 똑같이 나온다(둘 다 제 기준 대비 비율이라 같은 레벨이면 같은 값이다).
+// `skills`는 스킬 정의의 배열이다. **이름이 아니라 정의를 받는 것은** 동료는
+// `UNIT_SKILLS`, 주인공은 레벨을 얹은 `PLAYER_SKILLS`를 보기 때문이다 — 여기서
+// 표를 고르게 하면 두 표를 아는 자리가 하나 더 는다.
+function throughput(def, stats, skills, level) {
+  const base = derive(def, attrsAt(def, level, null));
+  const power = base.atk / (def.atk || 1);
+  // 치명타는 평균으로 녹여 넣는다. 터지는 맛은 전투의 것이고, 여기서 재는 것은
+  // 같은 시간에 얼마나 나가는가다.
+  const crit = 1 + stats.crit * (stats.critDamage - 1);
+  let hit = (stats.atk * crit) / def.attackCd;
+  let mend = 0;
+  let cost = 0;
+  let gain = 0;
+  for (const skill of skills || []) {
+    if (!skill) continue;
+    // **시전 시간도 주기에 넣는다.** 외우는 동안은 아무것도 못 하므로, 넣지
+    // 않으면 캐스팅 스킬이 공짜로 강해 보인다.
+    const cycle = skill.cd + (skill.cast || 0);
+    const many = (skill.kind || '').indexOf('area') >= 0 || skill.kind === 'zone';
+    const hits = many ? POWER.foes : 1;
+    // 동료는 공격력의 배수(`mul`), 주인공은 정액(`damage`)에 마법 공격력을 곱한다.
+    if (skill.mul) hit += (stats.atk * crit * skill.mul * hits) / cycle;
+    if (skill.damage) hit += (skill.damage * stats.spell * crit * hits) / cycle;
+    if (skill.tick) {
+      const total = skill.tick * power * (skill.duration / (skill.interval || 1)) * hits;
+      if (skill.kind === 'heal-dot') mend += (total * stats.heal) / cycle;
+      else hit += total / cycle;
+    }
+    if (skill.heal) mend += (skill.heal * stats.heal * (many ? POWER.foes : 1)) / cycle;
+    if (skill.mana) gain += skill.mana / cycle;
+    cost += (skill.mp || 0) / cycle;
+  }
+  return { hit, mend, gain, need: cost * POWER.seconds };
+}
+
+// 화면에 적는 전투력. `stats`는 장비까지 얹은 값(`withGear`)이라 **옵션이 그대로
+// 걸린다** — 능력치 옵션은 그 앞(`attrsWithGear`)에서 이미 녹아 있다.
+function combatPower(def, stats, skills, level, attrs) {
+  const t = throughput(def, stats, skills, level);
+  // **마나가 못 버티면 스킬 몫을 그만큼 깎는다.** 마나를 다 쓴 유닛은 기본
+  // 공격만 하므로, 최대 마나와 마나 회복 스킬이 전투력에 걸리는 자리가 여기다 —
+  // 장비의 마나 옵션이 아무 데도 안 걸리면 "장비가 반영된다"가 반쪽이 된다.
+  const regen = (attrs ? attrs.int : 0) * MANA_REGEN_PER_INT;
+  const supply = stats.mp + (t.gain + regen) * POWER.seconds;
+  // 기본 공격은 마나를 안 먹으므로 깎이지 않는다. 스킬 몫만 버티는 만큼 센다.
+  const plain = (stats.atk * (1 + stats.crit * (stats.critDamage - 1))) / def.attackCd;
+  const ratio = t.need > 0 ? Math.min(1, supply / t.need) : 1;
+  const hit = plain + (t.hit - plain) * ratio;
+  const mend = t.mend * ratio;
+  const ehp = stats.hp / stats.armor / (1 - Math.min(ATTR.dodgeCap, stats.dodge));
+  const w = POWER.weights[def.job] || POWER.weights.dealer;
+  return Math.round(w.scale
+    * (w.ehp * (ehp / POWER.ehpUnit) + w.hit * hit + w.mend * mend));
 }
 
 // 레벨과 경험치. 캐릭터 레벨과 직업 레벨을 따로 두는 것은 둘이 오르는 이유가
@@ -2138,7 +2238,8 @@ const PARTY_MAX = 5;   // 주인공을 포함한 수
 const SKILL_MAX = 5;   // 전투에 등록할 수 있는 주인공 스킬 수
 
 const api = {
-  FIELD, JOBS, SPECS, RACES, raceOf, raceAttrs, RACE_WEAK, weakOf, schoolMul, potionsFor, MELEE_RANGE, roleOf, ATTACK_ORDER, HEAL_ORDER, PULL_ORDER, LEVEL, ATTRS, ATTR, ATTR_GROWTH, attrsAt, derive, STATS, LOWER_IS_BETTER, TIERS, AFFIX_COUNT, AFFIX_BASE, AFFIX_POOL,
+  FIELD, JOBS, SPECS, RACES, raceOf, raceAttrs, RACE_WEAK, weakOf, schoolMul, potionsFor,
+  MANA_REGEN_PER_INT, POWER, combatPower, MELEE_RANGE, roleOf, ATTACK_ORDER, HEAL_ORDER, PULL_ORDER, LEVEL, ATTRS, ATTR, ATTR_GROWTH, attrsAt, derive, STATS, LOWER_IS_BETTER, TIERS, AFFIX_COUNT, AFFIX_BASE, AFFIX_POOL,
   tierName, tierFloor, tierRoll, tierCeiling, TIER_POWER, AFFIX_RANGE, SHOP_MAX_TIER,
   RANKS, rankOf,
   SLOTS, GEAR, MATERIALS, REGIONS, NAMES, SPECIAL_POOL, SPECIAL_CHANCE,

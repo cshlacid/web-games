@@ -453,5 +453,64 @@ const gear = (defId, tier) => Items.make(defId, tier || 0, 3);
   check('막히면 골드도 그대로다', broke.gold, 0);
 }
 
+// --- 전투력 --------------------------------------------------------------
+//
+// **역할 안에서 읽는 값이다.** 탱커의 체력과 딜러의 공격력을 한 저울에 올리지
+// 않고, 역할마다 제 잣대로 재고 눈금만 맞춰 둔다.
+{
+  const p = P.create(9);
+  p.charLevel = 10;
+  const bare = P.power(p);
+  check('전투력이 나온다', bare > 0, true);
+
+  // **장비 옵션이 그대로 걸린다.** 걸리지 않으면 장비 비교에 쓸 수 없다.
+  const armor = Items.make('mail', 2, 4242);
+  const c = P.compare(p, armor);
+  check('장비 비교가 전투력을 함께 낸다', typeof c.powerDiff === 'number', true);
+  P.addItem(p, armor);
+  P.equip(p, armor.uid);
+  check('낀 뒤의 전투력이 비교에서 말한 값과 같다', P.power(p), c.power);
+  check('장비를 끼면 전투력이 오른다', P.power(p) > bare, true);
+
+  // **옵션이 좋을수록 더 오른다.** 등급 구간이 겹치지 않으므로(`AFFIX_RANGE`)
+  // 같은 물건의 높은 등급이 늘 더 나아야 한다.
+  const q = P.create(9);
+  q.charLevel = 10;
+  const common = Items.make('mail', 0, 4242);
+  const rare = Items.make('mail', 4, 4242);
+  check('높은 등급이 전투력을 더 올린다',
+    P.compare(q, rare).powerDiff > P.compare(q, common).powerDiff, true);
+
+  // 레벨이 오르면 전투력도 오른다 — 성장이 숫자로 보이는 것이 이 수치의 값이다.
+  const grown = P.create(9);
+  grown.charLevel = 20;
+  check('레벨이 오르면 전투력도 오른다', P.power(grown) > P.power(p), true);
+}
+
+// --- 동료 전투력 ---------------------------------------------------------
+{
+  const roster = Roster.create(21);
+  for (const m of roster) m.level = 10;
+  const one = roster[0];
+  const before = Roster.powerOf(one);
+  check('동료 전투력이 나온다', before > 0, true);
+  const gear = Items.make('mail', 2, 777);
+  one.gear.armor = gear;
+  check('동료도 장비가 전투력에 걸린다', Roster.powerOf(one) > before, true);
+
+  // **역할마다 눈금이 다르다.** 회복은 피해보다 자릿수가 작아 같은 눈금으로 적으면
+  // 힐러가 탱커의 3분의 1로 나온다 — 나란히 놓인 숫자를 눈이 먼저 읽는다.
+  const byJob = {};
+  for (const m of roster) {
+    const job = D.COMPANIONS[m.defId].job;
+    (byJob[job] = byJob[job] || []).push(Roster.powerOf(m));
+  }
+  const mid = (list) => list.slice().sort((a, b) => a - b)[list.length >> 1];
+  const jobs = Object.keys(byJob).filter((job) => byJob[job].length >= 2);
+  const spread = jobs.map((job) => mid(byJob[job]));
+  check('역할끼리 자릿수가 갈리지 않는다',
+    jobs.length < 2 || Math.max(...spread) / Math.min(...spread) < 2.5, true);
+}
+
 console.log(`${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);
