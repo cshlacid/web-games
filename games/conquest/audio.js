@@ -21,8 +21,8 @@
     { bass: 33, pad: [55, 60, 64, 71], top: 76 },
   ];
 
-  window.EufloriaSound = window.createGameAudio({
-    storageKey: 'web-games.eufloria.sound',
+  window.ConquestSound = window.createGameAudio({
+    storageKey: 'web-games.conquest.sound',
     bgmLevel: 0.85,
     sfxLevel: 0.75,
     step: STEP,
@@ -47,24 +47,24 @@
     },
 
     sfx: {
-      // 씨앗을 보낼 때. 짧게 올라가는 소리로 "떠났다"를 알린다.
+      // 병력을 보낼 때. 짧게 올라가는 소리로 "떠났다"를 알린다.
       send(now, tone) {
         tone({ freq: 520, at: now, dur: 0.16, type: 'triangle', gain: 0.16, attack: 0.005, glide: 760 });
       },
 
-      // 나무를 심을 때. arg가 있으면 방어 나무라 한 옥타브 아래로 두툼하게 낸다.
-      plant(now, tone, defense) {
-        const base = defense ? 196 : 294;
+      // 시설을 세울 때. arg가 있으면 방어탑라 한 옥타브 아래로 두툼하게 낸다.
+      build(now, tone, turret) {
+        const base = turret ? 196 : 294;
         tone({ freq: base, at: now, dur: 0.5, type: 'sine', gain: 0.18, attack: 0.01 });
         tone({ freq: base * 1.5, at: now + 0.06, dur: 0.45, type: 'sine', gain: 0.12, attack: 0.01 });
       },
 
-      // 나무가 부서질 때. 음정 없는 소리라 화음을 건드리지 않는다.
+      // 시설가 부서질 때. 음정 없는 소리라 화음을 건드리지 않는다.
       fell(now, tone, arg, noise) {
         noise({ at: now, dur: 0.24, gain: 0.16, type: 'bandpass', freq: 900, q: 0.8, glide: 260 });
       },
 
-      // 소행성을 얻을 때와 잃을 때. 같은 음형을 위아래로 뒤집어 둘을 짝으로 만든다.
+      // 거점을 얻을 때와 잃을 때. 같은 음형을 위아래로 뒤집어 둘을 짝으로 만든다.
       take(now, tone) {
         [523, 659, 784].forEach((freq, i) => {
           tone({ freq, at: now + i * 0.07, dur: 0.3, type: 'sine', gain: 0.16, attack: 0.006 });

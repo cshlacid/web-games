@@ -128,12 +128,12 @@ h1 {
   height: auto;
   background: var(--board-bg);
   border-radius: 14px;
-  /* 판을 누를 곳이 곧 소행성이라 click으로 짠다. touch-action을 none으로 두면
+  /* 판을 누를 곳이 곧 거점이라 click으로 짠다. touch-action을 none으로 두면
      touchend가 취소돼 click이 나지 않는다(공용 base.js). 끌어서 하는 조작이
      없으므로 기본값 그대로 둔다. */
 }
 
-/* 소행성. 색이 곧 주인이라 채우기만 바꾼다. */
+/* 거점. 색이 곧 주인이라 채우기만 바꾼다. */
 .rock { fill: var(--rock); }
 .rock.p1 { fill: var(--mine); }
 .rock.p2 { fill: var(--foe); }
@@ -154,7 +154,7 @@ h1 {
 .tint1 { fill: var(--mine); }
 .tint2 { fill: var(--foe); }
 
-.tree { fill: #f3f6fa; opacity: 0.92; pointer-events: none; }
+.build { fill: #f3f6fa; opacity: 0.92; pointer-events: none; }
 
 .dot { pointer-events: none; }
 .dot.p1 { fill: var(--mine); }
