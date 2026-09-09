@@ -110,12 +110,15 @@ function bossWave(region, level, rng) {
   // **적 힐러는 붙이지 않는다.** 다른 무리에서는 하나까지 두지만, 우두머리를
   // 계속 살리는 힐러가 옆에 서면 파티의 화력으로는 아무도 죽일 수 없는 무리가
   // 된다 — 여기만 예외로 둔다.
-  const others = region.enemies.filter((id) => D.ENEMIES[id].job !== 'healer');
+  // 쫄도 레벨을 따라 바뀐다 — 보통 무리와 같은 규칙을 타지 않으면 우두머리
+  // 옆에만 예전 적이 선다.
+  const others = region.enemies.map((id) => D.enemyAt(id, level))
+    .filter((id) => D.ENEMIES[id].job !== 'healer');
   const trash = others.filter((id) => D.rankOf(D.ENEMIES[id]).id === 'trash');
   const pool = (trash.length ? trash : others);
   let spent = bosses * THREAT.boss;
   while (spent < BOSS_BUDGET && wave.length < WAVE_MAX) {
-    const id = pick(rng, pool.length ? pool : region.enemies);
+    const id = pick(rng, pool.length ? pool : others);
     wave.push(id);
     spent += threatOf(id);
   }
@@ -129,15 +132,19 @@ function buildWaves(region, level, rng) {
     // 뒤 웨이브가 더 무겁다. 같은 크기로 두면 첫 웨이브에서 마나를 어떻게 쓰든
     // 결과가 같아진다.
     const budget = (3 + i + (rng() < 0.35 ? 1 : 0)) * 1.6;
-    const healer = region.enemies.find((id) => D.ENEMIES[id].job === 'healer');
-    const others = region.enemies.filter((id) => D.ENEMIES[id].job !== 'healer');
+    // **레벨이 문턱을 넘으면 같은 자리를 다른 적이 채운다**(`D.enemyAt`). 지역의
+    // 적 목록을 레벨마다 따로 적지 않으려고 여기 한 곳에서 갈아 끼운다 —
+    // 위협의 몫도 바뀐 쪽으로 세야 무리 크기가 맞는다.
+    const pool = region.enemies.map((id) => D.enemyAt(id, level));
+    const healer = pool.find((id) => D.ENEMIES[id].job === 'healer');
+    const others = pool.filter((id) => D.ENEMIES[id].job !== 'healer');
 
     // 힐러는 한 웨이브에 하나까지. 여럿이 서로를 살리면 파티의 화력으로는
     // 아무도 죽일 수 없는 웨이브가 나온다.
     const wave = [];
     let spent = 0;
     while (spent < budget && wave.length < WAVE_MAX) {
-      const id = pick(rng, others.length ? others : region.enemies);
+      const id = pick(rng, others.length ? others : pool);
       wave.push(id);
       spent += threatOf(id);
     }

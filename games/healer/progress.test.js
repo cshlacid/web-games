@@ -512,5 +512,59 @@ const gear = (defId, tier) => Items.make(defId, tier || 0, 3);
     jobs.length < 2 || Math.max(...spread) / Math.min(...spread) < 2.5, true);
 }
 
+// --- 주인공도 같은 저울에 있다 -------------------------------------------
+//
+// **주인공과 동료가 나란히 놓이는 자리가 편성 화면이다.** 잣대가 갈리면 그 화면의
+// 두 숫자를 견줄 수 없다. 주인공이 조금 위인 것은 맞다 — 스킬을 하나 더 들고
+// (다섯 대 넷) 사람이 조작하는 쪽이라 쿨타임이 짧다.
+{
+  const level = 10;
+  const p = P.create();
+  p.job = 'priest';
+  p.charLevel = level;
+  const each = Math.floor(((level - 1) * D.ATTR.pointsPerLevel) / 4);
+  p.attrPoints = { str: each, agi: each, int: each, vit: each };
+  p.jobs = { priest: { level: D.HERO_JOBS.priest.maxLevel, exp: 0 } };
+  const open = D.heroSkillsOf('priest').slice(0, 5);
+  p.learned = {};
+  for (const def of open) p.learned[def.id] = 1;
+  p.skills = open.map((def) => def.id);
+
+  // 씨앗을 못 박는 것은 명부가 무작위라 힐러가 아예 없는 씨앗이 나오기 때문이다.
+  const roster = Roster.create(11);
+  for (const m of roster) m.level = level;
+  const mates = roster.filter((m) => Roster.jobOf(m) === 'healer').map(Roster.powerOf);
+  const ratio = P.power(p) / Math.max(...mates);
+  check('주인공이 동료 힐러 중 가장 센 것보다 위다', ratio > 1, true);
+  check('그래도 갑절을 넘지는 않는다', ratio < 2, true);
+}
+
+// --- 시전은 겹치지 않는다 -------------------------------------------------
+//
+// **외우는 동안에는 아무것도 못 나간다**(`logic.js`가 그 틱을 통째로 건너뛴다).
+// 쿨타임만 보고 횟수를 더하면 **쿨타임이 짧은 캐스팅 스킬을 여럿 든 쪽이 실제보다
+// 크게 나온다** — 주인공이 그 자리에 있었다.
+{
+  const def = D.COMPANIONS[Object.keys(D.COMPANIONS)[0]];
+  const attrs = D.attrsAt(def, 10, null);
+  const stats = D.withGear(D.derive(def, attrs), {}, def.armor);
+  // 외우는 데 주기의 절반을 쓰는 스킬. 둘을 들면 시간이 꽉 차고, 넷을 들어도
+  // 그보다 더 나갈 수는 없다.
+  const slow = { id: 'x', kind: 'heal', heal: 100, cd: 2, cast: 2, mp: 10 };
+  const one = D.combatPower(def, stats, [slow], 10, attrs);
+  const two = D.combatPower(def, stats, [slow, slow], 10, attrs);
+  const four = D.combatPower(def, stats, [slow, slow, slow, slow], 10, attrs);
+  check('둘째 스킬은 첫째만큼 얹히지 않는다', two - one < one, true);
+  check('시전 시간이 꽉 차면 더 늘지 않는다', four <= two + 1, true);
+
+  // 즉시 시전은 외우는 시간이 남았을 때에만 나간다. 캐스팅으로 시간을 다 쓰면
+  // 아무리 짧은 쿨타임이라도 낄 자리가 없다.
+  const quick = { id: 'q', kind: 'heal', heal: 50, cd: 1, cast: 0, mp: 5 };
+  const busy = [slow, slow];
+  check('시간이 꽉 차면 즉시 시전도 못 낀다',
+    D.combatPower(def, stats, busy.concat([quick]), 10, attrs),
+    D.combatPower(def, stats, busy, 10, attrs));
+}
+
 console.log(`${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);

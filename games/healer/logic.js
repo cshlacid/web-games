@@ -132,6 +132,8 @@ function makeUnit(def, side, uid, x, y, level, override, bonus, potions, name, h
     // 갈래별로 얼마나 더 아픈가(`D.weakOf`). 종족이 정하므로 유닛을 만들 때
     // 한 번만 보고, 매 타격마다 표를 다시 뒤지지 않는다.
     weak: D.weakOf(def),
+    // 회복을 맞으면 얼마나 아픈가(`D.healHarmOf`). 위와 같은 이유로 여기서 한 번만 본다.
+    healHarm: D.healHarmOf(def),
     exp: Math.round((def.exp || 0) * (1 + 0.25 * (level - 1))),
     // 계열의 목록 중 레벨이 되는 것을 앞에서부터 넷. 편성 화면이 보여 준 것과
     // 전투에서 실제로 쓰는 것이 같아야 하므로 같은 함수를 쓴다.
@@ -417,6 +419,12 @@ function applyDamage(state, source, target, raw, dodgeable, school) {
 
 function applyHeal(state, source, target, raw) {
   if (target.dead) return 0;
+  // **언데드에게는 회복이 통하지 않는다**(`D.HEAL_HARM`). 생명의 힘을 받는 몸이
+  // 아니라는 것이 이 종족의 정의이고, 그래서 반경으로 퍼지는 회복은 이들에게
+  // 피해가 된다(`healSpread`). **막는 자리를 여기 하나로 둔다** — 회복이
+  // 지나가는 길이 지목·범위·장판·지속 넷이라, 자리마다 적으면 하나를 잊는다.
+  // 물약은 이 함수를 안 거치므로 `drink`에서 따로 막는다.
+  if (target.healHarm) return 0;
   // 회복도 터진다. 다만 받는 쪽이 아군이라 회피가 끼어들지 않는다.
   const crit = rollCrit(state, source, null);
   const healed = Math.round(raw * auraMul(state, source, 'heal') * crit);
@@ -443,6 +451,25 @@ function kill(state, unit) {
   // 죽은 유닛에게 걸린 장판·도트는 남겨 두면 부활 없는 이 게임에서 영원히 헛돈다.
   state.dots = state.dots.filter((dot) => dot.targetUid !== unit.uid);
   emit(state, { type: 'death', uid: unit.uid, side: unit.side, text: `${unit.name} 쓰러짐` });
+}
+
+// **반경으로 퍼지는 회복.** 시전자 편에게는 회복이지만, 반경 안에 회복이 해가
+// 되는 적이 서 있으면 그쪽에는 신성 피해가 된다(`D.HEAL_HARM`). 넷으로 흩어져
+// 있던 "반경 안의 아군을 훑는다"를 여기로 모은 것은, 적을 함께 훑는 자리가
+// 한 곳이어야 새 회복 스킬이 저절로 같은 규칙을 타기 때문이다.
+//
+// **회복량은 아군이 실제로 받은 값이 아니라 걸린 값이다.** 아군이 만피라
+// 회복이 0이 되어도 언데드는 그만큼 맞는다 — 한쪽의 남은 체력이 다른 쪽의
+// 피해를 정하면 화면에서 읽히지 않는다.
+function healSpread(state, source, side, point, radius, amount) {
+  // **편을 나누는 것은 회복뿐이다.** 반경 안의 언데드는 어느 편이든 맞는다 —
+  // 회복이 해가 되는 것은 그 몸의 성질이지 적이라서가 아니고, 편으로 갈라 두면
+  // 언젠가 언데드를 아군으로 들일 때 그쪽만 규칙 밖에 남는다.
+  for (const unit of state.units) {
+    if (unit.dead || dist(unit, point) > radius) continue;
+    if (unit.healHarm) applyDamage(state, source, unit, amount * unit.healHarm, false, 'holy');
+    else if (unit.side === side) applyHeal(state, source, unit, amount);
+  }
 }
 
 // 같은 스킬을 다시 걸면 쌓지 않고 새로 고친다. 쌓기로 하면 도트 하나로
@@ -504,10 +531,11 @@ function updateZones(state) {
     const spot = { x: zoneX(state, zone), y: zone.y };
     while (zone.nextAt <= state.t && zone.nextAt <= zone.endsAt + 1e-6) {
       const source = zone.sourceUid ? byUid(state, zone.sourceUid) : null;
-      for (const unit of alive(state, zone.side)) {
-        if (dist(unit, spot) > zone.radius) continue;
-        if (zone.kind === 'heal') applyHeal(state, source, unit, zone.amount);
-        else applyDamage(state, source, unit, zone.amount, false, zone.school);
+      if (zone.kind === 'heal') healSpread(state, source, zone.side, spot, zone.radius, zone.amount);
+      else {
+        for (const unit of alive(state, zone.side)) {
+          if (dist(unit, spot) <= zone.radius) applyDamage(state, source, unit, zone.amount, false, zone.school);
+        }
       }
       zone.nextAt += zone.interval;
     }
@@ -558,9 +586,7 @@ function runUnitSkill(state, unit, choice) {
   if (def.kind === 'heal') { applyHeal(state, unit, target, def.heal); return; }
   if (def.kind === 'heal-dot') { addDot(state, unit, target, def, 'heal'); return; }
   if (def.kind === 'heal-area') {
-    for (const mate of alive(state, unit.side)) {
-      if (dist(mate, target) <= def.radius) applyHeal(state, unit, mate, def.heal);
-    }
+    healSpread(state, unit, unit.side, target, def.radius, def.heal);
     return;
   }
   // 자기 마나를 되찾는다. 마나를 다 쓴 시전자가 남은 전투 내내 기본 공격만
@@ -873,9 +899,7 @@ function resolvePlayerSkill(state, def, spot) {
   else if (def.targeting === 'ally') addDot(state, caster, unit, def, 'heal', heal(def.tick));
   else if (def.targeting === 'enemy') addDot(state, caster, unit, def, 'damage', harm(def.tick));
   else if (def.targeting === 'area-ally' && def.heal) {
-    for (const ally of alive(state, 'ally')) {
-      if (dist(ally, point) <= def.radius) applyHeal(state, caster, ally, heal(def.heal));
-    }
+    healSpread(state, caster, 'ally', point, def.radius, heal(def.heal));
   } else if (def.targeting === 'area-ally') {
     addZone(state, caster, def, point.x, point.y, 'heal', heal(def.tick));
   } else if (def.targeting === 'area-enemy') {
@@ -932,6 +956,11 @@ function drink(state, unit, potionId) {
   const readyAt = unit === hero(state) ? state.potionReadyAt : unit.potionReadyAt;
   if (state.t < readyAt) return { ok: false, reason: '쿨타임' };
   if (unit.dead) return { ok: false, reason: '쓰러졌다' };
+  // 언데드에게는 회복이 통하지 않는다(위 `applyHeal`). 물약은 체력을 직접 더하는
+  // 자리라 그 규칙을 따로 한 번 더 적는다. **마나 물약은 막지 않는다** — 통하지
+  // 않는 것은 생명의 힘이지 마력이 아니다. **물약을 쓰기 전에 막는다**: 뒤에
+  // 두면 회복이 0인 채로 물약만 사라진다.
+  if (potion.restore === 'hp' && unit.healHarm) return { ok: false, reason: '회복이 통하지 않는다' };
 
   carried[potionId]--;
   if (unit === hero(state)) state.potionReadyAt = state.t + potion.cd;
@@ -998,7 +1027,8 @@ function march(state, dt) {
     // 사이는 사람이 힐을 넣는 자리라 회복이 차오르는 것이 보여야 한다. 외우는
     // 중이어도 몸은 쉬므로 아래 continue보다 앞에 둔다.
     const share = dt / WAVE_GAP;
-    unit.hp = Math.min(unit.maxHp, unit.hp + unit.maxHp * MARCH_RECOVER * share);
+    // 언데드는 쉬어도 몸이 낫지 않는다(위 `applyHeal`). 마나는 그대로 찬다.
+    if (!unit.healHarm) unit.hp = Math.min(unit.maxHp, unit.hp + unit.maxHp * MARCH_RECOVER * share);
     unit.mp = Math.min(unit.maxMp, unit.mp + unit.maxMp * MARCH_RECOVER_MP * share);
     // **외우는 중이면 걸음을 멈춘다.** 대열을 다시 짜자고 끌고 가면 그 순간
     // 시전이 취소되는데, 무리 사이는 사람이 힐을 넣는 자리라 누른 스킬이

@@ -93,6 +93,25 @@ const RACE_WEAK = {
 const weakOf = (def) => RACE_WEAK[raceOf(def).id] || null;
 const schoolMul = (weak, school) => (school && weak && weak[school]) || 1;
 
+// **회복이 통하지 않는 종족.** 이름이 오르면 두 가지가 함께 걸린다: 체력을 아예
+// 회복하지 못하고(`logic.applyHeal`이 막는다), 반경으로 퍼지는 회복을 맞으면
+// 그것이 피해가 된다(`logic.healSpread`). 값은 회복량 중 얼마를 신성 피해로
+// 돌리는가이고, 그 피해가 다시 위의 신성 배수를 타므로 언데드가 실제로 받는
+// 것은 회복량의 1.6배다.
+//
+// 갈래 표와 따로 둔 것은 **회복은 갈래가 없기 때문이다** — 회복에
+// `school: 'holy'`를 붙이면 아군에게 거는 회복까지 갈래를 타게 되고, 그러면
+// 언젠가 "신성에 강한 아군"이 회복을 덜 받는 일이 난다.
+//
+// **아프기까지 하는 것은 퍼지는 회복뿐이다**(범위 회복과 회복 장판). 아군 하나를
+// 지목하는 회복은 통하지 않고 끝난다 — 적을 지목할 수 없으므로 지금은 같은
+// 말이지만, 열어 두면 "적을 지목해 회복으로 때리는" 조작이 생겨 회복 스킬이
+// 공격 스킬이 된다.
+const HEAL_HARM = {
+  undead: 1,
+};
+const healHarmOf = (def) => HEAL_HARM[raceOf(def).id] || 0;
+
 // **물약은 인간형만 마신다.** 직업이 무엇을 들고 가는지는 JOB_POTIONS가 정하고,
 // 종족이 마실 수 있는지를 정한다.
 const potionsFor = (def) => (raceOf(def).humanoid
@@ -283,6 +302,11 @@ const POWER = {
   },
   // 광역기가 몇에게 닿는다고 볼 것인가. 무리 상한이 다섯이라 그 절반쯤이다.
   foes: 3,
+  // **회복이 닿는 머릿수는 그보다 적게 센다.** 광역 피해는 반경 안의 적에게 전부
+  // 유효하지만 광역 회복은 그 자리의 아군이 **깎여 있어야** 유효하고, AI도 둘
+  // 이상이 함께 깎였을 때만 쓴다(`ai.js`). 흘린 힐을 빼지 않는 계산이라 셋으로
+  // 세면 광역 회복을 든 쪽이 부푼다.
+  healed: 2,
   // 마나가 버티는지 재는 시간. 한 무리를 치는 데 걸리는 시간쯤이다.
   seconds: 60,
 };
@@ -299,26 +323,45 @@ function throughput(def, stats, skills, level) {
   // 치명타는 평균으로 녹여 넣는다. 터지는 맛은 전투의 것이고, 여기서 재는 것은
   // 같은 시간에 얼마나 나가는가다.
   const crit = 1 + stats.crit * (stats.critDamage - 1);
-  let hit = (stats.atk * crit) / def.attackCd;
+
+  // **시전은 겹치지 않는다.** 외우는 틱은 통째로 건너뛰므로(`logic.js`), 그동안은
+  // 즉시 시전도 기본 공격도 못 나간다. 쿨타임만 보고 횟수를 더하면 **쿨타임이
+  // 짧은 캐스팅 스킬을 여럿 든 쪽이 실제보다 크게 나온다** — 주인공이 그랬다
+  // (사람이 조작하는 쪽이라 동료보다 쿨타임이 짧고 스킬도 하나 더 든다).
+  //
+  // 단위 시간당 외우는 시간의 비율(`busy`)을 재서, 즉시 시전과 기본 공격에는
+  // 남는 시간의 몫만 준다. **1을 넘으면 캐스팅끼리 서로를 밀어내므로** 그만큼
+  // 다 함께 깎이고, 그때 즉시 시전은 아예 나갈 자리가 없다.
+  const list = (skills || []).filter(Boolean);
+  let busy = 0;
+  for (const skill of list) busy += (skill.cast || 0) / (skill.cd + (skill.cast || 0));
+  const castShare = busy > 1 ? 1 / busy : 1;
+  const freeShare = Math.max(0, 1 - Math.min(1, busy));
+  const shareOf = (skill) => (skill.cast ? castShare : freeShare);
+
+  let hit = (stats.atk * crit * freeShare) / def.attackCd;
   let mend = 0;
   let cost = 0;
   let gain = 0;
-  for (const skill of skills || []) {
-    if (!skill) continue;
+  for (const skill of list) {
     // **시전 시간도 주기에 넣는다.** 외우는 동안은 아무것도 못 하므로, 넣지
     // 않으면 캐스팅 스킬이 공짜로 강해 보인다.
-    const cycle = skill.cd + (skill.cast || 0);
+    const cycle = (skill.cd + (skill.cast || 0)) / shareOf(skill);
     const many = (skill.kind || '').indexOf('area') >= 0 || skill.kind === 'zone';
     const hits = many ? POWER.foes : 1;
+    const mates = many ? POWER.healed : 1;
     // 동료는 공격력의 배수(`mul`), 주인공은 정액(`damage`)에 마법 공격력을 곱한다.
     if (skill.mul) hit += (stats.atk * crit * skill.mul * hits) / cycle;
     if (skill.damage) hit += (skill.damage * stats.spell * crit * hits) / cycle;
     if (skill.tick) {
-      const total = skill.tick * power * (skill.duration / (skill.interval || 1)) * hits;
-      if (skill.kind === 'heal-dot') mend += (total * stats.heal) / cycle;
-      else hit += total / cycle;
+      const ticks = skill.duration / (skill.interval || 1);
+      // **회복 도트는 레벨 배수를 타지 않는다.** 걸어 놓은 값이 그대로 도는 쪽이고
+      // (`logic.js`의 `addDot`), 레벨 배수(`over`)는 피해 도트에만 붙는다. 둘 다
+      // 곱하고 있어서 재생류를 든 쪽이 실제의 갑절로 나왔다.
+      if (skill.kind === 'heal-dot') mend += (skill.tick * ticks * mates * stats.heal) / cycle;
+      else hit += (skill.tick * power * ticks * hits) / cycle;
     }
-    if (skill.heal) mend += (skill.heal * stats.heal * (many ? POWER.foes : 1)) / cycle;
+    if (skill.heal) mend += (skill.heal * stats.heal * mates) / cycle;
     if (skill.mana) gain += skill.mana / cycle;
     cost += (skill.mp || 0) / cycle;
   }
@@ -1285,6 +1328,11 @@ const SPEC_SKILLS = {
   // 밀쳐내기가 시안의 돌진이고, 나머지는 손으로 할퀴고 덮치는 것이다. 순서가 곧
   // 우선순위라 미는 것을 앞에 두었다: 느린 대신 후열을 밀어내며 붙는 쪽이다.
   zombie:  ['shove', 'gash', 'pounce', 'jab'],
+  // 구울도 적 전용이고 넷뿐이다. **좀비와 둘이 겹치고 둘이 다르다** — 미는 것
+  // (밀쳐내기) 대신 더 깊게 긋고(가르기) 쉬지 않고 벤다(속공). 발톱으로 할퀴어
+  // 찢는다는 시안을 이미 있는 것으로 옮긴 자리이고, 상위 대체인 것이 수치만이
+  // 아니라 손에서도 읽혀야 한다.
+  ghoul:   ['pounce', 'rend', 'jab', 'trip'],
   // 우두머리 전용. 새 스킬을 만들지 않고 수호와 전사의 무거운 것만 골라 묶었다 —
   // 이 계열이 하는 일은 "이미 있는 것 중 가장 아픈 것"이지 새로운 수단이 아니다.
   chieftain: ['rupture', 'sweep', 'roar', 'slam', 'shieldSlam', 'crush', 'bash'],
@@ -1920,17 +1968,43 @@ const ENEMIES = {
   // 있는지가 이 지역에서 값을 갖는 자리다.
   //
   // 시안의 "느린 움직임에도 끈질긴 생명력"을 수치로 옮겼다: 고블린 척후병보다
-  // 체력이 1.5배인데 걸음은 절반 아래고(9 대 21) 때리는 사이도 길다(2.2 대 1.5).
+  // 체력이 두 배 넘는데 걸음은 절반 아래고(9 대 21) 때리는 사이도 길다(2.2 대 1.5).
   // **등급은 잡졸이다** — 무리로 몰려오는 쪽이라 하나하나가 세면 안 된다.
   //
-  // **체력으로만 맞췄다.** 납골당은 지금 좀비 하나뿐이라 정예도 적 힐러도 없어
-  // 다른 지역보다 헐거웠는데(장비 파티로 재니 89% 대 82~86%), 공격력을 30에서
-  // 38로 올리자 이번에는 34~44%로 떨어졌다 — 잡졸이 다섯씩 나오는 자리라 한 방이
-  // 다섯 배로 걸린다. 체력만 1,106 → 1,218로 올려 83~87%에 맞췄다.
+  // **질긴 쪽으로만 세다**(체력 2,072 · 공격력 24). 처음에는 체력만 1,106 →
+  // 1,218로 올려 다른 지역에 맞췄는데(공격력을 38로 올려 봤더니 승률이 34~44%로
+  // 무너졌다 — 잡졸이 다섯씩 나오는 자리라 한 방이 다섯 배로 걸린다), 회복이
+  // 언데드를 때리게 되면서 **체력을 1.7배로 올리고 공격력을 0.8배로 낮췄다.**
+  // 전투가 길어지면 회복이 여러 번 들어갈 자리가 생기고, 때리는 힘을 함께
+  // 낮추면 그것이 "그냥 어려워진 것"이 되지 않는다. 재 보니 범위 회복을 든
+  // 힐러와 안 든 힐러의 승률 차이가 2~3%p에서 9~16%p로 벌어졌고, 파티 승률은
+  // 86·94·87%로 거의 그대로다 — 자세한 것은 `CLAUDE.md`의 "언데드에게는 회복이
+  // 공격이다"에 있다.
   zombie: { id: 'zombie', race: 'undead', rank: 'trash', exp: 14, name: '좀비',       job: 'dealer', sprite: 'zombie',
-            hp: 1218, mp: 72,  atk: 30, attackCd: 2.2, range: 7,  speed: 9,
-           attrs: { str: 30, agi: 6, int: 8, vit: 76 }, growth: 'enemy',
+            hp: 2072, mp: 72,  atk: 24, attackCd: 2.2, range: 7,  speed: 9,
+           attrs: { str: 30, agi: 6, int: 8, vit: 129 }, growth: 'enemy',
             armor: 0.9,  spec: 'zombie' },
+  // 구울. **좀비의 상위 대체다**(`ENEMY_UP`) — 높은 레벨의 납골당에서는 좀비
+  // 자리를 이쪽이 채운다. 같은 잡졸로 둔 것은 무리로 몰려오는 자리를 그대로
+  // 물려받기 때문이고, 등급을 올리면 위협의 몫이 두 배가 되어 머릿수가 줄어
+  // "무리 지어 사냥한다"가 사라진다.
+  //
+  // **좀비와 다른 방향으로 세다**: 좀비가 느리고 끈질기다면(걸음 9·체력 2,072)
+  // 구울은 빨리 붙고 조금 무르다(15·1,792). 한 방은 오히려 작다(21 대 24).
+  // 둘 다 언데드라 질긴 쪽으로 함께 올라갔지만(체력 1.7배·공격력 0.8배), 그
+  // 사이의 관계는 그대로다 — 자세한 것은 좀비 주석에 있다.
+  //
+  // **수치는 재서 잡았다.** 장비를 갖춘 파티로 납골당만 40개 씨앗씩 돌려 승률을
+  // 좀비만 나오는 판과 맞췄다 — 좀비만 Lv8 91% · Lv14 92% · Lv20 91%, 지금 값이
+  // 90% · 91% · 83%다. 처음 잡았던 값(공격 36·1.3초·걸음 20)은 79% · 9% · 4%로
+  // 판이 무너졌다. **걸음과 때리는 사이가 지배한다** — 공격력과 손 목록을 아무리
+  // 바꿔도 승률은 몇 점밖에 움직이지 않았고, 1.3→1.9초와 20→15로 되돌리자
+  // 한꺼번에 제자리로 왔다. 상위 대체가 "조금 센 같은 자리"로 읽히려면 이 둘을
+  // 건드리지 않는 편이 안전하다.
+  ghoul:  { id: 'ghoul', race: 'undead', rank: 'trash', exp: 20,   name: '구울',        job: 'dealer', sprite: 'ghoul',
+            hp: 1792, mp: 72,  atk: 21, attackCd: 1.9, range: 7,  speed: 15,
+           attrs: { str: 36, agi: 14, int: 8, vit: 111 }, growth: 'enemy',
+            armor: 0.86, spec: 'ghoul' },
   // 오우거 전사. **오크와 같은 등급인데 하는 일이 다르다** — 오크는 수호 계열이라
   // 도발로 붙들고 버티고, 이쪽은 전사 계열이라 한 방이 크다(공격력 63 대 51).
   // 대신 때리는 사이가 길고(2.2초) 걸음이 느리다(10 대 16). 같은 값을 다르게
@@ -1961,6 +2035,28 @@ const ENEMIES = {
             hp: 5222, mp: 136, atk: 67, attackCd: 2.0, range: 8,  speed: 14,
            attrs: { str: 100, agi: 6, int: 20, vit: 311 }, growth: 'enemy',
             armor: 0.62, spec: 'chieftain', always: ['rupture', 'sweep'] },
+};
+
+// **높은 레벨에서는 같은 자리를 다른 적이 채운다.** 계열이 한 번 올라가는 것
+// (`SPEC_UP`)과 닮았지만 다른 이야기다 — 그쪽은 같은 개체가 손을 바꾸는 것이고,
+// 이쪽은 개체 자체가 바뀐다. 좀비가 구울이 되는 것은 강해진 좀비가 아니라 다른
+// 시체다.
+//
+// **표로 둔 것은 언데드를 더 들일 자리이기 때문이다.** 지역의 적 목록을 레벨마다
+// 따로 적으면 지역을 하나 더할 때마다 목록이 배로 늘고, 무리를 짜는 쪽이 레벨을
+// 알아야 하는 이유가 흩어진다. 여기 한 줄이면 `quests.js`가 뽑을 때 갈아 끼운다.
+//
+// **문턱은 계열이 올라가는 레벨과 같은 12다.** 오크 전사가 광전사가 되는 그
+// 레벨에 납골당의 시체도 바뀐다 — 문턱이 여럿이면 "이 레벨부터 판이 달라진다"가
+// 화면에서 읽히지 않는다.
+const ENEMY_UP = {
+  zombie: { at: 12, to: 'ghoul' },
+};
+
+// 그 레벨에서 실제로 나오는 적. 뽑는 쪽이 이것만 거치면 표가 늘어도 분기가 늘지 않는다.
+const enemyAt = (id, level) => {
+  const up = ENEMY_UP[id];
+  return up && level >= up.at && ENEMIES[up.to] ? up.to : id;
 };
 
 // 동료 이름 조각. 명부에 새 동료가 들어올 때 조합해 쓴다 — 이름이 곧 신원이고,
@@ -2238,8 +2334,9 @@ const PARTY_MAX = 5;   // 주인공을 포함한 수
 const SKILL_MAX = 5;   // 전투에 등록할 수 있는 주인공 스킬 수
 
 const api = {
-  FIELD, JOBS, SPECS, RACES, raceOf, raceAttrs, RACE_WEAK, weakOf, schoolMul, potionsFor,
-  MANA_REGEN_PER_INT, POWER, combatPower, MELEE_RANGE, roleOf, ATTACK_ORDER, HEAL_ORDER, PULL_ORDER, LEVEL, ATTRS, ATTR, ATTR_GROWTH, attrsAt, derive, STATS, LOWER_IS_BETTER, TIERS, AFFIX_COUNT, AFFIX_BASE, AFFIX_POOL,
+  FIELD, JOBS, SPECS, RACES, raceOf, raceAttrs, RACE_WEAK, weakOf, schoolMul,
+  HEAL_HARM, healHarmOf, potionsFor,
+  MANA_REGEN_PER_INT, POWER, combatPower, ENEMY_UP, enemyAt, MELEE_RANGE, roleOf, ATTACK_ORDER, HEAL_ORDER, PULL_ORDER, LEVEL, ATTRS, ATTR, ATTR_GROWTH, attrsAt, derive, STATS, LOWER_IS_BETTER, TIERS, AFFIX_COUNT, AFFIX_BASE, AFFIX_POOL,
   tierName, tierFloor, tierRoll, tierCeiling, TIER_POWER, AFFIX_RANGE, SHOP_MAX_TIER,
   RANKS, rankOf,
   SLOTS, GEAR, MATERIALS, REGIONS, NAMES, SPECIAL_POOL, SPECIAL_CHANCE,
