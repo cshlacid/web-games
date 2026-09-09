@@ -202,46 +202,7 @@ h1 {
 }
 .btn:disabled { opacity: 0.35; cursor: default; }
 
-/* 결과는 판 위에 덮는다. 판을 가리는 대신 흐리게 남겨, 끝난 판의 모양이 그대로
-   보이게 한다. `hidden`은 UA의 display:none이라 여기서 다시 눌러 준다. */
-.result {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 14px;
-  background: var(--scrim);
-  backdrop-filter: blur(2px);
-  animation: result-in 0.22s ease-out;
-}
-
-.result[hidden] { display: none; }
-
-.result-card {
-  background: var(--sheet-bg);
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  padding: 18px 22px 16px;
-  text-align: center;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
-  max-width: 80%;
-}
-
-.result-title { margin: 0 0 6px; font-size: 19px; font-weight: 800; }
-.result-note { margin: 0 0 14px; font-size: 13px; color: var(--muted); }
-
-@keyframes result-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-/* 결과 카드는 판 위에 있어 움직임이 눈에 띈다. 줄이기를 요청한 기기에서는 끈다. */
-@media (prefers-reduced-motion: reduce) {
-  .result { animation: none; }
-}
-
-/* 도움말 시트. */
+/* 도움말 시트. 껍데기는 shared/sheet.css, 결과 덮개는 shared/result.css. */
 .sheet {
   background: var(--sheet-bg);
   border: 1px solid var(--line);

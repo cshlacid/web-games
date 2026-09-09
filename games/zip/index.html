@@ -9,6 +9,7 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235f6d87' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='M4 4 H20 L4 12 H20 L4 20 H20'/></svg>">
 <link rel="stylesheet" href="../../shared/base.css">
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="../../shared/result.css">
 <link rel="stylesheet" href="../../shared/sheet.css">
 </head>
 <body>
@@ -35,6 +36,15 @@
   <div class="board-wrap">
     <div class="board" id="board"></div>
     <div class="veil" id="veil" hidden>만드는 중…</div>
+    <div class="result" id="result" role="status" aria-live="polite" hidden>
+      <div class="result-card">
+        <p class="sheet-title" id="result-title"></p>
+        <p class="sheet-note" id="result-note"></p>
+        <div class="sheet-actions">
+          <button class="btn" id="again" type="button">한 판 더</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <p class="toast" id="toast" role="status" aria-live="polite"></p>
@@ -56,13 +66,6 @@
     </div>
   </div>
 
-  <div class="sheet" id="result" hidden>
-    <p class="sheet-title" id="result-title"></p>
-    <p class="sheet-note" id="result-note"></p>
-    <div class="sheet-actions">
-      <button class="btn" id="again" type="button">한 판 더</button>
-    </div>
-  </div>
 
   <div class="sheet" id="help" hidden>
     <p class="sheet-title">규칙</p>
