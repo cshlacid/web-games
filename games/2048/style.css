@@ -37,7 +37,6 @@ body {
   justify-content: center;
   padding: clamp(12px, 4vmin, 32px);
   /* 스와이프로 조작하므로 브라우저의 당겨서 새로고침·스크롤을 막는다. */
-  overscroll-behavior: none;
 }
 
 .app {

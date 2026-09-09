@@ -132,7 +132,6 @@ body {
   display: flex;
   justify-content: center;
   padding: clamp(10px, 3vmin, 24px) var(--pad-x);
-  overscroll-behavior: none;
   -webkit-user-select: none;
   user-select: none;
 }
