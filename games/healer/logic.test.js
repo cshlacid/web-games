@@ -2107,6 +2107,10 @@ function cast(state, skillId, target) {
 // 신성 스킬을 넣을 때마다 잊고, 유닛마다 분기를 두면 언데드를 하나 더할 때마다
 // 규칙이 는다. 앞으로 들일 언데드가 전부 같은 약점을 갖는 것이 이 표의 값이다.
 {
+  // 언데드를 더 들여도 종족이 정하므로 표를 안 고쳐도 된다 — 그것이 이 표의 값이다.
+  check('구울도 언데드라 신성에 약하다',
+    D.schoolMul(D.weakOf(D.ENEMIES.ghoul), 'holy'), 1.6);
+
   const zombie = D.ENEMIES.zombie;
   const scout = D.ENEMIES.scout;
   check('언데드만 신성에 약하다',
@@ -2141,6 +2145,42 @@ function cast(state, skillId, target) {
   L.applyDamage(state, null, zed, 100, false, null);
   const plain = before - zed.hp;
   check('좀비는 신성을 더 아프게 맞는다', Math.round((holy / plain) * 10) / 10, 1.6);
+}
+
+// --- 높은 레벨에서는 다른 적이 나온다 -----------------------------------
+//
+// **계열이 올라가는 것(`SPEC_UP`)과 다르다.** 그쪽은 같은 개체가 손을 바꾸고,
+// 이쪽은 개체 자체가 바뀐다 — 좀비가 구울이 되는 것은 강해진 좀비가 아니다.
+{
+  check('문턱 아래에서는 그대로다', D.enemyAt('zombie', 11), 'zombie');
+  check('문턱을 넘으면 갈린다', D.enemyAt('zombie', 12), 'ghoul');
+  check('표에 없는 적은 그대로다', D.enemyAt('scout', 30), 'scout');
+
+  // **바뀐 쪽이 반드시 더 세야 한다.** 상위 대체인데 약하면 레벨이 오를수록
+  // 판이 저절로 쉬워진다. 다만 초당 피해만으로 재지 않는다 — 구울은 한 방이
+  // 오히려 작고 빨리 붙어서 센 쪽이라, 그 값만 보면 상위 대체가 아니라고 나온다.
+  const dps = (id) => D.ENEMIES[id].atk / D.ENEMIES[id].attackCd;
+  for (const [id, up] of Object.entries(D.ENEMY_UP)) {
+    check(`${id} → ${up.to}: 초당 피해가 밀리지 않는다`, dps(up.to) >= dps(id), true);
+    check(`${id} → ${up.to}: 더 빨리 붙는다`,
+      D.ENEMIES[up.to].speed > D.ENEMIES[id].speed, true);
+    // 등급까지 오르면 위협의 몫이 두 배가 되어 무리 크기가 통째로 달라진다.
+    check(`${id} → ${up.to}: 등급은 그대로다`,
+      D.rankOf(D.ENEMIES[up.to]).id, D.rankOf(D.ENEMIES[id]).id);
+  }
+
+  // 실제로 생성되는 의뢰에서 갈리는지 본다. 무리를 짜는 쪽이 이 규칙을 안 거치면
+  // 표만 있고 화면에는 아무 일도 일어나지 않는다.
+  const Quests = require('./quests.js');
+  const seen = (level) => {
+    const out = new Set();
+    for (let i = 1; i <= 30; i++) {
+      for (const q of Quests.generate(level, i * 7)) for (const id of q.waves.flat()) out.add(id);
+    }
+    return out;
+  };
+  check('낮은 레벨 의뢰에는 구울이 없다', seen(6).has('ghoul'), false);
+  check('높은 레벨 의뢰에는 좀비가 없다', seen(18).has('zombie'), false);
 }
 
 // --- 초상화에 뜨는 상태 -------------------------------------------------
