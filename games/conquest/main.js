@@ -35,6 +35,8 @@ const el = {
   stats: document.getElementById('stats'),
   factory: document.getElementById('build-factory'),
   turret: document.getElementById('build-turret'),
+  rally: document.getElementById('rally'),
+  hint: document.getElementById('panel-hint'),
   result: document.getElementById('result'),
   resultTitle: document.getElementById('result-title'),
   resultNote: document.getElementById('result-note'),
@@ -53,6 +55,9 @@ let size = Number(localStorage.getItem(SIZE_KEY)) || 12;
 let level = AI.LEVELS[localStorage.getItem(LEVEL_KEY)] ? localStorage.getItem(LEVEL_KEY) : 'easy';
 let ratio = 0.5;
 let selected = null;
+// 집결지를 걸 곳을 고르는 중인가. 한 번 걸면 바로 꺼진다 — 켜 둔 채로 잊으면 보내려던
+// 병력이 안 가고 선만 생긴다.
+let rallyMode = false;
 let think = 0;
 let last = 0;
 let spin = 0;
@@ -69,9 +74,10 @@ function svg(name, attrs, cls) {
 function build() {
   el.board.textContent = '';
   const links = svg('g');
+  const rallies = svg('g');
   const flights = svg('g');
   const rocks = svg('g');
-  el.board.append(links, flights, rocks);
+  el.board.append(links, rallies, flights, rocks);
 
   const marks = world.nodes.map((a) => {
     const g = svg('g', { 'data-id': a.id });
@@ -95,7 +101,7 @@ function build() {
     return { rock, core, builds, dots, count, invader, sign: '', shown: -1 };
   });
 
-  view = { links, flights, rocks, marks, flying: new Map() };
+  view = { links, rallies, flights, rocks, marks, flying: new Map(), rallySign: '' };
 }
 
 function newGame() {
@@ -122,6 +128,40 @@ function drawLinks() {
     view.links.append(svg('line', { x1: from.x, y1: from.y, x2: to.x, y2: to.y }, 'link'));
   }
   view.links.append(svg('circle', { cx: from.x, cy: from.y, r: from.r + 7 }, 'ring'));
+}
+
+// 걸어 둔 집결지를 그린다. 판이 바뀔 때마다 다시 만들지 않고, 이어진 짝이 달라졌을
+// 때만 새로 그린다.
+function drawRallies() {
+  const sign = world.nodes.map((a) => `${a.owner}:${a.rally}`).join(',');
+  if (sign === view.rallySign) return;
+  view.rallySign = sign;
+  view.rallies.textContent = '';
+
+  for (const a of world.nodes) {
+    if (a.owner !== 1 || a.rally === null) continue;
+    const to = world.nodes[a.rally];
+    const dx = to.x - a.x;
+    const dy = to.y - a.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const ux = dx / len;
+    const uy = dy / len;
+    // 두 거점의 테두리 사이만 잇는다. 원 안까지 그으면 숫자를 가린다.
+    const x1 = a.x + ux * (a.r + 3);
+    const y1 = a.y + uy * (a.r + 3);
+    const x2 = to.x - ux * (to.r + 5);
+    const y2 = to.y - uy * (to.r + 5);
+    view.rallies.append(svg('line', { x1, y1, x2, y2 }, 'rally'));
+
+    // 화살촉. 방향이 보여야 어느 쪽으로 흐르는지 한눈에 읽힌다.
+    const hx = x2 - ux * 5;
+    const hy = y2 - uy * 5;
+    const px = -uy;
+    const py = ux;
+    view.rallies.append(svg('path', {
+      d: `M ${x2} ${y2} L ${hx + px * 3.2} ${hy + py * 3.2} L ${hx - px * 3.2} ${hy - py * 3.2} Z`,
+    }, 'rally-head'));
+  }
 }
 
 function buildShape(type, x, y) {
@@ -234,6 +274,11 @@ function paintPanel() {
 
   el.factory.disabled = !!world.over || !L.canBuild(world, a.id, 1, 'factory');
   el.turret.disabled = !!world.over || !L.canBuild(world, a.id, 1, 'turret');
+  el.rally.disabled = !!world.over;
+  el.rally.textContent = a.rally === null ? '집결지' : '집결 해제';
+  el.rally.setAttribute('aria-pressed', String(rallyMode));
+  el.hint.textContent = rallyMode ? '이어 둘 거점을 누르세요'
+    : a.rally === null ? '' : `병력이 ${L.RALLY_KEEP}만 남기고 흘러갑니다`;
 }
 
 function paintTally() {
@@ -246,6 +291,7 @@ function paintTally() {
 function paint() {
   world.nodes.forEach((a, i) => paintNode(a, view.marks[i]));
   paintFlights();
+  drawRallies();
   paintPanel();
   paintTally();
 }
@@ -296,6 +342,7 @@ function frame(now) {
 
 function select(id) {
   selected = id;
+  rallyMode = false;
   el.stats.dataset.id = '';
   drawLinks();
 }
@@ -306,6 +353,13 @@ el.board.addEventListener('click', (event) => {
   if (!g) { select(null); return; }
   const id = Number(g.dataset.id);
   const a = world.nodes[id];
+
+  // 집결지를 고르는 중이면 보내는 대신 잇는다.
+  if (rallyMode && selected !== null && id !== selected) {
+    if (L.setRally(world, selected, id, 1)) Sound.play('send');
+    rallyMode = false;
+    return;
+  }
 
   if (selected !== null && id !== selected && L.canSend(world, selected, id, 1)) {
     if (L.send(world, selected, id, 1, ratio)) {
@@ -323,6 +377,18 @@ el.factory.addEventListener('click', () => {
 });
 el.turret.addEventListener('click', () => {
   if (L.build(world, selected, 1, 'turret')) Sound.play('build', 1);
+});
+
+// 걸린 집결지가 있으면 이 단추는 푸는 단추가 되고, 없으면 이을 곳을 고르는 모드로 든다.
+el.rally.addEventListener('click', () => {
+  if (selected === null) return;
+  Sound.play('click');
+  if (world.nodes[selected].rally !== null) {
+    L.setRally(world, selected, null, 1);
+    rallyMode = false;
+    return;
+  }
+  rallyMode = !rallyMode;
 });
 
 for (const item of SIZES) {
