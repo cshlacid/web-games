@@ -2161,7 +2161,7 @@ function cast(state, skillId, target) {
   check('좀비는 신성을 더 아프게 맞는다', Math.round((holy / plain) * 10) / 10, 1.6);
 }
 
-// --- 언데드에게는 회복이 공격이다 ---------------------------------------
+// --- 언데드에게는 퍼지는 회복이 공격이다 ---------------------------------
 //
 // **반경으로 퍼지는 회복만이다**(`healSpread`). 아군 하나를 지목하는 회복은
 // 지목한 자리에 적이 설 수 없어 규칙이 닿을 일이 없고, 반경과 장판은 바닥을
@@ -2197,6 +2197,38 @@ function cast(state, skillId, target) {
   const hurt = mate.hp;
   cast(state, 'touch', { uid: mate.uid });
   check('지목한 아군은 회복된다', mate.hp > hurt, true);
+}
+
+// **언데드에게는 어떤 회복도 통하지 않는다.** 회복이 지나가는 길이 넷(지목·
+// 범위·장판·지속)에 물약과 무리 사이의 쉼까지 여섯인데, 막는 자리는 `applyHeal`
+// 하나이고 그 함수를 안 거치는 둘(물약·쉼)만 따로 적혀 있다.
+{
+  const state = battle({ quest: quest({ waves: [['zombie', 'scout']] }) });
+  const zed = state.units.find((u) => u.defId === 'zombie');
+  const goblin = state.units.find((u) => u.defId === 'scout');
+  zed.hp = Math.round(zed.maxHp * 0.5);
+  goblin.hp = Math.round(goblin.maxHp * 0.5);
+
+  const before = zed.hp;
+  check('좀비는 회복되지 않는다', L.applyHeal(state, null, zed, 500), 0);
+  check('회복을 맞아도 체력이 그대로다', zed.hp, before);
+  // 언데드가 아닌 적은 그대로 회복된다 — 막는 것은 종족이지 편이 아니다.
+  check('고블린은 회복된다', L.applyHeal(state, null, goblin, 200) > 0, true);
+
+  // 지속 회복도 같은 함수를 거치므로 함께 막힌다.
+  L.addDot(state, null, zed, D.UNIT_SKILLS.renew, 'heal', 100);
+  for (let i = 0; i < 90; i++) L.step(state, L.TICK);
+  check('지속 회복도 통하지 않는다', zed.hp <= before, true);
+
+  // 물약은 `applyHeal`을 안 거치고 체력을 직접 더하는 자리다.
+  zed.potions = { health: 3, mana: 3 };
+  zed.potionReadyAt = 0;
+  check('체력 물약을 마시지 못한다',
+    L.drink(state, zed, 'health').reason, '회복이 통하지 않는다');
+  check('물약이 그대로 남는다', zed.potions.health, 3);
+  // **마나는 통한다** — 통하지 않는 것은 생명의 힘이지 마력이 아니다.
+  zed.mp = 0;
+  check('마나 물약은 마신다', L.drink(state, zed, 'mana').ok, true);
 }
 
 // 바닥에 깔리는 회복은 **한 번 도는 동안 둘 다 한다** — 아군을 채우면서 같은

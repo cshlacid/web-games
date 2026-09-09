@@ -419,6 +419,12 @@ function applyDamage(state, source, target, raw, dodgeable, school) {
 
 function applyHeal(state, source, target, raw) {
   if (target.dead) return 0;
+  // **언데드에게는 회복이 통하지 않는다**(`D.HEAL_HARM`). 생명의 힘을 받는 몸이
+  // 아니라는 것이 이 종족의 정의이고, 그래서 반경으로 퍼지는 회복은 이들에게
+  // 피해가 된다(`healSpread`). **막는 자리를 여기 하나로 둔다** — 회복이
+  // 지나가는 길이 지목·범위·장판·지속 넷이라, 자리마다 적으면 하나를 잊는다.
+  // 물약은 이 함수를 안 거치므로 `drink`에서 따로 막는다.
+  if (target.healHarm) return 0;
   // 회복도 터진다. 다만 받는 쪽이 아군이라 회피가 끼어들지 않는다.
   const crit = rollCrit(state, source, null);
   const healed = Math.round(raw * auraMul(state, source, 'heal') * crit);
@@ -456,12 +462,13 @@ function kill(state, unit) {
 // 회복이 0이 되어도 언데드는 그만큼 맞는다 — 한쪽의 남은 체력이 다른 쪽의
 // 피해를 정하면 화면에서 읽히지 않는다.
 function healSpread(state, source, side, point, radius, amount) {
-  for (const mate of alive(state, side)) {
-    if (dist(mate, point) <= radius) applyHeal(state, source, mate, amount);
-  }
-  for (const foe of alive(state, AI.opposite(side))) {
-    if (!foe.healHarm || dist(foe, point) > radius) continue;
-    applyDamage(state, source, foe, amount * foe.healHarm, false, 'holy');
+  // **편을 나누는 것은 회복뿐이다.** 반경 안의 언데드는 어느 편이든 맞는다 —
+  // 회복이 해가 되는 것은 그 몸의 성질이지 적이라서가 아니고, 편으로 갈라 두면
+  // 언젠가 언데드를 아군으로 들일 때 그쪽만 규칙 밖에 남는다.
+  for (const unit of state.units) {
+    if (unit.dead || dist(unit, point) > radius) continue;
+    if (unit.healHarm) applyDamage(state, source, unit, amount * unit.healHarm, false, 'holy');
+    else if (unit.side === side) applyHeal(state, source, unit, amount);
   }
 }
 
@@ -949,6 +956,11 @@ function drink(state, unit, potionId) {
   const readyAt = unit === hero(state) ? state.potionReadyAt : unit.potionReadyAt;
   if (state.t < readyAt) return { ok: false, reason: '쿨타임' };
   if (unit.dead) return { ok: false, reason: '쓰러졌다' };
+  // 언데드에게는 회복이 통하지 않는다(위 `applyHeal`). 물약은 체력을 직접 더하는
+  // 자리라 그 규칙을 따로 한 번 더 적는다. **마나 물약은 막지 않는다** — 통하지
+  // 않는 것은 생명의 힘이지 마력이 아니다. **물약을 쓰기 전에 막는다**: 뒤에
+  // 두면 회복이 0인 채로 물약만 사라진다.
+  if (potion.restore === 'hp' && unit.healHarm) return { ok: false, reason: '회복이 통하지 않는다' };
 
   carried[potionId]--;
   if (unit === hero(state)) state.potionReadyAt = state.t + potion.cd;
@@ -1015,7 +1027,8 @@ function march(state, dt) {
     // 사이는 사람이 힐을 넣는 자리라 회복이 차오르는 것이 보여야 한다. 외우는
     // 중이어도 몸은 쉬므로 아래 continue보다 앞에 둔다.
     const share = dt / WAVE_GAP;
-    unit.hp = Math.min(unit.maxHp, unit.hp + unit.maxHp * MARCH_RECOVER * share);
+    // 언데드는 쉬어도 몸이 낫지 않는다(위 `applyHeal`). 마나는 그대로 찬다.
+    if (!unit.healHarm) unit.hp = Math.min(unit.maxHp, unit.hp + unit.maxHp * MARCH_RECOVER * share);
     unit.mp = Math.min(unit.maxMp, unit.mp + unit.maxMp * MARCH_RECOVER_MP * share);
     // **외우는 중이면 걸음을 멈춘다.** 대열을 다시 짜자고 끌고 가면 그 순간
     // 시전이 취소되는데, 무리 사이는 사람이 힐을 넣는 자리라 누른 스킬이
