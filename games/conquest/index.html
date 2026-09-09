@@ -39,6 +39,15 @@
   <div class="board-wrap">
     <svg class="board" id="board" viewBox="0 0 320 460" role="application"
       aria-label="거점 지도"></svg>
+    <!-- 결과는 판 한가운데에 띄운다. 화면 맨 아래에 두었더니 시선이 판에 있는 동안
+         끝난 줄 모르고 계속 두드리는 일이 있었다. -->
+    <div class="result" id="result" role="status" aria-live="polite" hidden>
+      <div class="result-card">
+        <p class="result-title" id="result-title"></p>
+        <p class="result-note" id="result-note"></p>
+        <button class="btn" id="again" type="button">한 판 더</button>
+      </div>
+    </div>
   </div>
 
   <div class="panel" id="panel">
@@ -50,14 +59,6 @@
         <button class="btn" id="build-turret" type="button">방어탑 10</button>
         <div class="picker" id="ratios" role="group" aria-label="보낼 양"></div>
       </div>
-    </div>
-  </div>
-
-  <div class="sheet" id="result" hidden>
-    <p class="sheet-title" id="result-title"></p>
-    <p class="sheet-note" id="result-note"></p>
-    <div class="sheet-actions">
-      <button class="btn" id="again" type="button">한 판 더</button>
     </div>
   </div>
 
