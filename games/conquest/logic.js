@@ -37,6 +37,14 @@ const STARVE = 0.05;     // 한도를 넘긴 부대가 초당 줄어드는 비�
 const MOVE_BASE = 24;    // 스탯 0에서의 이동 속도
 const MOVE_PER = 0.32;   // 속도 스탯 1당 더해지는 이동 속도
 
+// 집결지. 거점 하나에 목적지를 걸어 두면 생산된 병력이 알아서 흘러간다.
+// **남겨 두는 수는 시설 값과 같은 10이다.** 한 명도 남기지 않으면 방어가 비어 순찰
+// 한 부대에도 뺏기고, 손으로 시설을 세울 병력도 모이지 않는다.
+const RALLY_KEEP = 10;
+// 몇 초에 한 번 넘친 만큼 보내는가. 매 틱 보내면 초당 서른 개의 부대가 생겨 화면과
+// 판정이 둘 다 무거워진다.
+const RALLY_EVERY = 2;
+
 // 스탯은 1~200이고 50이 보통이다. 계수를 1 근처에 두어야 위의 초당 값들이
 // 그대로 감각과 맞는다.
 const strFactor = (v) => 0.5 + v / 100;
@@ -88,6 +96,8 @@ function createWorld(map) {
     builds: (a.builds || []).map((type) => ({ type, hp: BUILD_HP[type] })),
     units: { 1: emptyStack(), 2: emptyStack() },
     core: { hp: a.owner ? CORE_HP.owned : CORE_HP.neutral },
+    rally: null,
+    rallyAt: 0,
   }));
 
   for (const a of nodes) {
@@ -136,10 +146,16 @@ function canSend(world, fromId, toId, owner) {
 function send(world, fromId, toId, owner, ratio) {
   if (!canSend(world, fromId, toId, owner)) return false;
   const from = byId(world, fromId);
-  const to = byId(world, toId);
-  const stack = from.units[owner];
-  const n = Math.floor(stack.n * ratio);
+  return launch(world, from, byId(world, toId), owner, Math.floor(from.units[owner].n * ratio));
+}
+
+// 실제로 부대를 띄운다. 손으로 보낼 때는 비율로, 집결지로 흘려보낼 때는 수로 정해지는데
+// 그 아래는 같아서 여기로 모았다.
+function launch(world, from, to, owner, n) {
   if (n < 1) return false;
+  const stack = from.units[owner];
+  const toId = to.id;
+  const fromId = from.id;
 
   stack.n -= n;
   if (stack.n < 1) from.units[owner] = emptyStack();
@@ -159,6 +175,34 @@ function send(world, fromId, toId, owner, ratio) {
     pos: 0,
   });
   return true;
+}
+
+// 집결지를 걸거나 푼다(toId가 null이면 푼다). 사거리 밖은 걸 수 없다 — 어차피
+// 보낼 수 없는 곳이다.
+function setRally(world, id, toId, owner) {
+  const a = byId(world, id);
+  if (!a || a.owner !== owner) return false;
+  if (toId === null || toId === undefined) { a.rally = null; return true; }
+  const to = byId(world, toId);
+  if (!to || !inRange(a, to)) return false;
+  a.rally = toId;
+  a.rallyAt = world.t + RALLY_EVERY;
+  return true;
+}
+
+// 집결지로 넘친 병력을 흘려보낸다. 사거리 밖으로 밀려나거나(있을 수 없지만) 주인이
+// 바뀌면 스스로 풀린다.
+function tickRally(world, a) {
+  if (a.rally === null || !a.owner) return;
+  const to = byId(world, a.rally);
+  if (!to || !inRange(a, to)) { a.rally = null; return; }
+  // **상대에게 넘어간 곳으로는 더 보내지 않는다.** 걸어 둔 줄 모르고 두면 생산되는
+  // 족족 적진으로 조금씩 흘러 들어가 각개격파당한다. 빈 거점은 그대로 두어, 걸어만
+  // 두면 알아서 먹으러 가게 한다.
+  if (to.owner === foe(a.owner)) { a.rally = null; return; }
+  if (world.t < a.rallyAt) return;
+  a.rallyAt = world.t + RALLY_EVERY;
+  launch(world, a, to, a.owner, Math.floor(a.units[a.owner].n - RALLY_KEEP));
 }
 
 function canBuild(world, id, owner, type) {
@@ -276,6 +320,9 @@ function tickNode(world, a, dt, events) {
     a.core.hp = CORE_HP.owned;
     a.builds.length = 0;
     a.units[foe(winner)] = emptyStack();
+    // 걸어 둔 집결지는 주인과 함께 사라진다. 뺏은 쪽이 앞 주인의 보급선을 물려받으면
+    // 병력이 엉뚱한 곳으로 새 나간다.
+    a.rally = null;
     events.push({ type: 'taken', id: a.id, owner: winner });
   }
 }
@@ -321,6 +368,7 @@ function step(world, dt) {
   const events = [];
   world.t += dt;
   for (const a of world.nodes) tickNode(world, a, dt, events);
+  for (const a of world.nodes) tickRally(world, a);
   tickFlights(world, dt, events);
   const over = judge(world);
   if (over) {
@@ -331,9 +379,9 @@ function step(world, dt) {
 }
 
 const Logic = {
-  UNITS_PER_BUILD, RANGE, BUILD_HP, CORE_HP,
+  UNITS_PER_BUILD, RANGE, BUILD_HP, CORE_HP, RALLY_KEEP, RALLY_EVERY,
   emptyStack, maxBuilds, capacity, dist, inRange, merge,
-  createWorld, canSend, send, canBuild, build, power, holdings, judge, step,
+  createWorld, canSend, send, canBuild, build, setRally, power, holdings, judge, step,
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = Logic;

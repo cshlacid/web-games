@@ -181,6 +181,67 @@ function arena(spec) {
     [dented < L.CORE_HP.neutral, w.nodes[0].core.hp], [true, L.CORE_HP.neutral]);
 }
 
+// --- 집결지 ---
+{
+  const w = arena([
+    { x: 0, y: 0, owner: 1, builds: ['factory'], units: 30 },
+    { x: 80, y: 0, owner: 1 },
+    { x: 300, y: 0, owner: 1 },
+  ]);
+
+  check('사거리 밖으로는 걸 수 없다', L.setRally(w, 0, 2, 1), false);
+  check('남의 거점에는 걸 수 없다', L.setRally(w, 1, 0, 2), false);
+  check('사거리 안으로 건다', L.setRally(w, 0, 1, 1), true);
+
+  run(w, 3);
+  const left = w.nodes[0].units[1].n;
+  check('넘긴 만큼만 흘려보낸다', left >= L.RALLY_KEEP && left < L.RALLY_KEEP + 4, true);
+  run(w, 10);
+  check('보낸 병력은 집결지에 모인다', w.nodes[1].units[1].n > 15, true);
+
+  check('풀면 그대로 쌓인다', L.setRally(w, 0, null, 1), true);
+  run(w, 20);
+  check('푼 뒤에는 다시 늘어난다', w.nodes[0].units[1].n > L.RALLY_KEEP, true);
+}
+
+{
+  const w = arena([
+    { x: 0, y: 0, owner: 1, units: 8 },
+    { x: 80, y: 0, owner: 1 },
+  ]);
+  L.setRally(w, 0, 1, 1);
+  run(w, 10);
+  check('남길 만큼도 없으면 보내지 않는다',
+    [w.nodes[0].units[1].n, w.nodes[1].units[1].n], [8, 0]);
+}
+
+{
+  const w = arena([
+    { x: 0, y: 0, owner: 1, units: 30 },
+    { x: 80, y: 0, owner: 1 },
+  ]);
+  L.setRally(w, 0, 1, 1);
+  // 지키는 병력이 다 죽고 코어가 바닥난 자리에 상대가 들어온 상황
+  w.nodes[0].units[1] = L.emptyStack();
+  w.nodes[0].units[2] = { n: 20, str: 60, eng: 60, spd: 60 };
+  w.nodes[0].core.hp = 0.5;
+  run(w, 1);
+  check('그 자리는 상대에게 넘어간다', w.nodes[0].owner, 2);
+  check('주인이 바뀌면 집결지가 풀린다', w.nodes[0].rally, null);
+}
+
+{
+  const w = arena([
+    { x: 0, y: 0, owner: 1, builds: ['factory'], units: 30 },
+    { x: 80, y: 0, owner: 1 },
+  ]);
+  L.setRally(w, 0, 1, 1);
+  w.nodes[1].owner = 2;
+  run(w, 3);
+  check('집결지가 상대 손에 넘어가면 스스로 풀린다',
+    [w.nodes[0].rally, w.nodes[1].units[1].n], [null, 0]);
+}
+
 // --- 승패 ---
 {
   const w = world([
