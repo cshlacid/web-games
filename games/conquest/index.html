@@ -9,6 +9,7 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%234e9a6a'><circle cx='12' cy='12' r='5.4'/><circle cx='12' cy='2.6' r='1.9'/><circle cx='20.2' cy='16.8' r='1.9'/><circle cx='3.8' cy='16.8' r='1.9'/></svg>">
 <link rel="stylesheet" href="../../shared/base.css">
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="../../shared/result.css">
 <link rel="stylesheet" href="../../shared/sheet.css">
 </head>
 <body>
@@ -39,13 +40,13 @@
   <div class="board-wrap">
     <svg class="board" id="board" viewBox="0 0 320 460" role="application"
       aria-label="거점 지도"></svg>
-    <!-- 결과는 판 한가운데에 띄운다. 화면 맨 아래에 두었더니 시선이 판에 있는 동안
-         끝난 줄 모르고 계속 두드리는 일이 있었다. -->
     <div class="result" id="result" role="status" aria-live="polite" hidden>
       <div class="result-card">
-        <p class="result-title" id="result-title"></p>
-        <p class="result-note" id="result-note"></p>
-        <button class="btn" id="again" type="button">한 판 더</button>
+        <p class="sheet-title" id="result-title"></p>
+        <p class="sheet-note" id="result-note"></p>
+        <div class="sheet-actions">
+          <button class="btn" id="again" type="button">한 판 더</button>
+        </div>
       </div>
     </div>
   </div>
