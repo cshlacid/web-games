@@ -30,8 +30,8 @@ function check(name, actual, expected) {
 // 자료를 손으로 적는 자리가 없어졌기 때문이고, 대신 시트가 서로 어긋나지
 // 않는지(칸·프레임 수·크기 사다리)를 본다.
 {
-  // 열여섯 전부가 시안을 구운 그림 파일이다. 도형은 하나도 남지 않았다.
-  check('그림 파일 열여섯', Object.keys(Sprites.SHEETS).length, 16);
+  // 열일곱 전부가 시안을 구운 그림 파일이다. 도형은 하나도 남지 않았다.
+  check('그림 파일 열일곱', Object.keys(Sprites.SHEETS).length, 17);
 
   // **한 그림을 두 시트가 나눠 쓰는 것은 지금 한 쌍뿐이다.** 성기사는 아직 제
   // 시안이 없어 수호자 것을 빌린다 — 도형 렌더러를 걷어낸 뒤라 대신 그릴 것이
@@ -95,6 +95,9 @@ function check(name, actual, expected) {
   // 좀비는 사람 크기의 시체라 고블린보다 크지만, 잡졸이므로 정예를 넘지 않는다.
   check('좀비는 고블린보다 크고 오크보다 작다',
     personH('goblin') < personH('zombie') && personH('zombie') < personH('orc'), true);
+  // 구울은 좀비를 갈아 끼우는 자리라 조금 크다. 같은 잡졸이므로 정예는 넘지 않는다.
+  check('구울은 좀비보다 크고 오크보다 작다',
+    personH('zombie') < personH('ghoul') && personH('ghoul') < personH('orc'), true);
 }
 
 // --- 자료가 가리키는 그림이 실제로 있는가 -------------------------------

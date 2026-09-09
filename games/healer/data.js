@@ -1285,6 +1285,11 @@ const SPEC_SKILLS = {
   // 밀쳐내기가 시안의 돌진이고, 나머지는 손으로 할퀴고 덮치는 것이다. 순서가 곧
   // 우선순위라 미는 것을 앞에 두었다: 느린 대신 후열을 밀어내며 붙는 쪽이다.
   zombie:  ['shove', 'gash', 'pounce', 'jab'],
+  // 구울도 적 전용이고 넷뿐이다. **좀비와 둘이 겹치고 둘이 다르다** — 미는 것
+  // (밀쳐내기) 대신 더 깊게 긋고(가르기) 쉬지 않고 벤다(속공). 발톱으로 할퀴어
+  // 찢는다는 시안을 이미 있는 것으로 옮긴 자리이고, 상위 대체인 것이 수치만이
+  // 아니라 손에서도 읽혀야 한다.
+  ghoul:   ['pounce', 'rend', 'jab', 'trip'],
   // 우두머리 전용. 새 스킬을 만들지 않고 수호와 전사의 무거운 것만 골라 묶었다 —
   // 이 계열이 하는 일은 "이미 있는 것 중 가장 아픈 것"이지 새로운 수단이 아니다.
   chieftain: ['rupture', 'sweep', 'roar', 'slam', 'shieldSlam', 'crush', 'bash'],
@@ -1931,6 +1936,25 @@ const ENEMIES = {
             hp: 1218, mp: 72,  atk: 30, attackCd: 2.2, range: 7,  speed: 9,
            attrs: { str: 30, agi: 6, int: 8, vit: 76 }, growth: 'enemy',
             armor: 0.9,  spec: 'zombie' },
+  // 구울. **좀비의 상위 대체다**(`ENEMY_UP`) — 높은 레벨의 납골당에서는 좀비
+  // 자리를 이쪽이 채운다. 같은 잡졸로 둔 것은 무리로 몰려오는 자리를 그대로
+  // 물려받기 때문이고, 등급을 올리면 위협의 몫이 두 배가 되어 머릿수가 줄어
+  // "무리 지어 사냥한다"가 사라진다.
+  //
+  // **좀비와 다른 방향으로 세다**: 좀비가 느리고 끈질기다면(걸음 9·체력 1,218)
+  // 구울은 빨리 붙고 조금 무르다(15·1,050). 한 방은 오히려 작다(26 대 30).
+  //
+  // **수치는 재서 잡았다.** 장비를 갖춘 파티로 납골당만 40개 씨앗씩 돌려 승률을
+  // 좀비만 나오는 판과 맞췄다 — 좀비만 Lv8 91% · Lv14 92% · Lv20 91%, 지금 값이
+  // 90% · 91% · 83%다. 처음 잡았던 값(공격 36·1.3초·걸음 20)은 79% · 9% · 4%로
+  // 판이 무너졌다. **걸음과 때리는 사이가 지배한다** — 공격력과 손 목록을 아무리
+  // 바꿔도 승률은 몇 점밖에 움직이지 않았고, 1.3→1.9초와 20→15로 되돌리자
+  // 한꺼번에 제자리로 왔다. 상위 대체가 "조금 센 같은 자리"로 읽히려면 이 둘을
+  // 건드리지 않는 편이 안전하다.
+  ghoul:  { id: 'ghoul', race: 'undead', rank: 'trash', exp: 20,   name: '구울',        job: 'dealer', sprite: 'ghoul',
+            hp: 1050, mp: 72,  atk: 26, attackCd: 1.9, range: 7,  speed: 15,
+           attrs: { str: 36, agi: 14, int: 8, vit: 65 }, growth: 'enemy',
+            armor: 0.86, spec: 'ghoul' },
   // 오우거 전사. **오크와 같은 등급인데 하는 일이 다르다** — 오크는 수호 계열이라
   // 도발로 붙들고 버티고, 이쪽은 전사 계열이라 한 방이 크다(공격력 63 대 51).
   // 대신 때리는 사이가 길고(2.2초) 걸음이 느리다(10 대 16). 같은 값을 다르게
@@ -1961,6 +1985,28 @@ const ENEMIES = {
             hp: 5222, mp: 136, atk: 67, attackCd: 2.0, range: 8,  speed: 14,
            attrs: { str: 100, agi: 6, int: 20, vit: 311 }, growth: 'enemy',
             armor: 0.62, spec: 'chieftain', always: ['rupture', 'sweep'] },
+};
+
+// **높은 레벨에서는 같은 자리를 다른 적이 채운다.** 계열이 한 번 올라가는 것
+// (`SPEC_UP`)과 닮았지만 다른 이야기다 — 그쪽은 같은 개체가 손을 바꾸는 것이고,
+// 이쪽은 개체 자체가 바뀐다. 좀비가 구울이 되는 것은 강해진 좀비가 아니라 다른
+// 시체다.
+//
+// **표로 둔 것은 언데드를 더 들일 자리이기 때문이다.** 지역의 적 목록을 레벨마다
+// 따로 적으면 지역을 하나 더할 때마다 목록이 배로 늘고, 무리를 짜는 쪽이 레벨을
+// 알아야 하는 이유가 흩어진다. 여기 한 줄이면 `quests.js`가 뽑을 때 갈아 끼운다.
+//
+// **문턱은 계열이 올라가는 레벨과 같은 12다.** 오크 전사가 광전사가 되는 그
+// 레벨에 납골당의 시체도 바뀐다 — 문턱이 여럿이면 "이 레벨부터 판이 달라진다"가
+// 화면에서 읽히지 않는다.
+const ENEMY_UP = {
+  zombie: { at: 12, to: 'ghoul' },
+};
+
+// 그 레벨에서 실제로 나오는 적. 뽑는 쪽이 이것만 거치면 표가 늘어도 분기가 늘지 않는다.
+const enemyAt = (id, level) => {
+  const up = ENEMY_UP[id];
+  return up && level >= up.at && ENEMIES[up.to] ? up.to : id;
 };
 
 // 동료 이름 조각. 명부에 새 동료가 들어올 때 조합해 쓴다 — 이름이 곧 신원이고,
@@ -2239,7 +2285,7 @@ const SKILL_MAX = 5;   // 전투에 등록할 수 있는 주인공 스킬 수
 
 const api = {
   FIELD, JOBS, SPECS, RACES, raceOf, raceAttrs, RACE_WEAK, weakOf, schoolMul, potionsFor,
-  MANA_REGEN_PER_INT, POWER, combatPower, MELEE_RANGE, roleOf, ATTACK_ORDER, HEAL_ORDER, PULL_ORDER, LEVEL, ATTRS, ATTR, ATTR_GROWTH, attrsAt, derive, STATS, LOWER_IS_BETTER, TIERS, AFFIX_COUNT, AFFIX_BASE, AFFIX_POOL,
+  MANA_REGEN_PER_INT, POWER, combatPower, ENEMY_UP, enemyAt, MELEE_RANGE, roleOf, ATTACK_ORDER, HEAL_ORDER, PULL_ORDER, LEVEL, ATTRS, ATTR, ATTR_GROWTH, attrsAt, derive, STATS, LOWER_IS_BETTER, TIERS, AFFIX_COUNT, AFFIX_BASE, AFFIX_POOL,
   tierName, tierFloor, tierRoll, tierCeiling, TIER_POWER, AFFIX_RANGE, SHOP_MAX_TIER,
   RANKS, rankOf,
   SLOTS, GEAR, MATERIALS, REGIONS, NAMES, SPECIAL_POOL, SPECIAL_CHANCE,

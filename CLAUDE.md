@@ -112,7 +112,7 @@
 - **예외가 하나 있다: 힐러의 캐릭터 그림**(`games/healer/`의 `hero.png`,
   `tank.png`, `archer.png`, `mage.png`, `rogue.png`, `bard.png`, `priest.png`,
   `warrior.png`, `goblin.png`, `shaman.png`, `orc.png`, `hexer.png`, `ogre.png`,
-  `chief.png`, `zombie.png`). 사람이 그린 시안을 그대로 쓰기로 하면서 도형을 포기한 자리이고,
+  `chief.png`, `zombie.png`, `ghoul.png`). 사람이 그린 시안을 그대로 쓰기로 하면서 도형을 포기한 자리이고,
   **차례로 바뀌어 그 게임의 캐릭터는 이제 전부 그림 파일이고, 새 캐릭터도 그렇게 들어온다**(도형
   렌더러도 함께 걷어냈다). 규칙을 없앤 것이 아니라 **시안을 받은 캐릭터만 그림
   파일을 쓴다** — 아이콘과 배경은 여전히 도형이고, 다른 게임도 그대로다. 그림 파일을 들일 때 지키는 것: 프레임을 격자 한 장에 담아 요청을 하나로
