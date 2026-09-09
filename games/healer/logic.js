@@ -132,6 +132,8 @@ function makeUnit(def, side, uid, x, y, level, override, bonus, potions, name, h
     // 갈래별로 얼마나 더 아픈가(`D.weakOf`). 종족이 정하므로 유닛을 만들 때
     // 한 번만 보고, 매 타격마다 표를 다시 뒤지지 않는다.
     weak: D.weakOf(def),
+    // 회복을 맞으면 얼마나 아픈가(`D.healHarmOf`). 위와 같은 이유로 여기서 한 번만 본다.
+    healHarm: D.healHarmOf(def),
     exp: Math.round((def.exp || 0) * (1 + 0.25 * (level - 1))),
     // 계열의 목록 중 레벨이 되는 것을 앞에서부터 넷. 편성 화면이 보여 준 것과
     // 전투에서 실제로 쓰는 것이 같아야 하므로 같은 함수를 쓴다.
@@ -445,6 +447,24 @@ function kill(state, unit) {
   emit(state, { type: 'death', uid: unit.uid, side: unit.side, text: `${unit.name} 쓰러짐` });
 }
 
+// **반경으로 퍼지는 회복.** 시전자 편에게는 회복이지만, 반경 안에 회복이 해가
+// 되는 적이 서 있으면 그쪽에는 신성 피해가 된다(`D.HEAL_HARM`). 넷으로 흩어져
+// 있던 "반경 안의 아군을 훑는다"를 여기로 모은 것은, 적을 함께 훑는 자리가
+// 한 곳이어야 새 회복 스킬이 저절로 같은 규칙을 타기 때문이다.
+//
+// **회복량은 아군이 실제로 받은 값이 아니라 걸린 값이다.** 아군이 만피라
+// 회복이 0이 되어도 언데드는 그만큼 맞는다 — 한쪽의 남은 체력이 다른 쪽의
+// 피해를 정하면 화면에서 읽히지 않는다.
+function healSpread(state, source, side, point, radius, amount) {
+  for (const mate of alive(state, side)) {
+    if (dist(mate, point) <= radius) applyHeal(state, source, mate, amount);
+  }
+  for (const foe of alive(state, AI.opposite(side))) {
+    if (!foe.healHarm || dist(foe, point) > radius) continue;
+    applyDamage(state, source, foe, amount * foe.healHarm, false, 'holy');
+  }
+}
+
 // 같은 스킬을 다시 걸면 쌓지 않고 새로 고친다. 쌓기로 하면 도트 하나로
 // 무한히 강해지는데, 기획서에 중첩 규칙이 없으므로 약한 쪽을 택했다.
 function addDot(state, source, target, def, kind, amount) {
@@ -504,10 +524,11 @@ function updateZones(state) {
     const spot = { x: zoneX(state, zone), y: zone.y };
     while (zone.nextAt <= state.t && zone.nextAt <= zone.endsAt + 1e-6) {
       const source = zone.sourceUid ? byUid(state, zone.sourceUid) : null;
-      for (const unit of alive(state, zone.side)) {
-        if (dist(unit, spot) > zone.radius) continue;
-        if (zone.kind === 'heal') applyHeal(state, source, unit, zone.amount);
-        else applyDamage(state, source, unit, zone.amount, false, zone.school);
+      if (zone.kind === 'heal') healSpread(state, source, zone.side, spot, zone.radius, zone.amount);
+      else {
+        for (const unit of alive(state, zone.side)) {
+          if (dist(unit, spot) <= zone.radius) applyDamage(state, source, unit, zone.amount, false, zone.school);
+        }
       }
       zone.nextAt += zone.interval;
     }
@@ -558,9 +579,7 @@ function runUnitSkill(state, unit, choice) {
   if (def.kind === 'heal') { applyHeal(state, unit, target, def.heal); return; }
   if (def.kind === 'heal-dot') { addDot(state, unit, target, def, 'heal'); return; }
   if (def.kind === 'heal-area') {
-    for (const mate of alive(state, unit.side)) {
-      if (dist(mate, target) <= def.radius) applyHeal(state, unit, mate, def.heal);
-    }
+    healSpread(state, unit, unit.side, target, def.radius, def.heal);
     return;
   }
   // 자기 마나를 되찾는다. 마나를 다 쓴 시전자가 남은 전투 내내 기본 공격만
@@ -873,9 +892,7 @@ function resolvePlayerSkill(state, def, spot) {
   else if (def.targeting === 'ally') addDot(state, caster, unit, def, 'heal', heal(def.tick));
   else if (def.targeting === 'enemy') addDot(state, caster, unit, def, 'damage', harm(def.tick));
   else if (def.targeting === 'area-ally' && def.heal) {
-    for (const ally of alive(state, 'ally')) {
-      if (dist(ally, point) <= def.radius) applyHeal(state, caster, ally, heal(def.heal));
-    }
+    healSpread(state, caster, 'ally', point, def.radius, heal(def.heal));
   } else if (def.targeting === 'area-ally') {
     addZone(state, caster, def, point.x, point.y, 'heal', heal(def.tick));
   } else if (def.targeting === 'area-enemy') {

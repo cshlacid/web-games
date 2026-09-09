@@ -93,6 +93,20 @@ const RACE_WEAK = {
 const weakOf = (def) => RACE_WEAK[raceOf(def).id] || null;
 const schoolMul = (weak, school) => (school && weak && weak[school]) || 1;
 
+// **회복이 해가 되는 종족.** 값은 회복량 중 얼마를 신성 피해로 돌리는가이고,
+// 그 피해가 다시 위의 신성 배수를 타므로 언데드가 실제로 받는 것은 회복량의
+// 1.6배다. 갈래 표와 따로 둔 것은 **회복은 갈래가 없기 때문이다** — 회복에
+// `school: 'holy'`를 붙이면 아군에게 거는 회복까지 갈래를 타게 되고, 그러면
+// 언젠가 "신성에 강한 아군"이 회복을 덜 받는 일이 난다.
+//
+// **닿는 자리가 정해져 있다**(`logic.js`의 `healSpread`). 반경으로 퍼지는 회복과
+// 바닥에 깔리는 회복 장판만이고, 아군 하나를 지목하는 회복은 여기에 해당하지
+// 않는다 — 지목한 자리에 적이 설 수 없으므로 규칙이 닿을 일 자체가 없다.
+const HEAL_HARM = {
+  undead: 1,
+};
+const healHarmOf = (def) => HEAL_HARM[raceOf(def).id] || 0;
+
 // **물약은 인간형만 마신다.** 직업이 무엇을 들고 가는지는 JOB_POTIONS가 정하고,
 // 종족이 마실 수 있는지를 정한다.
 const potionsFor = (def) => (raceOf(def).humanoid
@@ -2284,7 +2298,8 @@ const PARTY_MAX = 5;   // 주인공을 포함한 수
 const SKILL_MAX = 5;   // 전투에 등록할 수 있는 주인공 스킬 수
 
 const api = {
-  FIELD, JOBS, SPECS, RACES, raceOf, raceAttrs, RACE_WEAK, weakOf, schoolMul, potionsFor,
+  FIELD, JOBS, SPECS, RACES, raceOf, raceAttrs, RACE_WEAK, weakOf, schoolMul,
+  HEAL_HARM, healHarmOf, potionsFor,
   MANA_REGEN_PER_INT, POWER, combatPower, ENEMY_UP, enemyAt, MELEE_RANGE, roleOf, ATTACK_ORDER, HEAL_ORDER, PULL_ORDER, LEVEL, ATTRS, ATTR, ATTR_GROWTH, attrsAt, derive, STATS, LOWER_IS_BETTER, TIERS, AFFIX_COUNT, AFFIX_BASE, AFFIX_POOL,
   tierName, tierFloor, tierRoll, tierCeiling, TIER_POWER, AFFIX_RANGE, SHOP_MAX_TIER,
   RANKS, rankOf,

@@ -2147,6 +2147,49 @@ function cast(state, skillId, target) {
   check('좀비는 신성을 더 아프게 맞는다', Math.round((holy / plain) * 10) / 10, 1.6);
 }
 
+// --- 언데드에게는 회복이 공격이다 ---------------------------------------
+//
+// **반경으로 퍼지는 회복만이다**(`healSpread`). 아군 하나를 지목하는 회복은
+// 지목한 자리에 적이 설 수 없어 규칙이 닿을 일이 없고, 반경과 장판은 바닥을
+// 덮으므로 그 안에 선 언데드가 함께 맞는다.
+{
+  // **동료를 멀리 치워 둔다.** 좀비의 체력이 줄어든 것이 회복 때문인지 동료가
+  // 때려서인지 갈리지 않으면 아무것도 못 본다.
+  const state = battle({ quest: quest({ waves: [['zombie', 'scout']] }),
+    skills: ['ripple', 'sanctuary', 'touch'] });
+  const me = L.hero(state);
+  const mate = AI.alive(state, 'ally').find((u) => u.uid !== me.uid);
+  for (const ally of AI.alive(state, 'ally')) if (ally.uid !== me.uid) ally.x = -200;
+  const zed = state.units.find((u) => u.defId === 'zombie');
+  const goblin = state.units.find((u) => u.defId === 'scout');
+  zed.x = me.x + 30; zed.y = me.y;
+  goblin.x = zed.x; goblin.y = zed.y;
+
+  const zedBefore = zed.hp;
+  const goblinBefore = goblin.hp;
+  cast(state, 'ripple', { x: zed.x, y: zed.y });
+  check('범위 회복이 좀비를 때린다', zed.hp < zedBefore, true);
+  check('같은 자리의 고블린은 멀쩡하다', goblin.hp, goblinBefore);
+
+  // 회복량과 신성 배수가 함께 걸린다. 방어(좀비의 `armor` 0.9)를 타므로 정확한
+  // 값 대신 "회복량은 넘는다"로 본다 — 1.6배에서 방어만큼 깎여도 그 아래로는
+  // 내려가지 않는다.
+  check('회복량보다 아프게 맞는다', zedBefore - zed.hp > L.playerSkill(state, 'ripple').heal, true);
+
+  // 장판도 같다. 바닥에 남아 초마다 도는 것이라 한 번 깔면 계속 아프다.
+  const before2 = zed.hp;
+  cast(state, 'sanctuary', { x: zed.x, y: zed.y });
+  for (let i = 0; i < 40 && zed.hp === before2; i++) L.step(state, L.TICK);
+  check('회복 장판도 좀비를 때린다', zed.hp < before2, true);
+
+  // **지목하는 회복은 그대로 회복이다.** 규칙이 반경에만 걸린다는 것을 못 박아
+  // 둔다 — 여기가 갈리면 아군에게 거는 회복이 언데드 파티에서 뜻을 잃는다.
+  mate.hp = Math.round(mate.maxHp * 0.5);
+  const hurt = mate.hp;
+  cast(state, 'touch', { uid: mate.uid });
+  check('지목한 아군은 회복된다', mate.hp > hurt, true);
+}
+
 // --- 높은 레벨에서는 다른 적이 나온다 -----------------------------------
 //
 // **계열이 올라가는 것(`SPEC_UP`)과 다르다.** 그쪽은 같은 개체가 손을 바꾸고,
