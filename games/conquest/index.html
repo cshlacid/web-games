@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>씨앗 번지기</title>
-<meta name="description" content="소행성에 나무를 심어 씨앗을 늘리고 이웃으로 번져 가는 실시간 전략 게임">
+<title>점령전</title>
+<meta name="description" content="거점에 생산탑을 세워 병력을 불리고 이웃 거점을 점령해 가는 실시간 전략 게임">
 <meta name="color-scheme" content="light dark">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%234e9a6a'><circle cx='12' cy='12' r='5.4'/><circle cx='12' cy='2.6' r='1.9'/><circle cx='20.2' cy='16.8' r='1.9'/><circle cx='3.8' cy='16.8' r='1.9'/></svg>">
 <link rel="stylesheet" href="../../shared/base.css">
@@ -19,7 +19,7 @@
         <a class="back" href="../../">← 목록</a>
         <button class="toggle" id="help-open" type="button" aria-pressed="false">도움말</button>
       </div>
-      <h1>씨앗 번지기</h1>
+      <h1>점령전</h1>
       <div class="head-actions">
         <button class="toggle sound" id="toggle-bgm" type="button" aria-pressed="true">BGM</button>
         <button class="toggle sound" id="toggle-sfx" type="button" aria-pressed="true">효과음</button>
@@ -38,16 +38,16 @@
 
   <div class="board-wrap">
     <svg class="board" id="board" viewBox="0 0 320 460" role="application"
-      aria-label="소행성 지도"></svg>
+      aria-label="거점 지도"></svg>
   </div>
 
   <div class="panel" id="panel">
-    <p class="panel-empty" id="panel-empty">내 소행성을 누르면 고릅니다.</p>
+    <p class="panel-empty" id="panel-empty">내 거점을 누르면 고릅니다.</p>
     <div class="panel-body" id="panel-body" hidden>
       <div class="stats" id="stats"></div>
       <div class="panel-actions">
-        <button class="btn" id="plant-dyson" type="button">다이슨 10</button>
-        <button class="btn" id="plant-defense" type="button">방어 10</button>
+        <button class="btn" id="build-factory" type="button">생산탑 10</button>
+        <button class="btn" id="build-turret" type="button">방어탑 10</button>
         <div class="picker" id="ratios" role="group" aria-label="보낼 양"></div>
       </div>
     </div>
@@ -64,21 +64,23 @@
   <div class="sheet" id="help" hidden>
     <p class="sheet-title">규칙</p>
     <ul class="help-list">
-      <li>소행성마다 <b>씨앗</b>이 궤도를 돕니다. 씨앗은 병력이자 화폐입니다.</li>
-      <li><b>다이슨 나무</b>는 씨앗을 낳고, <b>방어 나무</b>는 다가온 적 씨앗을 쏩니다.
-        나무 한 그루에 씨앗 <b>10</b>이 들고, 소행성이 클수록 더 심을 수 있습니다.</li>
-      <li>씨앗은 <b>사거리 안의 소행성</b>으로만 보냅니다. 고른 소행성에서 갈 수 있는
-        곳은 선으로 이어집니다.</li>
-      <li>싸움은 저절로 붙습니다. 남의 소행성은 <b>지키는 씨앗 → 나무 → 코어</b> 순서로
+      <li>거점마다 <b>병력</b>이 머무릅니다. 병력은 싸우는 힘이자 건설 비용입니다.</li>
+      <li><b>생산탑</b>은 병력을 뽑아내고, <b>방어탑</b>은 다가온 적 병력을 공격합니다.
+        하나 세우는 데 병력 <b>10</b>이 들고, 거점이 클수록 더 세울 수 있습니다.</li>
+      <li>병력은 <b>사거리 안의 거점</b>으로만 보냅니다. 고른 거점에서 갈 수 있는 곳은
+        선으로 이어집니다.</li>
+      <li>전투는 저절로 벌어집니다. 남의 거점은 <b>지키는 병력 → 시설 → 코어</b> 순서로
         무너뜨려야 넘어옵니다. 코어를 깎다 말고 물러나면 도로 차오릅니다.</li>
-      <li>씨앗의 <b>에너지·강도·속도</b>는 태어난 소행성에서 물려받습니다. 에너지는
-        코어를 깎는 속도, 강도는 싸움, 속도는 이동입니다. 좋은 소행성에서 뽑은 씨앗을
-        약한 무리에 섞으면 평균이 내려갑니다.</li>
-      <li>내 소행성을 누르고 이웃을 누르면 씨앗이 갑니다. <b>절반·전부</b>로 보낼 양을
+      <li>병력의 <b>점령력·공격력·이동속도</b>는 생산된 거점에서 물려받습니다. 점령력은
+        코어를 깎는 속도, 공격력은 전투, 이동속도는 이동입니다. 좋은 거점에서 뽑은
+        병력을 약한 부대에 섞으면 평균이 내려갑니다.</li>
+      <li>거점에 모을 수 있는 병력에는 <b>한도</b>가 있습니다. 넘긴 만큼은 조금씩 줄어드니
+        쌓아 두기보다 쓰는 편이 낫습니다.</li>
+      <li>내 거점을 누르고 이웃을 누르면 병력이 갑니다. <b>절반·전부</b>로 보낼 양을
         고릅니다. 빈 곳을 누르면 선택이 풀립니다.</li>
-      <li>상대의 소행성과 씨앗을 <b>모두 없애면 이깁니다.</b></li>
-      <li><b>난이도</b>는 판을 다시 만들지 않고 언제든 바꿀 수 있습니다. <b>쉬움</b>은 상대가
-        한동안 나무만 심고, 씨앗도 천천히 불어나며, 방어 나무를 세우지 않습니다.
+      <li>상대의 거점과 병력을 <b>모두 없애면 이깁니다.</b></li>
+      <li><b>난이도</b>는 판을 다시 만들지 않고 언제든 바꿀 수 있습니다. <b>쉬움</b>에서는 상대가
+        한동안 시설만 세우고, 병력도 천천히 불어나며, 방어탑을 세우지 않습니다.
         <b>어려움</b>은 자주 움직이고 여러 곳에서 한꺼번에 밀어붙입니다.</li>
     </ul>
     <div class="sheet-actions">
