@@ -29,6 +29,17 @@ const CORE_HP = { neutral: 50, owned: 100 };
 // 초당 계수들. 실측 없이 고른 값이 아니라 한 판을 3~5분에 끝내는 것을 목표로 맞췄다.
 const GROW = 0.6;        // 생산탑 한 그루가 낳는 병력
 const FIGHT = 0.15;      // 서로 부딪힐 때 깎이는 비율
+// 지키는 쪽의 이점. 같은 수로 부딪히면 지키는 쪽이 남는다.
+//
+// **없을 때는 공격과 수비가 완전히 대칭이었다.** 그러면 거점이 많은 쪽이 병력만 더
+// 모아 어디든 뚫고, 한 번 기울면 되돌릴 자리가 방어탑밖에 없다. 판단기가 칠 때
+// 1.3배를 요구하던 것도 규칙에는 없는 이점을 머릿속에서만 가정한 셈이었다.
+//
+// **1.25로 둔다.** 자가대국에서 60초에 밀리던 쪽이 이기는 판이 12/60에서 14/60으로
+// 늘고, 판 길이(중앙값 167초)와 끝나는 비율(95%)은 그대로다. 1.35까지 올리면 사람
+// 흉내의 '보통' 승률이 55%에서 43%로 떨어져 난이도가 같이 움직인다 — 수비를 세게
+// 하려다 상대를 세게 만드는 셈이라 거기서 멈췄다.
+const DEFEND_EDGE = 1.25;
 const BUILD_DPS = 0.6;    // 병력 하나가 시설에 넣는 피해
 const CORE_DPS = 0.5;    // 병력 하나가 코어에 넣는 피해
 const CORE_HEAL = 8;     // 공격이 끊기면 코어가 되돌아오는 속도
@@ -269,8 +280,11 @@ function tickNode(world, a, dt, events) {
   // 양쪽이 다 있으면 서로 깎는다. 같은 틱의 머릿수로 서로를 재야 한쪽이 먼저
   // 줄어든 값으로 계산되는 순서 편향이 생기지 않는다.
   if (one.n > 0 && two.n > 0) {
-    const lossOne = FIGHT * two.n * strFactor(two.str) * dt;
-    const lossTwo = FIGHT * one.n * strFactor(one.str) * dt;
+    // 주인이 있는 거점에서만 이점이 붙는다. 빈 거점에서 마주친 둘은 양쪽 다 손님이다.
+    const edgeOne = holder === 1 ? DEFEND_EDGE : 1;
+    const edgeTwo = holder === 2 ? DEFEND_EDGE : 1;
+    const lossOne = FIGHT * two.n * strFactor(two.str) * edgeTwo * dt;
+    const lossTwo = FIGHT * one.n * strFactor(one.str) * edgeOne * dt;
     hurt(a, 1, lossOne);
     hurt(a, 2, lossTwo);
   }
@@ -379,7 +393,7 @@ function step(world, dt) {
 }
 
 const Logic = {
-  UNITS_PER_BUILD, RANGE, BUILD_HP, CORE_HP, RALLY_KEEP, RALLY_EVERY,
+  UNITS_PER_BUILD, RANGE, BUILD_HP, CORE_HP, RALLY_KEEP, RALLY_EVERY, DEFEND_EDGE,
   emptyStack, maxBuilds, capacity, dist, inRange, merge,
   createWorld, canSend, send, canBuild, build, setRally, power, holdings, judge, step,
 };

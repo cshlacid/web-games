@@ -152,6 +152,25 @@ function arena(spec) {
   check('쏘는 동안 코어는 버틴다', w.nodes[0].owner, 1);
 }
 
+{
+  // 같은 수, 같은 스탯으로 부딪히면 지키는 쪽이 남는다.
+  const w = arena([{ x: 0, y: 0, owner: 1 }]);
+  w.nodes[0].units[1] = { n: 20, str: 60, eng: 60, spd: 60 };
+  w.nodes[0].units[2] = { n: 20, str: 60, eng: 60, spd: 60 };
+  run(w, 30);
+  check('지키는 쪽이 이긴다', [w.nodes[0].units[1].n > 0, w.nodes[0].units[2].n], [true, 0]);
+}
+
+{
+  // 빈 거점에서는 양쪽 다 손님이라 이점이 없다.
+  const w = arena([{ x: 0, y: 0 }]);
+  w.nodes[0].units[1] = { n: 20, str: 60, eng: 60, spd: 60 };
+  w.nodes[0].units[2] = { n: 20, str: 60, eng: 60, spd: 60 };
+  run(w, 5);
+  check('빈 거점에서는 똑같이 깎인다',
+    Math.abs(w.nodes[0].units[1].n - w.nodes[0].units[2].n) < 0.01, true);
+}
+
 // --- 점령 ---
 {
   const w = arena([{ x: 0, y: 0 }]);
