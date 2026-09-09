@@ -17,16 +17,25 @@ const EDGE = 1.3;
 // 뒤에서 앞으로 밀 때의 문턱. 찔끔찔끔 보내면 오는 길에 각개격파당한다.
 const MASS = 12;
 
-// 세기. **이 판단기는 사람보다 손이 빠른 것이 아니라 쉬지 않는 것이 강점이라,
-// 약하게 만드는 손잡이도 "얼마나 자주, 얼마나 서둘러"다.**
+// 난이도. **판단기는 사람보다 계산이 좋은 것이 아니라 쉬지 않고 여러 곳을 동시에
+// 두드리는 것이 강점이다.** 그래서 손잡이도 판단의 질이 아니라 손의 속도를 깎는 쪽에
+// 둔다 — 일부러 나쁜 수를 두게 만들면 약한 상대가 아니라 이해할 수 없는 상대가 된다.
 //  think   — 몇 초에 한 번 생각하는가. 뜸하면 그만큼 늦게 반응한다.
 //  edge    — 칠 때 요구하는 여유. 크면 웬만해선 참고 빈 소행성만 먹는다.
-//  opening — 이 시간까지는 나무만 심고 씨앗을 보내지 않는다. 사람이 판을 읽고
-//            첫 나무를 세울 틈을 주는 자리다.
+//  opening — 이 시간까지는 나무만 심고 씨앗을 보내지 않는다. 사람이 판을 읽고 첫
+//            나무를 세울 틈을 주는 자리다.
+//  moves   — 한 번 생각할 때 보낼 수 있는 무리의 수(0이면 제한 없음). 사람은 한 번에
+//            한 곳을 두드리는데 판단기는 앞줄 넷에서 동시에 쏟아붓는다.
+//  growth  — 생산 배수(규칙 쪽 `world.growth`). 손을 굼뜨게 하는 것만으로는 사람 손의
+//            속도까지 내려오지 않아, 씨앗이 불어나는 속도를 직접 깎는다.
+//  defense — 방어 나무를 세우는가. 한 번에 한 곳만 두드리는 사람에게 방어 나무가 선
+//            소행성은 사실상 벽이라, 쉬운 쪽에서 가장 먼저 걷어내는 것이 이것이다.
+//
+// 값은 사람 흉내(4.5초에 한 번, 한 번에 한 곳)와 붙여 고른 것이다 — `ai.test.js` 참고.
 const LEVELS = {
-  soft: { think: 2.6, edge: 1.9, opening: 20 },
-  normal: { think: 1.6, edge: 1.5, opening: 8 },
-  wild: { think: 1.0, edge: 1.25, opening: 0 },
+  easy: { think: 4.0, edge: 2.0, opening: 45, moves: 1, growth: 0.55, defense: false },
+  normal: { think: 3.0, edge: 1.8, opening: 25, moves: 1, growth: 0.8, defense: true },
+  hard: { think: 2.6, edge: 1.6, opening: 20, moves: 2, growth: 0.9, defense: true },
 };
 
 function foe(owner) {
@@ -85,12 +94,16 @@ function decide(world, owner, opts = {}) {
     if (a.seeds[owner].n < L.SEEDS_PER_TREE) continue;
     const hasDyson = a.trees.some((t) => t.type === 'dyson');
     // 적이 붙은 자리에만 방어 나무를 세운다. 나머지는 씨앗이 곧 힘이라 다이슨만 올린다.
-    const type = !hasDyson || !threatened(world, a, owner) ? 'dyson' : 'defense';
+    // defense가 꺼져 있으면 아예 세우지 않는다 — 방어 나무가 선 소행성은 한 번에 한
+    // 곳만 두드리는 사람에게 사실상 벽이라, 쉬운 쪽에서 먼저 걷어내는 것이 이것이다.
+    const type = opts.defense === false || !hasDyson || !threatened(world, a, owner)
+      ? 'dyson' : 'defense';
     acts.push({ type: 'plant', id: a.id, tree: type });
     busy.add(a.id);
   }
 
   if (opts.hold) return acts;
+  const moves = opts.moves || 0;
 
   // 노릴 곳을 하나 고른다. **싼 곳이 아니라 뚫리는 곳이다.** 싼 곳만 보면 씨앗이
   // 쌓인 자리에서 갈 수 없는 목표를 골라 놓고 영영 모자란 앞줄만 쳐다본다 — 한쪽이
@@ -126,7 +139,9 @@ function decide(world, owner, opts = {}) {
   }
 
   if (gap >= 0) {
-    for (const a of strike) {
+    // 많이 든 곳부터 보낸다. 손이 한 번뿐이면 그 한 번이 가장 큰 무리여야 한다.
+    const order = strike.slice().sort((p, q) => q.seeds[owner].n - p.seeds[owner].n);
+    for (const a of moves ? order.slice(0, moves) : order) {
       if (a.seeds[owner].n >= 1) acts.push({ type: 'send', from: a.id, to: target.id, ratio: 1 });
     }
     return acts;
@@ -135,7 +150,9 @@ function decide(world, owner, opts = {}) {
   const dist = distances(world, target, owner);
 
   // 아직 모자라면 뒤에서 앞으로 민다. 앞줄은 그대로 쌓아 둔다.
+  let pushed = 0;
   for (const a of mine) {
+    if (moves && pushed >= moves) break;
     if (busy.has(a.id)) continue;
     const step = dist.get(a.id);
     if (!step || step < 2) continue;
@@ -143,7 +160,7 @@ function decide(world, owner, opts = {}) {
     const forward = neighbors(world, a)
       .filter((b) => b.owner === owner && dist.get(b.id) === step - 1)
       .sort((p, q) => p.seeds[owner].n - q.seeds[owner].n)[0];
-    if (forward) acts.push({ type: 'send', from: a.id, to: forward.id, ratio: 0.75 });
+    if (forward) { acts.push({ type: 'send', from: a.id, to: forward.id, ratio: 0.75 }); pushed++; }
   }
 
   return acts;

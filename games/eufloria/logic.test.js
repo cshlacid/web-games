@@ -77,6 +77,18 @@ function arena(spec) {
   check('굶어도 정원 아래로는 내려가지 않는다', Math.round(w.asteroids[0].seeds[1].n), cap);
 }
 
+{
+  const w = arena([{ x: 0, y: 0, owner: 1, trees: ['dyson'], seeds: 0 }]);
+  w.growth[1] = 0.5;
+  run(w, 20);
+  const slow = w.asteroids[0].seeds[1].n;
+
+  const fast = arena([{ x: 0, y: 0, owner: 1, trees: ['dyson'], seeds: 0 }]);
+  run(fast, 20);
+  check('생산 배수를 낮추면 그만큼 천천히 는다',
+    Math.abs(slow / fast.asteroids[0].seeds[1].n - 0.5) < 0.01, true);
+}
+
 // --- 보내기 ---
 {
   const w = arena([

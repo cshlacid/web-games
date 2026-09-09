@@ -102,7 +102,17 @@ function createWorld(map) {
     }
   }
 
-  return { t: 0, seed: map.seed, start: map.start || null, asteroids, flights: [], over: null };
+  // 진영별 생산 배수. 난이도의 뼈대다 — 판단기를 굼뜨게 만드는 것만으로는 사람 손의
+  // 속도를 따라 내려오지 않아서, 상대가 씨앗을 얼마나 빨리 불리는지를 직접 건드린다.
+  return {
+    t: 0,
+    seed: map.seed,
+    start: map.start || null,
+    growth: { 1: 1, 2: 1 },
+    asteroids,
+    flights: [],
+    over: null,
+  };
 }
 
 function byId(world, id) {
@@ -189,7 +199,8 @@ function tickAsteroid(world, a, dt, events) {
     let dyson = 0;
     for (const tree of a.trees) if (tree.type === 'dyson') dyson++;
     if (dyson && mine.n < cap) {
-      const born = GROW * dyson * engFactor(a.stats.energy) * dt;
+      const rate = (world.growth && world.growth[holder]) || 1;
+      const born = GROW * rate * dyson * engFactor(a.stats.energy) * dt;
       a.seeds[holder] = merge(mine, {
         n: Math.min(born, cap - mine.n),
         str: a.stats.strength,
