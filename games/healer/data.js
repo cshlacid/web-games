@@ -302,6 +302,11 @@ const POWER = {
   },
   // 광역기가 몇에게 닿는다고 볼 것인가. 무리 상한이 다섯이라 그 절반쯤이다.
   foes: 3,
+  // **회복이 닿는 머릿수는 그보다 적게 센다.** 광역 피해는 반경 안의 적에게 전부
+  // 유효하지만 광역 회복은 그 자리의 아군이 **깎여 있어야** 유효하고, AI도 둘
+  // 이상이 함께 깎였을 때만 쓴다(`ai.js`). 흘린 힐을 빼지 않는 계산이라 셋으로
+  // 세면 광역 회복을 든 쪽이 부푼다.
+  healed: 2,
   // 마나가 버티는지 재는 시간. 한 무리를 치는 데 걸리는 시간쯤이다.
   seconds: 60,
 };
@@ -318,26 +323,45 @@ function throughput(def, stats, skills, level) {
   // 치명타는 평균으로 녹여 넣는다. 터지는 맛은 전투의 것이고, 여기서 재는 것은
   // 같은 시간에 얼마나 나가는가다.
   const crit = 1 + stats.crit * (stats.critDamage - 1);
-  let hit = (stats.atk * crit) / def.attackCd;
+
+  // **시전은 겹치지 않는다.** 외우는 틱은 통째로 건너뛰므로(`logic.js`), 그동안은
+  // 즉시 시전도 기본 공격도 못 나간다. 쿨타임만 보고 횟수를 더하면 **쿨타임이
+  // 짧은 캐스팅 스킬을 여럿 든 쪽이 실제보다 크게 나온다** — 주인공이 그랬다
+  // (사람이 조작하는 쪽이라 동료보다 쿨타임이 짧고 스킬도 하나 더 든다).
+  //
+  // 단위 시간당 외우는 시간의 비율(`busy`)을 재서, 즉시 시전과 기본 공격에는
+  // 남는 시간의 몫만 준다. **1을 넘으면 캐스팅끼리 서로를 밀어내므로** 그만큼
+  // 다 함께 깎이고, 그때 즉시 시전은 아예 나갈 자리가 없다.
+  const list = (skills || []).filter(Boolean);
+  let busy = 0;
+  for (const skill of list) busy += (skill.cast || 0) / (skill.cd + (skill.cast || 0));
+  const castShare = busy > 1 ? 1 / busy : 1;
+  const freeShare = Math.max(0, 1 - Math.min(1, busy));
+  const shareOf = (skill) => (skill.cast ? castShare : freeShare);
+
+  let hit = (stats.atk * crit * freeShare) / def.attackCd;
   let mend = 0;
   let cost = 0;
   let gain = 0;
-  for (const skill of skills || []) {
-    if (!skill) continue;
+  for (const skill of list) {
     // **시전 시간도 주기에 넣는다.** 외우는 동안은 아무것도 못 하므로, 넣지
     // 않으면 캐스팅 스킬이 공짜로 강해 보인다.
-    const cycle = skill.cd + (skill.cast || 0);
+    const cycle = (skill.cd + (skill.cast || 0)) / shareOf(skill);
     const many = (skill.kind || '').indexOf('area') >= 0 || skill.kind === 'zone';
     const hits = many ? POWER.foes : 1;
+    const mates = many ? POWER.healed : 1;
     // 동료는 공격력의 배수(`mul`), 주인공은 정액(`damage`)에 마법 공격력을 곱한다.
     if (skill.mul) hit += (stats.atk * crit * skill.mul * hits) / cycle;
     if (skill.damage) hit += (skill.damage * stats.spell * crit * hits) / cycle;
     if (skill.tick) {
-      const total = skill.tick * power * (skill.duration / (skill.interval || 1)) * hits;
-      if (skill.kind === 'heal-dot') mend += (total * stats.heal) / cycle;
-      else hit += total / cycle;
+      const ticks = skill.duration / (skill.interval || 1);
+      // **회복 도트는 레벨 배수를 타지 않는다.** 걸어 놓은 값이 그대로 도는 쪽이고
+      // (`logic.js`의 `addDot`), 레벨 배수(`over`)는 피해 도트에만 붙는다. 둘 다
+      // 곱하고 있어서 재생류를 든 쪽이 실제의 갑절로 나왔다.
+      if (skill.kind === 'heal-dot') mend += (skill.tick * ticks * mates * stats.heal) / cycle;
+      else hit += (skill.tick * power * ticks * hits) / cycle;
     }
-    if (skill.heal) mend += (skill.heal * stats.heal * (many ? POWER.foes : 1)) / cycle;
+    if (skill.heal) mend += (skill.heal * stats.heal * mates) / cycle;
     if (skill.mana) gain += skill.mana / cycle;
     cost += (skill.mp || 0) / cycle;
   }
