@@ -17,6 +17,18 @@ const EDGE = 1.3;
 // 뒤에서 앞으로 밀 때의 문턱. 찔끔찔끔 보내면 오는 길에 각개격파당한다.
 const MASS = 12;
 
+// 세기. **이 판단기는 사람보다 손이 빠른 것이 아니라 쉬지 않는 것이 강점이라,
+// 약하게 만드는 손잡이도 "얼마나 자주, 얼마나 서둘러"다.**
+//  think   — 몇 초에 한 번 생각하는가. 뜸하면 그만큼 늦게 반응한다.
+//  edge    — 칠 때 요구하는 여유. 크면 웬만해선 참고 빈 소행성만 먹는다.
+//  opening — 이 시간까지는 나무만 심고 씨앗을 보내지 않는다. 사람이 판을 읽고
+//            첫 나무를 세울 틈을 주는 자리다.
+const LEVELS = {
+  soft: { think: 2.6, edge: 1.9, opening: 20 },
+  normal: { think: 1.6, edge: 1.5, opening: 8 },
+  wild: { think: 1.0, edge: 1.25, opening: 0 },
+};
+
 function foe(owner) {
   return owner === 1 ? 2 : 1;
 }
@@ -60,7 +72,10 @@ function distances(world, target, owner) {
   return dist;
 }
 
-function decide(world, owner) {
+// opts로 세기를 받는다(없으면 예전 값 그대로). hold가 켜져 있으면 나무만 심는다.
+function decide(world, owner, opts = {}) {
+  const edge = opts.edge || EDGE;
+  const mass = opts.mass || MASS;
   const acts = [];
   const mine = world.asteroids.filter((a) => a.owner === owner);
   const busy = new Set();
@@ -74,6 +89,8 @@ function decide(world, owner) {
     acts.push({ type: 'plant', id: a.id, tree: type });
     busy.add(a.id);
   }
+
+  if (opts.hold) return acts;
 
   // 노릴 곳을 하나 고른다. **싼 곳이 아니라 뚫리는 곳이다.** 싼 곳만 보면 씨앗이
   // 쌓인 자리에서 갈 수 없는 목표를 골라 놓고 영영 모자란 앞줄만 쳐다본다 — 한쪽이
@@ -104,7 +121,7 @@ function decide(world, owner) {
     // 양쪽이 서로 1.3배를 기다리며 늙는데, 지키는 쪽도 같이 늘어나 그 배수가 영영
     // 오지 않는다.
     const flooded = ready > room * 2;
-    const margin = ready - need * (flooded ? 1 : EDGE);
+    const margin = ready - need * (flooded ? 1 : edge);
     if (margin > gap) { gap = margin; target = t; strike = front; }
   }
 
@@ -122,7 +139,7 @@ function decide(world, owner) {
     if (busy.has(a.id)) continue;
     const step = dist.get(a.id);
     if (!step || step < 2) continue;
-    if (a.seeds[owner].n < MASS) continue;
+    if (a.seeds[owner].n < mass) continue;
     const forward = neighbors(world, a)
       .filter((b) => b.owner === owner && dist.get(b.id) === step - 1)
       .sort((p, q) => p.seeds[owner].n - q.seeds[owner].n)[0];
@@ -139,7 +156,7 @@ function apply(world, owner, acts) {
   }
 }
 
-const AI = { EDGE, MASS, cost, threatened, distances, decide, apply };
+const AI = { EDGE, MASS, LEVELS, cost, threatened, distances, decide, apply };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = AI;
 if (typeof window !== 'undefined') window.EufloriaAI = AI;
