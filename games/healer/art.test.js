@@ -33,16 +33,16 @@ function check(name, actual, expected) {
   // 열일곱 전부가 시안을 구운 그림 파일이다. 도형은 하나도 남지 않았다.
   check('그림 파일 열일곱', Object.keys(Sprites.SHEETS).length, 17);
 
-  // **한 그림을 두 시트가 나눠 쓰는 것은 지금 한 쌍뿐이다.** 성기사는 아직 제
-  // 시안이 없어 수호자 것을 빌린다 — 도형 렌더러를 걷어낸 뒤라 대신 그릴 것이
-  // 없었다. 여기에 못 박아 두는 것은 **성기사 시안이 오는 날 이 검사가 먼저
-  // 깨지게** 하려는 것이다.
+  // **한 그림을 두 시트가 나눠 쓰지 않는다.** 성기사가 제 시안이 없어 수호자
+  // 것을 빌리던 동안에는 여기에 그 한 쌍을 못 박아 두었다 — 편성 화면에서 둘을
+  // 이름으로만 갈라야 했기 때문이다. 시안이 오면서 그 자리가 없어졌고, 다시
+  // 빌리는 일이 생기면 여기서 걸린다.
   const byFile = {};
   for (const [kind, sheet] of Object.entries(Sprites.SHEETS)) {
     (byFile[sheet.src] = byFile[sheet.src] || []).push(kind);
   }
-  check('그림을 빌려 쓰는 것은 성기사뿐이다',
-    Object.values(byFile).filter((list) => list.length > 1), [['tank', 'paladin']]);
+  check('그림을 나눠 쓰는 시트가 없다',
+    Object.values(byFile).filter((list) => list.length > 1), []);
 
   // **시트가 저마다 성립해야 한다.** 칸·줄·프레임 수가 어긋나면 화면에서는
   // 엉뚱한 칸이 잘려 나오거나 프레임이 사라진다.
