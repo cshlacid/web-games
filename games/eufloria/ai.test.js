@@ -131,5 +131,71 @@ const full = ['dyson', 'defense'];
     A.decide(w, 2), [{ type: 'send', from: 0, to: 1, ratio: 1 }]);
 }
 
+// --- 세기 ---
+{
+  const w = stage([
+    { x: 0, y: 0, owner: 2, trees: full, seeds: 30 },
+    { x: 80, y: 0, owner: 1, seeds: 12 },
+  ]);
+  check('기본 여유로는 친다', A.decide(w, 2), [{ type: 'send', from: 0, to: 1, ratio: 1 }]);
+  check('여유를 크게 잡으면 같은 자리에서 참는다', A.decide(w, 2, { edge: 1.9 }), []);
+}
+
+{
+  const w = stage([
+    { x: 0, y: 0, owner: 2, trees: ['dyson'], seeds: 30 },
+    { x: 80, y: 0, owner: 1, seeds: 3 },
+  ]);
+  check('문을 닫아 두면 나무만 심는다',
+    A.decide(w, 2, { hold: true }), [{ type: 'plant', id: 0, tree: 'defense' }]);
+}
+
+{
+  const order = ['soft', 'normal', 'wild'].map((key) => A.LEVELS[key]);
+  check('순할수록 뜸하게 생각하고 크게 참는다', [
+    order[0].think > order[1].think && order[1].think > order[2].think,
+    order[0].edge > order[1].edge && order[1].edge > order[2].edge,
+    order[0].opening > order[1].opening && order[1].opening >= order[2].opening,
+  ], [true, true, true]);
+}
+
+// 사람 대신 '보통' 판단기를 세워 세기별로 승부를 본다. 사람은 이보다 느리므로
+// 여기서 나오는 승률이 사람이 겪을 승률의 아래쪽 어림이다.
+function match(level, seed, count, limit = 900) {
+  const world = L.createWorld(M.generate(seed, count));
+  const me = A.LEVELS.normal;
+  const foe = A.LEVELS[level];
+  let tMe = 0;
+  let tFoe = 0;
+  for (let t = 0; t < limit && !world.over; t += DT) {
+    if (t >= tMe) {
+      tMe = t + me.think;
+      A.apply(world, 1, A.decide(world, 1, { edge: me.edge, hold: t < me.opening }));
+    }
+    if (t >= tFoe) {
+      tFoe = t + foe.think;
+      A.apply(world, 2, A.decide(world, 2, { edge: foe.edge, hold: t < foe.opening }));
+    }
+    L.step(world, DT);
+  }
+  return world.over ? world.over.winner : 0;
+}
+
+{
+  const rate = (level) => {
+    let win = 0;
+    let n = 0;
+    for (const count of [9, 12, 15]) {
+      for (let seed = 1; seed <= 12; seed++) { n++; if (match(level, seed, count) === 1) win++; }
+    }
+    return win / n;
+  };
+  const soft = rate('soft');
+  const wild = rate('wild');
+  check('순한 상대는 대체로 진다', soft > 0.7, true);
+  check('사나운 상대는 대체로 이긴다', wild < 0.45, true);
+  check('세기를 올리면 상대가 세진다', soft > wild, true);
+}
+
 console.log(`${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);

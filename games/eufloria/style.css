@@ -93,6 +93,7 @@ h1 {
 .back:hover { opacity: 1; }
 
 .picker-row { display: flex; align-items: center; gap: 10px; }
+.picker-row #new-game { margin-left: auto; }
 .picker { display: flex; gap: 4px; }
 
 .pick {
@@ -112,6 +113,8 @@ h1 {
   border-color: var(--btn-bg);
   color: var(--btn-fg);
 }
+
+.row-label { font-size: 11px; font-weight: 600; color: var(--muted); }
 
 .tally { margin-left: auto; font-size: 12px; font-weight: 700; color: var(--muted); }
 .tally b { color: var(--mine); }
