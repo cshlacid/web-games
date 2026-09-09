@@ -131,7 +131,7 @@ const full = ['dyson', 'defense'];
     A.decide(w, 2), [{ type: 'send', from: 0, to: 1, ratio: 1 }]);
 }
 
-// --- 세기 ---
+// --- 난이도 ---
 {
   const w = stage([
     { x: 0, y: 0, owner: 2, trees: full, seeds: 30 },
@@ -148,53 +148,82 @@ const full = ['dyson', 'defense'];
   ]);
   check('문을 닫아 두면 나무만 심는다',
     A.decide(w, 2, { hold: true }), [{ type: 'plant', id: 0, tree: 'defense' }]);
+  check('방어를 꺼 두면 다이슨만 심는다',
+    A.decide(w, 2, { hold: true, defense: false }), [{ type: 'plant', id: 0, tree: 'dyson' }]);
 }
 
 {
-  const order = ['soft', 'normal', 'wild'].map((key) => A.LEVELS[key]);
-  check('순할수록 뜸하게 생각하고 크게 참는다', [
-    order[0].think > order[1].think && order[1].think > order[2].think,
-    order[0].edge > order[1].edge && order[1].edge > order[2].edge,
-    order[0].opening > order[1].opening && order[1].opening >= order[2].opening,
-  ], [true, true, true]);
+  // 앞줄 셋이 한 목표를 칠 수 있는 자리. 손을 한 번으로 묶으면 가장 큰 무리만 간다.
+  const w = stage([
+    { x: 0, y: 0, owner: 2, trees: full, seeds: 12 },
+    { x: 0, y: 80, owner: 2, trees: full, seeds: 30 },
+    { x: 0, y: 160, owner: 2, trees: full, seeds: 20 },
+    { x: 80, y: 80, owner: 1, seeds: 6 },
+  ]);
+  check('제한이 없으면 앞줄이 한꺼번에 쏟아붓는다', A.decide(w, 2).length, 3);
+  check('손을 하나로 묶으면 가장 큰 무리만 간다',
+    A.decide(w, 2, { moves: 1 }), [{ type: 'send', from: 1, to: 3, ratio: 1 }]);
 }
 
-// 사람 대신 '보통' 판단기를 세워 세기별로 승부를 본다. 사람은 이보다 느리므로
-// 여기서 나오는 승률이 사람이 겪을 승률의 아래쪽 어림이다.
-function match(level, seed, count, limit = 900) {
+{
+  const rung = ['easy', 'normal', 'hard'].map((key) => A.LEVELS[key]);
+  const falls = (key) => rung[0][key] > rung[1][key] && rung[1][key] >= rung[2][key];
+  check('쉬울수록 뜸하게 생각하고 크게 참고 늦게 나온다',
+    [falls('think'), falls('edge'), falls('opening')], [true, true, true]);
+  check('쉬울수록 천천히 자란다', rung[0].growth < rung[1].growth && rung[1].growth < rung[2].growth, true);
+  check('쉬움에서만 방어 나무를 접는다',
+    [rung[0].defense, rung[1].defense, rung[2].defense], [false, true, true]);
+}
+
+// --- 사람과 붙였을 때 ---
+// **사람 흉내를 세워 잰다.** 판단기끼리 붙이면 손 속도가 같아 난이도가 갈리지 않는데,
+// 실제로 갈리는 것은 대부분 손 속도다. 4.5초에 한 번, 한 번에 한 곳만 보내고, 판을
+// 읽는 데 12초를 쓰는 상대를 사람 자리에 세운다 — 느긋하게 두는 사람의 어림이다.
+const HUMAN = { think: 4.5, edge: 1.35, opening: 12, moves: 1 };
+
+// **이겼는가가 아니라 앞섰는가로 본다.** 손이 느린 쪽은 이겨 놓고도 남은 소행성을
+// 다 걷어내는 데 한참이 걸려, 10분 안에 끝나지 않은 판이 흔하다. 그런 판도 소행성을
+// 더 쥐고 있으면 사람이 이기고 있는 판이다.
+function ahead(level, seed, count, limit = 600) {
   const world = L.createWorld(M.generate(seed, count));
-  const me = A.LEVELS.normal;
   const foe = A.LEVELS[level];
-  let tMe = 0;
+  world.growth[2] = foe.growth;
+  let tHuman = 0;
   let tFoe = 0;
   for (let t = 0; t < limit && !world.over; t += DT) {
-    if (t >= tMe) {
-      tMe = t + me.think;
-      A.apply(world, 1, A.decide(world, 1, { edge: me.edge, hold: t < me.opening }));
+    if (t >= tHuman) {
+      tHuman = t + HUMAN.think;
+      A.apply(world, 1, A.decide(world, 1,
+        { edge: HUMAN.edge, hold: t < HUMAN.opening, moves: HUMAN.moves }));
     }
     if (t >= tFoe) {
       tFoe = t + foe.think;
-      A.apply(world, 2, A.decide(world, 2, { edge: foe.edge, hold: t < foe.opening }));
+      A.apply(world, 2, A.decide(world, 2,
+        { edge: foe.edge, hold: t < foe.opening, moves: foe.moves, defense: foe.defense }));
     }
     L.step(world, DT);
   }
-  return world.over ? world.over.winner : 0;
+  if (world.over) return world.over.winner === 1;
+  return L.holdings(world, 1) > L.holdings(world, 2);
+}
+
+function upperHand(level) {
+  let up = 0;
+  let n = 0;
+  for (const count of [9, 12, 15]) {
+    for (let seed = 1; seed <= 14; seed++) { n++; if (ahead(level, seed, count)) up++; }
+  }
+  return up / n;
 }
 
 {
-  const rate = (level) => {
-    let win = 0;
-    let n = 0;
-    for (const count of [9, 12, 15]) {
-      for (let seed = 1; seed <= 12; seed++) { n++; if (match(level, seed, count) === 1) win++; }
-    }
-    return win / n;
-  };
-  const soft = rate('soft');
-  const wild = rate('wild');
-  check('순한 상대는 대체로 진다', soft > 0.7, true);
-  check('사나운 상대는 대체로 이긴다', wild < 0.45, true);
-  check('세기를 올리면 상대가 세진다', soft > wild, true);
+  const easy = upperHand('easy');
+  const normal = upperHand('normal');
+  const hard = upperHand('hard');
+  check('쉬움은 느긋하게 둬도 거의 앞선다', easy > 0.85, true);
+  check('보통은 반반에 가깝다', normal > 0.4 && normal < 0.7, true);
+  check('어려움은 느긋하게 둬서는 밀린다', hard < 0.3, true);
+  check('난이도 순서대로 어려워진다', easy > normal && normal > hard, true);
 }
 
 console.log(`${passed}개 통과, ${failed}개 실패`);

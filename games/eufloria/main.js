@@ -16,7 +16,7 @@ const NS = 'http://www.w3.org/2000/svg';
 
 const SIZES = [{ label: '작게', n: 9 }, { label: '보통', n: 12 }, { label: '크게', n: 15 }];
 const RATIOS = [{ label: '절반', v: 0.5 }, { label: '전부', v: 1 }];
-const LEVELS = [{ label: '순함', key: 'soft' }, { label: '보통', key: 'normal' }, { label: '사나움', key: 'wild' }];
+const LEVELS = [{ label: '쉬움', key: 'easy' }, { label: '보통', key: 'normal' }, { label: '어려움', key: 'hard' }];
 const SIZE_KEY = 'web-games.eufloria.size';
 const LEVEL_KEY = 'web-games.eufloria.level';
 // 탭을 옮겼다 돌아오면 프레임 간격이 몇 초씩 튄다. 그대로 밀면 그 사이의 전투가
@@ -49,8 +49,8 @@ const el = {
 let world = null;
 let view = null;
 let size = Number(localStorage.getItem(SIZE_KEY)) || 12;
-// 기본은 가장 순한 상대다. 처음 여는 사람이 곧바로 밀리면 규칙을 익힐 틈이 없다.
-let level = AI.LEVELS[localStorage.getItem(LEVEL_KEY)] ? localStorage.getItem(LEVEL_KEY) : 'soft';
+// 기본은 가장 쉬운 쪽이다. 처음 여는 사람이 곧바로 밀리면 규칙을 익힐 틈이 없다.
+let level = AI.LEVELS[localStorage.getItem(LEVEL_KEY)] ? localStorage.getItem(LEVEL_KEY) : 'easy';
 let ratio = 0.5;
 let selected = null;
 let think = 0;
@@ -101,6 +101,7 @@ function build() {
 function newGame() {
   const seed = (Math.random() * 0xffffffff) >>> 0;
   world = L.createWorld(G.generate(seed, size));
+  world.growth[2] = AI.LEVELS[level].growth;
   selected = world.start.player;
   think = 0;
   el.result.hidden = true;
@@ -282,6 +283,8 @@ function frame(now) {
       AI.apply(world, 2, AI.decide(world, 2, {
         edge: setting.edge,
         hold: world.t < setting.opening,
+        moves: setting.moves,
+        defense: setting.defense,
       }));
     }
     handle(L.step(world, dt));
@@ -346,11 +349,12 @@ for (const item of LEVELS) {
   button.type = 'button';
   button.textContent = item.label;
   button.setAttribute('aria-pressed', String(item.key === level));
-  // 세기는 판을 다시 만들지 않고 그 자리에서 바뀐다. 밀린다 싶을 때 물러설 길을
-  // 열어 두는 것이 이 손잡이의 목적이다.
+  // 난이도는 판을 다시 만들지 않고 그 자리에서 바뀐다. 밀린다 싶을 때 물러설 길을
+  // 열어 두는 것이 이 손잡이의 목적이다. 생산 배수도 그 자리에서 갈아 끼운다.
   button.addEventListener('click', () => {
     level = item.key;
     localStorage.setItem(LEVEL_KEY, level);
+    world.growth[2] = AI.LEVELS[level].growth;
     for (const other of el.levels.children) {
       other.setAttribute('aria-pressed', String(other === button));
     }
