@@ -1899,8 +1899,22 @@ function cast(state, skillId, target) {
   const most = (list, key) => Math.max(...list.map((def) => def[key]));
   check('정예가 잡졸보다 세다',
     Math.min(...elite.map((d) => d.atk)) > most(trash, 'atk'), true);
-  check('정예가 잡졸보다 단단하다',
-    Math.min(...elite.map((d) => d.hp)) > most(trash, 'hp'), true);
+
+  // **체력만 놓고 보면 언데드가 이 순서를 벗어난다.** 회복이 그들을 때리게 되면서
+  // 질긴 쪽으로 잡았기 때문이고(체력 1.7배·공격력 0.8배), 좀비의 체력은 가장 무른
+  // 정예인 오크 주술사를 넘는다. 등급이 뜻하는 것은 체력이 아니라 **상대하기
+  // 버거운 정도**이므로, 체력 순서는 언데드를 뺀 채로 보고 진짜 규칙은 아래에서
+  // 본다 — 좀비의 한 방은 잡졸 중에서도 가장 작다.
+  const solid = trash.filter((def) => D.raceOf(def).id !== 'undead');
+  check('정예가 언데드 아닌 잡졸보다 단단하다',
+    Math.min(...elite.map((d) => d.hp)) > most(solid, 'hp'), true);
+
+  // **잡졸 하나가 정예 하나보다 버거우면 등급을 나눈 뜻이 없다.** 잡는 데 걸리는
+  // 시간(체력)과 그동안 맞는 양(초당 피해)을 곱해 견준다 — 둘 중 하나만 보면
+  // "질기지만 안 아픈 것"과 "무르지만 아픈 것"을 가릴 수 없다.
+  const load = (def) => (def.hp * def.atk) / def.attackCd;
+  check('정예 하나가 잡졸 하나보다 버겁다',
+    Math.min(...elite.map(load)) > Math.max(...trash.map(load)), true);
   check('우두머리가 정예보다 세다', boss.atk > most(elite, 'atk'), true);
   check('우두머리가 정예보다 단단하다', boss.hp > most(elite, 'hp'), true);
 
@@ -2176,18 +2190,33 @@ function cast(state, skillId, target) {
   // 내려가지 않는다.
   check('회복량보다 아프게 맞는다', zedBefore - zed.hp > L.playerSkill(state, 'ripple').heal, true);
 
-  // 장판도 같다. 바닥에 남아 초마다 도는 것이라 한 번 깔면 계속 아프다.
-  const before2 = zed.hp;
-  cast(state, 'sanctuary', { x: zed.x, y: zed.y });
-  for (let i = 0; i < 40 && zed.hp === before2; i++) L.step(state, L.TICK);
-  check('회복 장판도 좀비를 때린다', zed.hp < before2, true);
-
   // **지목하는 회복은 그대로 회복이다.** 규칙이 반경에만 걸린다는 것을 못 박아
   // 둔다 — 여기가 갈리면 아군에게 거는 회복이 언데드 파티에서 뜻을 잃는다.
+  mate.x = me.x; mate.y = me.y;   // 위에서 멀리 치워 두었다. 사거리 안으로 돌린다.
   mate.hp = Math.round(mate.maxHp * 0.5);
   const hurt = mate.hp;
   cast(state, 'touch', { uid: mate.uid });
   check('지목한 아군은 회복된다', mate.hp > hurt, true);
+}
+
+// 바닥에 깔리는 회복은 **한 번 도는 동안 둘 다 한다** — 아군을 채우면서 같은
+// 자리의 언데드를 때린다. 둘 중 하나만 도는 실수가 나면 화면에서는 "가끔 안
+// 듣는 장판"으로 보인다. 앞 블록과 전투를 나눈 것은, 거기서 파문에 맞은 좀비가
+// 죽어 있으면 "장판이 안 돌았다"와 구별되지 않기 때문이다.
+{
+  const state = battle({ quest: quest({ waves: [['zombie']] }), skills: ['sanctuary'] });
+  const me = L.hero(state);
+  const zed = state.units.find((u) => u.defId === 'zombie');
+  for (const ally of AI.alive(state, 'ally')) if (ally.uid !== me.uid) ally.x = -200;
+  me.hp = Math.round(me.maxHp * 0.5);
+  const mine = me.hp;
+  cast(state, 'sanctuary', { x: me.x, y: me.y });
+  zed.x = me.x; zed.y = me.y;
+  const before = zed.hp;
+  // 좀비가 때리면 회복분이 가려지므로 도는 동안 굳혀 둔다.
+  for (let i = 0; i < 60; i++) { zed.stunUntil = state.t + 5; L.step(state, L.TICK); }
+  check('회복 장판이 좀비를 때린다', zed.hp < before, true);
+  check('같은 장판이 아군은 회복한다', me.hp > mine, true);
 }
 
 // --- 높은 레벨에서는 다른 적이 나온다 -----------------------------------
