@@ -22,3 +22,35 @@
    이 값으로 아이폰에서 훑어본 결과 확대가 남은 자리는 둘이다 — 끌어서 조작하느라
    `none`을 건 판, 그리고 꼬들의 글자판. 둘 다 `shared/base.js`가 맡는다. */
 * { touch-action: pan-x pan-y; }
+
+/* **당겨서 새로고침과 고무줄 스크롤을 막는다.** 판을 끌다가 손가락이 위로 새면
+   페이지가 통째로 당겨져 새로고침되고, 그러면 두던 판이 날아간다. 게임 아홉 곳에
+   따로 적혀 있던 것을 여기로 모았다 — 목록 페이지에는 빠져 있어서 거기서만 당겨졌다.
+
+   스크롤 자체를 막는 것이 아니라 **끝에서 더 끌 때의 동작만** 없앤다. 화면보다 긴
+   페이지는 그대로 스크롤된다. */
+html, body { overscroll-behavior: none; }
+
+/* 두드릴 때 번쩍이는 회색 사각형을 없앤다. 웹킷이 링크·단추에 기본으로 넣는 것인데,
+   판을 두드릴 때마다 칸이 번쩍여 게임에서는 잡음이다. */
+body { -webkit-tap-highlight-color: transparent; }
+
+/* **길게 눌러도 글자가 잡히지 않게 한다.** 판을 끌거나 오래 누르면 iOS가 선택
+   손잡이와 복사 메뉴를 띄워 조작이 끊긴다. 다만 읽는 글이 든 시트와 결과 카드는
+   열어 둔다 — 규칙을 복사해 두고 싶을 수 있고, 거기서는 끌 일이 없다. */
+body {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.sheet, .sheet *, .result-card, .result-card * {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+
+input, textarea, [contenteditable] {
+  -webkit-user-select: auto;
+  user-select: auto;
+}
