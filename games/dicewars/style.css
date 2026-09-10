@@ -200,6 +200,57 @@ h1 {
 }
 .btn:disabled { opacity: 0.4; cursor: default; }
 
+/* 굴린 주사위. 판 한가운데에 덮되 누름은 받지 않는다 — 굴리는 동안에는 어차피
+   조작을 막지만, 여기서 누름을 먹으면 다음 수가 한 박자 씹힌다. */
+.roll {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  pointer-events: none;
+}
+.roll[hidden] { display: none; }
+
+.roll-card {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--sheet-bg);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.28);
+}
+
+.roll-row {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 4px;
+  max-width: 232px;
+}
+
+.die { width: 24px; height: 24px; display: block; }
+.die-face { fill: #fbf7f1; stroke-width: 2.4; }
+.die.p1 .die-face { stroke: var(--p1); }
+.die.p2 .die-face { stroke: var(--p2); }
+.die.p3 .die-face { stroke: var(--p3); }
+.die.p4 .die-face { stroke: var(--p4); }
+.die-pip { fill: #2a2119; }
+
+/* 굴리는 동안에는 눈이 정해지지 않았다는 것을 흔들림으로 알린다. */
+@keyframes die-shake {
+  0% { transform: translateY(0) rotate(-6deg); }
+  50% { transform: translateY(-3px) rotate(5deg); }
+  100% { transform: translateY(0) rotate(-6deg); }
+}
+.die.spin { animation: die-shake 0.18s linear infinite; }
+
+.roll-score {
+  margin: 0; min-height: 17px;
+  font-size: 13px; font-weight: 800; color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+/* 이긴 쪽을 색으로 가르지 않는다 — 상대의 공격에도 같은 표가 뜨므로 내 색을 쓰면
+   상대가 이긴 판이 내가 이긴 것처럼 보인다. */
+.roll-score .lose { color: var(--muted); }
+
+@media (prefers-reduced-motion: reduce) {
+  .die.spin { animation: none; }
+}
+
 /* 도움말 시트. 껍데기는 shared/sheet.css, 결과 덮개는 shared/result.css. */
 .sheet {
   border: 1px solid var(--line);

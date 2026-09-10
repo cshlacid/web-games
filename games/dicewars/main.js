@@ -25,7 +25,11 @@ const S = 10;
 const SQRT3 = Math.sqrt(3);
 // 상대가 한 수 둘 때마다 쉬는 시간. 너무 빠르면 무엇이 일어났는지 못 보고, 느리면
 // 기다리는 게임이 된다.
-const BOT_STEP = 750;
+const BOT_STEP = 380;
+// 주사위를 굴려 보이는 길이(밀리초). 상대 차례에는 짧게 — 여러 수를 이어 두므로
+// 같은 길이로 두면 보는 시간이 대부분이 된다.
+const ROLL = { me: { spin: 520, hold: 620 }, bot: { spin: 340, hold: 380 } };
+const ROLL_FRAME = 70;
 // 판 둘레의 여백(SVG 단위).
 const PAD = 5;
 
@@ -37,6 +41,10 @@ const el = {
   newGame: document.getElementById('new-game'),
   endTurn: document.getElementById('end-turn'),
   toast: document.getElementById('toast'),
+  roll: document.getElementById('roll'),
+  rollAttack: document.getElementById('roll-attack'),
+  rollDefend: document.getElementById('roll-defend'),
+  rollScore: document.getElementById('roll-score'),
   result: document.getElementById('result'),
   resultTitle: document.getElementById('result-title'),
   resultNote: document.getElementById('result-note'),
@@ -57,6 +65,9 @@ let selected = null;
 let rolling = false;   // 굴림을 보여 주는 동안에는 조작을 받지 않는다
 let botTimer = null;
 let dice = null;       // 이 판의 주사위. 씨드를 걸어 두면 같은 판을 다시 볼 수 있다
+let rollTimer = null;  // 굴림을 보여 주는 중인 타이머
+// 판 세대. 굴리는 도중에 새 판을 누르면 아직 남은 타이머가 지난 판의 뒷정리를 하려 든다.
+let era = 0;
 
 function svg(name, attrs, cls) {
   const node = document.createElementNS(NS, name);
@@ -166,6 +177,98 @@ function borderPaths(cellIds) {
   return paths;
 }
 
+// --- 주사위 굴리기 ---
+
+// 눈이 놓이는 자리(24칸 기준). 여섯 눈까지 쓸 자리를 미리 만들어 두고 켜고 끈다 —
+// 굴리는 동안 눈이 매 프레임 바뀌므로 그때마다 원을 새로 만들면 노드가 쏟아진다.
+const PIP_SPOTS = [[7, 7], [17, 7], [7, 12], [17, 12], [7, 17], [17, 17], [12, 12]];
+const PIP_FACES = {
+  1: [6],
+  2: [0, 5],
+  3: [0, 6, 5],
+  4: [0, 1, 4, 5],
+  5: [0, 1, 4, 5, 6],
+  6: [0, 1, 2, 3, 4, 5],
+};
+
+function dieNode(player) {
+  const node = svg('svg', { viewBox: '0 0 24 24' }, `die p${player}`);
+  node.append(svg('rect', { x: 1.2, y: 1.2, width: 21.6, height: 21.6, rx: 5 }, 'die-face'));
+  const pips = PIP_SPOTS.map(([x, y]) => {
+    const pip = svg('circle', { cx: x, cy: y, r: 2.3 }, 'die-pip');
+    node.append(pip);
+    return pip;
+  });
+  return { node, pips };
+}
+
+function setFace(die, value) {
+  const on = PIP_FACES[value];
+  die.pips.forEach((pip, i) => { pip.style.display = on.includes(i) ? '' : 'none'; });
+}
+
+function fillRow(row, count, player) {
+  row.textContent = '';
+  const dice = [];
+  for (let i = 0; i < count; i++) {
+    const die = dieNode(player);
+    die.node.classList.add('spin');
+    row.append(die.node);
+    dice.push(die);
+  }
+  return dice;
+}
+
+// 공격 한 번을 보여 준다. **구르는 동안의 눈은 Math.random으로 굴린다** — 판의 주사위는
+// 씨드를 건 굴림이라, 보여 주기용으로 거기서 뽑으면 같은 씨드가 다른 판을 만든다.
+function showRoll(result, attacker, defender, mine, then) {
+  const pace = mine ? ROLL.me : ROLL.bot;
+  const startedIn = era;
+  const quiet = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const attack = fillRow(el.rollAttack, result.attackRoll.length, attacker);
+  const defend = fillRow(el.rollDefend, result.defendRoll.length, defender);
+  const all = attack.concat(defend);
+  el.rollScore.textContent = '';
+  el.roll.hidden = false;
+  // 굴리는 동안에는 차례를 넘기지 못한다. 판을 다시 칠하는 것은 주사위가 멎은 뒤라
+  // 단추 상태도 그때까지는 손으로 잠가 둔다.
+  el.endTurn.disabled = true;
+
+  const land = () => {
+    if (startedIn !== era) return;
+    all.forEach((die) => die.node.classList.remove('spin'));
+    result.attackRoll.forEach((value, i) => setFace(attack[i], value));
+    result.defendRoll.forEach((value, i) => setFace(defend[i], value));
+    el.rollScore.innerHTML = `${result.attackSum} 대 ${result.defendSum} · `
+      + `<span class="${result.win ? 'win' : 'lose'}">${result.win ? '이겼습니다' : '막혔습니다'}</span>`;
+    // 소리는 **나에게 좋은 일인지**로 고른다. 상대가 뚫으면 내 쪽에서는 나쁜 소식이다.
+    Sound.play((mine ? result.win : !result.win) ? 'win' : 'fail', mine ? 1 : 0.6);
+    setTimeout(() => {
+      if (startedIn !== era) return;
+      el.roll.hidden = true;
+      then();
+    }, pace.hold);
+  };
+
+  if (quiet || !pace.spin) {
+    for (const die of all) setFace(die, 1);
+    land();
+    return;
+  }
+
+  for (const die of all) setFace(die, 1 + Math.floor(Math.random() * 6));
+  let spent = 0;
+  const spin = setInterval(() => {
+    spent += ROLL_FRAME;
+    for (const die of all) setFace(die, 1 + Math.floor(Math.random() * 6));
+    if (startedIn !== era) { clearInterval(spin); return; }
+    if (spent < pace.spin) return;
+    clearInterval(spin);
+    land();
+  }, ROLL_FRAME);
+  rollTimer = spin;
+}
+
 // --- 판 만들기 ---
 
 function build() {
@@ -239,7 +342,10 @@ function newGame() {
   dice = rng(seed ^ 0x5bf03635);
   selected = null;
   rolling = false;
+  era++;
   clearTimeout(botTimer);
+  clearInterval(rollTimer);
+  el.roll.hidden = true;
   el.result.hidden = true;
   build();
   paint();
@@ -337,27 +443,32 @@ function describe(result) {
 function resolve(fromId, toId, player) {
   const before = game.territories[fromId].dice;
   const against = game.territories[toId].dice;
+  const beforeOwner = game.territories[toId].owner;
   const result = R.attack(game, fromId, toId, player, dice);
   if (!result) return null;
 
   rolling = true;
   selected = null;
   clearOdds();
-  paint();
-  say(`${before}개로 ${against}개를 칩니다 — ${describe(result)}`);
-  Sound.play(result.win ? 'win' : 'fail');
+  paintMarks();
+  say(`${before}개로 ${against}개를 칩니다…`);
 
-  setTimeout(() => {
+  // 주사위가 멎기 전에 판을 고쳐 칠하면 결과가 먼저 새어 나간다.
+  showRoll(result, player, beforeOwner, true, () => {
     rolling = false;
-    if (game.over) { finish(); return; }
     paint();
+    say(`${before}개로 ${against}개를 칩니다 — ${describe(result)}`);
+    if (game.over) { finish(); return; }
     if (game.turn !== 1) runBot();
-  }, 450);
+  });
   return result;
 }
 
 function finish() {
   clearTimeout(botTimer);
+  // 결과 덮개와 굴림 표가 겹치지 않게 한다. 마지막 공격의 굴림은 이미 접혔지만,
+  // 판이 끝나는 자리가 여럿이라 여기서 한 번 더 잠근다.
+  el.roll.hidden = true;
   const winner = game.over.winner;
   el.resultTitle.textContent = winner === 1 ? '다 차지했습니다' : '졌습니다';
   el.resultNote.textContent = winner === 1
@@ -393,12 +504,15 @@ function runBot() {
       return;
     }
     done++;
+    const foe = game.territories[move.to].owner;
     const result = R.attack(game, move.from, move.to, player, dice);
-    paint();
-    say(`<b>${player}번</b>의 공격 — ${describe(result)}`);
-    Sound.play(result.win ? 'fail' : 'win', 0.6);
-    if (game.over) { botTimer = setTimeout(finish, 500); return; }
-    botTimer = setTimeout(step, BOT_STEP);
+    say(`<b>${player}번</b>이 ${move.dice}개로 ${move.against}개를 칩니다…`);
+    showRoll(result, player, foe, false, () => {
+      paint();
+      say(`<b>${player}번</b>의 공격 — ${describe(result)}`);
+      if (game.over) { botTimer = setTimeout(finish, 500); return; }
+      botTimer = setTimeout(step, BOT_STEP);
+    });
   };
   botTimer = setTimeout(step, BOT_STEP);
 }
