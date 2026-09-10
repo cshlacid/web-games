@@ -90,14 +90,28 @@ function build() {
   el.board.textContent = '';
   el.board.setAttribute('viewBox', `0 0 ${puzzle.w * CELL} ${puzzle.h * CELL}`);
 
+  const guides = svg('g');
   const bridges = svg('g');
   const islands = svg('g');
   const hits = svg('g');
-  el.board.append(bridges, islands, hits);
+  el.board.append(guides, bridges, islands, hits);
 
   const lines = board.links.map((link) => {
     const a = board.islands[link.a];
     const b = board.islands[link.b];
+    // 놓을 수 있는 자리를 미리 깔아 둔다. 다리와 같은 자리에 그리므로 다리가 놓이면
+    // 가려지지 않게 감춘다(paint).
+    const guide = link.horizontal
+      ? svg('line', {
+        x1: center(a.x) + ISLAND_R, y1: center(a.y),
+        x2: center(b.x) - ISLAND_R, y2: center(b.y),
+      }, 'guide')
+      : svg('line', {
+        x1: center(a.x), y1: center(a.y) + ISLAND_R,
+        x2: center(b.x), y2: center(b.y) - ISLAND_R,
+      }, 'guide');
+    guides.append(guide);
+
     const pair = [];
     for (const side of [-1, 1]) {
       const off = side * GAP;
@@ -141,7 +155,7 @@ function build() {
     hit.dataset.link = String(link.id);
     hits.append(hit);
 
-    return { pair, single, shown: -1 };
+    return { guide, pair, single, shown: -1, guided: null };
   });
 
   const marks = board.islands.map((island) => {
@@ -173,7 +187,7 @@ function newGame() {
     done: false,
   };
   el.result.hidden = true;
-  el.toast.textContent = '';
+  el.toast.textContent = '점선을 눌러 다리를 놓으세요.';
   el.timer.textContent = '0:00';
   showBest();
   build();
@@ -185,9 +199,17 @@ function newGame() {
 function paint() {
   const { board, state } = game;
 
+  const full = board.islands.map((island) => R.degree(board, state, island.id) === island.need);
+
   board.links.forEach((link, i) => {
     const node = view.lines[i];
     const n = state[link.id];
+    // 안내 점선은 다리 수뿐 아니라 양쪽 섬이 찼는지에 따라서도 바뀌므로 따로 본다.
+    const guided = n === 0 && !(full[link.a] && full[link.b]);
+    if (guided !== node.guided) {
+      node.guided = guided;
+      node.guide.setAttribute('opacity', guided ? '1' : '0');
+    }
     if (n === node.shown) return;
     node.shown = n;
     node.single.setAttribute('opacity', n === 1 ? '1' : '0');
@@ -196,7 +218,7 @@ function paint() {
 
   for (const island of board.islands) {
     const node = view.marks[island.id];
-    const done = R.degree(board, state, island.id) === island.need;
+    const done = full[island.id];
     if (done === node.done) continue;
     node.done = done;
     node.circle.setAttribute('class', done ? 'island done' : 'island');
@@ -259,6 +281,7 @@ function place(li) {
     return;
   }
   startClock();
+  el.toast.textContent = '';
   Sound.play(after === 0 ? 'erase' : 'place', after);
   paint();
   if (R.isDone(game.board, game.state)) finish();
