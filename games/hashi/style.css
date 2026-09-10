@@ -11,6 +11,7 @@
   --done: #2f7d8c;
   --done-soft: #d5eaee;
   --wrong: #c2567a;
+  --pick: #d98324;
   --btn-bg: #3f5a63;
   --btn-fg: #f2f7f8;
   --sheet-bg: #ffffff;
@@ -32,6 +33,7 @@
     --done: #5fb9c9;
     --done-soft: #22383e;
     --wrong: #e07a9c;
+    --pick: #eda340;
     --btn-bg: #3a4e56;
     --sheet-bg: #212a2d;
   }
@@ -143,6 +145,12 @@ h1 {
 .island { fill: var(--island); stroke: var(--island-line); stroke-width: 3; }
 /* 숫자를 다 채운 섬. 색이 바뀌면 남은 섬만 눈에 들어온다. */
 .island.done { fill: var(--done-soft); stroke: var(--done); }
+
+/* 고른 섬과 거기서 이을 수 있는 섬. 다 채운 섬(--done)과 다른 색을 쓴다 — 같은 색이면
+   고른 것인지 다 채운 것인지 갈리지 않는다. */
+.island.picked { stroke: var(--pick); stroke-width: 5; }
+.island.near { stroke: var(--pick); stroke-dasharray: 4 4; }
+.guide.hot { stroke: var(--pick); stroke-dasharray: 0 9; }
 
 .count {
   font-size: 42px; font-weight: 800;
