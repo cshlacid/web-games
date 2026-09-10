@@ -17,6 +17,9 @@
 | [왕관 놓기](games/queens/) | 행·열·색마다 왕관을 하나씩 놓는다 | 순수 HTML/CSS/JS |
 | [Patches](games/patches/) | 격자를 직사각형 조각으로 남김없이 나눈다 | 순수 HTML/CSS/JS |
 | [힐러](games/healer/) | 파티에서 힐러 하나만 맡는다 | 순수 HTML/CSS/JS |
+| [점령전](games/conquest/) | 거점을 이어 병력을 보내 지도를 차지한다 | 순수 HTML/CSS/JS |
+| [다리 잇기](games/hashi/) | 섬을 숫자만큼 이어 하나로 만든다 | 순수 HTML/CSS/JS |
+| [주사위 영토전](games/dicewars/) | 주사위를 굴려 이웃 영토를 뺏는다 | 순수 HTML/CSS/JS |
 
 ## 로컬에서 실행
 
@@ -60,11 +63,27 @@ node games/healer/shop.test.js
 node games/healer/flow.test.js
 node games/healer/loot.test.js
 node games/healer/art.test.js
+node games/conquest/logic.test.js
+node games/conquest/mapgen.test.js
+node games/conquest/ai.test.js
+node games/hashi/rules.test.js
+node games/hashi/solver.test.js
+node games/hashi/generator.test.js
+node games/dicewars/rules.test.js
+node games/dicewars/ai.test.js
+node games/dicewars/mapgen.test.js
 ```
 
 ## 구조
 
 게임 하나가 `games/<이름>/` 폴더 하나에 담기고, 서로 독립적이다. 스택은 게임마다
-다를 수 있다. 루트 `index.html`이 게임 목록 페이지다.
+다를 수 있다. 루트 `index.html`이 게임 목록 페이지이고, 여러 게임이 함께 쓰는
+부분은 `shared/`에 있다.
+
+## 홈 화면에 설치
+
+목록 페이지와 게임 페이지 모두 홈 화면에 추가해 앱처럼 띄울 수 있다. iOS는 "홈
+화면에 추가"를 누른 그 페이지를 시작 주소로 삼으므로 게임을 하나씩 따로 설치할 수
+있다. 서비스 워커는 두지 않아 늘 최신 파일을 받는다.
 
 기여·작업 규칙은 [CLAUDE.md](CLAUDE.md) 참고.
