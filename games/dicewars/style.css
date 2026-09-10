@@ -137,7 +137,7 @@ h1 {
   border-radius: 14px;
 }
 
-.cell { stroke: none; }
+.cell { stroke: none; cursor: pointer; }
 .cell.p1 { fill: var(--p1); }
 .cell.p2 { fill: var(--p2); }
 .cell.p3 { fill: var(--p3); }
@@ -145,31 +145,32 @@ h1 {
 
 /* 영토 경계. 칸끼리 색이 같아 그냥 두면 한 덩어리로 보인다 — 어디까지가 한 영토인지가
    이 게임의 전부라 경계는 진하게 긋는다. */
-.edge { stroke: var(--edge); stroke-width: 2.2; stroke-linecap: round; fill: none; }
+.edge { stroke: var(--edge); stroke-width: 2.6; stroke-linecap: round; fill: none; }
 
 /* 고른 영토와 칠 수 있는 곳. 테두리로만 알린다 — 색을 바꾸면 주인이 바뀐 것처럼 보인다. */
-.mark { fill: none; stroke-width: 3; }
+.mark { fill: none; stroke-width: 3.2; stroke-linecap: round; pointer-events: none; }
 .mark.pick { stroke: #ffffff; }
-.mark.target { stroke: #ffffff; stroke-dasharray: 5 4; opacity: 0.85; }
+.mark.target { stroke: #ffffff; stroke-dasharray: 5 4; opacity: 0.9; }
 
-.chip { fill: #ffffff; opacity: 0.92; }
+/* 주사위 수는 땅 위에 바로 쓰고 테두리를 둘러 읽는다. 흰 판을 깔았더니 판이 칸보다
+   커서 이웃 영토까지 덮어, 어느 땅의 숫자인지가 되레 흐려졌다. */
+.chip { fill: none; pointer-events: none; }
 .dice {
-  font-size: 15px; font-weight: 800;
+  font-size: 14px; font-weight: 800;
   text-anchor: middle; dominant-baseline: central;
+  fill: #ffffff;
+  stroke: rgba(20, 14, 8, 0.55);
+  stroke-width: 2.6;
+  paint-order: stroke;
+  stroke-linejoin: round;
   pointer-events: none;
 }
-.dice.p1 { fill: var(--p1); }
-.dice.p2 { fill: var(--p2); }
-.dice.p3 { fill: var(--p3); }
-.dice.p4 { fill: var(--p4); }
 
 /* 이길 확률은 **그 영토의 주사위 수 자리에** 대신 쓴다. 옆에 따로 달면 촘촘한 판에서
    이웃 숫자와 겹쳐 둘 다 못 읽는다. 고르는 동안에는 상대 주사위 수보다 확률이 알고
    싶은 값이고, 확률 안에 그 수가 이미 들어 있다. */
-.dice.odds { font-size: 11px; fill: #241f1b; }
+.dice.odds { font-size: 10px; fill: #241f1b; stroke: none; }
 .chip.odds { fill: #ffd98a; opacity: 0.97; }
-
-.hit { fill: transparent; cursor: pointer; }
 
 .toast {
   margin: 0; min-height: 20px;

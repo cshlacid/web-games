@@ -102,6 +102,35 @@ function edgePoint(center, deg) {
   return [center.x + S * Math.cos(angle), center.y + S * Math.sin(angle)];
 }
 
+// 칸 무리의 바깥선. 판의 영토 경계와 고른 영토를 덧그리는 선이 같은 계산을 쓴다 —
+// 따로 두면 한쪽만 고쳐 선이 어긋난다.
+function borderLines(cellIds) {
+  const set = new Set(cellIds);
+  const out = [];
+  for (const i of cellIds) {
+    const cell = map.cells[i];
+    const center = centerOf(cell);
+    for (const dir of DIRS) {
+      const [dq, dr] = cell.r % 2 ? dir.odd : dir.even;
+      const nq = cell.q + dq;
+      const nr = cell.r + dr;
+      const inside = nq >= 0 && nr >= 0 && nq < map.w && nr < map.h;
+      if (inside && set.has(nr * map.w + nq)) continue;
+      const [x1, y1] = edgePoint(center, dir.deg - 30);
+      const [x2, y2] = edgePoint(center, dir.deg + 30);
+      out.push({ x1, y1, x2, y2 });
+    }
+  }
+  return out;
+}
+
+function lineNode(seg, cls) {
+  return svg('line', {
+    x1: seg.x1.toFixed(2), y1: seg.y1.toFixed(2),
+    x2: seg.x2.toFixed(2), y2: seg.y2.toFixed(2),
+  }, cls);
+}
+
 // --- 판 만들기 ---
 
 function build() {
@@ -114,33 +143,25 @@ function build() {
   const edges = svg('g');
   const marks = svg('g');
   const chips = svg('g');
-  const hits = svg('g');
-  el.board.append(cells, edges, marks, chips, hits);
+  el.board.append(cells, edges, marks, chips);
 
   const owner = new Array(map.w * map.h).fill(-1);
   map.territories.forEach((t) => t.cells.forEach((c) => { owner[c] = t.id; }));
 
+  // **칸 자체가 누르는 자리다.** 숫자 둘레에 원판을 깔아 두었더니 영토의 나머지 칸은
+  // 눌러도 반응이 없고, 이웃 영토의 원판과 겹쳐 엉뚱한 곳이 잡히기도 했다.
   const cellNodes = map.cells.map((cell, i) => {
     const center = centerOf(cell);
     const points = [0, 1, 2, 3, 4, 5].map((k) => corner(center, k)).join(' ');
     const node = svg('polygon', { points }, 'cell');
+    node.dataset.territory = String(owner[i]);
     cells.append(node);
-
-    // 이웃이 다른 영토인 변에만 선을 긋는다.
-    for (const dir of DIRS) {
-      const [dq, dr] = cell.r % 2 ? dir.odd : dir.even;
-      const nq = cell.q + dq;
-      const nr = cell.r + dr;
-      const inside = nq >= 0 && nr >= 0 && nq < map.w && nr < map.h;
-      if (inside && owner[nr * map.w + nq] === owner[i]) continue;
-      const [x1, y1] = edgePoint(center, dir.deg - 30);
-      const [x2, y2] = edgePoint(center, dir.deg + 30);
-      edges.append(svg('line', {
-        x1: x1.toFixed(2), y1: y1.toFixed(2), x2: x2.toFixed(2), y2: y2.toFixed(2),
-      }, 'edge'));
-    }
     return node;
   });
+
+  for (const t of map.territories) {
+    for (const seg of borderLines(t.cells)) edges.append(lineNode(seg, 'edge'));
+  }
 
   // 영토마다 가운데 칸 하나를 골라 주사위 수를 얹는다. 무게중심에 두면 영토가 굽은
   // 모양일 때 칸 밖으로 나가 다른 영토 위에 뜬다.
@@ -149,16 +170,12 @@ function build() {
     const center = centerOf(map.cells[spot]);
     const g = svg('g');
     const box = svg('rect', {
-      x: (center.x - 9).toFixed(2), y: (center.y - 8).toFixed(2),
-      width: 18, height: 16, rx: 4,
+      x: (center.x - 10).toFixed(2), y: (center.y - 7).toFixed(2),
+      width: 20, height: 14, rx: 4,
     }, 'chip');
     const text = svg('text', { x: center.x.toFixed(2), y: center.y.toFixed(2) }, 'dice');
     g.append(box, text);
     chips.append(g);
-
-    const hit = svg('circle', { cx: center.x.toFixed(2), cy: center.y.toFixed(2), r: S * 1.6 }, 'hit');
-    hit.dataset.territory = String(t.id);
-    hits.append(hit);
 
     return { box, text, center, shown: -1, owner: -1 };
   });
@@ -199,7 +216,6 @@ function paint() {
     const chip = view.chipNodes[t.id];
     if (chip.owner !== t.owner) {
       chip.owner = t.owner;
-      chip.text.setAttribute('class', `dice p${t.owner}`);
       for (const cell of map.territories[t.id].cells) {
         view.cellNodes[cell].setAttribute('class', `cell p${t.owner}`);
       }
@@ -224,18 +240,19 @@ function paintMarks() {
   if (selected === null || game.over) return;
 
   const from = game.territories[selected];
-  const ring = (id, cls) => {
-    const chip = view.chipNodes[id];
-    view.marks.append(svg('circle', {
-      cx: chip.center.x.toFixed(2), cy: chip.center.y.toFixed(2), r: S * 1.15,
-    }, `mark ${cls}`));
+  // 숫자 둘레에 동그라미를 치면 어느 땅이 고른 땅인지가 아니라 어느 숫자를 골랐는지만
+  // 보인다. 땅의 바깥선을 그대로 덧그려 영토 모양을 알린다.
+  const outline = (id, cls) => {
+    for (const seg of borderLines(map.territories[id].cells)) {
+      view.marks.append(lineNode(seg, `mark ${cls}`));
+    }
   };
 
-  ring(selected, 'pick');
+  outline(selected, 'pick');
   for (const id of from.neighbors) {
     const to = game.territories[id];
     if (to.owner === from.owner) continue;
-    ring(id, 'target');
+    outline(id, 'target');
     const chip = view.chipNodes[id];
     chip.text.textContent = `${O.percent(from.dice, to.dice)}%`;
     chip.text.setAttribute('class', 'dice odds');
@@ -248,7 +265,7 @@ function clearOdds() {
   for (const t of game.territories) {
     const chip = view.chipNodes[t.id];
     chip.text.textContent = String(t.dice);
-    chip.text.setAttribute('class', `dice p${t.owner}`);
+    chip.text.setAttribute('class', 'dice');
     chip.box.setAttribute('class', 'chip');
   }
 }
