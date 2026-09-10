@@ -93,8 +93,14 @@ function build() {
   const guides = svg('g');
   const bridges = svg('g');
   const islands = svg('g');
-  const hits = svg('g');
-  el.board.append(guides, bridges, islands, hits);
+  el.board.append(guides, bridges, islands);
+
+  // **누르는 자리는 판 전체 하나다.** 자리마다 사각형을 깔았더니 판의 43%만 눌렸고,
+  // 통로를 조금만 벗어나면 아무 일도 일어나지 않았다. 어디를 누르든 가장 가까운
+  // 자리를 찾아 주는 편이 손가락에 맞다(linkAt).
+  el.board.append(svg('rect', {
+    x: 0, y: 0, width: puzzle.w * CELL, height: puzzle.h * CELL,
+  }, 'hit'));
 
   const lines = board.links.map((link) => {
     const a = board.islands[link.a];
@@ -140,20 +146,6 @@ function build() {
       }, 'bridge');
     single.setAttribute('opacity', '0');
     bridges.append(single);
-
-    // 누르는 자리는 두 섬 사이의 통로만 덮는다. 섬까지 덮으면 옆 자리의 통로와
-    // 겹쳐, 섬 가장자리를 눌렀을 때 엉뚱한 다리가 놓인다.
-    const hit = link.horizontal
-      ? svg('rect', {
-        x: center(a.x) + ISLAND_R, y: center(a.y) - CELL * 0.42,
-        width: center(b.x) - center(a.x) - ISLAND_R * 2, height: CELL * 0.84,
-      }, 'hit')
-      : svg('rect', {
-        x: center(a.x) - CELL * 0.42, y: center(a.y) + ISLAND_R,
-        width: CELL * 0.84, height: center(b.y) - center(a.y) - ISLAND_R * 2,
-      }, 'hit');
-    hit.dataset.link = String(link.id);
-    hits.append(hit);
 
     return { guide, pair, single, shown: -1, guided: null };
   });
@@ -287,11 +279,63 @@ function place(li) {
   if (R.isDone(game.board, game.state)) finish();
 }
 
+// 누른 자리에서 가장 가까운 다리 자리. 통로에서 이만큼 떨어진 곳까지 받는다 —
+// 나란한 통로는 한 칸씩 떨어져 있으므로 반 칸을 넘겨 잡아도 서로 넘보지 않는다.
+const REACH = CELL * 0.62;
+// 섬 한가운데의 죽은 자리. 여기서는 어느 쪽으로 기울었는지 알 수 없어 아무것도 하지
+// 않는다. 조금이라도 기울면 그쪽 통로가 잡히므로 섬도 누르는 자리가 된다.
+const DEAD = 13;
+
+function distanceToLink(link, x, y) {
+  const a = game.board.islands[link.a];
+  const b = game.board.islands[link.b];
+  // 섬에 가린 부분을 뺀 통로만 잰다. 섬까지 넣으면 한 섬에 모인 자리들이 모두 거리
+  // 0이 되어 어느 쪽으로 눌렀는지가 사라진다.
+  const x1 = link.horizontal ? center(a.x) + ISLAND_R : center(a.x);
+  const y1 = link.horizontal ? center(a.y) : center(a.y) + ISLAND_R;
+  const x2 = link.horizontal ? center(b.x) - ISLAND_R : center(b.x);
+  const y2 = link.horizontal ? center(b.y) : center(b.y) - ISLAND_R;
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const len = dx * dx + dy * dy;
+  const t = len ? Math.max(0, Math.min(1, ((x - x1) * dx + (y - y1) * dy) / len)) : 0;
+  return Math.hypot(x - (x1 + dx * t), y - (y1 + dy * t));
+}
+
+// 이 자리에서 무엇이든 일어나는가. 다리가 놓여 있으면 언제나 걷을 수 있고, 빈 자리는
+// 하나를 놓을 수 있어야 한다(가로지르는 다리에 막히면 그렇지 못하다).
+function usable(li) {
+  return game.state[li] > 0 || R.canSet(game.board, game.state, li, 1);
+}
+
+function linkAt(event) {
+  if (event.clientX === undefined) return null;
+  const rect = el.board.getBoundingClientRect();
+  const box = el.board.viewBox.baseVal;
+  if (!rect.width || !rect.height) return null;
+  const x = box.x + (event.clientX - rect.left) / rect.width * box.width;
+  const y = box.y + (event.clientY - rect.top) / rect.height * box.height;
+
+  for (const island of game.board.islands) {
+    if (Math.hypot(center(island.x) - x, center(island.y) - y) < DEAD) return null;
+  }
+
+  const near = game.board.links
+    .map((link) => ({ id: link.id, gap: distanceToLink(link, x, y) }))
+    .filter((one) => one.gap <= REACH)
+    .sort((one, two) => one.gap - two.gap);
+  if (!near.length) return null;
+  // 막힌 자리가 조금 더 가깝다고 그것을 집으면 누를 때마다 "놓을 수 없습니다"만 뜬다.
+  // 손이 닿은 자리 중에 할 수 있는 것이 있으면 그것을 고른다.
+  const open = near.find((one) => usable(one.id));
+  return (open || near[0]).id;
+}
+
 el.board.addEventListener('click', (event) => {
   if (game.done) return;
-  const hit = event.target.closest('[data-link]');
-  if (!hit) return;
-  place(Number(hit.dataset.link));
+  const li = linkAt(event);
+  if (li === null) return;
+  place(li);
 });
 
 el.undo.addEventListener('click', () => {
@@ -368,6 +412,6 @@ window.SharedIcons.paint();
 newGame();
 
 // 풀이기는 화면에서 쓰지 않지만, 판이 이상할 때 콘솔에서 바로 확인할 수 있게 열어 둔다.
-window.HashiDebug = { game: () => game, solver: S };
+window.HashiDebug = { game: () => game, solver: S, linkAt };
 
 })();
