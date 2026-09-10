@@ -403,12 +403,34 @@ function runBot() {
   botTimer = setTimeout(step, BOT_STEP);
 }
 
+// 누른 자리의 영토. 칸을 살짝 빗나갔으면 가까운 칸으로 붙여 준다 — 판 가장자리는 줄이
+// 어긋나 배경이 칸 사이까지 들어오는데, 거기서 놓아 버리면 고른 것이 풀린다.
+function territoryAt(event) {
+  const hit = event.target.closest('[data-territory]');
+  if (hit) return Number(hit.dataset.territory);
+  if (event.clientX === undefined) return null;
+
+  const rect = el.board.getBoundingClientRect();
+  const box = el.board.viewBox.baseVal;
+  if (!rect.width || !rect.height) return null;
+  const x = box.x + (event.clientX - rect.left) / rect.width * box.width;
+  const y = box.y + (event.clientY - rect.top) / rect.height * box.height;
+
+  let best = null;
+  let near = S * 1.4;
+  map.cells.forEach((cell, i) => {
+    const center = centerOf(cell);
+    const gap = Math.hypot(center.x - x, center.y - y);
+    if (gap < near) { near = gap; best = i; }
+  });
+  return best === null ? null : view.owner[best];
+}
+
 el.board.addEventListener('click', (event) => {
   if (game.over || rolling || game.turn !== 1) return;
-  const hit = event.target.closest('[data-territory]');
-  if (!hit) { selected = null; clearOdds(); paintMarks(); return; }
+  const id = territoryAt(event);
+  if (id === null || id < 0) { selected = null; clearOdds(); paintMarks(); return; }
 
-  const id = Number(hit.dataset.territory);
   const t = game.territories[id];
 
   if (selected !== null && R.canAttack(game, selected, id, 1)) {

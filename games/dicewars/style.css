@@ -145,7 +145,13 @@ h1 {
 
 /* 영토 경계. 칸끼리 색이 같아 그냥 두면 한 덩어리로 보인다 — 어디까지가 한 영토인지가
    이 게임의 전부라 경계는 진하게 긋는다. */
-.edge { stroke: var(--edge); stroke-width: 2.6; stroke-linejoin: round; stroke-linecap: round; fill: none; }
+/* 경계선은 누름을 가로채지 않는다. 굵게 그은 선이 판 넓이의 5분의 1을 덮고 있어,
+   맞닿은 남의 영토를 치려고 경계 가까이를 누르면 선이 먼저 잡혀 고른 것이 풀렸다. */
+.edge {
+  stroke: var(--edge); stroke-width: 2.6;
+  stroke-linejoin: round; stroke-linecap: round;
+  fill: none; pointer-events: none;
+}
 
 /* 고른 영토와 칠 수 있는 곳. 테두리로만 알린다 — 색을 바꾸면 주인이 바뀐 것처럼 보인다. */
 .mark { fill: none; stroke-width: 3.2; stroke-linejoin: round; stroke-linecap: round; pointer-events: none; }
