@@ -145,10 +145,10 @@ h1 {
 
 /* 영토 경계. 칸끼리 색이 같아 그냥 두면 한 덩어리로 보인다 — 어디까지가 한 영토인지가
    이 게임의 전부라 경계는 진하게 긋는다. */
-.edge { stroke: var(--edge); stroke-width: 2.6; stroke-linecap: round; fill: none; }
+.edge { stroke: var(--edge); stroke-width: 2.6; stroke-linejoin: round; stroke-linecap: round; fill: none; }
 
 /* 고른 영토와 칠 수 있는 곳. 테두리로만 알린다 — 색을 바꾸면 주인이 바뀐 것처럼 보인다. */
-.mark { fill: none; stroke-width: 3.2; stroke-linecap: round; pointer-events: none; }
+.mark { fill: none; stroke-width: 3.2; stroke-linejoin: round; stroke-linecap: round; pointer-events: none; }
 .mark.pick { stroke: #ffffff; }
 .mark.target { stroke: #ffffff; stroke-dasharray: 5 4; opacity: 0.9; }
 

@@ -26,6 +26,8 @@ const SQRT3 = Math.sqrt(3);
 // 상대가 한 수 둘 때마다 쉬는 시간. 너무 빠르면 무엇이 일어났는지 못 보고, 느리면
 // 기다리는 게임이 된다.
 const BOT_STEP = 750;
+// 판 둘레의 여백(SVG 단위).
+const PAD = 5;
 
 const el = {
   board: document.getElementById('board'),
@@ -104,7 +106,7 @@ function edgePoint(center, deg) {
 
 // 칸 무리의 바깥선. 판의 영토 경계와 고른 영토를 덧그리는 선이 같은 계산을 쓴다 —
 // 따로 두면 한쪽만 고쳐 선이 어긋난다.
-function borderLines(cellIds) {
+function borderSegments(cellIds) {
   const set = new Set(cellIds);
   const out = [];
   for (const i of cellIds) {
@@ -124,20 +126,55 @@ function borderLines(cellIds) {
   return out;
 }
 
-function lineNode(seg, cls) {
-  return svg('line', {
-    x1: seg.x1.toFixed(2), y1: seg.y1.toFixed(2),
-    x2: seg.x2.toFixed(2), y2: seg.y2.toFixed(2),
-  }, cls);
+// **바깥선은 변마다 선을 긋지 않고 이어 붙여 닫힌 길로 그린다.** 변을 따로 그으면
+// 두 변이 만나는 꼭짓점마다 둥근 끝이 서로를 덮지 못해 쐐기꼴로 파여, 폰에서 경계가
+// 끊겨 보였다. 한 길로 이으면 이음매를 stroke-linejoin이 채운다.
+function borderPaths(cellIds) {
+  const segs = borderSegments(cellIds);
+  const key = (x, y) => `${x.toFixed(2)},${y.toFixed(2)}`;
+  const at = new Map();
+  segs.forEach((seg, i) => {
+    for (const k of [key(seg.x1, seg.y1), key(seg.x2, seg.y2)]) {
+      if (!at.has(k)) at.set(k, []);
+      at.get(k).push(i);
+    }
+  });
+
+  const used = new Array(segs.length).fill(false);
+  const paths = [];
+  for (let i = 0; i < segs.length; i++) {
+    if (used[i]) continue;
+    used[i] = true;
+    const seg = segs[i];
+    const start = key(seg.x1, seg.y1);
+    const points = [[seg.x1, seg.y1], [seg.x2, seg.y2]];
+    let here = key(seg.x2, seg.y2);
+    // 꼭짓점 하나에 변이 넷 모이는 자리(영토가 잘록한 곳)가 있어 아무 것이나 집는다 —
+    // 어느 쪽을 골라도 남은 변은 다음 길에서 다시 걸린다.
+    while (here !== start) {
+      const next = (at.get(here) || []).find((j) => !used[j]);
+      if (next === undefined) break;
+      used[next] = true;
+      const other = segs[next];
+      const far = key(other.x1, other.y1) === here ? [other.x2, other.y2] : [other.x1, other.y1];
+      points.push(far);
+      here = key(far[0], far[1]);
+    }
+    const d = points.map(([x, y], n) => `${n ? 'L' : 'M'}${x.toFixed(2)},${y.toFixed(2)}`).join(' ');
+    paths.push(here === start ? `${d} Z` : d);
+  }
+  return paths;
 }
 
 // --- 판 만들기 ---
 
 function build() {
   el.board.textContent = '';
-  const width = SQRT3 * S * (map.w + 0.5) + SQRT3 * S / 2;
-  const height = 1.5 * S * map.h + S * 1.5;
-  el.board.setAttribute('viewBox', `0 0 ${width.toFixed(1)} ${height.toFixed(1)}`);
+  // 칸이 상자에 딱 붙어 왼쪽·위가 잘려 보였다. 네 변에 같은 여백을 두른다 — 오른쪽과
+  // 아래는 줄 어긋남 때문에 이미 남던 자리라, 그만큼을 폭·높이에서 뺀다.
+  const width = SQRT3 * S * (map.w + 0.5) + PAD * 2;
+  const height = 1.5 * S * map.h + S * 0.5 + PAD * 2;
+  el.board.setAttribute('viewBox', `${-PAD} ${-PAD} ${width.toFixed(1)} ${height.toFixed(1)}`);
 
   const cells = svg('g');
   const edges = svg('g');
@@ -160,7 +197,7 @@ function build() {
   });
 
   for (const t of map.territories) {
-    for (const seg of borderLines(t.cells)) edges.append(lineNode(seg, 'edge'));
+    for (const d of borderPaths(t.cells)) edges.append(svg('path', { d }, 'edge'));
   }
 
   // 영토마다 가운데 칸 하나를 골라 주사위 수를 얹는다. 무게중심에 두면 영토가 굽은
@@ -243,8 +280,8 @@ function paintMarks() {
   // 숫자 둘레에 동그라미를 치면 어느 땅이 고른 땅인지가 아니라 어느 숫자를 골랐는지만
   // 보인다. 땅의 바깥선을 그대로 덧그려 영토 모양을 알린다.
   const outline = (id, cls) => {
-    for (const seg of borderLines(map.territories[id].cells)) {
-      view.marks.append(lineNode(seg, `mark ${cls}`));
+    for (const d of borderPaths(map.territories[id].cells)) {
+      view.marks.append(svg('path', { d }, `mark ${cls}`));
     }
   };
 
