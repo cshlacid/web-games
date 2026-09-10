@@ -1,0 +1,213 @@
+:root {
+  --bg: #f7f4f1;
+  --fg: #33291f;
+  --muted: #8a7a6a;
+  --line: #ded3c8;
+  --board-bg: #ece4da;
+  --edge: #6d5c4b;
+  --btn-bg: #5a4a3b;
+  --btn-fg: #f8f4ef;
+  --sheet-bg: #ffffff;
+
+  /* 진영 색. 넷이 서로 멀찍이 떨어진 색조여야 판이 한눈에 읽힌다. */
+  --p1: #2f7d6a;
+  --p2: #c9603f;
+  --p3: #c8992f;
+  --p4: #6b5bb5;
+
+  --pad-x: clamp(10px, 4vmin, 28px);
+  --app-max: 440px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #191614;
+    --fg: #e8ded2;
+    --muted: #9b8a79;
+    --line: #3a322b;
+    --board-bg: #221d1a;
+    --edge: #a7937d;
+    --btn-bg: #4a3d31;
+    --sheet-bg: #241f1b;
+
+    --p1: #48a48c;
+    --p2: #e07a55;
+    --p3: #dfb54a;
+    --p4: #8c7bd8;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  display: flex;
+  justify-content: center;
+  padding: clamp(10px, 3vmin, 24px) var(--pad-x);
+}
+
+.app {
+  width: min(100%, var(--app-max));
+  display: flex;
+  flex-direction: column;
+  gap: clamp(8px, 2vmin, 14px);
+}
+
+/* 헤더 배치는 모든 게임이 같다. */
+.title-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 10px;
+}
+
+.title-row h1 { text-align: center; }
+.title-row .head-nav { justify-self: start; }
+.head-nav { display: flex; align-items: center; gap: 14px; }
+.title-row .head-actions { justify-self: end; }
+
+h1 {
+  margin: 0;
+  font-size: clamp(20px, 5.2vmin, 30px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.head-actions { display: flex; align-items: baseline; gap: 14px; }
+
+.toggle {
+  border: 0; background: none; padding: 0;
+  color: inherit; font-family: inherit; font-size: 14px; font-weight: 600;
+  cursor: pointer; opacity: 0.6;
+}
+.toggle:hover { opacity: 1; }
+.toggle.sound { font-size: 12px; }
+.toggle.sound[aria-pressed="false"] { opacity: 0.38; text-decoration: line-through; }
+
+.back {
+  color: inherit; opacity: 0.6; text-decoration: none;
+  font-size: 14px; font-weight: 600;
+}
+.back:hover { opacity: 1; }
+
+.picker-row { display: flex; align-items: center; gap: 10px; }
+.picker-row #new-game { margin-left: auto; }
+.picker { display: flex; gap: 4px; }
+.row-label { font-size: 11px; font-weight: 600; color: var(--muted); }
+
+.pick {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.pick[aria-pressed="true"] {
+  background: var(--btn-bg);
+  border-color: var(--btn-bg);
+  color: var(--btn-fg);
+}
+
+/* 전황. 진영 색을 그대로 써서 어느 쪽이 내 것인지 따로 읽지 않아도 되게 한다. */
+.tally { margin-left: auto; display: flex; align-items: baseline; gap: 7px; font-size: 12px; font-weight: 700; }
+.tally .label { color: var(--muted); font-weight: 600; }
+.tally span { font-variant-numeric: tabular-nums; }
+.tally .me { color: var(--p1); }
+.tally .foe2 { color: var(--p2); }
+.tally .foe3 { color: var(--p3); }
+.tally .foe4 { color: var(--p4); }
+.tally .out { opacity: 0.35; text-decoration: line-through; }
+
+.board-wrap { position: relative; }
+
+.board {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: var(--board-bg);
+  border-radius: 14px;
+}
+
+.cell { stroke: none; }
+.cell.p1 { fill: var(--p1); }
+.cell.p2 { fill: var(--p2); }
+.cell.p3 { fill: var(--p3); }
+.cell.p4 { fill: var(--p4); }
+
+/* 영토 경계. 칸끼리 색이 같아 그냥 두면 한 덩어리로 보인다 — 어디까지가 한 영토인지가
+   이 게임의 전부라 경계는 진하게 긋는다. */
+.edge { stroke: var(--edge); stroke-width: 2.2; stroke-linecap: round; fill: none; }
+
+/* 고른 영토와 칠 수 있는 곳. 테두리로만 알린다 — 색을 바꾸면 주인이 바뀐 것처럼 보인다. */
+.mark { fill: none; stroke-width: 3; }
+.mark.pick { stroke: #ffffff; }
+.mark.target { stroke: #ffffff; stroke-dasharray: 5 4; opacity: 0.85; }
+
+.chip { fill: #ffffff; opacity: 0.92; }
+.dice {
+  font-size: 15px; font-weight: 800;
+  text-anchor: middle; dominant-baseline: central;
+  pointer-events: none;
+}
+.dice.p1 { fill: var(--p1); }
+.dice.p2 { fill: var(--p2); }
+.dice.p3 { fill: var(--p3); }
+.dice.p4 { fill: var(--p4); }
+
+/* 이길 확률은 **그 영토의 주사위 수 자리에** 대신 쓴다. 옆에 따로 달면 촘촘한 판에서
+   이웃 숫자와 겹쳐 둘 다 못 읽는다. 고르는 동안에는 상대 주사위 수보다 확률이 알고
+   싶은 값이고, 확률 안에 그 수가 이미 들어 있다. */
+.dice.odds { font-size: 11px; fill: #241f1b; }
+.chip.odds { fill: #ffd98a; opacity: 0.97; }
+
+.hit { fill: transparent; cursor: pointer; }
+
+.toast {
+  margin: 0; min-height: 20px;
+  font-size: 13px; font-weight: 700; text-align: center; color: var(--muted);
+}
+.toast b { color: var(--fg); }
+
+.pad { display: flex; }
+
+.btn {
+  flex: 1;
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  border: 0;
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 15px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+}
+.btn:disabled { opacity: 0.4; cursor: default; }
+
+/* 도움말 시트. 껍데기는 shared/sheet.css, 결과 덮개는 shared/result.css. */
+.sheet {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--sheet-bg);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sheet[hidden] { display: none; }
+
+.sheet-title { margin: 0; font-size: 19px; font-weight: 800; }
+.sheet-note { margin: 0; font-size: 14px; color: var(--muted); }
+.sheet-actions { display: flex; gap: 8px; }
+
+.help-list { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.7; }
+.help-list li { margin-bottom: 6px; }
