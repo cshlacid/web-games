@@ -1,0 +1,246 @@
+:root {
+  --bg: #f6f3ee;
+  --fg: #2f2a22;
+  --muted: #8b8073;
+  --line: #ded6c9;
+  --board-bg: #efeae1;
+  --row-bg: #ffffff;
+  --die: #fbf7f1;
+  --die-line: #b9ac99;
+  --pip: #2f2a22;
+  --keep: #b5761f;
+  --score: #3f7a5c;
+  --btn-bg: #4d4234;
+  --btn-fg: #f8f4ef;
+  --sheet-bg: #ffffff;
+
+  --pad-x: clamp(10px, 4vmin, 28px);
+  --app-max: 440px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #171614;
+    --fg: #e7e0d5;
+    --muted: #948a7c;
+    --line: #33302a;
+    --board-bg: #201d1a;
+    --row-bg: #262220;
+    --die: #efe7db;
+    --die-line: #6c6255;
+    --pip: #201d1a;
+    --keep: #e0a350;
+    --score: #6fbf95;
+    --btn-bg: #453b30;
+    --sheet-bg: #241f1c;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  display: flex;
+  justify-content: center;
+  padding: clamp(10px, 3vmin, 24px) var(--pad-x);
+}
+
+.app {
+  width: min(100%, var(--app-max));
+  display: flex;
+  flex-direction: column;
+  gap: clamp(8px, 2vmin, 14px);
+}
+
+/* 헤더 배치는 모든 게임이 같다. */
+.title-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 10px;
+}
+
+.title-row h1 { text-align: center; }
+.title-row .head-nav { justify-self: start; }
+.head-nav { display: flex; align-items: center; gap: 14px; }
+.title-row .head-actions { justify-self: end; }
+
+h1 {
+  margin: 0;
+  font-size: clamp(20px, 5.2vmin, 30px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.head-actions { display: flex; align-items: baseline; gap: 14px; }
+
+.toggle {
+  border: 0; background: none; padding: 0;
+  color: inherit; font-family: inherit; font-size: 14px; font-weight: 600;
+  cursor: pointer; opacity: 0.6;
+}
+.toggle:hover { opacity: 1; }
+.toggle.sound { font-size: 12px; }
+.toggle.sound[aria-pressed="false"] { opacity: 0.38; text-decoration: line-through; }
+
+.back {
+  color: inherit; opacity: 0.6; text-decoration: none;
+  font-size: 14px; font-weight: 600;
+}
+.back:hover { opacity: 1; }
+
+.info-row { display: flex; align-items: center; gap: 12px; }
+.round { font-size: 12px; font-weight: 700; }
+.best { font-size: 12px; font-weight: 600; color: var(--muted); }
+.info-row #new-game { margin-left: auto; }
+
+.pick {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.board-wrap { position: relative; }
+
+/* 점수판. 폰에서 열두 칸을 한 줄로 세우면 스크롤해야 해서 두 폭으로 나눈다 —
+   위 여섯 칸과 아래 여섯 칸이 원래 다른 묶음이라 나누는 자리도 자연스럽다. */
+.sheet-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 8px;
+  border-radius: 14px;
+  background: var(--board-bg);
+}
+
+.slot {
+  display: flex; align-items: center; justify-content: space-between; gap: 6px;
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: var(--row-bg);
+  color: inherit;
+  font-family: inherit;
+  padding: 7px 9px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.slot .name { font-size: 12px; font-weight: 700; }
+.slot .value {
+  font-size: 13px; font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 적힌 칸은 또렷하게, 아직 빈 칸의 미리보기는 흐리게. 이 둘이 같은 무게로 보이면
+   무엇이 이미 끝난 칸인지 한눈에 갈리지 않는다. */
+.slot.filled { cursor: default; }
+.slot.filled .value { color: var(--score); }
+.slot.open .value { color: var(--muted); opacity: 0.75; }
+.slot.open.zero .value { opacity: 0.4; }
+.slot.open:hover { border-color: var(--keep); }
+.slot.dead { cursor: default; opacity: 0.55; }
+
+/* 보너스와 합계는 누르는 칸이 아니다. */
+.slot.sum {
+  background: none;
+  border-color: var(--line);
+  cursor: default;
+}
+.slot.sum .name { color: var(--muted); }
+.slot.total .value { font-size: 15px; }
+.slot.sum.hit .value { color: var(--keep); }
+
+.toast {
+  margin: 0; min-height: 20px;
+  font-size: 13px; font-weight: 700; text-align: center; color: var(--muted);
+}
+.toast b { color: var(--fg); }
+
+/* 주사위. 잡아 둔 것은 아래로 내려 앉히고 테두리를 씌운다 — 색만 바꾸면 밝은 화면에서
+   잡았는지가 잘 안 보였다. */
+.dice-row { display: flex; justify-content: center; gap: clamp(6px, 2.4vmin, 12px); }
+
+.die {
+  width: clamp(46px, 15vmin, 62px);
+  height: clamp(46px, 15vmin, 62px);
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  transition: transform 120ms ease;
+}
+.die:disabled { cursor: default; }
+.die.kept { transform: translateY(6px); }
+
+.die-face { fill: var(--die); stroke: var(--die-line); stroke-width: 1.6; }
+.die.kept .die-face { stroke: var(--keep); stroke-width: 3; }
+.die-pip { fill: var(--pip); }
+.die.blank .die-face { fill: none; stroke-dasharray: 4 4; }
+
+@keyframes die-shake {
+  0% { transform: translateY(0) rotate(-7deg); }
+  50% { transform: translateY(-4px) rotate(6deg); }
+  100% { transform: translateY(0) rotate(-7deg); }
+}
+.die.spin { animation: die-shake 0.17s linear infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .die.spin { animation: none; }
+  .die { transition: none; }
+}
+
+.pad { display: flex; gap: 8px; }
+
+.btn {
+  flex: 1;
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  border: 0;
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 15px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+}
+.btn:disabled { opacity: 0.4; cursor: default; }
+
+.btn.ghost {
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: 6px;
+  background: none;
+  color: inherit;
+  border: 1px solid var(--line);
+  font-size: 13px;
+}
+.btn.ghost .icon { width: 16px; height: 16px; }
+
+/* 도움말 시트. 껍데기는 shared/sheet.css, 결과 덮개는 shared/result.css. */
+.sheet {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--sheet-bg);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sheet[hidden] { display: none; }
+
+.sheet-title { margin: 0; font-size: 19px; font-weight: 800; }
+.sheet-note { margin: 0; font-size: 14px; color: var(--muted); }
+.sheet-actions { display: flex; gap: 8px; }
+
+.help-list { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.7; }
+.help-list li { margin-bottom: 6px; }

@@ -20,6 +20,7 @@
 | [점령전](games/conquest/) | 거점을 이어 병력을 보내 지도를 차지한다 | 순수 HTML/CSS/JS |
 | [다리 잇기](games/hashi/) | 섬을 숫자만큼 이어 하나로 만든다 | 순수 HTML/CSS/JS |
 | [주사위 영토전](games/dicewars/) | 주사위를 굴려 이웃 영토를 뺏는다 | 순수 HTML/CSS/JS |
+| [야추](games/yacht/) | 주사위 다섯 개를 세 번 굴려 열두 칸을 채운다 | 순수 HTML/CSS/JS |
 
 ## 로컬에서 실행
 
@@ -72,6 +73,7 @@ node games/hashi/generator.test.js
 node games/dicewars/rules.test.js
 node games/dicewars/ai.test.js
 node games/dicewars/mapgen.test.js
+node games/yacht/rules.test.js
 ```
 
 ## 구조
