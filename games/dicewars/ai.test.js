@@ -105,7 +105,9 @@ function rate(level, players) {
   let n = 0;
   let unfinished = 0;
   let turns = 0;
-  for (let seed = 1; seed <= 30; seed++) {
+  // 서른 판으로는 보통과 어려움의 순서가 뒤집히는 날이 있었다. 둘의 차이가 한 자릿수
+  // 퍼센트라 표본이 그만큼 필요하다.
+  for (let seed = 1; seed <= 60; seed++) {
     const r = play(level, seed, players);
     n++;
     turns += r.turns;

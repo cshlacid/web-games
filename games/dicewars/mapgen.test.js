@@ -66,11 +66,20 @@ check('영토를 고르게 나눈다', made.every(({ players, map }) => {
   return Math.max(...mine) === Math.min(...mine);
 }), true);
 
-check('주사위도 고르게 나눈다', made.every(({ players, map }) => {
+// 보정 주사위를 뺀 나머지가 고르게 나뉘어야 한다. 자리별 보정은 선공 이점을 메우는
+// 값이라, 그것까지 합쳐 놓고 고른지 보면 규칙이 지워진다.
+check('보정을 빼면 주사위도 고르게 나눈다', made.every(({ players, map }) => {
+  const per = new Array(players + 1).fill(0);
+  for (const t of map.territories) per[t.owner] += t.dice;
+  const mine = per.slice(1).map((n, i) => n - M.KOMI[players][i]);
+  return Math.max(...mine) - Math.min(...mine) <= 1;
+}), true);
+
+check('뒷차례일수록 주사위를 더 받는다', made.every(({ players, map }) => {
   const per = new Array(players + 1).fill(0);
   for (const t of map.territories) per[t.owner] += t.dice;
   const mine = per.slice(1);
-  return Math.max(...mine) - Math.min(...mine) <= 1;
+  return mine.every((n, i) => i === 0 || n >= mine[i - 1]);
 }), true);
 
 check('주사위는 1에서 8 사이', made.every(({ map }) =>

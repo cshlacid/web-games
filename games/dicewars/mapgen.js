@@ -19,6 +19,19 @@ const SETUPS = {
 const EXTRA_PER_TERRITORY = 1.6;
 const MAX_DICE = 8;
 
+// 뒷차례가 받는 보정 주사위(자리 순서대로). **먼저 치는 쪽이 구조적으로 유리하다** —
+// 아무것도 보태지 않으면 같은 세기끼리 붙여도 선공이 2인 89%, 3인 63%, 4인 44%로
+// 이겼다(공평하면 50/33/25%). 판을 700번씩 돌려 자리별 승률이 고르게 되는 값을
+// 골랐다: 2인 46/54, 3인 33/35/32, 4인 28/24/24/24.
+//
+// 사람이 적을수록 보정이 커지는 것은 첫 수의 값이 커지기 때문이다. 2인에서는 한 번의
+// 선제가 판의 절반을 가르지만, 4인에서는 뒤에서 셋이 받아친다.
+const KOMI = {
+  2: [0, 6],
+  3: [0, 3, 4],
+  4: [0, 1, 2, 2],
+};
+
 function rng(seed) {
   let a = seed >>> 0;
   return function next() {
@@ -130,9 +143,11 @@ function build(seed, players) {
 
   // 주사위를 뿌린다. 사람마다 같은 수를 받고, 여덟이 넘는 영토는 건너뛴다.
   const extra = Math.round(spec.territories / players * EXTRA_PER_TERRITORY);
+  const komi = KOMI[players] || [];
   for (let player = 1; player <= players; player++) {
     const mine = territories.filter((t) => t.owner === player);
-    for (let i = 0; i < extra; i++) {
+    const count = extra + (komi[player - 1] || 0);
+    for (let i = 0; i < count; i++) {
       const open = mine.filter((t) => t.dice < MAX_DICE);
       if (!open.length) break;
       open[Math.floor(next() * open.length)].dice++;
@@ -150,7 +165,7 @@ function generate(seed, players) {
   return null;
 }
 
-const MapGen = { SETUPS, MAX_DICE, rng, shuffle, neighborsOf, build, generate };
+const MapGen = { SETUPS, MAX_DICE, KOMI, rng, shuffle, neighborsOf, build, generate };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = MapGen;
 if (typeof window !== 'undefined') window.DiceMap = MapGen;
