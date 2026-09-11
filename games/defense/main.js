@@ -283,9 +283,15 @@ function hud() {
 
   for (const node of el.palette.children) {
     const key = node.dataset.key;
-    node.classList.toggle('poor', run.gold < D.UNITS[key].cost);
-    // 이미 부른 영웅은 회색으로 둔다 — 눌러도 안 되는 이유가 보여야 한다.
-    node.classList.toggle('used', !!D.UNITS[key].hero && run.heroUsed);
+    // **값은 매 프레임 다시 적는다.** 겹쳐 세울수록 오르는데 세울 때의 값과 팔레트에
+    // 적힌 값이 다르면, 눌러 놓고 왜 안 되는지 알 수 없다.
+    const cost = R.costOf(run, key);
+    const tag = node.querySelector('.cost');
+    if (tag.textContent !== String(cost)) tag.textContent = String(cost);
+    node.classList.toggle('poor', run.gold < cost);
+    // 더 못 세우는 자리는 회색으로 둔다 — 이미 부른 영웅과 한도에 닿은 종류다.
+    const full = (!!D.UNITS[key].hero && run.heroUsed) || R.standing(run, key) >= D.MOST_OF_KIND;
+    node.classList.toggle('used', full);
     node.setAttribute('aria-pressed', String(chosen === key));
   }
   for (const node of el.items.children) {
@@ -321,7 +327,7 @@ function hud() {
       el.barUp.innerHTML = `<b>올리기 ${cost}</b><span>공격 ${num(now.damage)}→${num(next.damage)}`
         + ` · 체력 ${now.hp}→${next.hp} · 사거리 +${(next.far - now.far).toFixed(1)}칸</span>`;
     }
-    el.barSell.textContent = `해고 +${Math.round(d.cost * D.RUN.refund)}`;
+    el.barSell.textContent = `해고 +${Math.round((picked.paid || d.cost) * D.RUN.refund)}`;
   }
 }
 
@@ -439,7 +445,8 @@ function buildPalette() {
     cost.className = 'cost';
     cost.textContent = String(d.cost);
     node.appendChild(cost);
-    node.title = `${d.name} · 사거리 ${d.range.min}-${d.range.max} · ${d.skill.name}(${d.skill.cd}초) — ${d.skill.note}`;
+    node.title = `${d.name} · 사거리 ${d.range.min}-${d.range.max} · ${d.skill.name}(${d.skill.cd}초)`
+    + ` — ${d.skill.note} · 같은 종류는 ${D.MOST_OF_KIND}명까지, 겹칠수록 값이 오른다`;
     node.addEventListener('click', () => {
       chosen = chosen === key ? null : key;
       picked = null;
@@ -572,7 +579,7 @@ el.canvas.addEventListener('pointerup', (ev) => {
       R.place(run, it.key, it.x, it.y);
       Sound.play('place');
       picked = null;
-      if (run.gold < D.UNITS[it.key].cost) chosen = null;
+      if (run.gold < R.costOf(run, it.key)) chosen = null;
     } else if (it.why) {
       toast(it.why);
     }
