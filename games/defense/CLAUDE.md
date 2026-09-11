@@ -13,7 +13,9 @@
 node games/defense/mapgen.test.js  # 판의 규격·재현성·빈 칸 연결성
 node games/defense/paths.test.js   # 돌아갈까 뚫을까, 약한 쪽 고르기, 공성형
 node games/defense/waves.test.js   # 웨이브 구성·해금 차례·마릿수 상한
-node games/defense/rules.test.js   # 배치·단계·전투·막아 세우기·승패·영웅 자리
+node games/defense/rules.test.js   # 배치·단계·전투·막아 세우기·승패·아이템·영웅 자리
+node games/defense/goals.test.js   # 목표 일곱의 판정과 스테이지별 재현성
+node games/defense/meta.test.js    # 보유·레벨·편성·보상 카드·정산·저장본
 ```
 
 굽는 단계는 없다. 판은 스테이지 번호 하나로 그때그때 만들어진다.

@@ -39,6 +39,10 @@
       <span class="chip gold" id="gold">160</span>
       <span class="chip wave" id="wave">대기</span>
     </div>
+    <div class="goal-row">
+      <button class="toggle" id="camp-open" type="button" aria-pressed="false">정비</button>
+      <span class="goal" id="goal"></span>
+    </div>
   </header>
 
   <div class="board-wrap">
@@ -47,6 +51,7 @@
       <div class="result-card">
         <p class="sheet-title" id="result-title"></p>
         <p class="sheet-note" id="result-note"></p>
+        <div class="cards" id="cards" hidden></div>
         <div class="sheet-actions">
           <button class="btn" id="again" type="button">다음</button>
         </div>
@@ -58,6 +63,8 @@
 
   <div class="pad">
     <div class="palette" id="palette" role="group" aria-label="세울 사람"></div>
+
+    <div class="items" id="items" role="group" aria-label="1회용 아이템"></div>
 
     <div class="unit-bar" id="unit-bar" hidden>
       <span class="unit-name" id="unit-name"></span>
@@ -78,6 +85,31 @@
     </div>
   </div>
 
+  <div class="sheet" id="camp" hidden>
+    <p class="sheet-title">정비 <span class="gems" id="camp-gems"></span></p>
+
+    <p class="camp-label">스테이지</p>
+    <div class="stage-pick">
+      <button class="btn small ghost arrow back-way" id="stage-down" type="button" aria-label="앞 스테이지"><span class="tool-icon" data-icon="next"></span></button>
+      <span class="stage-now" id="stage-now">1</span>
+      <button class="btn small ghost arrow" id="stage-up" type="button" aria-label="다음 스테이지"><span class="tool-icon" data-icon="next"></span></button>
+      <span class="camp-note" id="stage-note"></span>
+    </div>
+
+    <p class="camp-label">편성 <span class="camp-note" id="team-count"></span></p>
+    <div class="camp-list" id="team-list"></div>
+
+    <p class="camp-label">육성 <span class="camp-note">레벨이 오르면 그 사람의 피해가 는다</span></p>
+    <div class="camp-list" id="level-list"></div>
+
+    <p class="camp-label">그 밖에</p>
+    <div class="camp-list" id="perk-list"></div>
+
+    <div class="sheet-actions">
+      <button class="btn" id="camp-close" type="button">닫기</button>
+    </div>
+  </div>
+
   <div class="sheet" id="help" hidden>
     <p class="sheet-title">규칙</p>
     <ul class="help-list">
@@ -93,6 +125,11 @@
       <li>한 판은 <b>웨이브 열 개</b>이고 마지막은 <b>우두머리</b>입니다.</li>
       <li>세운 사람은 <b>골드로 올릴 수</b> 있고, <b>해고하면 일부를 돌려받습니다.</b></li>
       <li><b>적이 밟고 있는 칸에는 세울 수 없습니다.</b> 길목은 미리 잡아 두세요.</li>
+      <li>스테이지마다 <b>목표</b>가 붙습니다. <b>못 채워도 클리어는 클리어</b>이고,
+        채우면 <b>카드를 한 장 고릅니다</b> — 새 사람, 보석, 1회용 아이템.</li>
+      <li><b>보석으로 레벨을 올립니다.</b> 판 안의 값은 그대로이고 스테이지마다 적만
+        세지므로, 멀리 가려면 키워야 합니다.</li>
+      <li><b>진 판도 보석을 줍니다.</b> 막혔을 때는 아이템을 모아 한 판에 몰아 쓰세요.</li>
     </ul>
     <div class="sheet-actions">
       <button class="btn" id="help-close" type="button">닫기</button>
@@ -108,6 +145,8 @@
 <script src="waves.js"></script>
 <script src="sprites.js"></script>
 <script src="rules.js"></script>
+<script src="goals.js"></script>
+<script src="meta.js"></script>
 <script src="../../shared/audio.js"></script>
 <script src="audio.js"></script>
 <script src="../../shared/sheet.js"></script>

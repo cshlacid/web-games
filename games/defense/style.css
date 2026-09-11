@@ -97,7 +97,6 @@ h1 {
 }
 .chip { color: var(--muted); }
 .chip.gold { color: var(--gold); margin-left: auto; }
-.chip.gold::before { content: "◆ "; }
 .chip.lives { color: var(--life); }
 .chip.wave { color: var(--fg); }
 
@@ -188,3 +187,73 @@ h1 {
 .btn:disabled { opacity: 0.4; cursor: default; }
 
 .help-list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; line-height: 1.55; }
+
+.goal-row { display: flex; align-items: center; gap: 10px; font-size: 12px; }
+.goal { color: var(--muted); font-weight: 600; }
+.goal b { color: var(--fg); }
+.goal.done { color: var(--exit); }
+
+.items { display: flex; gap: 6px; flex-wrap: wrap; }
+.items:empty { display: none; }
+.item {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 12px;
+  cursor: pointer;
+}
+.item[aria-pressed="true"] { background: var(--btn-bg); border-color: var(--btn-bg); color: var(--btn-fg); }
+.item:disabled { opacity: 0.35; cursor: default; }
+
+/* 보상 카드. 목표를 채웠을 때만 나온다. */
+.cards[hidden] { display: none; }
+.cards { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 2px; }
+.card {
+  display: flex; flex-direction: column; gap: 2px;
+  text-align: left;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  cursor: pointer;
+}
+.card b { font-size: 13px; }
+.card span { font-size: 11px; color: var(--muted); }
+
+.camp-label { margin: 14px 0 6px; font-size: 12px; font-weight: 700; }
+.camp-note { font-weight: 500; color: var(--muted); }
+.gems { float: right; font-size: 13px; font-weight: 700; color: var(--gold); }
+.arrow { display: flex; align-items: center; justify-content: center; padding: 6px 10px; }
+.arrow .tool-icon { width: 16px; height: 16px; }
+.arrow.back-way .tool-icon { transform: rotate(180deg); }
+
+.stage-pick { display: flex; align-items: center; gap: 8px; }
+.stage-now { font-size: 16px; font-weight: 800; min-width: 2ch; text-align: center; font-variant-numeric: tabular-nums; }
+.stage-pick .camp-note { font-size: 11px; }
+
+.camp-list { display: flex; flex-direction: column; gap: 5px; }
+.row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 13px;
+  text-align: left;
+  width: 100%;
+  cursor: pointer;
+}
+.row canvas { width: 26px; height: 26px; image-rendering: pixelated; }
+.row .who { font-weight: 700; }
+.row .sub { color: var(--muted); font-size: 11px; margin-left: auto; }
+.row[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--btn-bg); }
+.row:disabled { opacity: 0.4; cursor: default; }
+.row .price { color: var(--gold); font-weight: 700; font-size: 12px; }

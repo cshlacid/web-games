@@ -73,7 +73,8 @@ function createRun(stage, opts) {
     heroUsed: false,
     stats: {
       livesLost: 0, goldSpent: 0, upgrades: 0, sold: 0,
-      kinds: {}, placed: 0, heroUsed: false, bossAt: null, time: 0, goldLeft: 0,
+      kinds: {}, placed: 0, heroUsed: false, bossFrom: null, bossAt: null, time: 0, goldLeft: 0,
+      items: 0,
     },
   };
 }
@@ -173,6 +174,8 @@ function spawn(run, foeKey, hp) {
     from, to: null, p: 0, slowT: 0, slowBy: 1,
   };
   run.foes.push(foe);
+  // 참수 목표가 재는 것은 우두머리가 나온 뒤의 시간이다.
+  if (foeKey === 'boss' && run.stats.bossFrom == null) run.stats.bossFrom = run.time;
   emit(run, { type: 'spawn', key: foeKey, x: from.x, y: from.y });
 }
 
@@ -379,6 +382,49 @@ function finish(run, how) {
   emit(run, { type: 'over', how });
 }
 
+// 1회용 아이템. 벽에 부딪힌 스테이지를 넘는 수단이라, 막혔을 때 할 일이 파밍이
+// 아니라 판단이 된다. 아이템을 가지고 있는지는 meta.js가 세고 여기서는 효과만 낸다.
+const ITEMS = {
+  bomb: { name: '폭탄', note: '모든 적의 체력을 35% 깎는다' },
+  freeze: { name: '얼림', note: '3초 동안 모두 멈춘다' },
+  purse: { name: '보급', note: '골드 120' },
+  mend: { name: '구호', note: '목숨 하나를 되돌린다' },
+  order: { name: '명령서', note: '한 사람을 빈 칸으로 옮긴다' },
+};
+
+function useItem(run, id, target) {
+  if (run.over || !ITEMS[id]) return false;
+  if (id === 'bomb') {
+    if (!run.foes.length) return false;
+    for (const e of run.foes) if (!e.dead) hurt(run, e, e.max * 0.35, true);
+    sweep(run);
+  } else if (id === 'freeze') {
+    if (!run.foes.length) return false;
+    for (const e of run.foes) { e.slowT = 3; e.slowBy = 0; }
+  } else if (id === 'purse') {
+    run.gold += 120;
+  } else if (id === 'mend') {
+    run.lives += 1;
+  } else if (id === 'order') {
+    // 옮기는 것도 세우는 것과 같은 자리 규칙을 탄다 — 적이 밟은 칸은 안 된다.
+    const u = target && run.units.find((e) => e.id === target.id);
+    if (!u) return false;
+    const c = at(run.map, target.x, target.y);
+    if (run.map.walls[c] || run.cells[c] || occupied(run, target.x, target.y)) return false;
+    run.cells[at(run.map, u.x, u.y)] = null;
+    u.x = target.x;
+    u.y = target.y;
+    run.cells[c] = u;
+    // 옮긴 직후에는 잠깐 싸우지 못한다. 아니면 위험할 때마다 옮겨 붙이는 것이
+    // 늘 최선이 된다.
+    u.cd = 1.2;
+    clearFields(run);
+  }
+  run.stats.items++;
+  emit(run, { type: 'item', id });
+  return true;
+}
+
 // 화면이 부르는 자리. 밀린 시간은 버린다.
 function step(run, dt) {
   if (run.over) return drain(run);
@@ -399,7 +445,7 @@ function run(state, seconds) {
 }
 
 const Rules = {
-  TICK, statOf, upCost, createRun, canPlace, place, sell, upgrade,
+  TICK, ITEMS, statOf, upCost, createRun, canPlace, place, sell, upgrade, useItem,
   step, run, foeXY, occupied, fieldFor, lead, drain, spawn, startWave,
 };
 
