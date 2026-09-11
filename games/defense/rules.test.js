@@ -322,6 +322,33 @@ const kept = pricey.gold;
 R.sell(pricey, second.id);
 check('돌려받는 몫은 치른 값 기준', pricey.gold - kept, Math.round(paid * D.RUN.refund));
 
+// --- 단계가 바꾸는 리듬 ---
+// 피해만 오르면 빙결술사처럼 값이 "바닥을 얼려 둔 시간"에 있는 캐릭터는 올려도
+// 체감이 없다.
+const iceOne = R.statOf('frost', 1, {});
+const iceThree = R.statOf('frost', 3, {});
+check('단계를 올리면 쿨타임이 준다', iceThree.skill.cd < iceOne.skill.cd, true);
+check('단계를 올리면 지속이 는다', iceThree.skill.fieldFor > iceOne.skill.fieldFor, true);
+check('얼음이 깔려 있는 비율이 오른다',
+  iceThree.skill.fieldFor / iceThree.skill.cd > iceOne.skill.fieldFor / iceOne.skill.cd, true);
+check('출혈도 길어진다', R.statOf('spear', 3, {}).skill.bleedFor > D.UNITS.spear.skill.bleedFor, true);
+check('기절도 길어진다', R.statOf('shield', 3, {}).skill.stunFor > D.UNITS.shield.skill.stunFor, true);
+check('자료 원본은 그대로다',
+  [D.UNITS.frost.skill.cd, D.UNITS.frost.skill.fieldFor], [9, 4]);
+check('1단계는 자료 그대로', iceOne.skill.cd, D.UNITS.frost.skill.cd);
+
+// 실제로 더 자주 나가는가.
+function zonesIn(tier, seconds) {
+  const r = make(field, { mods: { startGold: 10 } });
+  r.timer = 9999;
+  const u = R.place(r, 'frost', 2, 0);
+  u.tier = tier;
+  stand(r, 'grunt', 900000, 2, 2);
+  R.run(r, seconds);
+  return r.stats.skills;
+}
+check('3단계가 1단계보다 자주 깐다', zonesIn(3, 30) > zonesIn(1, 30), true);
+
 // --- 기여도 ---
 // 판이 끝난 뒤 "누가 얼마나 했는가"를 읽는 자료. 리포트가 이것만 본다.
 const credit = make(field, { mods: { startGold: 10 } });

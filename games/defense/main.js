@@ -309,12 +309,18 @@ function hud() {
     const wait = Math.max(0, picked.scd);
     el.barName.textContent = `${d.name} ${picked.tier}단계`;
     // 지금 수치를 그대로 적는다. 스킬 칸은 힐러만 회복량이고 나머지는 한 방 피해다.
-    const power = d.skill.shape === 'heal'
-      ? `회복 <b>${num(d.skill.heal * (run.mods.heal == null ? 1 : run.mods.heal))}</b>`
-      : `<b>${num(now.damage * (d.skill.mul == null ? 1 : d.skill.mul))}</b>`;
+    // 얼음 지대는 한 방의 크기가 아니라 **초당 얼마를 깎는가**가 뜻 있는 값이다.
+    const sk = now.skill;
+    const power = sk.shape === 'heal'
+      ? `회복 <b>${num(sk.heal * (run.mods.heal == null ? 1 : run.mods.heal))}</b>`
+      : (sk.shape === 'field'
+        ? `초당 <b>${num(now.damage * sk.fieldDps)}</b>`
+        : `<b>${num(now.damage * (sk.mul == null ? 1 : sk.mul))}</b>`);
+    const hold = now.skill.fieldFor || now.skill.bleedFor || now.skill.stunFor;
     el.barStats.innerHTML = `체력 <b>${Math.round(picked.hp)}/${now.hp}</b> · `
       + `공격 <b>${num(now.damage)}</b> · 사거리 <b>${d.range.min}-${d.range.max}</b><br>`
-      + `${d.skill.name} ${power} · 쿨타임 ${d.skill.cd}초 · `
+      + `${d.skill.name} ${power} · 쿨타임 <b>${num(now.skill.cd)}초</b>`
+      + (hold ? ` · 지속 <b>${num(hold)}초</b>` : '') + ' · '
       + (wait > 0.1 ? `<b>${Math.ceil(wait)}초 남음</b>` : '<b>준비됨</b>');
     const top = picked.tier >= D.UP.max;
     const cost = R.upCost(picked.key, picked.tier);
@@ -324,8 +330,12 @@ function hud() {
     } else {
       // 값을 치르기 전에 무엇이 얼마나 오르는지 나란히 보여 준다.
       const next = R.statOf(picked.key, picked.tier + 1, run.mods);
-      el.barUp.innerHTML = `<b>올리기 ${cost}</b><span>공격 ${num(now.damage)}→${num(next.damage)}`
-        + ` · 체력 ${now.hp}→${next.hp} · 사거리 +${(next.far - now.far).toFixed(1)}칸</span>`;
+      const nextHold = next.skill.fieldFor || next.skill.bleedFor || next.skill.stunFor;
+      el.barUp.innerHTML = `<b>올리기 ${cost}</b>`
+        + `<span>공격 ${num(now.damage)}→${num(next.damage)} · 체력 ${now.hp}→${next.hp}`
+        + ` · 사거리 +${(next.far - now.far).toFixed(1)}칸</span>`
+        + `<span>쿨타임 ${num(now.skill.cd)}→${num(next.skill.cd)}초`
+        + (hold ? ` · 지속 ${num(hold)}→${num(nextHold)}초` : '') + '</span>';
     }
     el.barSell.textContent = `해고 +${Math.round((picked.paid || d.cost) * D.RUN.refund)}`;
   }

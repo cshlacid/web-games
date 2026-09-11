@@ -40,8 +40,21 @@ function statOf(key, tier, mods) {
     near: Math.max(0, d.range.min - 0.5),
     far: d.range.max + 0.5 + D.UP.range * step + (mods.range || 0),
     rate: d.rate,
-    skill: d.skill,
+    // 스킬은 단계에 따라 리듬이 바뀌므로 그때그때 만들어 준다. 원본을 건드리면
+    // 판마다 값이 누적된다.
+    skill: skillAt(d.skill, step),
   };
+}
+
+function skillAt(sk, step) {
+  if (!step) return sk;
+  const cd = Math.pow(D.UP.cd, step);
+  const hold = Math.pow(D.UP.hold, step);
+  const got = { ...sk, cd: sk.cd * cd };
+  if (sk.fieldFor) got.fieldFor = sk.fieldFor * hold;
+  if (sk.bleedFor) got.bleedFor = sk.bleedFor * hold;
+  if (sk.stunFor) got.stunFor = sk.stunFor * hold;
+  return got;
 }
 
 const inRange = (stat, dist) => dist <= stat.far && dist >= stat.near;
