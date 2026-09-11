@@ -23,6 +23,7 @@
 | [야추](games/yacht/) | 주사위 다섯 개를 굴려 상대와 점수를 겨룬다 | 순수 HTML/CSS/JS |
 | [노노그램](games/nonogram/) | 가장자리 숫자대로 칠해 숨은 그림을 찾는다 | 순수 HTML/CSS/JS |
 | [차 빼기](games/rushhour/) | 막힌 차들을 밀어 빨간 차를 빼낸다 | 순수 HTML/CSS/JS |
+| [길목 지키기](games/defense/) | 길목에 사람을 세워 밀려오는 적을 막는다 | 순수 HTML/CSS/JS |
 
 ## 로컬에서 실행
 
@@ -83,6 +84,13 @@ node games/nonogram/generator.test.js
 node games/rushhour/rules.test.js
 node games/rushhour/solver.test.js
 node games/rushhour/generator.test.js
+node games/defense/mapgen.test.js
+node games/defense/paths.test.js
+node games/defense/waves.test.js
+node games/defense/rules.test.js
+node games/defense/goals.test.js
+node games/defense/meta.test.js
+node games/defense/balance.test.js
 ```
 
 ## 구조
