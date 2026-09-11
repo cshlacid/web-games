@@ -35,6 +35,7 @@ for (const [name, id] of [
 const ctx = el.canvas.getContext('2d');
 const PITCH = { archer: 720, shield: 300, cannon: 200, frost: 880, spear: 420, healer: 560 };
 const SHOT_LIFE = 0.1;
+const POP_LIFE = 0.3;
 
 let save = T.load();
 let stage = 1;
@@ -46,6 +47,7 @@ let picked = null;   // 판에서 고른 사람
 let press = null;    // 누르고 있는 동안의 미리보기
 let order = null;    // 명령서로 옮기는 중
 let shots = [];
+let pops = [];
 let cell = 40;
 let body = 32;
 let theme = {};
@@ -147,10 +149,14 @@ function paint() {
       ctx.lineWidth = 2;
       ctx.strokeRect(u.x * cell + 2, u.y * cell + 2, cell - 4, cell - 4);
       // 사거리는 고른 순간에만 보여 준다 — 늘 그리면 판이 원으로 덮인다.
+      // **안쪽 한계가 있으면 도넛으로 그린다.** 포수가 코앞을 못 친다는 것을
+      // 글로 적어 두는 것보다 이 구멍 하나가 잘 알린다.
+      const stat = R.statOf(u.key, u.tier, run.mods);
       ctx.globalAlpha = 0.18;
       ctx.beginPath();
-      ctx.arc(cx, cy, R.statOf(u.key, u.tier, run.mods).range * cell, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.arc(cx, cy, stat.far * cell, 0, Math.PI * 2);
+      if (stat.near > 0.6) ctx.arc(cx, cy, stat.near * cell, 0, Math.PI * 2, true);
+      ctx.fill('evenodd');
       ctx.globalAlpha = 1;
     }
     SP.draw(ctx, u.key, cx, cy - 1, body);
@@ -172,6 +178,21 @@ function paint() {
     ctx.strokeRect(press.x * cell + 2, press.y * cell + 2, cell - 4, cell - 4);
   }
 
+  for (const z of run.zones) {
+    ctx.globalAlpha = Math.min(0.42, 0.14 + z.t * 0.09);
+    ctx.fillStyle = SP.TINT.frost.light;
+    ctx.beginPath();
+    ctx.arc(z.x * cell + cell / 2, z.y * cell + cell / 2, z.r * cell, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 0.7;
+    ctx.strokeStyle = SP.TINT.frost.main;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 4]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
+  }
+
   for (const e of run.foes) {
     const p = R.foeXY(e);
     const cx = p.x * cell + cell / 2;
@@ -186,7 +207,31 @@ function paint() {
       ctx.arc(cx, cy, size * 0.52, 0, Math.PI * 2);
       ctx.stroke();
     }
+    if (e.bleed) {
+      ctx.fillStyle = SP.TINT.spear.main;
+      ctx.beginPath();
+      ctx.arc(cx + size * 0.32, cy + size * 0.3, 2.6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    if (e.stunT > 0) {
+      ctx.strokeStyle = theme.gold;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(cx, cy - size * 0.55, size * 0.22, 0.2, Math.PI - 0.2);
+      ctx.stroke();
+    }
   }
+
+  for (const p of pops) {
+    const grow = 1 - p.t / POP_LIFE;
+    ctx.globalAlpha = Math.max(0, p.t / POP_LIFE) * 0.9;
+    ctx.strokeStyle = p.kind === 'crit' ? theme.life : theme.gold;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(p.x * cell + cell / 2, p.y * cell + cell / 2, cell * (0.2 + grow * 0.32), 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
 
   for (const s of shots) {
     ctx.globalAlpha = Math.max(0, s.t / SHOT_LIFE) * 0.85;
@@ -236,7 +281,7 @@ function hud() {
   el.bar.hidden = !picked;
   if (picked) {
     const d = D.UNITS[picked.key];
-    el.barName.textContent = `${d.name} ${picked.tier}단계`;
+    el.barName.textContent = `${d.name} ${picked.tier}단계 · 사거리 ${d.range.min}-${d.range.max}`;
     const top = picked.tier >= D.UP.max;
     el.barUp.disabled = top || run.gold < R.upCost(picked.key, picked.tier);
     el.barUp.textContent = top ? '끝까지 올렸다' : `올리기 ${R.upCost(picked.key, picked.tier)}`;
@@ -253,6 +298,8 @@ function handle(events) {
       if (now - lastShotSound > 70) { Sound.play('shot', PITCH[ev.key] || 660); lastShotSound = now; }
     } else if (ev.type === 'heal') {
       shots.push({ from: ev.from, to: ev.to, t: SHOT_LIFE * 2, kind: 'heal' });
+    } else if (ev.type === 'crit' || ev.type === 'stun') {
+      pops.push({ x: ev.x, y: ev.y, t: POP_LIFE, kind: ev.type });
     } else if (ev.type === 'kill') {
       if (now - lastShotSound > 40) Sound.play('kill');
     } else if (ev.type === 'down') {
@@ -324,7 +371,7 @@ function buildPalette() {
     cost.className = 'cost';
     cost.textContent = String(d.cost);
     node.appendChild(cost);
-    node.title = `${d.name} — ${d.note}`;
+    node.title = `${d.name} · 사거리 ${d.range.min}-${d.range.max} — ${d.note}`;
     node.addEventListener('click', () => {
       chosen = chosen === key ? null : key;
       picked = null;
@@ -379,6 +426,7 @@ function newRun(next) {
   press = null;
   order = null;
   shots = [];
+  pops = [];
   el.result.hidden = true;
   el.cards.hidden = true;
   el.again.disabled = false;
@@ -402,6 +450,8 @@ function frame(now) {
   }
   for (const s of shots) s.t -= dt;
   if (shots.length) shots = shots.filter((s) => s.t > 0);
+  for (const p of pops) p.t -= dt;
+  if (pops.length) pops = pops.filter((p) => p.t > 0);
   if (toastUntil && now > toastUntil) { el.toast.textContent = ''; toastUntil = 0; }
   paint();
   hud();

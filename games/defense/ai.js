@@ -32,16 +32,16 @@ function freeCells(run, key) {
 }
 
 // 그 자리에서 길을 몇 칸이나 볼 수 있는가. 사거리 안에 든 길 칸을 센다.
-function coverage(run, route, x, y, range) {
+function coverage(run, route, x, y, stat) {
   let n = 0;
-  for (const c of route) if (Math.hypot(c.x - x, c.y - y) <= range) n++;
+  for (const c of route) if (R.inRange(stat, Math.hypot(c.x - x, c.y - y))) n++;
   return n;
 }
 
 function bestSpot(run, key, style) {
   const route = P.route(run.map, R.fieldFor(run, 'grunt'), run.map.entry);
   const onPath = new Set(route.map((c) => `${c.x},${c.y}`));
-  const range = R.statOf(key, 1, run.mods).range;
+  const stat = R.statOf(key, 1, run.mods);
   let best = null;
   for (const c of freeCells(run, key)) {
     const here = onPath.has(`${c.x},${c.y}`);
@@ -49,7 +49,7 @@ function bestSpot(run, key, style) {
     // 죽으라고 내보내는 꼴이라, 그것을 봉쇄 전략이라고 부를 수 없다.
     const mayBlock = style === 'wall' && key === 'shield';
     if (mayBlock !== here) continue;
-    const score = coverage(run, route, c.x, c.y, range) + (here ? 3 : 0);
+    const score = coverage(run, route, c.x, c.y, stat) + (here ? 3 : 0);
     if (score <= 0) continue;
     if (!best || score > best.score) best = { x: c.x, y: c.y, score };
   }

@@ -111,31 +111,139 @@ R.run(broken, 60);
 check('다 부수면 그 사람은 사라진다', broken.units.includes(frail), false);
 check('부수고 나면 지나간다', broken.stats.livesLost, 1);
 
-// --- 성격 ---
-const armor = make(field);
-const spear = R.statOf('spear', 1, {});
-const archer = R.statOf('archer', 1, {});
-const pierced = make(field);
-R.spawn(armor, 'armored', 100);
-R.spawn(pierced, 'armored', 100);
-const a0 = armor.foes[0].hp;
-armor.foes[0].hp -= Math.max(1, archer.damage - D.FOES.armored.armor);
-pierced.foes[0].hp -= Math.max(1, spear.damage);
-check('중장병에게는 방어만큼 덜 들어간다', a0 - armor.foes[0].hp, archer.damage - D.FOES.armored.armor);
-check('창병은 방어를 무시한다', a0 - pierced.foes[0].hp, spear.damage);
+// --- 사거리 ---
+// 적을 원하는 칸에 세워 놓고 본다. 한 틱만 밀면 그 자리에서 무슨 일이 나는지
+// 그대로 드러난다.
+// `hold`를 주면 그 자리에 붙들어 둔다. 걷게 두면 몇 초 만에 사거리를 벗어나
+// 무엇을 재고 있었는지 알 수 없게 된다.
+function stand(run, key, hp, x, y, hold = true) {
+  R.spawn(run, key, hp);
+  const e = run.foes[run.foes.length - 1];
+  e.from = { x, y };
+  e.to = null;
+  e.p = 0;
+  if (hold) e.stunT = 9999;
+  return e;
+}
 
-const slow = make(field);
-R.place(slow, 'frost', 2, 1);
-R.spawn(slow, 'grunt', 400);
-R.run(slow, 4);
-check('빙결술사는 느리게 만든다', slow.foes[0].slowT > 0, true);
+const reach = make(field, { mods: { startGold: 10 } });
+reach.timer = 9999;
+const gunner = R.place(reach, 'cannon', 2, 2);
+const hugging = stand(reach, 'grunt', 400, 2, 3);   // 바로 옆
+R.run(reach, 4);
+check('포수는 코앞의 적을 못 친다', hugging.hp, hugging.max);
 
+const afar = make(field, { mods: { startGold: 10 } });
+afar.timer = 9999;
+R.place(afar, 'cannon', 2, 0);
+const away = stand(afar, 'grunt', 400, 2, 3);
+R.run(afar, 4);
+check('포수는 떨어진 적을 친다', away.hp < away.max, true);
+check('안쪽 한계는 자료에서 나온다', R.statOf('cannon', 1, {}).near, D.UNITS.cannon.range.min - 0.5);
+check('붙어 있으면 사거리 밖', R.inRange(R.statOf('cannon', 1, {}), 1), false);
+check('두 칸부터 사거리 안', R.inRange(R.statOf('cannon', 1, {}), 2), true);
+check('궁수는 네 칸까지', R.inRange(R.statOf('archer', 1, {}), 4), true);
+check('대각선 이웃도 한 칸으로 친다', R.inRange(R.statOf('shield', 1, {}), Math.SQRT2), true);
+check('다섯 칸은 못 친다', R.inRange(R.statOf('archer', 1, {}), 5), false);
+check('단계를 올려도 안쪽 한계는 그대로', R.statOf('cannon', 3, {}).near, R.statOf('cannon', 1, {}).near);
+check('단계를 올리면 바깥은 늘어난다', R.statOf('cannon', 3, {}).far > R.statOf('cannon', 1, {}).far, true);
+
+// --- 관통과 출혈 ---
+const row = make(field, { mods: { startGold: 10 } });
+row.timer = 9999;
+R.place(row, 'spear', 2, 0);
+const front = stand(row, 'grunt', 400, 2, 1);
+const behind = stand(row, 'grunt', 400, 2, 2);
+const aside = stand(row, 'grunt', 400, 0, 2);
+for (let i = 0; i < 4; i++) R.step(row, R.TICK);
+check('창은 한 줄을 꿰뚫는다', [front.hp < front.max, behind.hp < behind.max], [true, true]);
+check('줄 밖은 맞지 않는다', aside.hp, aside.max);
+
+const bleeding = make(field, { mods: { startGold: 10 } });
+bleeding.timer = 9999;
+R.place(bleeding, 'spear', 2, 0);
+const cut = stand(bleeding, 'armored', 400, 2, 1);
+R.run(bleeding, 1);
+const afterHit = cut.hp;
+cut.bleed = { dps: D.UNITS.spear.skill.bleedDps, t: 1 };
+const beforeBleed = cut.hp;
+R.run(bleeding, 1.2);
+check('출혈은 시간이 지나며 깎는다', cut.hp < beforeBleed, true);
+check('출혈은 방어를 무시한다',
+  Math.abs((beforeBleed - cut.hp) - D.UNITS.spear.skill.bleedDps) < 2.5, true);
+check('맞은 적에게 출혈이 붙는다', afterHit < cut.max, true);
+
+// **지속 피해에는 최소 1이 붙지 않는다.** 틱마다 1이 들어가면 초당 서른이 된다.
+const drip = make(field);
+const slowly = stand(drip, 'grunt', 1000, 1, 1);
+const was = slowly.hp;
+for (let i = 0; i < 30; i++) {
+  slowly.bleed = { dps: 3, t: 9 };
+  R.step(drip, R.TICK);
+}
+check('한 틱에 들어가는 지속 피해는 값 그대로', was - slowly.hp < 6, true);
+
+// --- 기절 ---
+const held = make(hall, { mods: { startGold: 10 }, seed: 5 });
+held.timer = 9999;
+R.place(held, 'shield', 1, 2);
+stand(held, 'grunt', 4000, 1, 1, false);
+R.run(held, 25);
+check('방패병은 적을 기절시킨다', held.stats.stuns > 0, true);
+
+// --- 치명타 ---
+const sniping = make(field, { mods: { startGold: 10 }, seed: 3 });
+sniping.timer = 9999;
+R.place(sniping, 'archer', 2, 0);
+stand(sniping, 'grunt', 6000, 2, 2);
+R.run(sniping, 30);
+check('궁수는 치명타를 낸다', sniping.stats.crits > 0, true);
+
+function crits(seed) {
+  const r = make(field, { mods: { startGold: 10 }, seed });
+  r.timer = 9999;
+  R.place(r, 'archer', 2, 0);
+  stand(r, 'grunt', 6000, 2, 2);
+  R.run(r, 30);
+  return r.stats.crits;
+}
+check('같은 씨드면 굴림도 같다', crits(11), crits(11));
+check('씨드가 다르면 굴림도 다르다', crits(11) === crits(12), false);
+
+// --- 바닥 얼음 ---
+const icy = make(field, { mods: { startGold: 10 } });
+icy.timer = 9999;
+R.place(icy, 'frost', 2, 0);
+const chilled = stand(icy, 'grunt', 4000, 2, 2);
+R.run(icy, 3);
+check('빙결술사는 바닥을 깐다', icy.zones.length > 0, true);
+check('밟은 적은 느려진다', chilled.slowT > 0, true);
+check('밟은 적은 깎인다', chilled.hp < chilled.max, true);
+check('얼음이 무한히 쌓이지는 않는다', icy.zones.length <= 12, true);
+
+const melt = make(field, { mods: { startGold: 10 } });
+melt.timer = 9999;
+R.place(melt, 'frost', 2, 0);
+stand(melt, 'grunt', 4000, 2, 2);
+R.run(melt, 2);
+melt.foes.length = 0;
+R.run(melt, 2 + D.UNITS.frost.skill.fieldFor + 1);
+check('시간이 지나면 얼음이 녹는다', melt.zones.length, 0);
+
+// --- 회복 ---
 const heal = make(field, { mods: { startGold: 3 } });
 const hurt = R.place(heal, 'shield', 2, 2);
 R.place(heal, 'healer', 2, 3);
 hurt.hp = 10;
 R.run(heal, 5);
 check('힐러는 아군을 되살린다', hurt.hp > 10, true);
+
+const tooFar = make(field, { mods: { startGold: 3 } });
+const lonely = R.place(tooFar, 'shield', 0, 0);
+R.place(tooFar, 'healer', 4, 4);
+lonely.hp = 10;
+R.run(tooFar, 5);
+check('사거리 밖은 되살리지 못한다', lonely.hp, 10);
 
 // --- 골드와 승패 ---
 const bounty = make(field);

@@ -12,30 +12,48 @@
 //
 // 값에 이론은 없다. 웨이브 열 개를 3~4분에 끝내는 것을 목표로 잡은 출발점이고,
 // 실제 값은 `balance.test.js`의 자동 플레이로 맞춘다.
+// **사거리는 안쪽과 바깥쪽 둘이다.** 포수는 2~5라 코앞의 적을 못 친다 — 바깥에서
+// 때리는 자리와 앞을 막는 자리가 갈리는 것이 이 게임의 배치다. `min`은 사람이 읽는
+// 값이고 판정에서 쓰는 안쪽 한계는 `min - 1`이다(1이면 붙어 있어도 친다).
+//
+// `shape`가 공격이 닿는 모양, `skill`이 그 위에 얹히는 것이다. 값에 이론은 없고
+// `balance.test.js`의 자동 플레이로 맞춘다.
 const UNITS = {
   archer: {
-    name: '궁수', cost: 60, damage: 12, range: 2.6, rate: 1.1, hp: 60, kind: 'single',
-    note: '한 놈씩 빠르게. 처음부터 있는 하나',
+    name: '궁수', cost: 60, damage: 9, rate: 1.1, hp: 60,
+    range: { min: 1, max: 4 }, shape: 'single',
+    skill: { crit: 0.25, critMul: 2 },
+    note: '멀리서 한 놈씩. 치명타가 터진다',
   },
   shield: {
-    name: '방패병', cost: 70, damage: 4, range: 1.2, rate: 1.0, hp: 320, kind: 'single',
-    note: '길을 막고 버틴다. 공격은 거들 뿐',
+    name: '방패병', cost: 70, damage: 4, rate: 1.0, hp: 320,
+    range: { min: 1, max: 1 }, shape: 'single',
+    skill: { stun: 0.22, stunFor: 0.8 },
+    note: '앞을 막고 기절시킨다. 공격은 거들 뿐',
   },
   cannon: {
-    name: '포수', cost: 110, damage: 18, range: 2.4, rate: 0.55, hp: 70, kind: 'splash',
-    splash: 1.1, note: '한 발이 주변까지. 무리에 강하다',
+    name: '포수', cost: 110, damage: 26, rate: 0.4, hp: 70,
+    range: { min: 2, max: 5 }, shape: 'splash',
+    skill: { splash: 1.2 },
+    note: '느리지만 한 발이 주변까지. 코앞은 못 친다',
   },
   frost: {
-    name: '빙결술사', cost: 90, damage: 4, range: 2.6, rate: 0.8, hp: 55, kind: 'slow',
-    slow: 0.45, slowFor: 1.6, note: '피해 대신 시간을 번다',
+    name: '빙결술사', cost: 90, damage: 3, rate: 0.6, hp: 55,
+    range: { min: 1, max: 3 }, shape: 'field',
+    skill: { fieldR: 1.1, fieldDps: 7, fieldFor: 3, slow: 0.5 },
+    note: '바닥을 얼려 둔다. 밟는 동안 깎이고 느려진다',
   },
   spear: {
-    name: '창병', cost: 90, damage: 14, range: 1.6, rate: 0.9, hp: 110, kind: 'pierce',
-    note: '방어를 무시한다. 중장병 전용',
+    name: '창병', cost: 90, damage: 12, rate: 0.9, hp: 110,
+    range: { min: 1, max: 2 }, shape: 'line',
+    skill: { bleedDps: 6, bleedFor: 3 },
+    note: '한 줄로 꿰뚫고 출혈을 남긴다',
   },
   healer: {
-    name: '힐러', cost: 100, damage: 0, range: 2.2, rate: 1.4, hp: 70, kind: 'heal',
-    heal: 25, note: '주변 아군을 되살린다. 방패병과 짝',
+    name: '힐러', cost: 100, damage: 0, rate: 1.4, hp: 70,
+    range: { min: 1, max: 3 }, shape: 'heal',
+    skill: { heal: 25 },
+    note: '주변 아군을 되살린다. 방패병과 짝',
   },
 };
 
@@ -50,8 +68,12 @@ const UP = {
   cost: [1.0, 1.6],   // 2단계, 3단계로 올리는 값 (고용비 배수)
   damage: 1.6,
   hp: 1.5,
-  range: 0.3,
+  range: 0.4,         // 바깥쪽만 늘어난다. 안쪽 한계는 그대로 둔다
 };
+
+// **지속 피해는 방어를 무시한다.** 출혈과 바닥 얼음이 여기 걸린다 — 창병이
+// 중장병을 맡는 자리가 이 한 줄에서 나온다. 직접 때리는 값만 방어에 깎인다.
+const DOT_PIERCES = true;
 
 // 적. hp는 그 스테이지 기준 체력에 곱하는 배수다.
 //
@@ -81,7 +103,7 @@ const RUN = {
   refund: 0.6,    // 해고했을 때 돌려받는 비율
 };
 
-const Data = { UNITS, STARTER, LOCKED, UP, FOES, FOE_FROM, RUN };
+const Data = { UNITS, STARTER, LOCKED, UP, DOT_PIERCES, FOES, FOE_FROM, RUN };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = Data;
 if (typeof window !== 'undefined') window.DefenseData = Data;
