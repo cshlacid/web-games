@@ -74,13 +74,17 @@ const UNITS = {
 // 따로 한 칸을 차지한다.
 const HEROES = {
   blade: {
-    name: '검성', cost: 220, damage: 26, rate: 1.2, hp: 500, hero: true,
+    name: '검성', who: '레안', cost: 220, damage: 26, rate: 1.2, hp: 500, hero: true,
     range: { min: 1, max: 1 },
+    // **기본 공격도 둘레를 벤다.** 회전베기가 도는 5초 사이에는 한 놈씩 때리는
+    // 창병과 다를 것이 없었다. 반지름 1.1이라 대각선(1.41)은 빠지고 맞닿은 넷만
+    // 맞는다 — 스킬(1.7)이 더 넓은 자리는 그대로 남는다.
+    basic: { shape: 'ring', ring: 1.1 },
     skill: { name: '회전베기', cd: 5, shape: 'ring', mul: 1.6, ring: 1.7, note: '둘레를 통째로 벤다' },
     note: '길목에 서서 베고 버틴다',
   },
   arch: {
-    name: '대마법사', cost: 260, damage: 28, rate: 0.55, hp: 90, hero: true,
+    name: '대마법사', who: '모르윈', cost: 260, damage: 28, rate: 0.55, hp: 90, hero: true,
     range: { min: 2, max: 6 },
     // **기본 공격부터 범위다.** 영웅인데 한 놈씩 때리는 초당 11이라 궁수와 다를 것이
     // 없었다. 범위는 `single`이 아니라 `area`로 들어가므로 중장병의 저항도 타지
@@ -93,8 +97,12 @@ const HEROES = {
     note: '판 끝에서 끝까지 닿는다. 코앞은 못 친다',
   },
   saint: {
-    name: '성기사', cost: 240, damage: 14, rate: 1, hp: 260, hero: true,
+    name: '성기사', who: '가론', cost: 240, damage: 18, rate: 1, hp: 260, hero: true,
     range: { min: 1, max: 4 },
+    // **때리면서 되살린다.** 치유의 빛이 6초에 한 번이라 그 사이에는 공격력 14짜리
+    // 잡캐였다. 회복량은 고정값이 아니라 제 공격력에 대한 비율이라 레벨을 따라
+    // 같이 오른다.
+    basic: { shape: 'smite', heal: 0.9 },
     skill: { name: '치유의 빛', cd: 6, shape: 'heal', heal: 110, all: true, note: '둘레의 아군을 한꺼번에' },
     note: '옆을 통째로 되살리고 같이 싸운다',
   },

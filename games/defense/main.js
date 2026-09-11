@@ -59,6 +59,21 @@ const idx = (x, y) => y * run.map.w + x;
 // 100 아래에서는 소수 한 자리까지 적는다. 레벨 하나가 올리는 폭이 그 자리에 있어,
 // 반올림해 버리면 올려도 숫자가 그대로인 것처럼 보인다.
 const num = (v) => (v >= 100 ? String(Math.round(v)) : v.toFixed(1));
+
+// **영웅은 제 이름을 가진다.** 직함만 적으면 셋이 "영웅"으로 뭉뚱그려져 어느 판에
+// 누구를 꺼냈는지 기억에 남지 않는다. 일반 캐릭터는 직함이 곧 이름이다.
+const who = (key) => {
+  const d = D.UNITS[key];
+  return d.who ? `${d.name} ${d.who}` : d.name;
+};
+
+// 기본 공격의 모양을 적지 않는 캐릭터가 대부분이라, 다른 자들만 꼬리표를 단다.
+const BASIC_TAG = { splash: '(범위)', ring: '(둘레)', smite: '(+회복)' };
+const BASIC_NOTE = {
+  splash: '기본 공격이 범위',
+  ring: '기본 공격도 둘레를 벤다',
+  smite: '기본 공격도 아군을 되살린다',
+};
 const big = (v) => Math.round(v).toLocaleString('ko-KR');
 // 단추와 목록의 작은 그림은 배경으로 얹는다 — 시트가 아직 안 왔어도 브라우저가
 // 알아서 채운다.
@@ -307,7 +322,7 @@ function hud() {
     const d = D.UNITS[picked.key];
     const now = R.statOf(picked.key, picked.tier, run.mods);
     const wait = Math.max(0, picked.scd);
-    el.barName.textContent = `${d.name} ${picked.tier}단계`;
+    el.barName.textContent = `${who(picked.key)} ${picked.tier}단계`;
     // 지금 수치를 그대로 적는다. 스킬 칸은 힐러만 회복량이고 나머지는 한 방 피해다.
     // 얼음 지대는 한 방의 크기가 아니라 **초당 얼마를 깎는가**가 뜻 있는 값이다.
     const sk = now.skill;
@@ -318,7 +333,7 @@ function hud() {
         : `<b>${num(now.damage * (sk.mul == null ? 1 : sk.mul))}</b>`);
     const hold = now.skill.fieldFor || now.skill.bleedFor || now.skill.stunFor;
     el.barStats.innerHTML = `체력 <b>${Math.round(picked.hp)}/${now.hp}</b> · `
-      + `공격 <b>${num(now.damage)}</b>${now.basic.shape === 'splash' ? '(범위)' : ''} · 사거리 <b>${d.range.min}-${d.range.max}</b><br>`
+      + `공격 <b>${num(now.damage)}</b>${BASIC_TAG[now.basic.shape] || ''} · 사거리 <b>${d.range.min}-${d.range.max}</b><br>`
       + `${d.skill.name} ${power} · 쿨타임 <b>${num(now.skill.cd)}초</b>`
       + (hold ? ` · 지속 <b>${num(hold)}초</b>` : '') + ' · '
       + (wait > 0.1 ? `<b>${Math.ceil(wait)}초 남음</b>` : '<b>준비됨</b>');
@@ -359,7 +374,7 @@ function handle(events) {
       if (now - lastShotSound > 40) Sound.play('kill');
     } else if (ev.type === 'down') {
       Sound.play('down');
-      toast(`${D.UNITS[ev.key].name}이(가) 무너졌다`);
+      toast(`${who(ev.key)}이(가) 무너졌다`);
     } else if (ev.type === 'leak') {
       Sound.play('leak');
       toast(ev.lost > 1 ? `우두머리가 지나갔다 · 목숨 −${ev.lost}` : '적이 지나갔다');
@@ -390,7 +405,7 @@ function showReport() {
     if (r.t.skills) bits.push(`스킬 ${r.t.skills}`);
     const line = document.createElement('div');
     line.className = 'line';
-    line.innerHTML = `<span class="who">${D.UNITS[r.key].name}</span>`
+    line.innerHTML = `<span class="who">${who(r.key)}</span>`
       + `<span class="bar"><i style="width:${Math.round((r.sum / top) * 100)}%;background:${(SP.TINT[r.key] || {}).main || '#888'}"></i></span>`
       + `<span class="did">${bits.join(' · ') || `${r.t.hired}명 고용`}</span>`;
     el.report.appendChild(line);
@@ -455,8 +470,8 @@ function buildPalette() {
     cost.className = 'cost';
     cost.textContent = String(d.cost);
     node.appendChild(cost);
-    const basic = d.basic && d.basic.shape === 'splash' ? ' · 기본 공격이 범위' : '';
-    node.title = `${d.name} · 사거리 ${d.range.min}-${d.range.max}${basic} · ${d.skill.name}(${d.skill.cd}초)`
+    const basic = d.basic ? ` · ${BASIC_NOTE[d.basic.shape]}` : '';
+    node.title = `${who(key)} · 사거리 ${d.range.min}-${d.range.max}${basic} · ${d.skill.name}(${d.skill.cd}초)`
     + ` — ${d.skill.note} · 같은 종류는 ${D.MOST_OF_KIND}명까지, 겹칠수록 값이 오른다`;
     node.addEventListener('click', () => {
       chosen = chosen === key ? null : key;
@@ -645,7 +660,7 @@ function renderCamp() {
   // 영웅은 아래 제 칸에서 고른다 — 여기에 섞으면 일반 칸을 쓰는 것처럼 보인다.
   for (const key of save.owned.filter((k) => !T.isHero(k))) {
     const on = save.team.includes(key);
-    const node = row(`<span class="who">${D.UNITS[key].name}</span><span class="sub">${on ? '편성됨' : D.UNITS[key].note}</span>`);
+    const node = row(`<span class="who">${who(key)}</span><span class="sub">${on ? '편성됨' : D.UNITS[key].note}</span>`);
     node.prepend(spriteNode(key, 26));
     node.setAttribute('aria-pressed', String(on));
     node.addEventListener('click', () => {
@@ -668,7 +683,7 @@ function renderCamp() {
   }
   for (const key of heroes) {
     const on = save.hero === key;
-    const node = row(`<span class="who">${D.UNITS[key].name}<br><span class="camp-note">${D.UNITS[key].skill.name} · ${D.UNITS[key].note}</span></span>`
+    const node = row(`<span class="who">${who(key)}<br><span class="camp-note">${D.UNITS[key].skill.name} · ${D.UNITS[key].note}</span></span>`
       + `<span class="sub">${on ? '데려감' : `고용 ${D.UNITS[key].cost}`}</span>`);
     node.prepend(spriteNode(key, 26));
     node.setAttribute('aria-pressed', String(on));
@@ -693,7 +708,7 @@ function renderCamp() {
   for (const key of shut) {
     const cost = T.unlockCost(save, key);
     const d = D.UNITS[key];
-    const node = row(`<span class="who">${d.hero ? `영웅 ${d.name}` : d.name}`
+    const node = row(`<span class="who">${d.hero ? `영웅 ${who(key)}` : d.name}`
       + `<br><span class="camp-note">사거리 ${d.range.min}-${d.range.max} · ${d.skill.name} — ${d.skill.note}</span></span>`
       + `<span class="sub price">보석 ${cost}</span>`);
     node.prepend(spriteNode(key, 26));
@@ -713,7 +728,7 @@ function renderCamp() {
     const cost = T.levelCost(save, key);
     const now = R.statOf(key, 1, T.modsOf(save));
     const next = R.statOf(key, 1, T.modsWith(save, key, 1));
-    const node = row(`<span class="who">${D.UNITS[key].name} <span class="camp-note">레벨 ${T.levelOf(save, key)}</span>`
+    const node = row(`<span class="who">${who(key)} <span class="camp-note">레벨 ${T.levelOf(save, key)}</span>`
       + `<br><span class="camp-note">공격 ${num(now.damage)}→${num(next.damage)} · 체력 ${now.hp}→${next.hp}</span></span>`
       + `<span class="sub price">보석 ${cost}</span>`);
     node.prepend(spriteNode(key, 26));

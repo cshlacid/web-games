@@ -336,6 +336,48 @@ const mageStat = R.statOf('arch', 1, mageHeavy.mods);
 check('대마법사의 기본은 중장병의 저항을 안 탄다',
   mageThrough > mageStat.damage * 0.9, true);
 
+// --- 검성의 기본 공격은 둘레다 ---
+// 반지름 1.1이라 맞닿은 칸만 맞고 대각선(1.41)은 빠진다.
+const sweep = make(field, { roster: D.HERO_KEYS, mods: { startGold: 10 } });
+sweep.timer = 9999;
+R.place(sweep, 'blade', 2, 2).scd = 9999;
+const sideA = stand(sweep, 'grunt', 9000, 2, 3);
+const sideB = stand(sweep, 'grunt', 9000, 1, 2);
+const corner = stand(sweep, 'grunt', 9000, 3, 3);
+R.step(sweep, R.TICK);
+check('검성의 기본 공격이 맞닿은 것을 통째로 벤다',
+  [sideA.hp < sideA.max, sideB.hp < sideB.max], [true, true]);
+check('대각선은 기본 공격에 안 맞는다', corner.hp, corner.max);
+
+const bladeHeavy = make(field, { roster: D.HERO_KEYS, mods: { startGold: 10 } });
+bladeHeavy.timer = 9999;
+R.place(bladeHeavy, 'blade', 2, 2).scd = 9999;
+const heavyB = stand(bladeHeavy, 'armored', 90000, 2, 3);
+R.step(bladeHeavy, R.TICK);
+const bladeStat = R.statOf('blade', 1, bladeHeavy.mods);
+check('검성의 기본도 중장병의 저항을 안 탄다',
+  bladeHeavy.foes[0].max - bladeHeavy.foes[0].hp > bladeStat.damage * 0.9, true);
+check('그 적이 중장병이 맞다', heavyB.key, 'armored');
+
+// --- 성기사의 기본 공격은 때리면서 되살린다 ---
+const smite = make(field, { roster: [...D.HERO_KEYS, 'shield'], mods: { startGold: 20 } });
+smite.timer = 9999;
+const wounded = R.place(smite, 'shield', 1, 2);
+R.place(smite, 'saint', 2, 2).scd = 9999;
+wounded.hp = 20;
+const struck = stand(smite, 'grunt', 9000, 2, 3);
+R.step(smite, R.TICK);
+check('성기사의 기본 공격이 적을 친다', struck.hp < struck.max, true);
+check('같은 번에 아군도 되살린다', wounded.hp > 20, true);
+check('기본으로 되살린 양도 기여도에 남는다', R.tally(smite, 'saint').healed > 0, true);
+
+const alone = make(field, { roster: D.HERO_KEYS, mods: { startGold: 10 } });
+alone.timer = 9999;
+R.place(alone, 'saint', 2, 2).scd = 9999;
+const soloTarget = stand(alone, 'grunt', 9000, 2, 3);
+R.step(alone, R.TICK);
+check('되살릴 이가 없어도 공격은 나간다', soloTarget.hp < soloTarget.max, true);
+
 // --- 같은 종류는 여섯까지 ---
 const crowd = make(field, { mods: { startGold: 40 } });
 let put = 0;

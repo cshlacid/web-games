@@ -360,6 +360,44 @@ function useSkill(run, u, stat, target, spot) {
   }
 }
 
+// 기본 공격 한 번. **영웅은 여기서부터 모양이 다르다** — 쿨타임 동안 하는 일이
+// 일반 캐릭터와 같으면 값이 네 배인 이유가 판에서 보이지 않는다.
+function useBasic(run, u, stat, target, spot) {
+  const b = stat.basic;
+  if (b.shape === 'splash') {
+    // 범위는 한 놈씩 때리는 것이 아니라 `area`로 들어가 중장병의 저항을 타지 않는다.
+    hurt(run, target, stat.damage, D.HIT.area, u.key);
+    const r = b.splash * mul(run.mods, 'splash');
+    for (const e of run.foes) {
+      if (e === target || e.dead) continue;
+      const p = foeXY(e);
+      if (Math.hypot(p.x - spot.x, p.y - spot.y) <= r) hurt(run, e, stat.damage * 0.6, D.HIT.area, u.key);
+    }
+  } else if (b.shape === 'ring') {
+    // 스킬의 `ring`과 같이 **표적이 아니라 자기를 가운데로** 삼는다. 길목을 막고
+    // 선 채로 둘러싼 것을 통째로 벤다.
+    hurt(run, target, stat.damage, D.HIT.area, u.key);
+    for (const e of run.foes) {
+      if (e === target || e.dead) continue;
+      const p = foeXY(e);
+      if (Math.hypot(p.x - u.x, p.y - u.y) <= b.ring) hurt(run, e, stat.damage, D.HIT.area, u.key);
+    }
+  } else if (b.shape === 'smite') {
+    // 때리면서 가장 다친 아군을 되살린다. 되살릴 이가 없어도 공격은 나간다.
+    hurt(run, target, stat.damage, D.HIT.single, u.key);
+    const worst = hurtAlly(run, u, stat);
+    if (worst) {
+      const was = worst.hp;
+      worst.hp = Math.min(worst.max, worst.hp + stat.damage * b.heal * mul(run.mods, 'heal'));
+      tally(run, u.key).healed += worst.hp - was;
+      emit(run, { type: 'heal', from: { x: u.x, y: u.y }, to: { x: worst.x, y: worst.y } });
+    }
+  } else {
+    hurt(run, target, stat.damage, D.HIT.single, u.key);
+  }
+  emit(run, { type: 'shot', key: u.key, from: { x: u.x, y: u.y }, to: spot });
+}
+
 // 사거리 안에서 가장 많이 깎인 아군. 힐러의 스킬이 향하는 곳이다.
 function hurtAlly(run, u, stat) {
   let worst = null;
@@ -429,21 +467,9 @@ function tickUnits(run) {
       tally(run, u.key).skills++;
       useSkill(run, u, stat, target, spot);
       emit(run, { type: 'skill', key: u.key, from: { x: u.x, y: u.y }, to: spot });
-    } else if (stat.basic.shape === 'splash') {
-      // 기본 공격부터 범위인 자리. 범위는 한 놈씩 때리는 것이 아니라 `area`로
-      // 들어가 중장병의 저항을 타지 않는다.
-      hurt(run, target, stat.damage, D.HIT.area, u.key);
-      const r = stat.basic.splash * mul(run.mods, 'splash');
-      for (const e of run.foes) {
-        if (e === target || e.dead) continue;
-        const p = foeXY(e);
-        if (Math.hypot(p.x - spot.x, p.y - spot.y) <= r) hurt(run, e, stat.damage * 0.6, D.HIT.area, u.key);
-      }
-      emit(run, { type: 'shot', key: u.key, from: { x: u.x, y: u.y }, to: spot });
     } else {
-      // 쿨타임 중에는 기본 공격. 한 놈만 때린다.
-      hurt(run, target, stat.damage, D.HIT.single, u.key);
-      emit(run, { type: 'shot', key: u.key, from: { x: u.x, y: u.y }, to: spot });
+      // 쿨타임 중에도 가만히 있지 않는다.
+      useBasic(run, u, stat, target, spot);
     }
   }
 }
