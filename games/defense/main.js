@@ -624,7 +624,8 @@ function renderCamp() {
   el.teamCount.textContent = `${save.team.length}/${T.slotsOf(save)}칸`;
 
   el.teamList.textContent = '';
-  for (const key of save.owned) {
+  // 영웅은 아래 제 칸에서 고른다 — 여기에 섞으면 일반 칸을 쓰는 것처럼 보인다.
+  for (const key of save.owned.filter((k) => !T.isHero(k))) {
     const on = save.team.includes(key);
     const node = row(`<span class="who">${D.UNITS[key].name}</span><span class="sub">${on ? '편성됨' : D.UNITS[key].note}</span>`);
     node.prepend(spriteNode(key, 26));

@@ -9,7 +9,10 @@
 // 점으로 끝나 열셋이 서로 비슷해 보여 그만뒀다.
 //
 // **칸 크기와 차례는 `art.js`가 정하고 여기는 같은 값을 적어 둔다.** `art.js`는
-// node에서만 도는 그림 자료라 브라우저가 읽지 않는다. 둘을 바꿀 때는 같이 바꾼다.
+// node에서만 도는 그림 자료라 브라우저가 읽지 않는다. 둘을 바꿀 때는 같이 바꾼다 —
+// **`art.test.js`가 그 둘이 어긋났는지 본다.** 영웅 셋을 그려 놓고 여기에 안 적어
+// 한 번 데었다: 줄 수가 둘로 잡혀 칸마다 아랫줄이 비쳤고, 영웅은 판에서 아예
+// 그려지지 않았다.
 (function () {
 
 const SHEET = {
@@ -19,6 +22,7 @@ const SHEET = {
   order: [
     'archer', 'shield', 'cannon', 'frost', 'spear', 'healer',
     'grunt', 'swarm', 'swift', 'armored', 'breaker', 'mender', 'boss',
+    'blade', 'arch', 'saint',
   ],
 };
 
@@ -37,6 +41,9 @@ const TINT = {
   breaker: { main: '#5e3d4b', light: '#e0555f' },
   mender: { main: '#584a7e', light: '#9fe6b4' },
   boss: { main: '#5a2942', light: '#ff5d4d' },
+  blade: { main: '#8e2f3c', light: '#ffcf5c' },
+  arch: { main: '#5b4a9e', light: '#c8b4ff' },
+  saint: { main: '#e2bd5c', light: '#ffe9a8' },
 };
 
 function slot(key) {

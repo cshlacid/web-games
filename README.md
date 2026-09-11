@@ -91,6 +91,7 @@ node games/defense/rules.test.js
 node games/defense/goals.test.js
 node games/defense/meta.test.js
 node games/defense/balance.test.js
+node games/defense/art.test.js
 ```
 
 ## 구조
