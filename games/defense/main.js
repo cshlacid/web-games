@@ -54,15 +54,12 @@ let lastShotSound = 0;
 let toastUntil = 0;
 
 const idx = (x, y) => y * run.map.w + x;
+// 단추와 목록의 작은 그림은 배경으로 얹는다 — 시트가 아직 안 왔어도 브라우저가
+// 알아서 채운다.
 const spriteNode = (key, side) => {
-  const node = document.createElement('canvas');
-  node.width = 32;
-  node.height = 32;
-  const g = node.getContext('2d');
-  g.imageSmoothingEnabled = false;
-  const art = SP.sprite(key, 2);
-  if (art) g.drawImage(art, 0, 0);
-  if (side) { node.style.width = `${side}px`; node.style.height = `${side}px`; }
+  const node = document.createElement('i');
+  node.className = 'pic';
+  node.setAttribute('style', SP.style(key, side || 30));
   return node;
 };
 
@@ -88,8 +85,10 @@ function layout() {
   el.canvas.width = Math.round(w * dpr);
   el.canvas.height = Math.round(h * dpr);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  // 점 그림이라 흐려지면 안 된다.
-  ctx.imageSmoothingEnabled = false;
+  // 한 칸을 160px로 그려 두고 줄여 쓴다. 폰의 화면 배율이 2~3배라 줄인 그림이
+  // 오히려 선명하다.
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
 }
 
 // 적이 지금 갈 길. 보병 기준으로 그린다 — 종류마다 길이 달라 다 그리면 판이
@@ -106,12 +105,6 @@ function ghostRoute(key, x, y) {
   const cells = run.cells.map((u) => (u ? { hp: u.hp } : null));
   cells[idx(x, y)] = { hp: R.statOf(key, 1, run.mods).hp };
   return routeNow(cells);
-}
-
-function drawSprite(key, cx, cy, size) {
-  const art = SP.sprite(key, 2);
-  if (!art) return;
-  ctx.drawImage(art, Math.round(cx - size / 2), Math.round(cy - size / 2), size, size);
 }
 
 function bar(x, y, w, ratio, color) {
@@ -160,7 +153,7 @@ function paint() {
       ctx.fill();
       ctx.globalAlpha = 1;
     }
-    drawSprite(u.key, cx, cy - 1, body);
+    SP.draw(ctx, u.key, cx, cy - 1, body);
     if (u.hp < u.max) bar(u.x * cell + 4, u.y * cell + cell - 6, cell - 8, u.hp / u.max, theme.exit);
     for (let i = 1; i < u.tier; i++) {
       ctx.fillStyle = theme.gold;
@@ -172,7 +165,7 @@ function paint() {
 
   if (press && press.key) {
     ctx.globalAlpha = press.ok ? 0.55 : 0.25;
-    drawSprite(press.key, press.x * cell + cell / 2, press.y * cell + cell / 2, body);
+    SP.draw(ctx, press.key, press.x * cell + cell / 2, press.y * cell + cell / 2, body);
     ctx.globalAlpha = 1;
     ctx.strokeStyle = press.ok ? theme.fg : theme.entry;
     ctx.lineWidth = 2;
@@ -184,10 +177,10 @@ function paint() {
     const cx = p.x * cell + cell / 2;
     const cy = p.y * cell + cell / 2;
     const size = e.key === 'boss' ? body * 1.35 : (e.key === 'swarm' ? body * 0.78 : body);
-    drawSprite(e.key, cx, cy, size);
+    SP.draw(ctx, e.key, cx, cy, size);
     if (e.hp < e.max) bar(cx - body / 2, cy - size / 2 - 5, body, e.hp / e.max, theme.life);
     if (e.slowT > 0) {
-      ctx.strokeStyle = SP.TINT.frost.a;
+      ctx.strokeStyle = SP.TINT.frost.main;
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.arc(cx, cy, size * 0.52, 0, Math.PI * 2);
@@ -197,7 +190,7 @@ function paint() {
 
   for (const s of shots) {
     ctx.globalAlpha = Math.max(0, s.t / SHOT_LIFE) * 0.85;
-    ctx.strokeStyle = s.kind === 'heal' ? SP.TINT.healer.x : ((SP.TINT[s.kind] || {}).a || theme.fg);
+    ctx.strokeStyle = s.kind === 'heal' ? SP.TINT.healer.light : ((SP.TINT[s.kind] || {}).main || theme.fg);
     ctx.lineWidth = s.kind === 'cannon' ? 3 : 1.5;
     ctx.beginPath();
     ctx.moveTo(s.from.x * cell + cell / 2, s.from.y * cell + cell / 2);
@@ -607,6 +600,7 @@ bindSoundToggle(el.toggleBgm, 'bgm', (on) => Sound.setBgm(on));
 bindSoundToggle(el.toggleSfx, 'sfx', (on) => Sound.setSfx(on));
 
 window.SharedIcons.paint();
+SP.load();
 readTheme();
 newRun(save.best + 1);
 renderCamp();
