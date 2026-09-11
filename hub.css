@@ -136,6 +136,32 @@ h1 {
   opacity: 0.6;
 }
 
+/* 아직 다듬는 중인 게임은 목록 맨 아래에 따로 모은다. 완성된 것들 사이에 섞어
+   두면 처음 열어 본 사람이 하필 그것부터 눌러 보고 게임 전체를 그 인상으로
+   판단한다. **딱지는 카드에도 그대로 둔다** — 여기까지 내려오지 않고 링크로 바로
+   들어오는 사람도 있다. 다 만들어지면 카드를 위 목록으로 옮기고 딱지만 떼면 된다. */
+.wip {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-top: 1px solid var(--card-border);
+  padding-top: clamp(18px, 4vmin, 28px);
+}
+
+.wip h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  opacity: 0.75;
+}
+
+.wip-note {
+  margin: -6px 0 2px;
+  font-size: 12.5px;
+  opacity: 0.55;
+}
+
 footer {
   display: flex;
   align-items: baseline;
