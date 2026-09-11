@@ -19,6 +19,10 @@ const G = node ? require('./goals.js') : window.DefenseGoals;
 const KEY = 'web-games.defense.save';
 
 const LEVEL_STEP = 1.06;                                  // 레벨 하나가 올리는 피해
+// **체력도 같이 오르되 더 천천히 오른다.** 성장률을 지는 축은 피해 쪽이고, 체력은
+// 곱해도 초당 피해에 들어가지 않아 균형식에 걸리지 않는다. 다만 레벨을 올렸는데
+// 숫자가 하나만 움직이면 무엇이 좋아졌는지 읽히지 않아 같이 올린다.
+const LEVEL_HP = 1.04;
 const LEVEL_COST = (l) => Math.round(12 * Math.pow(1.15, l));
 const GEM_BASE = 10;
 const GEM_GROWTH = 1.31;                                  // 스테이지마다 오르는 보상
@@ -83,9 +87,18 @@ const levelCost = (save, key) => LEVEL_COST(levelOf(save, key));
 const perkCost = (save, id) => PERKS[id].cost(save.perks[id]);
 
 // 규칙이 보는 것은 이것뿐이다.
+const gainOf = (level) => ({ damage: Math.pow(LEVEL_STEP, level), hp: Math.pow(LEVEL_HP, level) });
+
+// 레벨을 하나 더 올렸을 때의 계수. 화면이 "지금 → 올린 뒤"를 나란히 보여 줄 때 쓴다.
+function modsWith(save, key, plus) {
+  const m = modsOf(save);
+  m.unit[key] = gainOf(levelOf(save, key) + (plus || 0));
+  return m;
+}
+
 function modsOf(save) {
   const unit = {};
-  for (const key of Object.keys(D.UNITS)) unit[key] = { damage: Math.pow(LEVEL_STEP, levelOf(save, key)) };
+  for (const key of Object.keys(D.UNITS)) unit[key] = gainOf(levelOf(save, key));
   return {
     unit,
     lives: save.perks.lives,
@@ -211,8 +224,8 @@ function settle(save, stage, run, rand) {
 }
 
 const Meta = {
-  KEY, PERKS, ITEM_POOL, ITEM_NAME, LEVEL_STEP, GEM_GROWTH, SLOTS_BASE,
-  blank, patch, load, store, modsOf, slotsOf, levelOf, levelCost, perkCost,
+  KEY, PERKS, ITEM_POOL, ITEM_NAME, LEVEL_STEP, LEVEL_HP, GEM_GROWTH, SLOTS_BASE,
+  blank, patch, load, store, modsOf, modsWith, gainOf, slotsOf, levelOf, levelCost, perkCost,
   buyLevel, buyPerk, grant, toggleTeam, fillTeam, gemsFor, cardsFor, takeCard,
   useItem, settle,
 };

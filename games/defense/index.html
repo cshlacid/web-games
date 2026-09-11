@@ -51,8 +51,10 @@
       <div class="result-card">
         <p class="sheet-title" id="result-title"></p>
         <p class="sheet-note" id="result-note"></p>
+        <div class="report" id="report"></div>
         <div class="cards" id="cards" hidden></div>
         <div class="sheet-actions">
+          <button class="btn ghost" id="result-camp" type="button">정비</button>
           <button class="btn" id="again" type="button">다음</button>
         </div>
       </div>
@@ -67,9 +69,12 @@
     <div class="items" id="items" role="group" aria-label="1회용 아이템"></div>
 
     <div class="unit-bar" id="unit-bar" hidden>
-      <span class="unit-name" id="unit-name"></span>
-      <button class="btn small" id="unit-up" type="button">올리기</button>
-      <button class="btn small ghost" id="unit-sell" type="button">해고</button>
+      <div class="unit-top">
+        <span class="unit-name" id="unit-name"></span>
+        <button class="btn small ghost" id="unit-sell" type="button">해고</button>
+      </div>
+      <div class="unit-stats" id="unit-stats"></div>
+      <button class="btn small wide" id="unit-up" type="button">올리기</button>
     </div>
 
     <div class="tools">
@@ -124,7 +129,10 @@
       <li>적이 <b>출구에 닿으면 목숨이 줍니다.</b> 목숨이 다하면 그 판은 끝입니다.</li>
       <li>한 판은 <b>웨이브 열 개</b>이고 마지막은 <b>우두머리</b>입니다.</li>
       <li>세운 사람은 <b>골드로 올릴 수</b> 있고, <b>해고하면 일부를 돌려받습니다.</b>
-        올리면 사거리 바깥쪽도 조금 넓어집니다.</li>
+        사람을 누르면 지금 체력·공격과 함께 <b>올렸을 때 얼마나 오르는지</b>가
+        단추에 같이 적힙니다.</li>
+      <li>판이 끝나면 <b>누가 얼마나 했는지</b>를 캐릭터별로 보여 줍니다 — 피해,
+        처치, 몸으로 버틴 피해, 회복, 스킬 횟수.</li>
       <li><b>사거리는 사람마다 다르고 안쪽 한계가 있습니다.</b> 포수는 2~5칸이라
         <b>코앞의 적은 못 칩니다</b> — 누르면 사거리가 도넛으로 보입니다.</li>
       <li><b>적이 밟고 있는 칸에는 세울 수 없습니다.</b> 길목은 미리 잡아 두세요.</li>

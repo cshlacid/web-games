@@ -147,12 +147,46 @@ h1 {
 .unit-bar[hidden] { display: none; }
 
 .unit-bar {
-  display: flex; align-items: center; gap: 8px;
-  padding: 8px 10px;
+  display: flex; flex-direction: column; gap: 7px;
+  padding: 9px 10px;
   border: 1px solid var(--line);
   border-radius: 10px;
 }
+.unit-top { display: flex; align-items: center; gap: 8px; }
 .unit-name { font-size: 13px; font-weight: 700; margin-right: auto; }
+
+/* 지금 수치를 그대로 적는다. 올리기 단추에는 "지금 → 올린 뒤"가 같이 붙어,
+   값을 치르기 전에 무엇이 얼마나 오르는지 보고 고를 수 있다. */
+.unit-stats {
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.unit-stats b { color: var(--fg); font-weight: 700; }
+
+/* 판이 끝난 뒤의 기여도. 누가 일했는지는 숫자로만 갈린다.
+   **칸을 못 박은 격자로 짠다** — 한 줄 flex로 두었더니 오른쪽 글이 길어질 때
+   막대가 0까지 눌려 사라졌다. 막대는 짧아도 순서를 한눈에 보이는 몫을 한다. */
+.report { display: flex; flex-direction: column; gap: 5px; margin: 2px 0 4px; }
+.report:empty { display: none; }
+.report .line {
+  display: grid;
+  grid-template-columns: 4.7em 32px 1fr;
+  align-items: center;
+  gap: 7px;
+  text-align: left;
+  font-size: 11px;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+}
+.report .who { font-weight: 700; }
+.report .bar { height: 5px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.report .bar i { display: block; height: 100%; border-radius: 3px; }
+.report .did { color: var(--muted); }
+
+/* 결과 문구는 줄바꿈을 살린다 — 목표와 보상이 한 줄로 붙으면 읽기 어렵다. */
+#result-note { white-space: pre-line; }
 
 .tools { display: flex; gap: 6px; }
 .tool {
@@ -183,6 +217,8 @@ h1 {
   cursor: pointer;
 }
 .btn.small { font-size: 12px; padding: 6px 12px; }
+.btn.wide { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 7px 10px; }
+.btn.wide span { font-size: 10.5px; font-weight: 600; opacity: 0.75; font-variant-numeric: tabular-nums; }
 .btn.ghost { background: none; color: var(--muted); box-shadow: inset 0 0 0 1px var(--line); }
 .btn:disabled { opacity: 0.4; cursor: default; }
 

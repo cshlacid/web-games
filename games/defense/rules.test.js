@@ -276,6 +276,44 @@ const poked = stand(idle, 'grunt', 9000, 2, 1);
 R.run(idle, 3);
 check('되살릴 이가 없으면 힐러도 적을 친다', poked.hp < poked.max, true);
 
+// --- 기여도 ---
+// 판이 끝난 뒤 "누가 얼마나 했는가"를 읽는 자료. 리포트가 이것만 본다.
+const credit = make(field, { mods: { startGold: 10 } });
+credit.timer = 9999;
+R.place(credit, 'archer', 2, 0);
+const shot = stand(credit, 'grunt', 9000, 2, 1);
+R.run(credit, 3);
+check('때린 몫이 그 사람에게 쌓인다', R.tally(credit, 'archer').dealt > 0, true);
+check('때린 값과 적이 잃은 값이 같다',
+  Math.abs(R.tally(credit, 'archer').dealt - (shot.max - shot.hp)) < 0.01, true);
+check('고용한 수가 남는다', R.tally(credit, 'archer').hired, 1);
+check('쓴 골드가 남는다', R.tally(credit, 'archer').spent, D.UNITS.archer.cost);
+
+// **넘치는 몫은 세지 않는다.** 마지막 한 방이 판 전체의 피해를 가져가면 리포트가
+// 누가 일했는지가 아니라 누가 막타를 쳤는지를 말하게 된다.
+const overkill = make(field, { mods: { startGold: 10 } });
+overkill.timer = 9999;
+R.place(overkill, 'archer', 2, 0);
+const tiny = stand(overkill, 'swarm', 1, 2, 1);
+R.run(overkill, 1);
+check('넘치는 피해는 세지 않는다', R.tally(overkill, 'archer').dealt <= tiny.max, true);
+check('잡은 수가 남는다', R.tally(overkill, 'archer').kills, 1);
+
+const soaked = make(hall, { mods: { startGold: 10 } });
+soaked.timer = 9999;
+R.place(soaked, 'shield', 1, 3);
+R.spawn(soaked, 'grunt', 400);
+R.run(soaked, 20);
+check('몸으로 받아 낸 피해가 남는다', R.tally(soaked, 'shield').taken > 0, true);
+
+const mended = make(field, { mods: { startGold: 3 } });
+const scarred = R.place(mended, 'shield', 2, 2);
+R.place(mended, 'healer', 2, 3);
+scarred.hp = 10;
+R.run(mended, 6);
+check('되살린 양이 남는다', R.tally(mended, 'healer').healed > 0, true);
+check('되살린 양은 실제로 오른 만큼', Math.abs(R.tally(mended, 'healer').healed - (scarred.hp - 10)) < 0.01, true);
+
 // --- 골드와 승패 ---
 const bounty = make(field);
 R.place(bounty, 'archer', 2, 1);

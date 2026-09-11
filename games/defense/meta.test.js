@@ -35,6 +35,14 @@ grow.gems = 1000;
 T.buyLevel(grow, 'archer');
 check('레벨은 곱으로 붙는다', +T.modsOf(grow).unit.archer.damage.toFixed(4), +T.LEVEL_STEP.toFixed(4));
 check('레벨을 올리면 값이 나간다', grow.gems < 1000, true);
+check('레벨은 체력도 올린다', +T.modsOf(grow).unit.archer.hp.toFixed(4), +T.LEVEL_HP.toFixed(4));
+check('체력이 피해보다 천천히 오른다', T.LEVEL_HP < T.LEVEL_STEP, true);
+// 화면이 "지금 → 올린 뒤"를 나란히 보이려면 한 레벨 위의 계수가 필요하다.
+check('한 레벨 위의 계수를 내준다',
+  +T.modsWith(grow, 'archer', 1).unit.archer.damage.toFixed(4),
+  +Math.pow(T.LEVEL_STEP, T.levelOf(grow, 'archer') + 1).toFixed(4));
+check('다른 캐릭터는 건드리지 않는다',
+  T.modsWith(grow, 'archer', 1).unit.cannon.damage, T.modsOf(grow).unit.cannon.damage);
 check('비용은 레벨마다 오른다', T.levelCost(grow, 'archer') > T.levelCost(fresh(), 'archer'), true);
 check('가지지 않은 캐릭터는 못 올린다', T.buyLevel(grow, 'cannon'), false);
 

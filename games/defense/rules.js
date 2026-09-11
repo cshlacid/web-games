@@ -48,6 +48,16 @@ const inRange = (stat, dist) => dist <= stat.far && dist >= stat.near;
 
 const upCost = (key, tier) => Math.round(D.UNITS[key].cost * D.UP.cost[tier - 1]);
 
+// 캐릭터 종류마다 한 줄씩. 판이 끝난 뒤 "누가 얼마나 했는가"를 여기서 읽는다.
+function tally(run, key) {
+  let row = run.tally[key];
+  if (!row) {
+    row = { dealt: 0, kills: 0, skills: 0, healed: 0, taken: 0, hired: 0, spent: 0 };
+    run.tally[key] = row;
+  }
+  return row;
+}
+
 function emit(run, event) {
   run.events.push(event);
   if (run.events.length > EVENT_CAP) run.events.shift();
@@ -71,6 +81,7 @@ function createRun(stage, opts) {
     cells: new Array(map.w * map.h).fill(null),
     foes: [],
     zones: [],
+    tally: {},
     fields: {},
     gold: Math.round(D.RUN.gold * mul(mods, 'startGold')),
     lives: D.RUN.lives + (mods.lives || 0),
@@ -134,6 +145,9 @@ function place(run, key, x, y) {
   run.stats.goldSpent += cost;
   run.stats.placed++;
   run.stats.kinds[key] = (run.stats.kinds[key] || 0) + 1;
+  const row = tally(run, key);
+  row.hired++;
+  row.spent += cost;
   if (D.UNITS[key].hero) { run.heroUsed = true; run.stats.heroUsed = true; }
   clearFields(run);
   emit(run, { type: 'place', key, x, y });
@@ -161,6 +175,7 @@ function upgrade(run, id) {
   run.gold -= cost;
   run.stats.goldSpent += cost;
   run.stats.upgrades++;
+  tally(run, u.key).spent += cost;
   const before = statOf(u.key, u.tier, run.mods).hp;
   u.tier++;
   const after = statOf(u.key, u.tier, run.mods).hp;
@@ -215,13 +230,18 @@ function lead(run, e) {
 
 // **지속 피해에는 최소 1이 붙지 않는다.** 방어를 무시하는 대신 값 그대로 들어간다 —
 // 최소값을 걸어 두면 틱마다 1이 들어가 바닥 얼음이 초당 서른을 깎았다.
-function hurt(run, e, amount, pierce) {
+function hurt(run, e, amount, pierce, by) {
   const f = D.FOES[e.key];
   const armor = pierce ? 0 : f.armor;
   const dealt = pierce ? Math.max(0, amount) : Math.max(1, amount - armor);
+  const before = e.hp;
   e.hp -= dealt;
+  // **넘치는 몫은 세지 않는다.** 안 그러면 마지막 한 방이 판 전체의 피해를
+  // 가져가 리포트가 누가 일했는지가 아니라 누가 막타를 쳤는지를 말하게 된다.
+  if (by) tally(run, by).dealt += Math.min(dealt, Math.max(0, before));
   if (e.hp <= 0) {
     e.dead = true;
+    if (by) tally(run, by).kills++;
     run.gold += Math.round(f.bounty * mul(run.mods, 'gold'));
     if (e.key === 'boss' && run.stats.bossAt == null) run.stats.bossAt = run.time;
     emit(run, { type: 'kill', key: e.key, ...foeXY(e) });
@@ -239,10 +259,10 @@ function toLine(px, py, x0, y0, x1, y1) {
 
 // 바닥에 깔리는 얼음. 새로 깔지 않고 가까운 것을 되살린다 — 매 발마다 쌓으면
 // 같은 자리에 수십 개가 겹쳐 초당 피해가 터진다.
-function dropZone(run, x, y, skill) {
+function dropZone(run, x, y, skill, by) {
   const near = run.zones.find((z) => Math.hypot(z.x - x, z.y - y) < 0.7);
   if (near) { near.t = skill.fieldFor; return near; }
-  const zone = { x, y, r: skill.fieldR, dps: skill.fieldDps, slow: skill.slow, t: skill.fieldFor };
+  const zone = { x, y, r: skill.fieldR, dps: skill.fieldDps, slow: skill.slow, t: skill.fieldFor, by };
   run.zones.push(zone);
   if (run.zones.length > 12) run.zones.shift();
   emit(run, { type: 'zone', x, y, r: zone.r });
@@ -257,7 +277,7 @@ function tickZones(run) {
       if (e.dead) continue;
       const p = foeXY(e);
       if (Math.hypot(p.x - z.x, p.y - z.y) > z.r) continue;
-      hurt(run, e, z.dps * TICK, D.DOT_PIERCES);
+      hurt(run, e, z.dps * TICK, D.DOT_PIERCES, z.by);
       // 밟고 있는 동안만 느려진다. 나가면 곧 풀린다.
       e.slowT = 0.25;
       e.slowBy = z.slow;
@@ -270,9 +290,9 @@ function tickZones(run) {
 function useSkill(run, u, stat, target, spot) {
   const sk = stat.skill;
   const power = stat.damage * (sk.mul == null ? 1 : sk.mul);
-  hurt(run, target, power, false);
+  hurt(run, target, power, false, u.key);
   if (sk.stunFor) target.stunT = sk.stunFor;
-  if (sk.bleedDps) target.bleed = { dps: sk.bleedDps, t: sk.bleedFor };
+  if (sk.bleedDps) target.bleed = { dps: sk.bleedDps, t: sk.bleedFor, by: u.key };
 
   if (sk.shape === 'line') {
     // 나와 목표를 잇는 줄 위의 것은 모두 맞는다.
@@ -281,18 +301,18 @@ function useSkill(run, u, stat, target, spot) {
       const p = foeXY(e);
       if (toLine(p.x, p.y, u.x, u.y, spot.x, spot.y) > 0.55) continue;
       if (Math.hypot(p.x - u.x, p.y - u.y) > stat.far) continue;
-      hurt(run, e, power, false);
-      if (sk.bleedDps) e.bleed = { dps: sk.bleedDps, t: sk.bleedFor };
+      hurt(run, e, power, false, u.key);
+      if (sk.bleedDps) e.bleed = { dps: sk.bleedDps, t: sk.bleedFor, by: u.key };
     }
   } else if (sk.shape === 'splash') {
     const r = sk.splash * mul(run.mods, 'splash');
     for (const e of run.foes) {
       if (e === target || e.dead) continue;
       const p = foeXY(e);
-      if (Math.hypot(p.x - spot.x, p.y - spot.y) <= r) hurt(run, e, power * 0.6, false);
+      if (Math.hypot(p.x - spot.x, p.y - spot.y) <= r) hurt(run, e, power * 0.6, false, u.key);
     }
   } else if (sk.shape === 'field') {
-    dropZone(run, spot.x, spot.y, sk);
+    dropZone(run, spot.x, spot.y, sk, u.key);
   }
 }
 
@@ -322,10 +342,15 @@ function tickUnits(run) {
     if (ready && sk.shape === 'heal') {
       const worst = hurtAlly(run, u, stat);
       if (worst) {
+        const was = worst.hp;
         worst.hp = Math.min(worst.max, worst.hp + sk.heal * mul(run.mods, 'heal'));
         u.cd = 1 / stat.rate;
         u.scd = sk.cd;
         run.stats.skills++;
+        const back = Math.min(worst.max, worst.hp) - was;
+        const row = tally(run, u.key);
+        row.skills++;
+        row.healed += back;
         emit(run, { type: 'heal', from: { x: u.x, y: u.y }, to: { x: worst.x, y: worst.y } });
         continue;
       }
@@ -349,11 +374,12 @@ function tickUnits(run) {
     if (ready && sk.shape !== 'heal') {
       u.scd = sk.cd;
       run.stats.skills++;
+      tally(run, u.key).skills++;
       useSkill(run, u, stat, target, spot);
       emit(run, { type: 'skill', key: u.key, from: { x: u.x, y: u.y }, to: spot });
     } else {
       // 쿨타임 중에는 기본 공격. 한 놈만 때린다.
-      hurt(run, target, stat.damage, false);
+      hurt(run, target, stat.damage, false, u.key);
       emit(run, { type: 'shot', key: u.key, from: { x: u.x, y: u.y }, to: spot });
     }
   }
@@ -366,7 +392,7 @@ function tickFoes(run) {
     if (e.slowT > 0) e.slowT -= TICK;
     if (e.bleed) {
       e.bleed.t -= TICK;
-      hurt(run, e, e.bleed.dps * TICK, D.DOT_PIERCES);
+      hurt(run, e, e.bleed.dps * TICK, D.DOT_PIERCES, e.bleed.by);
       if (e.bleed.t <= 0) e.bleed = null;
       if (e.dead) continue;
     }
@@ -402,7 +428,10 @@ function tickFoes(run) {
     if (block) {
       // 앞을 막고 선 이를 부순다. 부수는 동안 서 있으므로 다른 자리에서 때린다 —
       // 막는 쪽이 시간을 벌되 사람을 갈아 넣는 교환이 여기서 생긴다.
+      // 몸으로 받아 낸 피해. 방패병이 한 일이 여기에만 남는다.
+      const bite = Math.min(block.hp, f.siege * TICK);
       block.hp -= f.siege * TICK;
+      tally(run, block.key).taken += bite;
       emit(run, { type: 'bite', x: block.x, y: block.y });
       if (block.hp <= 0) {
         run.units.splice(run.units.indexOf(block), 1);
@@ -548,7 +577,7 @@ function run(state, seconds) {
 
 const Rules = {
   TICK, ITEMS, statOf, upCost, createRun, canPlace, place, sell, upgrade, useItem,
-  step, run, foeXY, occupied, fieldFor, lead, drain, spawn, startWave, inRange, toLine,
+  step, run, foeXY, occupied, fieldFor, lead, drain, spawn, startWave, inRange, toLine, tally,
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = Rules;

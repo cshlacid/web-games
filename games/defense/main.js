@@ -22,7 +22,7 @@ for (const [name, id] of [
   ['canvas', 'board'], ['palette', 'palette'], ['items', 'items'],
   ['stage', 'stage'], ['lives', 'lives'], ['gold', 'gold'], ['wave', 'wave'], ['goal', 'goal'],
   ['toast', 'toast'], ['bar', 'unit-bar'], ['barName', 'unit-name'], ['barUp', 'unit-up'],
-  ['barSell', 'unit-sell'], ['rush', 'rush'], ['speed', 'speed'], ['restart', 'restart'],
+  ['barSell', 'unit-sell'], ['barStats', 'unit-stats'], ['report', 'report'], ['resultCamp', 'result-camp'], ['rush', 'rush'], ['speed', 'speed'], ['restart', 'restart'],
   ['result', 'result'], ['resultTitle', 'result-title'], ['resultNote', 'result-note'],
   ['cards', 'cards'], ['again', 'again'],
   ['camp', 'camp'], ['campOpen', 'camp-open'], ['campClose', 'camp-close'], ['campGems', 'camp-gems'],
@@ -56,6 +56,10 @@ let lastShotSound = 0;
 let toastUntil = 0;
 
 const idx = (x, y) => y * run.map.w + x;
+// 100 아래에서는 소수 한 자리까지 적는다. 레벨 하나가 올리는 폭이 그 자리에 있어,
+// 반올림해 버리면 올려도 숫자가 그대로인 것처럼 보인다.
+const num = (v) => (v >= 100 ? String(Math.round(v)) : v.toFixed(1));
+const big = (v) => Math.round(v).toLocaleString('ko-KR');
 // 단추와 목록의 작은 그림은 배경으로 얹는다 — 시트가 아직 안 왔어도 브라우저가
 // 알아서 채운다.
 const spriteNode = (key, side) => {
@@ -288,12 +292,28 @@ function hud() {
   el.bar.hidden = !picked;
   if (picked) {
     const d = D.UNITS[picked.key];
+    const now = R.statOf(picked.key, picked.tier, run.mods);
     const wait = Math.max(0, picked.scd);
-    el.barName.textContent = `${d.name} ${picked.tier}단계 · 사거리 ${d.range.min}-${d.range.max}`
-      + ` · ${d.skill.name} ${wait > 0.1 ? `${Math.ceil(wait)}초` : '준비'}`;
+    el.barName.textContent = `${d.name} ${picked.tier}단계`;
+    // 지금 수치를 그대로 적는다. 스킬 칸은 힐러만 회복량이고 나머지는 한 방 피해다.
+    const power = d.skill.shape === 'heal'
+      ? `회복 <b>${num(d.skill.heal * (run.mods.heal == null ? 1 : run.mods.heal))}</b>`
+      : `<b>${num(now.damage * (d.skill.mul == null ? 1 : d.skill.mul))}</b>`;
+    el.barStats.innerHTML = `체력 <b>${Math.round(picked.hp)}/${now.hp}</b> · `
+      + `공격 <b>${num(now.damage)}</b> · 사거리 <b>${d.range.min}-${d.range.max}</b><br>`
+      + `${d.skill.name} ${power} · 쿨타임 ${d.skill.cd}초 · `
+      + (wait > 0.1 ? `<b>${Math.ceil(wait)}초 남음</b>` : '<b>준비됨</b>');
     const top = picked.tier >= D.UP.max;
-    el.barUp.disabled = top || run.gold < R.upCost(picked.key, picked.tier);
-    el.barUp.textContent = top ? '끝까지 올렸다' : `올리기 ${R.upCost(picked.key, picked.tier)}`;
+    const cost = R.upCost(picked.key, picked.tier);
+    el.barUp.disabled = top || run.gold < cost;
+    if (top) {
+      el.barUp.innerHTML = '<b>끝까지 올렸다</b>';
+    } else {
+      // 값을 치르기 전에 무엇이 얼마나 오르는지 나란히 보여 준다.
+      const next = R.statOf(picked.key, picked.tier + 1, run.mods);
+      el.barUp.innerHTML = `<b>올리기 ${cost}</b><span>공격 ${num(now.damage)}→${num(next.damage)}`
+        + ` · 체력 ${now.hp}→${next.hp} · 사거리 +${(next.far - now.far).toFixed(1)}칸</span>`;
+    }
     el.barSell.textContent = `해고 +${Math.round(d.cost * D.RUN.refund)}`;
   }
 }
@@ -329,6 +349,31 @@ function handle(events) {
   }
 }
 
+// 기여도. 때린 것·몸으로 받아 낸 것·되살린 것을 한 자로 재 순서를 매긴다.
+function showReport() {
+  el.report.textContent = '';
+  const rows = Object.keys(run.tally)
+    .map((key) => ({ key, t: run.tally[key], sum: run.tally[key].dealt + run.tally[key].taken + run.tally[key].healed }))
+    .filter((r) => r.sum > 0 || r.t.hired)
+    .sort((a, b) => b.sum - a.sum);
+  if (!rows.length) return;
+  const top = Math.max(...rows.map((r) => r.sum), 1);
+  for (const r of rows) {
+    const bits = [];
+    if (r.t.dealt >= 1) bits.push(`피해 ${big(r.t.dealt)}`);
+    if (r.t.kills) bits.push(`처치 ${r.t.kills}`);
+    if (r.t.taken >= 1) bits.push(`버팀 ${big(r.t.taken)}`);
+    if (r.t.healed >= 1) bits.push(`회복 ${big(r.t.healed)}`);
+    if (r.t.skills) bits.push(`스킬 ${r.t.skills}`);
+    const line = document.createElement('div');
+    line.className = 'line';
+    line.innerHTML = `<span class="who">${D.UNITS[r.key].name}</span>`
+      + `<span class="bar"><i style="width:${Math.round((r.sum / top) * 100)}%;background:${(SP.TINT[r.key] || {}).main || '#888'}"></i></span>`
+      + `<span class="did">${bits.join(' · ') || `${r.t.hired}명 고용`}</span>`;
+    el.report.appendChild(line);
+  }
+}
+
 function finish(how) {
   Sound.play(how === 'won' ? 'win' : 'lose');
   const got = T.settle(save, stage, run, Math.random);
@@ -341,6 +386,7 @@ function finish(how) {
   bits.push(`보석 +${got.gems}`);
   el.resultNote.textContent = bits.join('\n');
   el.again.textContent = how === 'won' ? '다음 스테이지' : '다시';
+  showReport();
   showCards(got.cards);
   el.result.hidden = false;
 }
@@ -586,7 +632,11 @@ function renderCamp() {
   el.levelList.textContent = '';
   for (const key of save.owned) {
     const cost = T.levelCost(save, key);
-    const node = row(`<span class="who">${D.UNITS[key].name} <span class="camp-note">레벨 ${T.levelOf(save, key)}</span></span><span class="sub price">보석 ${cost}</span>`);
+    const now = R.statOf(key, 1, T.modsOf(save));
+    const next = R.statOf(key, 1, T.modsWith(save, key, 1));
+    const node = row(`<span class="who">${D.UNITS[key].name} <span class="camp-note">레벨 ${T.levelOf(save, key)}</span>`
+      + `<br><span class="camp-note">공격 ${num(now.damage)}→${num(next.damage)} · 체력 ${now.hp}→${next.hp}</span></span>`
+      + `<span class="sub price">보석 ${cost}</span>`);
     node.prepend(spriteNode(key, 26));
     node.disabled = save.gems < cost;
     node.addEventListener('click', () => {
@@ -636,6 +686,11 @@ el.speed.addEventListener('click', () => {
   Sound.play('click');
 });
 el.restart.addEventListener('click', () => { newRun(stage); Sound.play('click'); });
+el.resultCamp.addEventListener('click', () => {
+  renderCamp();
+  campSheet.open();
+  Sound.play('click');
+});
 el.again.addEventListener('click', () => {
   newRun(run.over === 'won' ? stage + 1 : stage);
   Sound.play('click');
@@ -646,7 +701,7 @@ const dark = window.matchMedia('(prefers-color-scheme: dark)');
 if (dark.addEventListener) dark.addEventListener('change', readTheme);
 
 window.SharedSheet.bind({ sheet: el.help, opener: el.helpOpen, closer: el.helpClose });
-window.SharedSheet.bind({ sheet: el.camp, opener: el.campOpen, closer: el.campClose });
+const campSheet = window.SharedSheet.bind({ sheet: el.camp, opener: el.campOpen, closer: el.campClose });
 el.campOpen.addEventListener('click', renderCamp);
 
 function bindSoundToggle(node, key, apply) {
