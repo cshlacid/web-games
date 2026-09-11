@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>길목 지키기</title>
+<meta name="description" content="길목에 사람을 세워 밀려오는 적을 막는다">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><rect x='2' y='2' width='20' height='20' rx='3' fill='%23e7e2d8'/><path d='M12 4 L19 7 v5 c0 4-3 6.5-7 8-4-1.5-7-4-7-8 V7 Z' fill='%234272b8'/><path d='M12 8.5 v7' stroke='%23fff' stroke-width='1.6' stroke-linecap='round'/><path d='M8.8 11.8 h6.4' stroke='%23fff' stroke-width='1.6' stroke-linecap='round'/></svg>">
+<link rel="manifest" href="../../manifest.json">
+<link rel="apple-touch-icon" href="../../icons/icon-180.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="길목 지키기">
+<meta name="theme-color" content="#f5f3ee" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#16181a" media="(prefers-color-scheme: dark)">
+<link rel="stylesheet" href="../../shared/base.css">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="../../shared/result.css">
+<link rel="stylesheet" href="../../shared/sheet.css">
+</head>
+<body>
+<main class="app">
+  <header class="head">
+    <div class="title-row">
+      <div class="head-nav">
+        <a class="back" href="../../">← 목록</a>
+        <button class="toggle" id="help-open" type="button" aria-pressed="false">도움말</button>
+      </div>
+      <h1>길목 지키기</h1>
+      <div class="head-actions">
+        <button class="toggle sound" id="toggle-bgm" type="button" aria-pressed="true">BGM</button>
+        <button class="toggle sound" id="toggle-sfx" type="button" aria-pressed="true">효과음</button>
+      </div>
+    </div>
+    <div class="status">
+      <span class="chip" id="stage">스테이지 1</span>
+      <span class="chip lives" id="lives">목숨 5</span>
+      <span class="chip gold" id="gold">160</span>
+      <span class="chip wave" id="wave">대기</span>
+    </div>
+  </header>
+
+  <div class="board-wrap">
+    <canvas class="board" id="board"></canvas>
+    <div class="result" id="result" role="status" aria-live="polite" hidden>
+      <div class="result-card">
+        <p class="sheet-title" id="result-title"></p>
+        <p class="sheet-note" id="result-note"></p>
+        <div class="sheet-actions">
+          <button class="btn" id="again" type="button">다음</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="toast" id="toast" role="status" aria-live="polite"></p>
+
+  <div class="pad">
+    <div class="palette" id="palette" role="group" aria-label="세울 사람"></div>
+
+    <div class="unit-bar" id="unit-bar" hidden>
+      <span class="unit-name" id="unit-name"></span>
+      <button class="btn small" id="unit-up" type="button">올리기</button>
+      <button class="btn small ghost" id="unit-sell" type="button">해고</button>
+    </div>
+
+    <div class="tools">
+      <button class="tool" id="rush" type="button">
+        <span class="tool-icon" data-icon="next"></span><span class="tool-label">바로 보내기</span>
+      </button>
+      <button class="tool" id="speed" type="button">
+        <span class="tool-icon" data-icon="next"></span><span class="tool-label">1배속</span>
+      </button>
+      <button class="tool" id="restart" type="button">
+        <span class="tool-icon" data-icon="restart"></span><span class="tool-label">다시</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="sheet" id="help" hidden>
+    <p class="sheet-title">규칙</p>
+    <ul class="help-list">
+      <li>아래에서 <b>사람을 고르고 빈 칸을 누르면</b> 그 자리에 섭니다. 누르고 있는
+        동안 <b>적이 갈 길이 어떻게 바뀌는지</b> 미리 보입니다.</li>
+      <li>적은 <b>가장 빨리 출구에 닿는 길</b>로 옵니다. 돌아가는 것보다 사람을 부수는
+        것이 빠르면 <b>부수고 지나갑니다.</b></li>
+      <li>그래서 길을 <b>완전히 막아도 됩니다.</b> 대신 막은 사람은 부서지고, 부서진
+        사람은 돌아오지 않습니다.</li>
+      <li><b>공성병</b>은 조금만 돌아가야 해도 뚫고 들어옵니다. 막는 것만으로 짜면
+        여기서 무너집니다.</li>
+      <li>적이 <b>출구에 닿으면 목숨이 줍니다.</b> 목숨이 다하면 그 판은 끝입니다.</li>
+      <li>한 판은 <b>웨이브 열 개</b>이고 마지막은 <b>우두머리</b>입니다.</li>
+      <li>세운 사람은 <b>골드로 올릴 수</b> 있고, <b>해고하면 일부를 돌려받습니다.</b></li>
+      <li><b>적이 밟고 있는 칸에는 세울 수 없습니다.</b> 길목은 미리 잡아 두세요.</li>
+    </ul>
+    <div class="sheet-actions">
+      <button class="btn" id="help-close" type="button">닫기</button>
+    </div>
+  </div>
+</main>
+
+<script src="../../shared/base.js"></script>
+<script src="../../shared/icons.js"></script>
+<script src="mapgen.js"></script>
+<script src="paths.js"></script>
+<script src="data.js"></script>
+<script src="waves.js"></script>
+<script src="sprites.js"></script>
+<script src="rules.js"></script>
+<script src="../../shared/audio.js"></script>
+<script src="audio.js"></script>
+<script src="../../shared/sheet.js"></script>
+<script src="main.js"></script>
+</body>
+</html>
