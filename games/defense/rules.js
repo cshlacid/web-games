@@ -48,6 +48,13 @@ const inRange = (stat, dist) => dist <= stat.far && dist >= stat.near;
 
 const upCost = (key, tier) => Math.round(D.UNITS[key].cost * D.UP.cost[tier - 1]);
 
+// 지금 이 종류를 하나 더 세우는 값. 이미 선 수만큼 오른다.
+const standing = (run, key) => run.units.reduce((n, u) => n + (u.key === key ? 1 : 0), 0);
+
+function costOf(run, key) {
+  return Math.round(D.UNITS[key].cost * Math.pow(D.RAISE, standing(run, key)));
+}
+
 // 캐릭터 종류마다 한 줄씩. 판이 끝난 뒤 "누가 얼마나 했는가"를 여기서 읽는다.
 function tally(run, key) {
   let row = run.tally[key];
@@ -130,15 +137,17 @@ function canPlace(run, key, x, y) {
   if (run.cells[c]) return '이미 서 있다';
   if (occupied(run, x, y)) return '적이 밟고 있다';
   if (D.UNITS[key].hero && run.heroUsed) return '영웅은 한 판에 한 번';
-  if (run.gold < D.UNITS[key].cost) return '골드가 모자라다';
+  if (standing(run, key) >= D.MOST_OF_KIND) return `${D.UNITS[key].name}는 ${D.MOST_OF_KIND}명까지`;
+  if (run.gold < costOf(run, key)) return '골드가 모자라다';
   return null;
 }
 
 function place(run, key, x, y) {
   if (canPlace(run, key, x, y)) return null;
-  const cost = D.UNITS[key].cost;
+  const cost = costOf(run, key);
   const stat = statOf(key, 1, run.mods);
-  const unit = { id: run.seq++, key, x, y, tier: 1, hp: stat.hp, max: stat.hp, cd: 0, scd: 0 };
+  // 치른 값을 들고 있는다 — 해고할 때 돌려주는 몫이 그때 값이라야 앞뒤가 맞는다.
+  const unit = { id: run.seq++, key, x, y, tier: 1, hp: stat.hp, max: stat.hp, cd: 0, scd: 0, paid: cost };
   run.units.push(unit);
   run.cells[at(run.map, x, y)] = unit;
   run.gold -= cost;
@@ -160,7 +169,7 @@ function sell(run, id) {
   const u = run.units[i];
   run.units.splice(i, 1);
   run.cells[at(run.map, u.x, u.y)] = null;
-  run.gold += Math.round(D.UNITS[u.key].cost * D.RUN.refund);
+  run.gold += Math.round((u.paid || D.UNITS[u.key].cost) * D.RUN.refund);
   run.stats.sold++;
   clearFields(run);
   emit(run, { type: 'sell', x: u.x, y: u.y });
@@ -228,12 +237,17 @@ function lead(run, e) {
   return f.dist[at(run.map, e.from.x, e.from.y)];
 }
 
-// **지속 피해에는 최소 1이 붙지 않는다.** 방어를 무시하는 대신 값 그대로 들어간다 —
-// 최소값을 걸어 두면 틱마다 1이 들어가 바닥 얼음이 초당 서른을 깎았다.
-function hurt(run, e, amount, pierce, by) {
+// `kind`가 `single`이면 그 적의 `resist`만큼 깎여 들어간다. 범위·관통·지속은
+// 그대로다 — 조합을 요구하는 규칙이 이 한 줄에 있다.
+//
+// **지속 피해에는 최소 1이 붙지 않는다.** 최소값을 걸어 두면 틱마다 1이 들어가
+// 바닥 얼음이 초당 서른을 깎았다.
+function hurt(run, e, amount, kind, by) {
   const f = D.FOES[e.key];
-  const armor = pierce ? 0 : f.armor;
-  const dealt = pierce ? Math.max(0, amount) : Math.max(1, amount - armor);
+  const cut = kind === D.HIT.single ? (f.resist || 0) : 0;
+  const dealt = kind === D.HIT.dot
+    ? Math.max(0, amount)
+    : Math.max(1, amount * (1 - cut));
   const before = e.hp;
   e.hp -= dealt;
   // **넘치는 몫은 세지 않는다.** 안 그러면 마지막 한 방이 판 전체의 피해를
@@ -259,10 +273,10 @@ function toLine(px, py, x0, y0, x1, y1) {
 
 // 바닥에 깔리는 얼음. 새로 깔지 않고 가까운 것을 되살린다 — 매 발마다 쌓으면
 // 같은 자리에 수십 개가 겹쳐 초당 피해가 터진다.
-function dropZone(run, x, y, skill, by) {
+function dropZone(run, x, y, skill, by, dps) {
   const near = run.zones.find((z) => Math.hypot(z.x - x, z.y - y) < 0.7);
-  if (near) { near.t = skill.fieldFor; return near; }
-  const zone = { x, y, r: skill.fieldR, dps: skill.fieldDps, slow: skill.slow, t: skill.fieldFor, by };
+  if (near) { near.t = skill.fieldFor; near.dps = dps; return near; }
+  const zone = { x, y, r: skill.fieldR, dps, slow: skill.slow, t: skill.fieldFor, by };
   run.zones.push(zone);
   if (run.zones.length > 12) run.zones.shift();
   emit(run, { type: 'zone', x, y, r: zone.r });
@@ -277,7 +291,7 @@ function tickZones(run) {
       if (e.dead) continue;
       const p = foeXY(e);
       if (Math.hypot(p.x - z.x, p.y - z.y) > z.r) continue;
-      hurt(run, e, z.dps * TICK, D.DOT_PIERCES, z.by);
+      hurt(run, e, z.dps * TICK, D.HIT.dot, z.by);
       // 밟고 있는 동안만 느려진다. 나가면 곧 풀린다.
       e.slowT = 0.25;
       e.slowBy = z.slow;
@@ -290,9 +304,12 @@ function tickZones(run) {
 function useSkill(run, u, stat, target, spot) {
   const sk = stat.skill;
   const power = stat.damage * (sk.mul == null ? 1 : sk.mul);
-  hurt(run, target, power, false, u.key);
+  // 지속 피해는 그 사람의 공격력에 대한 비율이다. 고정값으로 두면 레벨이 올라도
+  // 그대로라, 방어를 무시하는 수단이 후반에 의미를 잃는다.
+  const dot = sk.bleedDps ? { dps: stat.damage * sk.bleedDps, t: sk.bleedFor, by: u.key } : null;
+  hurt(run, target, power, sk.shape === 'single' ? D.HIT.single : D.HIT.area, u.key);
   if (sk.stunFor) target.stunT = sk.stunFor;
-  if (sk.bleedDps) target.bleed = { dps: sk.bleedDps, t: sk.bleedFor, by: u.key };
+  if (dot) target.bleed = { ...dot };
 
   if (sk.shape === 'ring') {
     // 목표가 아니라 **자기를 가운데로** 삼는다. 길목에 세워 두면 지나가는 것이
@@ -301,8 +318,8 @@ function useSkill(run, u, stat, target, spot) {
       if (e === target || e.dead) continue;
       const p = foeXY(e);
       if (Math.hypot(p.x - u.x, p.y - u.y) > sk.ring) continue;
-      hurt(run, e, power, false, u.key);
-      if (sk.bleedDps) e.bleed = { dps: sk.bleedDps, t: sk.bleedFor, by: u.key };
+      hurt(run, e, power, D.HIT.area, u.key);
+      if (dot) e.bleed = { ...dot };
     }
   } else if (sk.shape === 'line') {
     // 나와 목표를 잇는 줄 위의 것은 모두 맞는다.
@@ -311,18 +328,18 @@ function useSkill(run, u, stat, target, spot) {
       const p = foeXY(e);
       if (toLine(p.x, p.y, u.x, u.y, spot.x, spot.y) > 0.55) continue;
       if (Math.hypot(p.x - u.x, p.y - u.y) > stat.far) continue;
-      hurt(run, e, power, false, u.key);
-      if (sk.bleedDps) e.bleed = { dps: sk.bleedDps, t: sk.bleedFor, by: u.key };
+      hurt(run, e, power, D.HIT.area, u.key);
+      if (dot) e.bleed = { ...dot };
     }
   } else if (sk.shape === 'splash') {
     const r = sk.splash * mul(run.mods, 'splash');
     for (const e of run.foes) {
       if (e === target || e.dead) continue;
       const p = foeXY(e);
-      if (Math.hypot(p.x - spot.x, p.y - spot.y) <= r) hurt(run, e, power * 0.6, false, u.key);
+      if (Math.hypot(p.x - spot.x, p.y - spot.y) <= r) hurt(run, e, power * 0.6, D.HIT.area, u.key);
     }
   } else if (sk.shape === 'field') {
-    dropZone(run, spot.x, spot.y, sk, u.key);
+    dropZone(run, spot.x, spot.y, sk, u.key, stat.damage * sk.fieldDps);
   }
 }
 
@@ -397,7 +414,7 @@ function tickUnits(run) {
       emit(run, { type: 'skill', key: u.key, from: { x: u.x, y: u.y }, to: spot });
     } else {
       // 쿨타임 중에는 기본 공격. 한 놈만 때린다.
-      hurt(run, target, stat.damage, false, u.key);
+      hurt(run, target, stat.damage, D.HIT.single, u.key);
       emit(run, { type: 'shot', key: u.key, from: { x: u.x, y: u.y }, to: spot });
     }
   }
@@ -410,7 +427,7 @@ function tickFoes(run) {
     if (e.slowT > 0) e.slowT -= TICK;
     if (e.bleed) {
       e.bleed.t -= TICK;
-      hurt(run, e, e.bleed.dps * TICK, D.DOT_PIERCES, e.bleed.by);
+      hurt(run, e, e.bleed.dps * TICK, D.HIT.dot, e.bleed.by);
       if (e.bleed.t <= 0) e.bleed = null;
       if (e.dead) continue;
     }
@@ -426,7 +443,7 @@ function tickFoes(run) {
           if (o === e || o.dead || o.hp >= o.max) continue;
           const p = foeXY(o);
           if (Math.hypot(p.x - me.x, p.y - me.y) > f.healRange) continue;
-          o.hp = Math.min(o.max, o.hp + f.heal * (o.max / 100 + 1));
+          o.hp = Math.min(o.max, o.hp + f.heal * o.max);
         }
       }
     }
@@ -545,7 +562,7 @@ function useItem(run, id, target) {
   if (run.over || !ITEMS[id]) return false;
   if (id === 'bomb') {
     if (!run.foes.length) return false;
-    for (const e of run.foes) if (!e.dead) hurt(run, e, e.max * 0.35, true);
+    for (const e of run.foes) if (!e.dead) hurt(run, e, e.max * 0.35, D.HIT.dot);
     sweep(run);
   } else if (id === 'freeze') {
     if (!run.foes.length) return false;
@@ -595,7 +612,7 @@ function run(state, seconds) {
 
 const Rules = {
   TICK, ITEMS, statOf, upCost, createRun, canPlace, place, sell, upgrade, useItem,
-  step, run, foeXY, occupied, fieldFor, lead, drain, spawn, startWave, inRange, toLine, tally,
+  step, run, foeXY, occupied, fieldFor, lead, drain, spawn, startWave, inRange, toLine, tally, costOf, standing,
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = Rules;

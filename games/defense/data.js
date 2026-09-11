@@ -47,7 +47,7 @@ const UNITS = {
     range: { min: 1, max: 3 },
     skill: {
       name: '얼음 지대', cd: 9, shape: 'field', mul: 0.5,
-      fieldR: 1.3, fieldDps: 9, fieldFor: 4, slow: 0.45,
+      fieldR: 1.3, fieldDps: 1.3, fieldFor: 4, slow: 0.45,
       note: '바닥을 얼려 둔다. 밟는 동안 깎이고 느려진다',
     },
     note: '오래 기다리는 대신 판을 바꾼다',
@@ -56,7 +56,7 @@ const UNITS = {
     name: '창병', cost: 90, damage: 10, rate: 0.9, hp: 110,
     range: { min: 1, max: 2 },
     skill: {
-      name: '꿰뚫기', cd: 4, shape: 'line', mul: 1.4, bleedDps: 7, bleedFor: 3,
+      name: '꿰뚫기', cd: 4, shape: 'line', mul: 1.4, bleedDps: 0.65, bleedFor: 3,
       note: '한 줄을 꿰고 출혈을 남긴다',
     },
     note: '',
@@ -83,7 +83,7 @@ const HEROES = {
     name: '대마법사', cost: 260, damage: 20, rate: 0.55, hp: 90, hero: true,
     range: { min: 2, max: 6 },
     skill: {
-      name: '운석', cd: 10, shape: 'splash', mul: 3.6, splash: 2, bleedDps: 10, bleedFor: 3,
+      name: '운석', cd: 10, shape: 'splash', mul: 3.6, splash: 2, bleedDps: 0.5, bleedFor: 3,
       note: '떨어뜨려 태운다',
     },
     note: '판 끝에서 끝까지 닿는다. 코앞은 못 친다',
@@ -116,27 +116,46 @@ const UP = {
   range: 0.4,         // 바깥쪽만 늘어난다. 안쪽 한계는 그대로 둔다
 };
 
-// **지속 피해는 방어를 무시한다.** 출혈과 바닥 얼음이 여기 걸린다 — 창병이
-// 중장병을 맡는 자리가 이 한 줄에서 나온다. 직접 때리는 값만 방어에 깎인다.
-const DOT_PIERCES = true;
+// 공격이 닿는 종류. `resist`는 `single`에만 걸린다 — 범위·관통·지속은 제값이
+// 들어간다. **지속 피해에는 최소 1이 붙지 않는다**(직접 때리는 값에만 붙는 바닥이라,
+// 그대로 두면 틱마다 1이 들어가 초당 서른이 된다).
+const HIT = { single: 'single', area: 'area', dot: 'dot' };
 
 // 적. hp는 그 스테이지 기준 체력에 곱하는 배수다.
+//
+// **`resist`는 "한 놈씩 때리는 공격"에만 걸리는 감소율이다.** 수치로 된 방어는
+// 소용이 없었다 — 보석을 한 캐릭터에 몰면 레벨 60을 넘겨 어떤 방어값도 뚫는다.
+// 그래서 막는 것을 값이 아니라 **공격의 종류**로 바꿨다. 중장병은 궁수가 아무리
+// 세도 거의 안 통하고, 범위(포격·회전베기)·관통(꿰뚫기)·지속(출혈·얼음)이라야
+// 제값이 들어간다. 조합이 필요해지는 자리가 여기다.
 //
 // siege(초당 피해)와 bias(부수는 시간에 곱하는 성향)가 길찾기의 성격을 만든다.
 // 공성병은 둘 다 극단이라 조금만 돌아가야 해도 뚫고 들어온다.
 const FOES = {
-  grunt:   { name: '보병', speed: 1.1, hp: 1, armor: 0, siege: 12, bias: 1, bounty: 8, cost: 1 },
-  swarm:   { name: '무리', speed: 1.3, hp: 0.35, armor: 0, siege: 6, bias: 1, bounty: 4, cost: 0.5 },
-  swift:   { name: '경보병', speed: 2.0, hp: 0.6, armor: 0, siege: 8, bias: 1.2, bounty: 7, cost: 0.9 },
-  armored: { name: '중장병', speed: 0.8, hp: 1.6, armor: 6, siege: 14, bias: 1, bounty: 14, cost: 1.8 },
-  breaker: { name: '공성병', speed: 0.85, hp: 1.5, armor: 2, siege: 40, bias: 0.4, bounty: 16, cost: 2 },
-  mender:  { name: '치유병', speed: 1.0, hp: 1.0, armor: 0, siege: 10, bias: 1, bounty: 15, heal: 8, healRange: 1.8, cost: 1.9 },
-  boss:    { name: '우두머리', speed: 0.7, hp: 12, armor: 10, siege: 60, bias: 0.7, bounty: 80, cost: 0 },
+  grunt:   { name: '보병', speed: 1.1, hp: 1, resist: 0, siege: 12, bias: 1, bounty: 8, cost: 1 },
+  swarm:   { name: '무리', speed: 1.35, hp: 0.32, resist: 0, siege: 6, bias: 1, bounty: 4, cost: 0.5 },
+  swift:   { name: '경보병', speed: 2.8, hp: 0.55, resist: 0, siege: 8, bias: 1.2, bounty: 7, cost: 0.9 },
+  // 한 놈씩 때리는 공격은 15%만 들어간다. 궁수를 아무리 키워도 이 벽은 안 넘는다.
+  armored: { name: '중장병', speed: 0.8, hp: 1.5, resist: 0.9, siege: 14, bias: 1, bounty: 22, cost: 1.8 },
+  breaker: { name: '공성병', speed: 0.85, hp: 1.4, resist: 0.35, siege: 60, bias: 0.4, bounty: 16, cost: 2 },
+  // 초당 최대 체력의 6%를 되살린다. 조금씩 깎아서는 따라잡지 못한다.
+  mender:  { name: '치유병', speed: 1, hp: 1, resist: 0.4, siege: 10, bias: 1, bounty: 15, heal: 0.06, healRange: 1.8, cost: 1.9 },
+  boss:    { name: '우두머리', speed: 0.7, hp: 12, resist: 0.55, siege: 70, bias: 0.7, bounty: 90, cost: 0 },
 };
 
 // 종류가 처음 나오는 스테이지. 숫자만 커지면 웨이브 10과 웨이브 80에서 하는 일이
 // 같아져 무한이 지루함이 된다 — 대응이 바뀌는 자리를 여기서 만든다.
 const FOE_FROM = { grunt: 1, swarm: 2, swift: 3, armored: 5, breaker: 7, mender: 10 };
+
+// **같은 종류는 판에 여섯까지만 세운다.** 값으로 막으려 해 봤지만(겹칠수록 비싸게,
+// 방어를 세게, 적을 세게) 전부 칼날 위였다 — 한 종류만 키우면 레벨이 두 배로
+// 올라가 어떤 수치든 결국 넘긴다. 마릿수를 못 박는 것이 유일하게 확실하다.
+// 여섯이면 한 종류로는 스물두 마리 무리도 중장병 일곱도 감당이 안 되고, 다섯
+// 종류를 섞으면 서른 명이라 넉넉하다.
+const MOST_OF_KIND = 6;
+
+// 그 안에서도 겹쳐 세울수록 조금씩 비싸진다. 한도에 닿기 전에도 섞는 쪽이 싸다.
+const RAISE = 1.18;
 
 // 판 하나의 뼈대.
 const RUN = {
@@ -148,7 +167,7 @@ const RUN = {
   refund: 0.6,    // 해고했을 때 돌려받는 비율
 };
 
-const Data = { UNITS, HEROES, HERO_KEYS, HERO_FROM, STARTER, LOCKED, UP, DOT_PIERCES, FOES, FOE_FROM, RUN };
+const Data = { UNITS, HEROES, HERO_KEYS, HERO_FROM, STARTER, LOCKED, UP, HIT, RAISE, MOST_OF_KIND, FOES, FOE_FROM, RUN };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = Data;
 if (typeof window !== 'undefined') window.DefenseData = Data;

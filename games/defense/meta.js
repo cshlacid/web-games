@@ -36,6 +36,14 @@ const PERKS = {
 };
 
 const ITEM_POOL = ['bomb', 'freeze', 'purse', 'mend', 'order'];
+
+// **보석으로도 캐릭터를 연다.** 카드가 빠르고 싼 길이지만, 목표를 못 채우는 사람이
+// 막아 낼 종류를 영영 못 얻는 일이 생긴다 — 필요한 대응이 없어 갇히는 것이 이
+// 게임에서 가장 나쁜 상태다. 값은 이미 연 수만큼 오른다.
+const OPEN_COST = 140;
+const OPEN_RAISE = 1.7;
+const HERO_COST = 700;
+const HERO_RAISE = 1.8;
 const ITEM_NAME = { bomb: '폭탄', freeze: '얼림', purse: '보급', mend: '구호', order: '명령서' };
 
 const blank = () => ({
@@ -101,6 +109,26 @@ function chooseHero(save, key) {
 }
 
 // 규칙이 보는 것은 이것뿐이다.
+// 잠긴 사람을 여는 값. 영웅은 따로 센다.
+function unlockCost(save, key) {
+  if (isHero(key)) {
+    const had = save.owned.filter(isHero).length;
+    return Math.round(HERO_COST * Math.pow(HERO_RAISE, had));
+  }
+  const had = save.owned.filter((k) => !isHero(k)).length - 1;
+  return Math.round(OPEN_COST * Math.pow(OPEN_RAISE, Math.max(0, had)));
+}
+
+function buyUnit(save, key) {
+  if (!D.UNITS[key] || save.owned.includes(key)) return false;
+  const cost = unlockCost(save, key);
+  if (save.gems < cost) return false;
+  save.gems -= cost;
+  return grant(save, key);
+}
+
+const lockedList = (save) => [...D.LOCKED, ...D.HERO_KEYS].filter((k) => !save.owned.includes(k));
+
 const gainOf = (level) => ({ damage: Math.pow(LEVEL_STEP, level), hp: Math.pow(LEVEL_HP, level) });
 
 // 레벨을 하나 더 올렸을 때의 계수. 화면이 "지금 → 올린 뒤"를 나란히 보여 줄 때 쓴다.
@@ -238,6 +266,9 @@ function useItem(save, id) {
 function settle(save, stage, run, rand) {
   const goal = G.goalOf(stage);
   const goalDone = run.over === 'won' && G.met(goal, run.stats);
+  // **카드는 목표를 채울 때마다 나온다.** 처음 한 번으로 묶어 봤더니, 막아 낼 종류가
+  // 없어 진 사람이 그 종류를 얻을 길까지 같이 막혔다. 예전 스테이지로 돌아가 목표를
+  // 채우는 것이 벽 앞에서 할 일이 된다 — 한 판이 3분이라 무한정 돌 만한 것도 아니다.
   const first = run.over === 'won' && !save.cleared[stage];
   const gems = gemsFor(save, stage, run, goalDone);
   save.gems += gems;
@@ -245,8 +276,8 @@ function settle(save, stage, run, rand) {
     save.cleared[stage] = true;
     if (stage > save.best) save.best = stage;
   }
-  if (goalDone) save.goals[stage] = true;
   const cards = goalDone ? cardsFor(save, stage, G.bonusOf(goal).cards, rand) : [];
+  if (goalDone) save.goals[stage] = true;
   return { goal, goalDone, first, gems, cards };
 }
 
@@ -255,6 +286,7 @@ const Meta = {
   blank, patch, load, store, modsOf, modsWith, gainOf, rosterOf, chooseHero, isHero,
   slotsOf, levelOf, levelCost, perkCost,
   buyLevel, buyPerk, grant, toggleTeam, fillTeam, gemsFor, cardsFor, takeCard,
+  unlockCost, buyUnit, lockedList, OPEN_COST, HERO_COST,
   useItem, settle,
 };
 

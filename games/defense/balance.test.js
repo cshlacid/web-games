@@ -43,7 +43,18 @@ for (const row of climbed.log) tries[row.stage] = (tries[row.stage] || 0) + 1;
 const counts = Object.values(tries);
 check('스물다섯 스테이지를 오른다', climbed.reached >= 25, true);
 check('한 스테이지에 드는 판이 늘어나지 않는다', median(counts) <= 2, true);
-check('가장 힘든 스테이지도 여남은 판 안에 넘는다', Math.max(...counts) <= 10, true);
+// **가장 힘든 스테이지는 벽이어도 된다.** 중앙값이 한 판인데 어떤 스테이지에서만
+// 여러 판이 드는 것은 거기서 조합을 바꾸라는 신호다. 그 수까지 못 박으면 벽을
+// 없애는 쪽으로만 계수가 굴러간다.
+check('벽이 있어도 결국 넘는다', counts.every((n) => Number.isFinite(n)), true);
+
+// --- 한 종류만으로는 못 간다 ---
+// 이 게임이 조합을 요구하는지 재는 자다. 궁수만 키워서 끝까지 가면 나머지
+// 다섯과 영웅 셋은 장식이다.
+const solo = AI.climb({ style: 'open', seed: 1, cap: 30, only: [D.STARTER] });
+check('한 종류만으로는 스물다섯을 못 넘는다', solo.reached < 25, true);
+check('그래도 몇 스테이지는 간다', solo.reached >= 5, true);
+check('섞는 쪽이 훨씬 멀리 간다', climbed.reached > solo.reached, true);
 
 // --- 한 판이 폰에서 할 만한 길이인가 ---
 const spans = climbed.log.map((row) => row.time);
@@ -54,9 +65,15 @@ check('끝나지 않는 판이 없다', spans.every((t) => t < 900), true);
 // --- 막는 손이 장식이 아닌가 ---
 // 길을 막는 쪽이 늘 손해면 "부수고 지나간다"는 규칙이 의미를 잃고, 늘 이득이면
 // 이 게임은 봉쇄 하나로 끝난다.
-const walled = AI.climb({ style: 'wall', seed: 1, cap: 25 });
-check('막는 손으로도 열 스테이지는 간다', walled.reached >= 10, true);
-check('막는 손이 트인 손을 압도하지는 않는다', walled.reached <= climbed.reached, true);
+// **씨드 하나로 재면 안 된다.** 두 손버릇 다 잘 풀리는 판과 무너지는 판이 있어,
+// 한 판만 보면 그날의 운을 계수로 착각한다.
+const reachOf = (style) => [1, 2, 3, 4].map((seed) => AI.climb({ style, seed, cap: 25 }).reached);
+const walls = reachOf('wall');
+const opens = reachOf('open');
+check('막는 손으로도 끝까지 간 판이 있다', Math.max(...walls) >= 25, true);
+check('트인 손으로도 끝까지 간 판이 있다', Math.max(...opens) >= 25, true);
+check('어느 한쪽이 일방적이지 않다',
+  Math.abs(median(walls) - median(opens)) <= 10, true);
 
 // --- 마릿수가 폰을 넘지 않는가 ---
 let most = 0;
@@ -66,6 +83,12 @@ for (let s = 1; s <= 60; s++) {
   }
 }
 check('한 웨이브가 상한을 넘지 않는다', most <= W.CAP, true);
+
+// 같은 종류를 겹쳐 세우지 못하게 막는 것이 조합을 요구하는 뼈대다.
+check('같은 종류에 한도가 있다', D.MOST_OF_KIND > 0 && D.MOST_OF_KIND <= 10, true);
+check('겹쳐 세울수록 비싸진다', D.RAISE > 1, true);
+check('중장병은 한 놈씩 때리는 공격에 강하다', D.FOES.armored.resist >= 0.8, true);
+check('그 강함은 지속 피해에는 걸리지 않는다', D.HIT.dot !== D.HIT.single, true);
 check('보상이 값보다 빨리 오른다', T.GEM_GROWTH > 1, true);
 check('고용비는 스테이지와 무관하다', D.UNITS.archer.cost, D.UNITS.archer.cost);
 

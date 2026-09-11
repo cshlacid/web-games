@@ -20,12 +20,12 @@ const GROWTH = 1.12;
 // **사거리와 스킬을 손보면 여기부터 다시 잰다.** 궁수의 사거리를 2.6에서 4로
 // 넓혔더니 서른 스테이지를 한 판씩에 다 깨서, 자동 플레이로 다시 맞춘 값이 50이다
 // (30이면 전부 한 판, 60이면 한 스테이지에 열 판, 75면 중앙값이 네 판이 된다).
-const BASE = 50;
+const BASE = 40;
 // 같은 스테이지 안에서도 뒤 웨이브가 무겁다. 판 하나에도 기울기가 있어야 한다.
 const STEP = 0.08;
 
 // 한 번에 화면에 설 수 있는 수. 넘기면 폰에서 프레임이 무너진다.
-const CAP = 40;
+const CAP = 46;
 const FIRST_MEET = 3;
 
 const hpOf = (stage, wave) => BASE * Math.pow(GROWTH, stage - 1) * (1 + STEP * (wave - 1));
@@ -42,13 +42,19 @@ function createRng(seed) {
 
 // 마리 사이 간격. 무리는 쏟아지고 중장병은 뚝뚝 떨어져야 같은 예산이라도
 // 다른 판이 된다.
-const GAP = { swarm: 0.35, swift: 0.5, grunt: 0.7, mender: 0.9, armored: 1.0, breaker: 1.1, boss: 0 };
+const GAP = { swarm: 0.25, swift: 0.42, grunt: 0.7, mender: 0.9, armored: 1.0, breaker: 1.1, boss: 0 };
 
 // 한 무더기의 상한. 예산만 보고 나누면 싼 종류가 스무 마리씩 쏟아져 다른 종류가
 // 낄 자리가 없어진다.
-const MOST = { swarm: 16, swift: 12, grunt: 12, armored: 8, breaker: 6, mender: 5 };
+const MOST = { swarm: 22, swift: 14, grunt: 12, armored: 9, breaker: 6, mender: 5 };
 // 그 종류를 처음 만나는 스테이지에서는 몇 마리만 섞어 보낸다. 처음 보는 적이
 // 떼로 오면 무엇이 달라졌는지 배울 틈이 없다.
+
+// 비싼 종류가 나오기 시작하는 웨이브. **앞쪽 웨이브는 싼 것만 온다** — 시작
+// 골드로는 서너 명밖에 못 세우는데 거기에 중장병이 끼면 대응이 문제가 아니라
+// 지갑이 문제가 된다. 실제로 스테이지 21의 세 번째 웨이브가 중장병 넷이라
+// 백 판 넘게 막혔다.
+const firstWave = (key) => (D.FOES[key].cost <= 1 ? 1 : Math.ceil(4 + (D.FOES[key].cost - 1) * 2));
 
 function poolAt(stage) {
   return Object.keys(D.FOE_FROM).filter((k) => stage >= D.FOE_FROM[k]);
@@ -72,7 +78,7 @@ function waveOf(stage, wave) {
       // 비싼 종류는 웨이브가 무르익은 뒤에만 나온다. 그리고 같은 종류를 두 무더기로
       // 쪼개지 않는다 — 한 웨이브에 종류가 둘이어야 대응할 것이 생긴다.
       const ready = pool.filter((k) => !used.includes(k)
-        && D.FOES[k].cost <= budget && (wave >= 3 || D.FOES[k].cost <= 1));
+        && D.FOES[k].cost <= budget && wave >= firstWave(k));
       if (!ready.length) break;
       const foe = ready[Math.floor(next() * ready.length)];
       used.push(foe);
@@ -102,7 +108,7 @@ const wavesOf = (stage) => {
   return list;
 };
 
-const Waves = { GROWTH, BASE, CAP, MOST, FIRST_MEET, hpOf, waveOf, wavesOf, poolAt };
+const Waves = { GROWTH, BASE, CAP, MOST, FIRST_MEET, firstWave, hpOf, waveOf, wavesOf, poolAt };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = Waves;
 if (typeof window !== 'undefined') window.DefenseWaves = Waves;

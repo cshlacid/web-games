@@ -100,6 +100,23 @@ for (const k of D.LOCKED) T.grant(allOwned, k);
 const late = T.cardsFor(allOwned, D.HERO_FROM, 4, () => 0.3);
 check('일반이 다 열리면 영웅 카드가 나온다', late.some((c) => c.hero), true);
 
+// --- 보석으로 여는 길 ---
+// 목표를 못 채우는 사람이 막아 낼 종류를 영영 못 얻으면 그 자리에서 갇힌다.
+const shop = T.blank();
+check('처음에는 잠긴 것이 있다', T.lockedList(shop).length > 0, true);
+check('보석이 없으면 못 산다', T.buyUnit(shop, 'cannon'), false);
+shop.gems = T.unlockCost(shop, 'cannon');
+check('값을 치르면 열린다', T.buyUnit(shop, 'cannon'), true);
+check('보석이 나갔다', shop.gems, 0);
+check('열린 것은 다시 못 산다', T.buyUnit(shop, 'cannon'), false);
+shop.gems = 100000;
+const wasCost = T.unlockCost(shop, 'frost');
+T.buyUnit(shop, 'frost');
+check('열수록 값이 오른다', T.unlockCost(shop, 'spear') > wasCost, true);
+check('영웅은 더 비싸다', T.unlockCost(shop, 'blade') > T.unlockCost(shop, 'spear'), true);
+check('다 열면 목록이 빈다',
+  (T.lockedList(shop).forEach((k) => T.buyUnit(shop, k)), T.lockedList(shop).length), 0);
+
 // --- 보상 ---
 const won = R.createRun(3, {});
 won.over = 'won';

@@ -20,7 +20,7 @@ const Sound = window.DefenseSound;
 const el = {};
 for (const [name, id] of [
   ['canvas', 'board'], ['palette', 'palette'], ['items', 'items'],
-  ['stage', 'stage'], ['lives', 'lives'], ['time', 'time'], ['heroList', 'hero-list'], ['gold', 'gold'], ['wave', 'wave'], ['goal', 'goal'],
+  ['stage', 'stage'], ['lives', 'lives'], ['time', 'time'], ['heroList', 'hero-list'], ['lockList', 'lock-list'], ['gold', 'gold'], ['wave', 'wave'], ['goal', 'goal'],
   ['toast', 'toast'], ['bar', 'unit-bar'], ['barName', 'unit-name'], ['barUp', 'unit-up'],
   ['barSell', 'unit-sell'], ['barStats', 'unit-stats'], ['report', 'report'], ['resultCamp', 'result-camp'], ['rush', 'rush'], ['speed', 'speed'], ['restart', 'restart'],
   ['result', 'result'], ['resultTitle', 'result-title'], ['resultNote', 'result-note'],
@@ -661,6 +661,32 @@ function renderCamp() {
       Sound.play('click');
     });
     el.heroList.appendChild(node);
+  }
+
+  el.lockList.textContent = '';
+  const shut = T.lockedList(save);
+  if (!shut.length) {
+    const done = document.createElement('p');
+    done.className = 'camp-note';
+    done.textContent = '모두 열었습니다.';
+    el.lockList.appendChild(done);
+  }
+  for (const key of shut) {
+    const cost = T.unlockCost(save, key);
+    const d = D.UNITS[key];
+    const node = row(`<span class="who">${d.hero ? `영웅 ${d.name}` : d.name}`
+      + `<br><span class="camp-note">사거리 ${d.range.min}-${d.range.max} · ${d.skill.name} — ${d.skill.note}</span></span>`
+      + `<span class="sub price">보석 ${cost}</span>`);
+    node.prepend(spriteNode(key, 26));
+    node.disabled = save.gems < cost;
+    node.addEventListener('click', () => {
+      if (!T.buyUnit(save, key)) return;
+      T.store(save);
+      buildPalette();
+      renderCamp();
+      Sound.play('place');
+    });
+    el.lockList.appendChild(node);
   }
 
   el.levelList.textContent = '';

@@ -278,6 +278,50 @@ const poked = stand(idle, 'grunt', 9000, 2, 1);
 R.run(idle, 3);
 check('되살릴 이가 없으면 힐러도 적을 친다', poked.hp < poked.max, true);
 
+// --- 막는 것은 값이 아니라 공격의 종류다 ---
+// 중장병은 한 놈씩 때리는 공격에 강하다. 범위·관통·지속은 제값이 들어간다.
+check('중장병은 한 놈씩 때리는 공격에 강하다', D.FOES.armored.resist > 0.5, true);
+check('보병에게는 그런 것이 없다', D.FOES.grunt.resist, 0);
+
+const single = make(field, { mods: { startGold: 10 } });
+single.timer = 9999;
+R.place(single, 'archer', 2, 0);
+const tanky = stand(single, 'armored', 90000, 2, 1);
+R.run(single, 1);
+const throughSingle = tanky.max - tanky.hp;
+
+const wide = make(field, { mods: { startGold: 10 } });
+wide.timer = 9999;
+R.place(wide, 'spear', 2, 0);
+const same = stand(wide, 'armored', 90000, 2, 1);
+R.step(wide, R.TICK);
+const throughArea = same.max - same.hp;
+check('관통은 같은 적에게 훨씬 많이 들어간다', throughArea > throughSingle * 2, true);
+
+// --- 같은 종류는 여섯까지 ---
+const crowd = make(field, { mods: { startGold: 40 } });
+let put = 0;
+for (let y = 0; y < field.h; y++) {
+  for (let x = 0; x < field.w; x++) if (R.place(crowd, 'archer', x, y)) put++;
+}
+check('같은 종류는 여섯까지', put, D.MOST_OF_KIND);
+check('한도에 닿으면 이유를 말한다',
+  R.canPlace(crowd, 'archer', 4, 4).includes(String(D.MOST_OF_KIND)), true);
+check('다른 종류는 그대로 세울 수 있다', R.canPlace(crowd, 'shield', 4, 4), null);
+
+// 겹쳐 세울수록 비싸진다. 섞는 쪽이 싸지는 자리다.
+const pricey = make(field, { mods: { startGold: 40 } });
+const first = R.costOf(pricey, 'archer');
+R.place(pricey, 'archer', 1, 1);
+check('둘째부터 값이 오른다', R.costOf(pricey, 'archer') > first, true);
+check('다른 종류 값은 그대로', R.costOf(pricey, 'shield'), D.UNITS.shield.cost);
+const paid = R.costOf(pricey, 'archer');
+const second = R.place(pricey, 'archer', 2, 2);
+check('치른 값을 들고 있는다', second.paid, paid);
+const kept = pricey.gold;
+R.sell(pricey, second.id);
+check('돌려받는 몫은 치른 값 기준', pricey.gold - kept, Math.round(paid * D.RUN.refund));
+
 // --- 기여도 ---
 // 판이 끝난 뒤 "누가 얼마나 했는가"를 읽는 자료. 리포트가 이것만 본다.
 const credit = make(field, { mods: { startGold: 10 } });

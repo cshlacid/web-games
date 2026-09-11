@@ -70,9 +70,9 @@ function act(run, style) {
   // 차례가 비싸면 살 수 있는 것 중 가장 비싼 것으로 대신한다. 기다리기만 하면
   // 골드를 쥔 채 뚫린다.
   const tries = [first, ...run.roster.filter((k) => k !== first)
-    .sort((a, b) => D.UNITS[b].cost - D.UNITS[a].cost)];
+    .sort((a, b) => R.costOf(run, b) - R.costOf(run, a))];
   for (const key of tries) {
-    if (!key || run.gold < D.UNITS[key].cost) continue;
+    if (!key || run.gold < R.costOf(run, key)) continue;
     const spot = bestSpot(run, key, style);
     if (spot) { R.place(run, key, spot.x, spot.y); return true; }
   }
@@ -107,7 +107,10 @@ function play(stage, save, opts) {
 
 // 보석을 가장 싼 레벨부터 붓는다. 캐릭터 피해는 서로 더해지므로 나눠 키우는 쪽이
 // 조금 낫고, 사람도 대개 그렇게 쓴다.
-function spend(save) {
+// **데려가는 사람만 키운다.** 가진 것 전부에 골고루 부으면 정작 판에 세우는
+// 사람들의 레벨이 반으로 깎인다 — 사람도 그렇게 쓰지 않는다.
+function spend(save, only) {
+  const grow = only || T.rosterOf(save);
   let moved = true;
   let bought = false;
   while (moved) {
@@ -115,8 +118,22 @@ function spend(save) {
     // 데려갈 사람이 칸보다 많으면 칸부터 늘린다. 좋은 사람을 얻고도 못 데려가는
     // 것이 레벨 하나보다 크게 손해다.
     if (save.owned.length > T.slotsOf(save) && T.buyPerk(save, 'slots')) { moved = true; bought = true; continue; }
+    // **막아 낼 종류가 모자라면 레벨보다 사람을 먼저 산다.** 목표를 못 채워도
+    // 보석으로 여는 길이 있다.
+    // **여유가 있을 때만 산다.** 가진 보석을 통째로 해금에 쓰면 정작 세울 사람들의
+    // 레벨이 바닥이라, 종류만 늘고 판은 더 못 깬다.
+    if (!only && save.owned.filter((k) => !T.isHero(k)).length < 4) {
+      const shut = T.lockedList(save).filter((k) => !T.isHero(k));
+      if (shut.length && save.gems >= T.unlockCost(save, shut[0]) * 2 && T.buyUnit(save, shut[0])) {
+        T.fillTeam(save);
+        moved = true;
+        bought = true;
+        continue;
+      }
+    }
     let cheapest = null;
     for (const key of save.owned) {
+      if (grow.length && !grow.includes(key)) continue;
       const cost = T.levelCost(save, key);
       if (cost > save.gems) continue;
       if (!cheapest || cost < cheapest.cost) cheapest = { key, cost };
@@ -145,16 +162,33 @@ function climb(opts) {
   // 카드가 갈려야 해서 씨드를 하나 받는다.
   const roll = rngOf(o.seed == null ? 1 : o.seed);
   const save = T.blank();
+  // **한 종류만으로 어디까지 가는가.** 조합이 필요한 게임인지 재는 자다 — 궁수만
+  // 올려서 끝까지 가면 나머지 다섯은 장식이다.
+  const only = o.only || null;
+  const keepTeam = () => {
+    if (!only) return;
+    save.team = only.filter((k) => save.owned.includes(k));
+    if (!save.team.length) save.team = [D.STARTER];
+    save.hero = null;
+  };
+  keepTeam();
   const log = [];
   let stage = 1;
   let tries = 0;
   while (stage <= (o.cap || 60)) {
     const run = play(stage, save, { style });
     const got = T.settle(save, stage, run, roll);
-    if (got.cards.length) T.takeCard(save, got.cards[Math.floor(roll() * got.cards.length)]);
+    if (got.cards.length) {
+      // **새 캐릭터가 있으면 그것부터 고른다.** 사람도 그렇게 고르고, 무엇보다
+      // 대응할 종류가 없으면 보석을 아무리 쌓아도 못 넘는 벽이 나온다.
+      const open = got.cards.filter((c) => c.kind === 'unlock');
+      const pool = open.length ? open : got.cards;
+      T.takeCard(save, pool[Math.floor(roll() * pool.length)]);
+    }
     // 카드가 없어도 잠긴 사람은 언젠가 열린다고 보고, 편성 칸이 남으면 채운다.
     T.fillTeam(save);
-    const grew = spend(save);
+    keepTeam();
+    const grew = spend(save, only);
     log.push({ stage, won: run.over === 'won', wave: run.wave, time: Math.round(run.time) });
     if (run.over === 'won') { stage++; tries = 0; continue; }
     // 진 판이 레벨 하나라도 올려 줬다면 다음 도전은 다른 판이다. 아무것도 안
@@ -164,10 +198,24 @@ function climb(opts) {
     // 클리어의 몇 십 분의 일이라, 벽 앞에서 같은 판만 다시 미는 것으로는 영영
     // 넘지 못한다. 사람이 실제로 하는 것도 이쪽이다.
     if (save.best >= 1) {
-      const farm = play(save.best, save, { style });
-      T.settle(save, save.best, farm, roll);
-      log.push({ stage: save.best, farm: true, won: farm.over === 'won', wave: farm.wave, time: Math.round(farm.time) });
-      if (spend(save)) { tries = 0; continue; }
+      // **아직 목표를 못 채운 예전 스테이지를 먼저 고른다.** 거기서 목표를 채우면
+      // 카드가 나와 막아 낼 종류를 얻는다 — 사람이 벽 앞에서 하는 것도 이쪽이다.
+      const back = [];
+      for (let s = 1; s <= save.best; s++) if (!save.goals[s]) back.push(s);
+      // **그중 가장 높은 곳을 고른다.** 아래로 내려갈수록 보석이 적어, 낮은 판을
+      // 돌면 목표는 채워도 레벨이 안 오른다.
+      const pick = back.length ? Math.max(...back) : save.best;
+      const farm = play(pick, save, { style });
+      const won = T.settle(save, pick, farm, roll);
+      if (won.cards.length) {
+        const open = won.cards.filter((c) => c.kind === 'unlock');
+        const pool = open.length ? open : won.cards;
+        T.takeCard(save, pool[Math.floor(roll() * pool.length)]);
+        T.fillTeam(save);
+        keepTeam();
+      }
+      log.push({ stage: pick, farm: true, won: farm.over === 'won', wave: farm.wave, time: Math.round(farm.time) });
+      if (won.cards.length || spend(save, only)) { tries = 0; continue; }
     }
     if (++tries >= (o.retries || 8)) break;
   }
