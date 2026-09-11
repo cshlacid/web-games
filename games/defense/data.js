@@ -14,46 +14,58 @@
 // 실제 값은 `balance.test.js`의 자동 플레이로 맞춘다.
 // **사거리는 안쪽과 바깥쪽 둘이다.** 포수는 2~5라 코앞의 적을 못 친다 — 바깥에서
 // 때리는 자리와 앞을 막는 자리가 갈리는 것이 이 게임의 배치다. `min`은 사람이 읽는
-// 값이고 판정에서 쓰는 안쪽 한계는 `min - 1`이다(1이면 붙어 있어도 친다).
+// 값이고 판정에서 쓰는 안쪽 한계는 `min - 0.5`다.
 //
-// `shape`가 공격이 닿는 모양, `skill`이 그 위에 얹히는 것이다. 값에 이론은 없고
-// `balance.test.js`의 자동 플레이로 맞춘다.
+// **모두 기본 공격과 스킬 둘을 가진다.** 기본 공격은 한 놈을 때리는 것이고, 스킬은
+// 제 쿨타임이 돌아올 때 그 자리를 대신한다. **쿨타임 중에는 가만히 있지 않고 기본
+// 공격을 한다** — 기다리는 동안 아무것도 못 하면 쿨타임이 긴 캐릭터는 세울 이유가
+// 없어진다.
+//
+// `skill.mul`은 기본 공격 대비 배수다. 값에 이론은 없고 `balance.test.js`의 자동
+// 플레이로 맞춘다.
 const UNITS = {
   archer: {
     name: '궁수', cost: 60, damage: 9, rate: 1.1, hp: 60,
-    range: { min: 1, max: 4 }, shape: 'single',
-    skill: { crit: 0.25, critMul: 2 },
-    note: '멀리서 한 놈씩. 치명타가 터진다',
+    range: { min: 1, max: 4 },
+    skill: { name: '정조준', cd: 5, shape: 'single', mul: 2.4, note: '두 배가 넘게 꽂는 한 발' },
+    note: '멀리서 한 놈씩',
   },
   shield: {
-    name: '방패병', cost: 70, damage: 4, rate: 1.0, hp: 320,
-    range: { min: 1, max: 1 }, shape: 'single',
-    skill: { stun: 0.22, stunFor: 0.8 },
-    note: '앞을 막고 기절시킨다. 공격은 거들 뿐',
+    name: '방패병', cost: 70, damage: 5, rate: 1.0, hp: 320,
+    range: { min: 1, max: 1 },
+    skill: { name: '후려치기', cd: 3.5, shape: 'single', mul: 1.2, stunFor: 1.2, note: '때려서 멈춰 세운다' },
+    note: '앞을 막고 버틴다. 체력이 아주 높다',
   },
   cannon: {
-    name: '포수', cost: 110, damage: 26, rate: 0.4, hp: 70,
-    range: { min: 2, max: 5 }, shape: 'splash',
-    skill: { splash: 1.2 },
-    note: '느리지만 한 발이 주변까지. 코앞은 못 친다',
+    name: '포수', cost: 110, damage: 10, rate: 0.8, hp: 70,
+    range: { min: 2, max: 5 },
+    skill: { name: '포격', cd: 6, shape: 'splash', mul: 2.6, splash: 1.2, note: '한 발이 주변까지' },
+    note: '코앞은 못 친다',
   },
   frost: {
-    name: '빙결술사', cost: 90, damage: 3, rate: 0.6, hp: 55,
-    range: { min: 1, max: 3 }, shape: 'field',
-    skill: { fieldR: 1.1, fieldDps: 7, fieldFor: 3, slow: 0.5 },
-    note: '바닥을 얼려 둔다. 밟는 동안 깎이고 느려진다',
+    name: '빙결술사', cost: 90, damage: 6, rate: 0.9, hp: 55,
+    range: { min: 1, max: 3 },
+    skill: {
+      name: '얼음 지대', cd: 9, shape: 'field', mul: 0.5,
+      fieldR: 1.3, fieldDps: 9, fieldFor: 4, slow: 0.45,
+      note: '바닥을 얼려 둔다. 밟는 동안 깎이고 느려진다',
+    },
+    note: '오래 기다리는 대신 판을 바꾼다',
   },
   spear: {
-    name: '창병', cost: 90, damage: 12, rate: 0.9, hp: 110,
-    range: { min: 1, max: 2 }, shape: 'line',
-    skill: { bleedDps: 6, bleedFor: 3 },
-    note: '한 줄로 꿰뚫고 출혈을 남긴다',
+    name: '창병', cost: 90, damage: 10, rate: 0.9, hp: 110,
+    range: { min: 1, max: 2 },
+    skill: {
+      name: '꿰뚫기', cd: 4, shape: 'line', mul: 1.4, bleedDps: 7, bleedFor: 3,
+      note: '한 줄을 꿰고 출혈을 남긴다',
+    },
+    note: '',
   },
   healer: {
-    name: '힐러', cost: 100, damage: 0, rate: 1.4, hp: 70,
-    range: { min: 1, max: 3 }, shape: 'heal',
-    skill: { heal: 25 },
-    note: '주변 아군을 되살린다. 방패병과 짝',
+    name: '힐러', cost: 100, damage: 5, rate: 1.0, hp: 70,
+    range: { min: 1, max: 3 },
+    skill: { name: '치유', cd: 3.5, shape: 'heal', heal: 30, note: '가장 다친 아군을 되살린다' },
+    note: '되살릴 이가 없으면 같이 싸운다',
   },
 };
 

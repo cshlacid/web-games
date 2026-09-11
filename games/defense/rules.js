@@ -40,26 +40,13 @@ function statOf(key, tier, mods) {
     near: Math.max(0, d.range.min - 0.5),
     far: d.range.max + 0.5 + D.UP.range * step + (mods.range || 0),
     rate: d.rate,
-    shape: d.shape,
-    skill: d.skill || {},
+    skill: d.skill,
   };
 }
 
 const inRange = (stat, dist) => dist <= stat.far && dist >= stat.near;
 
 const upCost = (key, tier) => Math.round(D.UNITS[key].cost * D.UP.cost[tier - 1]);
-
-// 치명타와 기절은 굴려서 갈린다. **씨드를 판에 박아 둔다** — 같은 스테이지를 같은
-// 손으로 두면 같은 결과가 나와야 자동 플레이로 계수를 잴 수 있다.
-function createRng(seed) {
-  let a = (seed >>> 0) || 1;
-  return function next() {
-    a |= 0; a = (a + 0x6D2B79F5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
 
 function emit(run, event) {
   run.events.push(event);
@@ -84,7 +71,6 @@ function createRun(stage, opts) {
     cells: new Array(map.w * map.h).fill(null),
     foes: [],
     zones: [],
-    rng: createRng(o.seed == null ? Math.imul(stage + 7, 0x27D4EB2D) : o.seed),
     fields: {},
     gold: Math.round(D.RUN.gold * mul(mods, 'startGold')),
     lives: D.RUN.lives + (mods.lives || 0),
@@ -97,7 +83,7 @@ function createRun(stage, opts) {
     stats: {
       livesLost: 0, goldSpent: 0, upgrades: 0, sold: 0,
       kinds: {}, placed: 0, heroUsed: false, bossFrom: null, bossAt: null, time: 0, goldLeft: 0,
-      items: 0, crits: 0, stuns: 0,
+      items: 0, skills: 0,
     },
   };
 }
@@ -141,7 +127,7 @@ function place(run, key, x, y) {
   if (canPlace(run, key, x, y)) return null;
   const cost = D.UNITS[key].cost;
   const stat = statOf(key, 1, run.mods);
-  const unit = { id: run.seq++, key, x, y, tier: 1, hp: stat.hp, max: stat.hp, cd: 0 };
+  const unit = { id: run.seq++, key, x, y, tier: 1, hp: stat.hp, max: stat.hp, cd: 0, scd: 0 };
   run.units.push(unit);
   run.cells[at(run.map, x, y)] = unit;
   run.gold -= cost;
@@ -280,43 +266,69 @@ function tickZones(run) {
   run.zones = run.zones.filter((z) => z.t > 0);
 }
 
-// 한 대 때린다. 치명타·기절·출혈이 여기서 갈린다.
-function strike(run, u, stat, target, amount, first) {
-  const skill = stat.skill;
-  let dealt = amount;
-  if (first && skill.crit && run.rng() < skill.crit) {
-    dealt *= skill.critMul;
-    run.stats.crits++;
-    emit(run, { type: 'crit', ...foeXY(target) });
+// 스킬 한 번. 기본 공격을 대신해 나가고, 모양마다 닿는 곳이 다르다.
+function useSkill(run, u, stat, target, spot) {
+  const sk = stat.skill;
+  const power = stat.damage * (sk.mul == null ? 1 : sk.mul);
+  hurt(run, target, power, false);
+  if (sk.stunFor) target.stunT = sk.stunFor;
+  if (sk.bleedDps) target.bleed = { dps: sk.bleedDps, t: sk.bleedFor };
+
+  if (sk.shape === 'line') {
+    // 나와 목표를 잇는 줄 위의 것은 모두 맞는다.
+    for (const e of run.foes) {
+      if (e === target || e.dead) continue;
+      const p = foeXY(e);
+      if (toLine(p.x, p.y, u.x, u.y, spot.x, spot.y) > 0.55) continue;
+      if (Math.hypot(p.x - u.x, p.y - u.y) > stat.far) continue;
+      hurt(run, e, power, false);
+      if (sk.bleedDps) e.bleed = { dps: sk.bleedDps, t: sk.bleedFor };
+    }
+  } else if (sk.shape === 'splash') {
+    const r = sk.splash * mul(run.mods, 'splash');
+    for (const e of run.foes) {
+      if (e === target || e.dead) continue;
+      const p = foeXY(e);
+      if (Math.hypot(p.x - spot.x, p.y - spot.y) <= r) hurt(run, e, power * 0.6, false);
+    }
+  } else if (sk.shape === 'field') {
+    dropZone(run, spot.x, spot.y, sk);
   }
-  hurt(run, target, dealt, false);
-  if (first && skill.stun && run.rng() < skill.stun) {
-    target.stunT = skill.stunFor;
-    run.stats.stuns++;
-    emit(run, { type: 'stun', ...foeXY(target) });
+}
+
+// 사거리 안에서 가장 많이 깎인 아군. 힐러의 스킬이 향하는 곳이다.
+function hurtAlly(run, u, stat) {
+  let worst = null;
+  for (const o of run.units) {
+    if (o === u || o.hp >= o.max) continue;
+    if (!inRange(stat, Math.hypot(o.x - u.x, o.y - u.y))) continue;
+    if (!worst || (o.max - o.hp) > (worst.max - worst.hp)) worst = o;
   }
-  if (skill.bleedDps) target.bleed = { dps: skill.bleedDps, t: skill.bleedFor };
+  return worst;
 }
 
 function tickUnits(run) {
   for (const u of run.units) {
     u.cd -= TICK;
+    u.scd -= TICK;
     if (u.cd > 0) continue;
     const stat = statOf(u.key, u.tier, run.mods);
+    const sk = stat.skill;
+    const ready = u.scd <= 0;
 
-    if (stat.shape === 'heal') {
-      // 가장 많이 깎인 아군 하나. 다 멀쩡하면 쉰다.
-      let worst = null;
-      for (const o of run.units) {
-        if (o === u || o.hp >= o.max) continue;
-        if (!inRange(stat, Math.hypot(o.x - u.x, o.y - u.y))) continue;
-        if (!worst || (o.max - o.hp) > (worst.max - worst.hp)) worst = o;
+    // 힐러의 스킬만 아군을 향한다. **되살릴 이가 없으면 쿨타임을 쓰지 않고
+    // 기본 공격으로 넘어간다** — 멀쩡한 판에서 치유가 헛돌면 힐러는 그 판 내내
+    // 아무것도 하지 않는다.
+    if (ready && sk.shape === 'heal') {
+      const worst = hurtAlly(run, u, stat);
+      if (worst) {
+        worst.hp = Math.min(worst.max, worst.hp + sk.heal * mul(run.mods, 'heal'));
+        u.cd = 1 / stat.rate;
+        u.scd = sk.cd;
+        run.stats.skills++;
+        emit(run, { type: 'heal', from: { x: u.x, y: u.y }, to: { x: worst.x, y: worst.y } });
+        continue;
       }
-      if (!worst) continue;
-      worst.hp = Math.min(worst.max, worst.hp + stat.skill.heal * mul(run.mods, 'heal'));
-      u.cd = 1 / stat.rate;
-      emit(run, { type: 'heal', from: { x: u.x, y: u.y }, to: { x: worst.x, y: worst.y } });
-      continue;
     }
 
     // 앞선 놈부터 친다. 새는 것을 막는 것이 목적이라 출구에 가까운 쪽이 먼저다.
@@ -330,32 +342,20 @@ function tickUnits(run) {
       if (far < best) { best = far; target = e; }
     }
     if (!target) continue;
+
     u.cd = 1 / stat.rate;
     const spot = foeXY(target);
 
-    strike(run, u, stat, target, stat.damage, true);
-
-    if (stat.shape === 'line') {
-      // 나와 목표를 잇는 줄 위의 것은 모두 맞는다.
-      for (const e of run.foes) {
-        if (e === target || e.dead) continue;
-        const p = foeXY(e);
-        if (toLine(p.x, p.y, u.x, u.y, spot.x, spot.y) > 0.55) continue;
-        if (Math.hypot(p.x - u.x, p.y - u.y) > stat.far) continue;
-        strike(run, u, stat, e, stat.damage, false);
-      }
-    } else if (stat.shape === 'splash') {
-      const r = stat.skill.splash * mul(run.mods, 'splash');
-      for (const e of run.foes) {
-        if (e === target || e.dead) continue;
-        const p = foeXY(e);
-        if (Math.hypot(p.x - spot.x, p.y - spot.y) <= r) strike(run, u, stat, e, stat.damage * 0.6, false);
-      }
-    } else if (stat.shape === 'field') {
-      dropZone(run, spot.x, spot.y, stat.skill);
+    if (ready && sk.shape !== 'heal') {
+      u.scd = sk.cd;
+      run.stats.skills++;
+      useSkill(run, u, stat, target, spot);
+      emit(run, { type: 'skill', key: u.key, from: { x: u.x, y: u.y }, to: spot });
+    } else {
+      // 쿨타임 중에는 기본 공격. 한 놈만 때린다.
+      hurt(run, target, stat.damage, false);
+      emit(run, { type: 'shot', key: u.key, from: { x: u.x, y: u.y }, to: spot });
     }
-
-    emit(run, { type: 'shot', key: u.key, from: { x: u.x, y: u.y }, to: spot });
   }
 }
 

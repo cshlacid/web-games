@@ -167,6 +167,13 @@ function paint() {
       ctx.arc(u.x * cell + 6 + i * 5, u.y * cell + 6, 2, 0, Math.PI * 2);
       ctx.fill();
     }
+    // 스킬이 준비됐는지. 쿨타임이 긴 빙결술사를 어디에 세울지가 여기서 갈린다.
+    if (u.scd <= 0) {
+      ctx.fillStyle = (SP.TINT[u.key] || {}).main || theme.fg;
+      ctx.beginPath();
+      ctx.arc(u.x * cell + cell - 6, u.y * cell + 6, 2.6, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   if (press && press.key) {
@@ -225,7 +232,7 @@ function paint() {
   for (const p of pops) {
     const grow = 1 - p.t / POP_LIFE;
     ctx.globalAlpha = Math.max(0, p.t / POP_LIFE) * 0.9;
-    ctx.strokeStyle = p.kind === 'crit' ? theme.life : theme.gold;
+    ctx.strokeStyle = (SP.TINT[p.key] || {}).main || theme.gold;
     ctx.lineWidth = 2.5;
     ctx.beginPath();
     ctx.arc(p.x * cell + cell / 2, p.y * cell + cell / 2, cell * (0.2 + grow * 0.32), 0, Math.PI * 2);
@@ -281,7 +288,9 @@ function hud() {
   el.bar.hidden = !picked;
   if (picked) {
     const d = D.UNITS[picked.key];
-    el.barName.textContent = `${d.name} ${picked.tier}단계 · 사거리 ${d.range.min}-${d.range.max}`;
+    const wait = Math.max(0, picked.scd);
+    el.barName.textContent = `${d.name} ${picked.tier}단계 · 사거리 ${d.range.min}-${d.range.max}`
+      + ` · ${d.skill.name} ${wait > 0.1 ? `${Math.ceil(wait)}초` : '준비'}`;
     const top = picked.tier >= D.UP.max;
     el.barUp.disabled = top || run.gold < R.upCost(picked.key, picked.tier);
     el.barUp.textContent = top ? '끝까지 올렸다' : `올리기 ${R.upCost(picked.key, picked.tier)}`;
@@ -298,8 +307,11 @@ function handle(events) {
       if (now - lastShotSound > 70) { Sound.play('shot', PITCH[ev.key] || 660); lastShotSound = now; }
     } else if (ev.type === 'heal') {
       shots.push({ from: ev.from, to: ev.to, t: SHOT_LIFE * 2, kind: 'heal' });
-    } else if (ev.type === 'crit' || ev.type === 'stun') {
-      pops.push({ x: ev.x, y: ev.y, t: POP_LIFE, kind: ev.type });
+    } else if (ev.type === 'skill') {
+      // 스킬이 나간 자리에 고리를 남긴다. 쿨타임이 돌아온 것을 눈으로 알린다.
+      shots.push({ from: ev.from, to: ev.to, t: SHOT_LIFE * 1.6, kind: ev.key });
+      pops.push({ x: ev.to.x, y: ev.to.y, t: POP_LIFE, key: ev.key });
+      if (now - lastShotSound > 40) { Sound.play('shot', (PITCH[ev.key] || 660) * 0.75); lastShotSound = now; }
     } else if (ev.type === 'kill') {
       if (now - lastShotSound > 40) Sound.play('kill');
     } else if (ev.type === 'down') {
@@ -371,7 +383,7 @@ function buildPalette() {
     cost.className = 'cost';
     cost.textContent = String(d.cost);
     node.appendChild(cost);
-    node.title = `${d.name} · 사거리 ${d.range.min}-${d.range.max} — ${d.note}`;
+    node.title = `${d.name} · 사거리 ${d.range.min}-${d.range.max} · ${d.skill.name}(${d.skill.cd}초) — ${d.skill.note}`;
     node.addEventListener('click', () => {
       chosen = chosen === key ? null : key;
       picked = null;

@@ -100,7 +100,9 @@ check('우두머리가 새면 셋이 준다', bossLeak.stats.livesLost, 3);
 const block = make(hall);
 const wall = R.place(block, 'shield', 1, 3);
 R.spawn(block, 'grunt', 50);
-for (let i = 0; i < 90; i++) R.step(block, R.TICK);
+// 방패병이 스킬로 붙들어 두므로 예전보다 오래 걸린다 — 기절이 풀린 사이에
+// 조금씩 부순다.
+for (let i = 0; i < 300; i++) R.step(block, R.TICK);
 check('막아 세우면 부수기 시작한다', wall.hp < wall.max, true);
 check('부수는 동안은 지나가지 못한다', block.stats.livesLost, 0);
 
@@ -148,34 +150,70 @@ check('다섯 칸은 못 친다', R.inRange(R.statOf('archer', 1, {}), 5), false
 check('단계를 올려도 안쪽 한계는 그대로', R.statOf('cannon', 3, {}).near, R.statOf('cannon', 1, {}).near);
 check('단계를 올리면 바깥은 늘어난다', R.statOf('cannon', 3, {}).far > R.statOf('cannon', 1, {}).far, true);
 
-// --- 관통과 출혈 ---
-const row = make(field, { mods: { startGold: 10 } });
-row.timer = 9999;
-R.place(row, 'spear', 2, 0);
-const front = stand(row, 'grunt', 400, 2, 1);
-const behind = stand(row, 'grunt', 400, 2, 2);
-const aside = stand(row, 'grunt', 400, 0, 2);
-for (let i = 0; i < 4; i++) R.step(row, R.TICK);
-check('창은 한 줄을 꿰뚫는다', [front.hp < front.max, behind.hp < behind.max], [true, true]);
-check('줄 밖은 맞지 않는다', aside.hp, aside.max);
+// --- 기본 공격과 스킬 ---
+// 스킬은 제 쿨타임이 돌아올 때만 나가고, 그 사이에는 기본 공격이 대신한다.
+const aim = make(field, { mods: { startGold: 10 } });
+aim.timer = 9999;
+R.place(aim, 'archer', 2, 0);
+const mark = stand(aim, 'grunt', 9000, 2, 1);
+R.step(aim, R.TICK);
+check('첫 발은 스킬이라 배수가 붙는다',
+  Math.abs((mark.max - mark.hp) - D.UNITS.archer.damage * D.UNITS.archer.skill.mul) < 0.01, true);
+mark.hp = mark.max;
+R.run(aim, 1.2);
+check('쿨타임 중에는 기본 피해가 들어간다',
+  Math.abs((mark.max - mark.hp) - D.UNITS.archer.damage) < 0.01, true);
+check('쿨타임 중에도 쉬지 않는다', mark.hp < mark.max, true);
 
+const lineHit = make(field, { mods: { startGold: 10 } });
+lineHit.timer = 9999;
+R.place(lineHit, 'spear', 2, 0);
+// 겨누는 것은 출구에 가장 가까운 놈이다. 여기서는 (2,2)가 그쪽이고 (2,1)은
+// 창이 지나는 줄 위에 있어 덤으로 맞는다.
+const aimed = stand(lineHit, 'grunt', 9000, 2, 2);
+const onWay = stand(lineHit, 'grunt', 9000, 2, 1);
+const aside = stand(lineHit, 'grunt', 9000, 0, 2);
+R.step(lineHit, R.TICK);
+check('창의 스킬은 한 줄을 꿰뚫는다', [aimed.hp < aimed.max, onWay.hp < onWay.max], [true, true]);
+check('줄 밖은 맞지 않는다', aside.hp, aside.max);
+check('꿰뚫린 적에게는 출혈이 남는다', !!onWay.bleed, true);
+
+aimed.hp = aimed.max; onWay.hp = onWay.max;
+aimed.bleed = null; onWay.bleed = null;
+R.run(lineHit, 2.5);
+check('쿨타임 중에는 한 놈만 맞는다', onWay.hp, onWay.max);
+check('그동안에도 겨눈 하나는 맞는다', aimed.hp < aimed.max, true);
+
+const bash = make(hall, { mods: { startGold: 10 } });
+bash.timer = 9999;
+R.place(bash, 'shield', 1, 2);
+const bashed = stand(bash, 'grunt', 9000, 1, 1, false);
+R.step(bash, R.TICK);
+check('방패병의 스킬은 기절시킨다', bashed.stunT > 0, true);
+
+// --- 출혈 ---
 const bleeding = make(field, { mods: { startGold: 10 } });
 bleeding.timer = 9999;
 R.place(bleeding, 'spear', 2, 0);
-const cut = stand(bleeding, 'armored', 400, 2, 1);
-R.run(bleeding, 1);
-const afterHit = cut.hp;
-cut.bleed = { dps: D.UNITS.spear.skill.bleedDps, t: 1 };
+const cut = stand(bleeding, 'armored', 9000, 2, 1);
+R.step(bleeding, R.TICK);
+check('맞은 적에게 출혈이 붙는다', !!cut.bleed, true);
 const beforeBleed = cut.hp;
-R.run(bleeding, 1.2);
+cut.bleed = { dps: D.UNITS.spear.skill.bleedDps, t: 1 };
+R.run(bleeding, bleeding.time + 1.05);
 check('출혈은 시간이 지나며 깎는다', cut.hp < beforeBleed, true);
-check('출혈은 방어를 무시한다',
-  Math.abs((beforeBleed - cut.hp) - D.UNITS.spear.skill.bleedDps) < 2.5, true);
-check('맞은 적에게 출혈이 붙는다', afterHit < cut.max, true);
+
+// 중장병의 방어는 6이다. 지속 피해가 방어를 탄다면 초당 7은 1 남짓만 들어간다.
+const armorTest = make(field);
+const tough = stand(armorTest, 'armored', 9000, 1, 1);
+const toughWas = tough.hp;
+tough.bleed = { dps: 6, t: 9 };
+R.run(armorTest, 1.05);
+check('지속 피해는 방어를 무시한다', Math.abs((toughWas - tough.hp) - 6) < 1, true);
 
 // **지속 피해에는 최소 1이 붙지 않는다.** 틱마다 1이 들어가면 초당 서른이 된다.
 const drip = make(field);
-const slowly = stand(drip, 'grunt', 1000, 1, 1);
+const slowly = stand(drip, 'grunt', 9000, 1, 1);
 const was = slowly.hp;
 for (let i = 0; i < 30; i++) {
   slowly.bleed = { dps: 3, t: 9 };
@@ -183,48 +221,33 @@ for (let i = 0; i < 30; i++) {
 }
 check('한 틱에 들어가는 지속 피해는 값 그대로', was - slowly.hp < 6, true);
 
-// --- 기절 ---
-const held = make(hall, { mods: { startGold: 10 }, seed: 5 });
-held.timer = 9999;
-R.place(held, 'shield', 1, 2);
-stand(held, 'grunt', 4000, 1, 1, false);
-R.run(held, 25);
-check('방패병은 적을 기절시킨다', held.stats.stuns > 0, true);
-
-// --- 치명타 ---
-const sniping = make(field, { mods: { startGold: 10 }, seed: 3 });
-sniping.timer = 9999;
-R.place(sniping, 'archer', 2, 0);
-stand(sniping, 'grunt', 6000, 2, 2);
-R.run(sniping, 30);
-check('궁수는 치명타를 낸다', sniping.stats.crits > 0, true);
-
-function crits(seed) {
-  const r = make(field, { mods: { startGold: 10 }, seed });
-  r.timer = 9999;
-  R.place(r, 'archer', 2, 0);
-  stand(r, 'grunt', 6000, 2, 2);
-  R.run(r, 30);
-  return r.stats.crits;
-}
-check('같은 씨드면 굴림도 같다', crits(11), crits(11));
-check('씨드가 다르면 굴림도 다르다', crits(11) === crits(12), false);
-
 // --- 바닥 얼음 ---
+check('빙결술사의 쿨타임이 가장 길다',
+  Object.keys(D.UNITS).every((k) => D.UNITS[k].skill.cd <= D.UNITS.frost.skill.cd), true);
+
 const icy = make(field, { mods: { startGold: 10 } });
 icy.timer = 9999;
 R.place(icy, 'frost', 2, 0);
-const chilled = stand(icy, 'grunt', 4000, 2, 2);
+const chilled = stand(icy, 'grunt', 9000, 2, 2);
 R.run(icy, 3);
 check('빙결술사는 바닥을 깐다', icy.zones.length > 0, true);
 check('밟은 적은 느려진다', chilled.slowT > 0, true);
 check('밟은 적은 깎인다', chilled.hp < chilled.max, true);
 check('얼음이 무한히 쌓이지는 않는다', icy.zones.length <= 12, true);
 
+// 쿨타임이 9초이므로 20초를 돌려도 몇 번뿐이다.
+const paced = make(field, { mods: { startGold: 10 } });
+paced.timer = 9999;
+R.place(paced, 'frost', 2, 0);
+stand(paced, 'grunt', 90000, 2, 2);
+R.run(paced, 20);
+check('긴 쿨타임만큼만 쓴다', paced.stats.skills <= Math.ceil(20 / D.UNITS.frost.skill.cd), true);
+check('그 사이에도 때린다', paced.foes[0].hp < paced.foes[0].max, true);
+
 const melt = make(field, { mods: { startGold: 10 } });
 melt.timer = 9999;
 R.place(melt, 'frost', 2, 0);
-stand(melt, 'grunt', 4000, 2, 2);
+stand(melt, 'grunt', 9000, 2, 2);
 R.run(melt, 2);
 melt.foes.length = 0;
 R.run(melt, 2 + D.UNITS.frost.skill.fieldFor + 1);
@@ -244,6 +267,14 @@ R.place(tooFar, 'healer', 4, 4);
 lonely.hp = 10;
 R.run(tooFar, 5);
 check('사거리 밖은 되살리지 못한다', lonely.hp, 10);
+
+// 멀쩡한 판에서 치유가 헛돌면 힐러는 그 판 내내 아무것도 하지 않는다.
+const idle = make(field, { mods: { startGold: 10 } });
+idle.timer = 9999;
+R.place(idle, 'healer', 2, 0);
+const poked = stand(idle, 'grunt', 9000, 2, 1);
+R.run(idle, 3);
+check('되살릴 이가 없으면 힐러도 적을 친다', poked.hp < poked.max, true);
 
 // --- 골드와 승패 ---
 const bounty = make(field);
