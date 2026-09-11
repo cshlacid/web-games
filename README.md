@@ -22,6 +22,7 @@
 | [주사위 영토전](games/dicewars/) | 주사위를 굴려 이웃 영토를 뺏는다 | 순수 HTML/CSS/JS |
 | [야추](games/yacht/) | 주사위 다섯 개를 굴려 상대와 점수를 겨룬다 | 순수 HTML/CSS/JS |
 | [노노그램](games/nonogram/) | 가장자리 숫자대로 칠해 숨은 그림을 찾는다 | 순수 HTML/CSS/JS |
+| [차 빼기](games/rushhour/) | 막힌 차들을 밀어 빨간 차를 빼낸다 | 순수 HTML/CSS/JS |
 
 ## 로컬에서 실행
 
@@ -79,6 +80,9 @@ node games/yacht/ai.test.js
 node games/nonogram/rules.test.js
 node games/nonogram/solver.test.js
 node games/nonogram/generator.test.js
+node games/rushhour/rules.test.js
+node games/rushhour/solver.test.js
+node games/rushhour/generator.test.js
 ```
 
 ## 구조
