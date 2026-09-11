@@ -14,6 +14,12 @@
   --btn-fg: #f8f4ef;
   --sheet-bg: #ffffff;
 
+  /* 자리 색. 넷이 서로 멀찍이 떨어진 색조여야 합계 줄이 한눈에 읽힌다. */
+  --p1: #3f7a5c;
+  --p2: #b5561f;
+  --p3: #8a6d1f;
+  --p4: #5a5bb5;
+
   --pad-x: clamp(10px, 4vmin, 28px);
   --app-max: 440px;
 }
@@ -33,6 +39,11 @@
     --score: #6fbf95;
     --btn-bg: #453b30;
     --sheet-bg: #241f1c;
+
+    --p1: #6fbf95;
+    --p2: #e08a55;
+    --p3: #d2ad4a;
+    --p4: #8f90dd;
   }
 }
 
@@ -93,10 +104,28 @@ h1 {
 }
 .back:hover { opacity: 1; }
 
-.info-row { display: flex; align-items: center; gap: 12px; }
-.round { font-size: 12px; font-weight: 700; }
-.best { font-size: 12px; font-weight: 600; color: var(--muted); }
-.info-row #new-game { margin-left: auto; }
+.picker-row { display: flex; align-items: center; gap: 10px; }
+.picker { display: flex; gap: 4px; }
+.row-label { font-size: 11px; font-weight: 600; color: var(--muted); }
+.round { font-size: 12px; font-weight: 700; color: var(--muted); }
+.picker-row #new-game { margin-left: auto; }
+
+/* 합계 줄. 자리 색을 그대로 써서 어느 쪽이 내 것인지 따로 읽지 않아도 되게 한다. */
+.tally { margin-left: auto; display: flex; align-items: baseline; gap: 7px; font-size: 12px; font-weight: 700; }
+.tally .label { color: var(--muted); font-weight: 600; }
+.tally span { font-variant-numeric: tabular-nums; }
+.tally .p1 { color: var(--p1); }
+.tally .p2 { color: var(--p2); }
+.tally .p3 { color: var(--p3); }
+.tally .p4 { color: var(--p4); }
+/* 지금 차례인 자리에만 밑줄. 점수판이 누구 것인지와 짝을 이룬다. */
+.tally .now { text-decoration: underline; text-underline-offset: 3px; }
+
+.whose { margin: 0; font-size: 12px; font-weight: 600; color: var(--muted); }
+.whose .p1 { color: var(--p1); }
+.whose .p2 { color: var(--p2); }
+.whose .p3 { color: var(--p3); }
+.whose .p4 { color: var(--p4); }
 
 .pick {
   border: 1px solid var(--line);
@@ -108,6 +137,12 @@ h1 {
   font-weight: 600;
   padding: 4px 10px;
   cursor: pointer;
+}
+
+.pick[aria-pressed="true"] {
+  background: var(--btn-bg);
+  border-color: var(--btn-bg);
+  color: var(--btn-fg);
 }
 
 .board-wrap { position: relative; }
@@ -149,6 +184,9 @@ h1 {
 .slot.open .value { color: var(--muted); opacity: 0.75; }
 .slot.open.zero .value { opacity: 0.4; }
 .slot.open:hover { border-color: var(--keep); }
+/* 0점을 적으려고 고른 칸. 한 번 더 눌러야 들어간다. */
+.slot.armed { border-color: var(--keep); background: var(--board-bg); }
+.slot.armed .value { color: var(--keep); opacity: 1; }
 .slot.dead { cursor: default; opacity: 0.55; }
 
 /* 보너스와 합계는 누르는 칸이 아니다. */
@@ -215,16 +253,6 @@ h1 {
   cursor: pointer;
 }
 .btn:disabled { opacity: 0.4; cursor: default; }
-
-.btn.ghost {
-  flex: 0 0 auto;
-  display: flex; align-items: center; gap: 6px;
-  background: none;
-  color: inherit;
-  border: 1px solid var(--line);
-  font-size: 13px;
-}
-.btn.ghost .icon { width: 16px; height: 16px; }
 
 /* 도움말 시트. 껍데기는 shared/sheet.css, 결과 덮개는 shared/result.css. */
 .sheet {

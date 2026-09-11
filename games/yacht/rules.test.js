@@ -58,8 +58,9 @@ check('이어지는 길이를 센다', [
 
 // --- 판 진행 ---
 {
-  const game = R.newGame();
+  const game = R.newGame(2);
   check('처음에는 세 번 굴릴 수 있다', game.rollsLeft, 3);
+  check('사람은 1번 자리', game.turn, 1);
   check('굴리기 전에는 잡을 수 없다', R.toggleKeep(game, 0), false);
 
   R.roll(game, feed([1, 2, 3, 4, 5]));
@@ -77,44 +78,73 @@ check('이어지는 길이를 센다', [
 }
 
 {
-  const game = R.newGame();
+  const game = R.newGame(2);
   check('굴리지 않고는 적을 수 없다', R.pick(game, 'choice'), null);
   R.roll(game, feed([2, 2, 2, 2, 2]));
   check('적으면 점수가 들어간다', R.pick(game, 'yacht').score, 50);
-  check('같은 칸에 두 번 적을 수 없다', R.pick(game, 'yacht'), null);
-  check('적으면 다음 판이 된다', [game.round, game.rollsLeft], [2, 3]);
+  check('적으면 차례가 넘어간다', [game.turn, game.rollsLeft], [2, 3]);
+  check('넘어간 자리에는 같은 칸이 비어 있다', R.pick(game, 'yacht'), null);
   check('주사위는 비워진다', game.dice, [0, 0, 0, 0, 0]);
-  check('남은 칸은 열한 개', R.open(game).length, 11);
+  check('적은 자리만 한 칸이 찼다',
+    [R.open(game, 1).length, R.open(game, 2).length], [11, 12]);
+  check('한 바퀴를 돌아야 다음 판', game.round, 1);
+}
+
+// 차례가 한 바퀴 돌면 판이 올라간다.
+{
+  const game = R.newGame(3);
+  for (let i = 0; i < 3; i++) {
+    R.roll(game, feed([1, 1, 1, 1, 1]));
+    R.pick(game, 'ones');
+  }
+  check('세 자리가 모두 적으면 다음 판', [game.turn, game.round], [1, 2]);
+  check('자리마다 제 점수판에 적힌다',
+    [1, 2, 3].map((p) => R.sheetOf(game, p).ones), [5, 5, 5]);
 }
 
 // 보너스: 위 칸 합이 63 이상이면 35점이 붙는다.
 {
-  const game = R.newGame();
+  const game = R.newGame(2);
   for (const [key, value] of [['ones', 3], ['twos', 6], ['threes', 9],
-    ['fours', 12], ['fives', 15], ['sixes', 18]]) game.sheet[key] = value;
-  check('위 칸 합', R.upperSum(game), 63);
-  check('보너스가 붙는다', R.bonus(game), 35);
-  check('총점에도 들어간다', R.total(game), 98);
+    ['fours', 12], ['fives', 15], ['sixes', 18]]) game.sheets[1][key] = value;
+  check('위 칸 합', R.upperSum(game, 1), 63);
+  check('보너스가 붙는다', R.bonus(game, 1), 35);
+  check('총점에도 들어간다', R.total(game, 1), 98);
+  check('남의 점수판은 그대로', R.total(game, 2), 0);
 
-  game.sheet.sixes = 12;
-  check('한 끗 모자라면 보너스가 없다', R.bonus(game), 0);
+  game.sheets[1].sixes = 12;
+  check('한 끗 모자라면 보너스가 없다', R.bonus(game, 1), 0);
 }
 
-// 열두 판을 다 채우면 끝난다.
+// 등수. 같은 점수면 자리 번호가 앞선 쪽이 앞에 선다.
 {
-  const game = R.newGame();
+  const game = R.newGame(3);
+  game.sheets[1].choice = 20;
+  game.sheets[2].choice = 30;
+  game.sheets[3].choice = 30;
+  check('점수 순으로 세운다', R.standings(game).map((one) => one.player), [2, 3, 1]);
+}
+
+// 모두가 열두 칸을 채우면 끝난다. 자리 수와 무관하게 차례 수는 같다.
+for (const players of [2, 3, 4]) {
+  const game = R.newGame(players);
   const next = feed([1, 1, 1, 1, 1]);
-  let rounds = 0;
-  while (!game.done && rounds < 20) {
+  let turns = 0;
+  while (!game.done && turns < 100) {
     R.roll(game, next);
     R.pick(game, R.open(game)[0]);
-    rounds++;
+    turns++;
   }
-  check('열두 판이면 끝', [rounds, game.done], [12, true]);
-  check('끝난 뒤에는 굴릴 수 없다', R.roll(game, next), null);
-  check('끝난 뒤에는 적을 수 없다', R.pick(game, 'choice'), null);
-  check('모든 칸이 채워졌다', R.open(game).length, 0);
+  check(`${players}인은 열두 판씩 돈다`, [turns, game.done], [12 * players, true]);
+  check(`${players}인 끝난 뒤에는 굴릴 수 없다`, R.roll(game, next), null);
+  check(`${players}인 끝난 뒤에는 적을 수 없다`, R.pick(game, 'choice'), null);
+  check(`${players}인 모든 자리가 다 채웠다`,
+    Array.from({ length: players }, (_, i) => R.open(game, i + 1).length),
+    new Array(players).fill(0));
 }
+
+check('인원은 둘에서 넷 사이로 잡힌다',
+  [R.newGame(1).players, R.newGame(9).players, R.newGame().players], [2, 4, 2]);
 
 console.log(`${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);

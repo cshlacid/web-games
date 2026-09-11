@@ -33,12 +33,19 @@
         <button class="toggle sound" id="toggle-sfx" type="button" aria-pressed="true">효과음</button>
       </div>
     </div>
-    <div class="info-row">
+    <div class="picker-row">
+      <div class="picker" id="players" role="group" aria-label="인원"></div>
       <span class="round" id="round"></span>
-      <span class="best" id="best"></span>
       <button class="pick" id="new-game" type="button">새 판</button>
     </div>
+    <div class="picker-row">
+      <span class="row-label">난이도</span>
+      <div class="picker" id="levels" role="group" aria-label="난이도"></div>
+      <span class="tally" id="tally"></span>
+    </div>
   </header>
+
+  <p class="whose" id="whose"></p>
 
   <div class="board-wrap">
     <div class="sheet-grid" id="sheet"></div>
@@ -58,7 +65,6 @@
   <div class="dice-row" id="dice"></div>
 
   <div class="pad">
-    <button class="btn ghost" id="undo" type="button"><span class="icon" data-icon="undo"></span>되돌리기</button>
     <button class="btn" id="roll" type="button">굴리기</button>
   </div>
 
@@ -69,15 +75,20 @@
         <b>잡아 두고</b> 나머지만 다시 굴립니다.</li>
       <li>굴린 뒤 <b>점수판의 빈 칸</b>을 누르면 그 칸에 적히고 다음 판으로 넘어갑니다.
         빈 칸에는 지금 주사위로 받을 점수가 <b>흐리게</b> 미리 보입니다.</li>
-      <li>열두 칸을 모두 채우면 끝납니다. <b>0점으로 버리는 칸</b>을 언제 쓸지가 이
-        놀이의 전부입니다.</li>
+      <li>차례는 <b>돌아가며</b> 옵니다. 모두가 열두 칸을 채우면 끝나고, <b>합계가 가장
+        높은 자리가 이깁니다.</b> <b>0점으로 버리는 칸</b>을 언제 쓸지가 이 놀이의
+        전부입니다.</li>
+      <li>판 위의 점수판은 <b>지금 차례인 자리의 것</b>입니다. 상대 차례에는 상대가 무엇을
+        적는지 그대로 보입니다.</li>
       <li><b>위 여섯 칸</b>은 그 눈의 개수만큼 받습니다(3이 셋이면 9점). 위 칸 합이
         <b>63점을 넘기면 보너스 35점</b>이 붙습니다 — 눈마다 셋씩 채우면 딱 63점입니다.</li>
       <li><b>초이스</b>는 다섯 눈의 합, <b>4다이스</b>는 같은 눈이 넷 이상일 때 다섯 눈의
         합, <b>풀하우스</b>는 셋 + 둘일 때 다섯 눈의 합입니다.</li>
       <li><b>S.스트레이트</b>는 넉 줄로 이어지면 15점, <b>L.스트레이트</b>는 닷 줄이면
         30점, <b>야추</b>는 다섯이 모두 같으면 50점입니다.</li>
-      <li>방금 적은 칸은 <b>되돌리기</b>로 무를 수 있습니다. 다시 굴리면 무를 수 없습니다.</li>
+      <li><b>0점을 적을 때만</b> 한 번 더 눌러 확인합니다. 값비싼 칸을 손이 미끄러져
+        버리는 일을 막으려는 것입니다.</li>
+      <li><b>난이도</b>는 판을 다시 만들지 않고 언제든 바꿀 수 있습니다.</li>
     </ul>
     <div class="sheet-actions">
       <button class="btn" id="help-close" type="button">닫기</button>
@@ -86,8 +97,8 @@
 </main>
 
 <script src="../../shared/base.js"></script>
-<script src="../../shared/icons.js"></script>
 <script src="rules.js"></script>
+<script src="ai.js"></script>
 <script src="../../shared/audio.js"></script>
 <script src="audio.js"></script>
 <script src="../../shared/sheet.js"></script>
