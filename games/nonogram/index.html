@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>노노그램</title>
+<meta name="description" content="가장자리 숫자대로 칸을 칠해 그림을 찾는 논리 퍼즐">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><rect x='2' y='2' width='20' height='20' rx='3' fill='%23e9e4dc'/><rect x='2' y='2' width='6.67' height='6.67' fill='%232f3b46'/><rect x='15.33' y='2' width='6.67' height='6.67' fill='%232f3b46'/><rect x='8.67' y='8.67' width='6.67' height='6.67' fill='%232f3b46'/><rect x='2' y='15.33' width='6.67' height='6.67' fill='%232f3b46'/><rect x='15.33' y='15.33' width='6.67' height='6.67' fill='%232f3b46'/></svg>">
+<link rel="manifest" href="../../manifest.json">
+<link rel="apple-touch-icon" href="../../icons/icon-180.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="노노그램">
+<meta name="theme-color" content="#f5f4f1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#15171a" media="(prefers-color-scheme: dark)">
+<link rel="stylesheet" href="../../shared/base.css">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="../../shared/sheet.css">
+</head>
+<body>
+<main class="app">
+  <header class="head">
+    <div class="title-row">
+      <div class="head-nav">
+        <a class="back" href="../../">← 목록</a>
+        <button class="toggle" id="help-open" type="button" aria-pressed="false">도움말</button>
+      </div>
+      <h1>노노그램</h1>
+      <div class="head-actions">
+        <button class="toggle sound" id="toggle-bgm" type="button" aria-pressed="true">BGM</button>
+        <button class="toggle sound" id="toggle-sfx" type="button" aria-pressed="true">효과음</button>
+      </div>
+    </div>
+    <div class="picker-row">
+      <div class="picker" id="sizes" role="group" aria-label="판 크기"></div>
+      <span class="best" id="best"></span>
+      <span class="timer" id="timer">0:00</span>
+    </div>
+  </header>
+
+  <div class="board-wrap">
+    <div class="board" id="board"></div>
+  </div>
+
+  <!-- 다 푼 그림을 가리면 안 되므로 결과는 판 위에 덮지 않고 아래에 편다
+       (루트 CLAUDE.md의 예외. 꼬들·체스 퍼즐과 같은 이유다). -->
+  <div class="sheet" id="result" role="status" aria-live="polite" hidden>
+    <p class="sheet-title" id="result-title"></p>
+    <p class="sheet-note" id="result-note"></p>
+    <div class="sheet-actions">
+      <button class="btn" id="again" type="button">새 판</button>
+    </div>
+  </div>
+
+  <p class="toast" id="toast" role="status" aria-live="polite"></p>
+
+  <div class="modes" id="modes" role="group" aria-label="칠하기 방식">
+    <button class="mode" id="mode-fill" type="button" aria-pressed="true">
+      <span class="mode-icon" data-game-icon="fill"></span><span class="mode-label">칠하기</span>
+    </button>
+    <button class="mode" id="mode-mark" type="button" aria-pressed="false">
+      <span class="mode-icon" data-game-icon="cross"></span><span class="mode-label">아님</span>
+    </button>
+  </div>
+
+  <div class="pad">
+    <div class="tools">
+      <button class="tool" id="undo" type="button">
+        <span class="tool-icon" data-icon="undo"></span><span class="tool-label">되돌리기</span>
+      </button>
+      <button class="tool" id="clear" type="button">
+        <span class="tool-icon" data-icon="backspace"></span><span class="tool-label">지우기</span>
+      </button>
+      <button class="tool" id="hint" type="button">
+        <span class="tool-icon" data-icon="hint"></span><span class="tool-label">힌트</span>
+      </button>
+      <button class="tool" id="new-game" type="button">
+        <span class="tool-icon" data-icon="plus"></span><span class="tool-label">새 판</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="sheet" id="help" hidden>
+    <p class="sheet-title">규칙</p>
+    <ul class="help-list">
+      <li>가장자리 숫자는 그 줄에서 <b>이어서 칠해진 칸의 길이</b>를 차례로 적은 것입니다.
+        <b>3 1</b>이면 셋을 칠하고 한 칸 이상 띄운 뒤 하나를 칠합니다.</li>
+      <li>칸을 <b>누르거나 쓸어서</b> 칠합니다. 이미 칠한 칸을 다시 쓸면 지워집니다.</li>
+      <li><b>아님</b>으로 바꾸면 비어 있는 것이 확실한 칸에 가위표를 칩니다. 판정에는
+        들어가지 않는 <b>메모</b>지만, 이것을 쳐 두어야 다음 칸이 보입니다.</li>
+      <li>숫자를 다 맞춘 줄은 <b>숫자가 흐려집니다.</b></li>
+      <li><b>모든 판은 찍지 않고 논리로만 풀립니다.</b> 막히면 한 줄만 다시 보세요 —
+        그 줄 안에서 반드시 정해지는 칸이 있습니다.</li>
+      <li>작은 판과 보통 판에는 <b>그림</b>이 숨어 있습니다. 다 풀면 이름이 나옵니다.</li>
+      <li><b>힌트</b>는 다음 한 칸을 알려 줍니다. 힌트를 쓴 판은 최고 기록에 넣지 않습니다.</li>
+    </ul>
+    <div class="sheet-actions">
+      <button class="btn" id="help-close" type="button">닫기</button>
+    </div>
+  </div>
+</main>
+
+<script src="../../shared/base.js"></script>
+<script src="../../shared/icons.js"></script>
+<script src="icons.js"></script>
+<script src="rules.js"></script>
+<script src="solver.js"></script>
+<script src="pictures.js"></script>
+<script src="generator.js"></script>
+<script src="../../shared/audio.js"></script>
+<script src="audio.js"></script>
+<script src="../../shared/sheet.js"></script>
+<script src="main.js"></script>
+</body>
+</html>
