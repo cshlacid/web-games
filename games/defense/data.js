@@ -69,6 +69,39 @@ const UNITS = {
   },
 };
 
+// 영웅. **한 판에 한 번만 부를 수 있다**(`hero`). 값이 비싸 첫 웨이브부터 세울 수
+// 없고, 어느 웨이브에 꺼내느냐가 그 판의 판단이 된다. 편성에서 일반 다섯 칸과는
+// 따로 한 칸을 차지한다.
+const HEROES = {
+  blade: {
+    name: '검성', cost: 220, damage: 26, rate: 1.2, hp: 500, hero: true,
+    range: { min: 1, max: 1 },
+    skill: { name: '회전베기', cd: 5, shape: 'ring', mul: 1.6, ring: 1.7, note: '둘레를 통째로 벤다' },
+    note: '길목에 서서 베고 버틴다',
+  },
+  arch: {
+    name: '대마법사', cost: 260, damage: 20, rate: 0.55, hp: 90, hero: true,
+    range: { min: 2, max: 6 },
+    skill: {
+      name: '운석', cd: 10, shape: 'splash', mul: 3.6, splash: 2, bleedDps: 10, bleedFor: 3,
+      note: '떨어뜨려 태운다',
+    },
+    note: '판 끝에서 끝까지 닿는다. 코앞은 못 친다',
+  },
+  saint: {
+    name: '성기사', cost: 240, damage: 14, rate: 1, hp: 260, hero: true,
+    range: { min: 1, max: 4 },
+    skill: { name: '치유의 빛', cd: 6, shape: 'heal', heal: 110, all: true, note: '둘레의 아군을 한꺼번에' },
+    note: '옆을 통째로 되살리고 같이 싸운다',
+  },
+};
+
+Object.assign(UNITS, HEROES);
+const HERO_KEYS = Object.keys(HEROES);
+// 영웅 카드는 이 스테이지부터 나온다. 처음 몇 판은 일반 캐릭터를 하나씩 배우는
+// 구간이라 그 앞에 섞으면 배울 것이 두 겹이 된다.
+const HERO_FROM = 4;
+
 // 처음 열려 있는 것은 궁수 하나뿐이다. 나머지는 목표를 달성해야 들어온다 —
 // 초반 대여섯 스테이지가 하나씩 배우는 구간이 된다.
 const STARTER = 'archer';
@@ -115,7 +148,7 @@ const RUN = {
   refund: 0.6,    // 해고했을 때 돌려받는 비율
 };
 
-const Data = { UNITS, STARTER, LOCKED, UP, DOT_PIERCES, FOES, FOE_FROM, RUN };
+const Data = { UNITS, HEROES, HERO_KEYS, HERO_FROM, STARTER, LOCKED, UP, DOT_PIERCES, FOES, FOE_FROM, RUN };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = Data;
 if (typeof window !== 'undefined') window.DefenseData = Data;

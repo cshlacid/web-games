@@ -92,7 +92,9 @@ function play(stage, save, opts) {
   const style = o.style || 'open';
   const run = R.createRun(stage, {
     mods: T.modsOf(save),
-    roster: save.team.slice(),
+    // 영웅도 데려간다. 사고 싶은 목록에는 없지만 골드가 남으면 비싼 것부터
+    // 고르므로 자연스럽게 불려 나간다.
+    roster: T.rosterOf(save),
     map: o.map,
   });
   let guard = 0;

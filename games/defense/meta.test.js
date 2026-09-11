@@ -77,6 +77,29 @@ check('빼면 자리가 난다', team.team.includes('cannon'), false);
 const solo = fresh();
 check('마지막 하나는 뺄 수 없다', T.toggleTeam(solo, D.STARTER), false);
 
+// --- 영웅 ---
+const heroSave = T.blank();
+T.grant(heroSave, 'blade');
+check('영웅을 받으면 바로 데려간다', heroSave.hero, 'blade');
+check('영웅은 일반 편성 칸을 쓰지 않는다', heroSave.team.includes('blade'), false);
+check('데려가는 것은 편성에 영웅 한 칸', T.rosterOf(heroSave), [D.STARTER, 'blade']);
+T.chooseHero(heroSave, 'blade');
+check('다시 고르면 두고 간다', heroSave.hero, null);
+check('영웅 없이도 데려갈 것은 있다', T.rosterOf(heroSave), [D.STARTER]);
+T.grant(heroSave, 'saint');
+check('이미 하나를 데려가면 새 영웅은 대기', heroSave.hero, 'saint');
+check('가지지 않은 영웅은 못 고른다', T.chooseHero(heroSave, 'arch'), false);
+check('영웅은 일반 편성에 못 넣는다', T.toggleTeam(heroSave, 'saint'), false);
+check('저장본은 가지지 않은 영웅을 버린다', T.patch({ hero: 'arch' }).hero, null);
+check('저장본은 가진 영웅만 남긴다', T.patch({ owned: ['archer', 'blade'], hero: 'blade' }).hero, 'blade');
+
+const early = T.cardsFor(T.blank(), D.HERO_FROM - 1, 4, () => 0.3);
+check('영웅 카드는 이른 스테이지에 안 나온다', early.some((c) => c.hero), false);
+const allOwned = T.blank();
+for (const k of D.LOCKED) T.grant(allOwned, k);
+const late = T.cardsFor(allOwned, D.HERO_FROM, 4, () => 0.3);
+check('일반이 다 열리면 영웅 카드가 나온다', late.some((c) => c.hero), true);
+
 // --- 보상 ---
 const won = R.createRun(3, {});
 won.over = 'won';

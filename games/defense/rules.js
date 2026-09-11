@@ -294,7 +294,17 @@ function useSkill(run, u, stat, target, spot) {
   if (sk.stunFor) target.stunT = sk.stunFor;
   if (sk.bleedDps) target.bleed = { dps: sk.bleedDps, t: sk.bleedFor, by: u.key };
 
-  if (sk.shape === 'line') {
+  if (sk.shape === 'ring') {
+    // 목표가 아니라 **자기를 가운데로** 삼는다. 길목에 세워 두면 지나가는 것이
+    // 전부 맞는다.
+    for (const e of run.foes) {
+      if (e === target || e.dead) continue;
+      const p = foeXY(e);
+      if (Math.hypot(p.x - u.x, p.y - u.y) > sk.ring) continue;
+      hurt(run, e, power, false, u.key);
+      if (sk.bleedDps) e.bleed = { dps: sk.bleedDps, t: sk.bleedFor, by: u.key };
+    }
+  } else if (sk.shape === 'line') {
     // 나와 목표를 잇는 줄 위의 것은 모두 맞는다.
     for (const e of run.foes) {
       if (e === target || e.dead) continue;
@@ -342,16 +352,24 @@ function tickUnits(run) {
     if (ready && sk.shape === 'heal') {
       const worst = hurtAlly(run, u, stat);
       if (worst) {
-        const was = worst.hp;
-        worst.hp = Math.min(worst.max, worst.hp + sk.heal * mul(run.mods, 'heal'));
+        // `all`이면 사거리 안의 다친 아군을 한꺼번에 되살린다.
+        const crowd = sk.all
+          ? run.units.filter((o) => o !== u && o.hp < o.max
+            && inRange(stat, Math.hypot(o.x - u.x, o.y - u.y)))
+          : [worst];
+        let back = 0;
+        for (const o of crowd) {
+          const was = o.hp;
+          o.hp = Math.min(o.max, o.hp + sk.heal * mul(run.mods, 'heal'));
+          back += o.hp - was;
+          emit(run, { type: 'heal', from: { x: u.x, y: u.y }, to: { x: o.x, y: o.y } });
+        }
         u.cd = 1 / stat.rate;
         u.scd = sk.cd;
         run.stats.skills++;
-        const back = Math.min(worst.max, worst.hp) - was;
         const row = tally(run, u.key);
         row.skills++;
         row.healed += back;
-        emit(run, { type: 'heal', from: { x: u.x, y: u.y }, to: { x: worst.x, y: worst.y } });
         continue;
       }
     }

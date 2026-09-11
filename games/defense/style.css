@@ -99,6 +99,13 @@ h1 {
 .chip.gold { color: var(--gold); margin-left: auto; }
 .chip.lives { color: var(--life); }
 .chip.wave { color: var(--fg); }
+.chip.time { font-variant-numeric: tabular-nums; }
+/* 속공 목표가 걸린 판에서는 남은 시간이 곧 목표다. 넘기면 색으로 알린다. */
+.chip.time.over { color: var(--life); }
+
+/* 영웅 자리. 한 판에 한 번뿐인 것이라 팔레트에서도 달라 보여야 한다. */
+.slot.hero { border-color: var(--gold); box-shadow: inset 0 0 0 1px var(--gold); }
+.slot.hero.used { opacity: 0.35; }
 
 .board-wrap { position: relative; display: flex; justify-content: center; }
 

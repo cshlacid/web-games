@@ -36,6 +36,7 @@
     <div class="status">
       <span class="chip" id="stage">스테이지 1</span>
       <span class="chip lives" id="lives">목숨 5</span>
+      <span class="chip time" id="time">0:00</span>
       <span class="chip gold" id="gold">160</span>
       <span class="chip wave" id="wave">대기</span>
     </div>
@@ -104,6 +105,9 @@
     <p class="camp-label">편성 <span class="camp-note" id="team-count"></span></p>
     <div class="camp-list" id="team-list"></div>
 
+    <p class="camp-label">영웅 <span class="camp-note">한 판에 한 번만 부를 수 있다. 한 명만 데려간다</span></p>
+    <div class="camp-list" id="hero-list"></div>
+
     <p class="camp-label">육성 <span class="camp-note">레벨이 오르면 그 사람의 피해가 는다</span></p>
     <div class="camp-list" id="level-list"></div>
 
@@ -136,6 +140,9 @@
       <li><b>사거리는 사람마다 다르고 안쪽 한계가 있습니다.</b> 포수는 2~5칸이라
         <b>코앞의 적은 못 칩니다</b> — 누르면 사거리가 도넛으로 보입니다.</li>
       <li><b>적이 밟고 있는 칸에는 세울 수 없습니다.</b> 길목은 미리 잡아 두세요.</li>
+      <li><b>영웅</b>은 한 판에 <b>한 번만</b> 부를 수 있고, 편성에서 따로 한 칸을
+        씁니다. 값이 비싸 첫 웨이브에는 못 세우니 <b>어느 웨이브에 꺼낼지</b>가
+        판단입니다. 스테이지 4부터 카드로 나옵니다.</li>
       <li>스테이지마다 <b>목표</b>가 붙습니다. <b>못 채워도 클리어는 클리어</b>이고,
         채우면 <b>카드를 한 장 고릅니다</b> — 새 사람, 보석, 1회용 아이템.</li>
       <li><b>보석으로 레벨을 올립니다.</b> 판 안의 값은 그대로이고 스테이지마다 적만

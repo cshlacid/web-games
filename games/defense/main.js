@@ -20,7 +20,7 @@ const Sound = window.DefenseSound;
 const el = {};
 for (const [name, id] of [
   ['canvas', 'board'], ['palette', 'palette'], ['items', 'items'],
-  ['stage', 'stage'], ['lives', 'lives'], ['gold', 'gold'], ['wave', 'wave'], ['goal', 'goal'],
+  ['stage', 'stage'], ['lives', 'lives'], ['time', 'time'], ['heroList', 'hero-list'], ['gold', 'gold'], ['wave', 'wave'], ['goal', 'goal'],
   ['toast', 'toast'], ['bar', 'unit-bar'], ['barName', 'unit-name'], ['barUp', 'unit-up'],
   ['barSell', 'unit-sell'], ['barStats', 'unit-stats'], ['report', 'report'], ['resultCamp', 'result-camp'], ['rush', 'rush'], ['speed', 'speed'], ['restart', 'restart'],
   ['result', 'result'], ['resultTitle', 'result-title'], ['resultNote', 'result-note'],
@@ -272,6 +272,11 @@ function hud() {
       : `웨이브 ${run.wave}/${run.waves.length}`);
   el.rush.disabled = !waiting || !!run.over;
 
+  // 진행 시간. 속공 목표가 걸린 판에서는 한도까지 같이 적는다.
+  const limit = goal.id === 'swift' ? goal.arg : null;
+  el.time.textContent = limit ? `${clock(run.time)} / ${clock(limit)}` : clock(run.time);
+  el.time.classList.toggle('over', !!limit && run.time > limit);
+
   const done = G.met(goal, run.stats);
   el.goal.classList.toggle('done', done && !!run.over);
   el.goal.innerHTML = `목표 <b>${goal.name}</b> · ${goal.note}`;
@@ -279,6 +284,8 @@ function hud() {
   for (const node of el.palette.children) {
     const key = node.dataset.key;
     node.classList.toggle('poor', run.gold < D.UNITS[key].cost);
+    // 이미 부른 영웅은 회색으로 둔다 — 눌러도 안 되는 이유가 보여야 한다.
+    node.classList.toggle('used', !!D.UNITS[key].hero && run.heroUsed);
     node.setAttribute('aria-pressed', String(chosen === key));
   }
   for (const node of el.items.children) {
@@ -414,14 +421,17 @@ function showCards(cards) {
 }
 
 // --- 판 시작 ---
+const clock = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
+
 function buildPalette() {
   el.palette.textContent = '';
-  el.palette.style.gridTemplateColumns = `repeat(${Math.max(3, save.team.length)}, minmax(0, 1fr))`;
-  for (const key of save.team) {
+  const roster = T.rosterOf(save);
+  el.palette.style.gridTemplateColumns = `repeat(${Math.max(3, roster.length)}, minmax(0, 1fr))`;
+  for (const key of roster) {
     const d = D.UNITS[key];
     const node = document.createElement('button');
     node.type = 'button';
-    node.className = 'slot';
+    node.className = D.UNITS[key].hero ? 'slot hero' : 'slot';
     node.dataset.key = key;
     node.setAttribute('aria-pressed', 'false');
     node.appendChild(spriteNode(key));
@@ -478,7 +488,7 @@ function useItem(id) {
 function newRun(next) {
   stage = Math.min(save.best + 1, Math.max(1, next || stage));
   goal = G.goalOf(stage);
-  run = R.createRun(stage, { mods: T.modsOf(save), roster: save.team.slice() });
+  run = R.createRun(stage, { mods: T.modsOf(save), roster: T.rosterOf(save) });
   chosen = save.team[0] || null;
   picked = null;
   press = null;
@@ -627,6 +637,30 @@ function renderCamp() {
       Sound.play('click');
     });
     el.teamList.appendChild(node);
+  }
+
+  el.heroList.textContent = '';
+  const heroes = save.owned.filter(T.isHero);
+  if (!heroes.length) {
+    const none = document.createElement('p');
+    none.className = 'camp-note';
+    none.textContent = `아직 없습니다. 스테이지 ${D.HERO_FROM}부터 목표를 채우면 카드로 나옵니다.`;
+    el.heroList.appendChild(none);
+  }
+  for (const key of heroes) {
+    const on = save.hero === key;
+    const node = row(`<span class="who">${D.UNITS[key].name}<br><span class="camp-note">${D.UNITS[key].skill.name} · ${D.UNITS[key].note}</span></span>`
+      + `<span class="sub">${on ? '데려감' : `고용 ${D.UNITS[key].cost}`}</span>`);
+    node.prepend(spriteNode(key, 26));
+    node.setAttribute('aria-pressed', String(on));
+    node.addEventListener('click', () => {
+      T.chooseHero(save, key);
+      T.store(save);
+      buildPalette();
+      renderCamp();
+      Sound.play('click');
+    });
+    el.heroList.appendChild(node);
   }
 
   el.levelList.textContent = '';

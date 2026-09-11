@@ -67,6 +67,10 @@ function defs(k, c) {
 const ground = () => `
   <ellipse cx="${MID}" cy="176" rx="46" ry="9" fill="#000" opacity="0.2"/>`;
 
+const heroGround = () => `
+  <ellipse cx="${MID}" cy="176" rx="54" ry="12" fill="#f0d27a" opacity="0.45"/>
+  <ellipse cx="${MID}" cy="176" rx="44" ry="8" fill="#000" opacity="0.2"/>`;
+
 // 다리와 신발. 천 옷 아래로 조금만 내민다 — 다 보이면 몸이 길어져 SD 비율이 깨진다.
 const boots = (k, c) => `
   <g stroke="${c.ink}" stroke-width="3.4" stroke-linejoin="round">
@@ -306,10 +310,10 @@ const cape = (k, c) => `
   <path d="M62 100 Q30 132 34 174 Q96 186 158 174 Q162 132 130 100 Z"
         fill="${c.dark}" stroke="${c.ink}" stroke-width="3.4" stroke-linejoin="round"/>`;
 
-function figure(key, c, parts) {
+function figure(key, c, parts, hero) {
   return `<svg viewBox="0 0 ${CELL} ${CELL}" width="${CELL}" height="${CELL}" xmlns="http://www.w3.org/2000/svg">
   <defs>${defs(key, c)}</defs>
-  ${ground()}
+  ${hero ? heroGround() : ground()}
   ${parts}
 </svg>`;
 }
@@ -445,9 +449,80 @@ FIGURES.boss = (() => {
     + head(k, c, 42) + hornedHelm(k, c, true) + rim(k) + '</g>');
 })();
 
+
+// --- 영웅 셋. 한 판에 한 번만 부를 수 있어 한눈에 달라 보여야 한다. ---
+// 금색 테와 망토, 그리고 머리 위로 뻗는 것으로 일반 캐릭터와 가른다.
+
+const greatSword = (k, c) => `
+  <g stroke="${c.ink}" stroke-width="3.4" stroke-linejoin="round">
+    <path d="M150 4 L164 30 L164 120 L136 120 L136 30 Z" fill="url(#mt${k})"/>
+    <path d="M144 20 L144 116" stroke="#ffffff" stroke-opacity="0.55" stroke-width="5"/>
+    <rect x="120" y="118" width="60" height="13" rx="6" fill="#d9b45c"/>
+    <rect x="143" y="128" width="14" height="34" rx="6" fill="#5a3d24"/>
+    <circle cx="150" cy="166" r="8" fill="#d9b45c"/>
+  </g>`;
+
+const orbStaff = (k, c) => `
+  <g stroke="${c.ink}" stroke-width="3.4" stroke-linejoin="round">
+    <rect x="146" y="56" width="12" height="116" rx="5" fill="url(#wd${k})"/>
+    <circle cx="152" cy="34" r="34" fill="url(#gl${k})" stroke="none"/>
+    <path d="M136 44 Q130 22 152 20 Q174 22 168 44 Q152 36 136 44 Z" fill="#d9b45c"/>
+    <circle cx="152" cy="32" r="17" fill="${c.light}"/>
+    <circle cx="146" cy="26" r="6" fill="#ffffff" opacity="0.9" stroke="none"/>
+  </g>`;
+
+const halo = (k, c) => `
+  <g stroke="${c.ink}" stroke-width="3.4" stroke-linejoin="round">
+    <ellipse cx="${MID}" cy="12" rx="30" ry="9" fill="none" stroke="#f0d27a" stroke-width="7"/>
+    ${pair(`<path d="M58 34 Q26 16 16 44 Q34 38 44 52 Q48 38 58 34 Z" fill="#fdf7e4"/>`)}
+  </g>`;
+
+const beard = (c) => `
+  <g stroke="${c.ink}" stroke-width="3.4" stroke-linejoin="round">
+    <path d="M62 78 Q68 130 96 134 Q124 130 130 78 Q96 96 62 78 Z" fill="#eee6da"/>
+  </g>`;
+
+const mace = (k, c) => `
+  <g stroke="${c.ink}" stroke-width="3.4" stroke-linejoin="round">
+    <rect x="144" y="74" width="12" height="96" rx="5" fill="#5a3d24"/>
+    <circle cx="150" cy="54" r="24" fill="url(#mt${k})"/>
+    <circle cx="142" cy="46" r="8" fill="#ffffff" opacity="0.5" stroke="none"/>
+    ${[0, 1, 2].map((i) => `<circle cx="${150 + Math.cos(i * 2.1) * 26}" cy="${54 + Math.sin(i * 2.1) * 26}" r="7" fill="#d9b45c"/>`).join('')}
+  </g>`;
+
+// 검성 — 붉은 판금과 망토, 등에 진 큰 칼. 붙어서 베는 자리다.
+FIGURES.blade = (() => {
+  const k = 'bl';
+  const c = { ...ALLY, main: '#8e2f3c', light: '#c25a62', dark: '#4e1720', glow: '#ffcf5c' };
+  return figure(k, c, cape(k, c) + greatSword(k, c) + boots(k, c) + torso(k, c, 6) + belt(k, c)
+    + arms(k, c, '#8f97a6') + pauldrons(k, c) + head(k, c) + openHelm(k, c)
+    + face(c, { iris: '#7a2a2a', brow: 3 }) + rim(k), true);
+})();
+
+// 대마법사 — 깊은 자주 옷과 흰 수염, 큰 구슬이 박힌 지팡이. 멀리서 내려친다.
+FIGURES.arch = (() => {
+  const k = 'ac';
+  const c = { ...ALLY, main: '#5b4a9e', light: '#8c7ad0', dark: '#362b63', glow: '#c8b4ff' };
+  return figure(k, c, orbStaff(k, c) + robe(k, c) + torso(k, c) + belt(k, c, 128)
+    + arms(k, c, '#463a78') + head(k, c) + wizardHat(k, c)
+    + face(c, { iris: '#4a3a8a', browColor: '#d8d2c6' }) + beard(c) + rim(k), true);
+})();
+
+// 성기사 — 흰 판금과 날개 달린 고리. 옆을 통째로 되살린다.
+FIGURES.saint = (() => {
+  const k = 'st';
+  const c = { ...ALLY, main: '#e2bd5c', light: '#fff0c0', dark: '#9c7524', glow: '#ffe9a8' };
+  // 망토만 푸른색이다 — 금빛 몸이 밝은 판에서 묻히지 않게 뒤를 받친다.
+  const cloak = { ...c, dark: '#39538c', ink: c.ink };
+  return figure(k, c, cape(k, cloak) + mace(k, c) + boots(k, c) + torso(k, c, 6) + belt(k, c)
+    + arms(k, c, '#d5cdb4') + pauldrons(k, c) + head(k, c) + halo(k, c)
+    + face(c, { iris: '#8a6b2a' }) + rim(k), true);
+})();
+
 const ORDER = [
   'archer', 'shield', 'cannon', 'frost', 'spear', 'healer',
   'grunt', 'swarm', 'swift', 'armored', 'breaker', 'mender', 'boss',
+  'blade', 'arch', 'saint',
 ];
 
 module.exports = { CELL, COLS, FIGURES, ORDER };

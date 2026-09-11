@@ -40,8 +40,10 @@ const ITEM_NAME = { bomb: '폭탄', freeze: '얼림', purse: '보급', mend: '�
 
 const blank = () => ({
   best: 0, gems: 0, levels: {}, perks: { lives: 0, slots: 0, purse: 0 },
-  owned: [D.STARTER], team: [D.STARTER], items: {}, cleared: {}, goals: {},
+  owned: [D.STARTER], team: [D.STARTER], hero: null, items: {}, cleared: {}, goals: {},
 });
+
+const isHero = (key) => !!(D.UNITS[key] && D.UNITS[key].hero);
 
 // 없는 칸·낡은 칸은 기본값으로 메운다. 캐릭터나 축을 새로 더해도 옛 저장본이
 // 깨지지 않아야 한다.
@@ -67,9 +69,11 @@ function patch(raw) {
     if (raw[from]) for (const k of Object.keys(raw[from])) if (raw[from][k]) s[from][k] = true;
   }
   if (Array.isArray(raw.team)) {
-    const keep = raw.team.filter((k) => s.owned.includes(k));
+    // 영웅은 일반 칸에 들어가지 않는다 — 자리를 따로 쓴다.
+    const keep = raw.team.filter((k) => s.owned.includes(k) && !isHero(k));
     if (keep.length) s.team = keep.slice(0, SLOTS_BASE + s.perks.slots);
   }
+  if (isHero(raw.hero) && s.owned.includes(raw.hero)) s.hero = raw.hero;
   return s;
 }
 
@@ -85,6 +89,16 @@ const slotsOf = (save) => SLOTS_BASE + save.perks.slots;
 const levelOf = (save, key) => save.levels[key] || 0;
 const levelCost = (save, key) => LEVEL_COST(levelOf(save, key));
 const perkCost = (save, id) => PERKS[id].cost(save.perks[id]);
+
+// 판에 데려가는 전부. 일반 편성에 영웅 한 칸이 더 붙는다.
+const rosterOf = (save) => (save.hero ? [...save.team, save.hero] : save.team.slice());
+
+// 영웅은 한 명만 데려간다. 같은 것을 다시 누르면 빼는 것으로 본다.
+function chooseHero(save, key) {
+  if (key != null && (!isHero(key) || !save.owned.includes(key))) return false;
+  save.hero = save.hero === key ? null : key;
+  return true;
+}
 
 // 규칙이 보는 것은 이것뿐이다.
 const gainOf = (level) => ({ damage: Math.pow(LEVEL_STEP, level), hp: Math.pow(LEVEL_HP, level) });
@@ -132,19 +146,25 @@ function grant(save, key) {
   const mean = levels.length ? Math.round(levels.reduce((a, b) => a + b, 0) / levels.length) : 0;
   save.owned.push(key);
   save.levels[key] = mean;
-  if (save.team.length < slotsOf(save)) save.team.push(key);
+  if (isHero(key)) {
+    if (!save.hero) save.hero = key;
+  } else if (save.team.length < slotsOf(save)) {
+    save.team.push(key);
+  }
   return true;
 }
 
 function fillTeam(save) {
   for (const k of save.owned) {
     if (save.team.length >= slotsOf(save)) break;
-    if (!save.team.includes(k)) save.team.push(k);
+    if (isHero(k) || save.team.includes(k)) continue;
+    save.team.push(k);
   }
+  if (!save.hero) save.hero = save.owned.find(isHero) || null;
 }
 
 function toggleTeam(save, key) {
-  if (!save.owned.includes(key)) return false;
+  if (!save.owned.includes(key) || isHero(key)) return false;
   const i = save.team.indexOf(key);
   if (i >= 0) {
     if (save.team.length <= 1) return false;   // 아무도 없이 판에 들어갈 수는 없다
@@ -173,11 +193,18 @@ function gemsFor(save, stage, run, goalDone) {
 // 한 장은 반드시 해금이라, 초반 몇 스테이지가 하나씩 배우는 구간이 된다.
 function cardsFor(save, stage, count, rand) {
   const roll = rand || Math.random;
+  // 잠긴 일반 캐릭터가 먼저다. 영웅은 몇 스테이지 지난 뒤에야 섞인다 — 처음
+  // 몇 판에 둘을 같이 내놓으면 배울 것이 두 겹이 된다.
   const locked = D.LOCKED.filter((k) => !save.owned.includes(k));
+  if (stage >= D.HERO_FROM) locked.push(...D.HERO_KEYS.filter((k) => !save.owned.includes(k)));
   const cards = [];
   for (let i = 0; i < Math.min(2, locked.length) && cards.length < count - 1; i++) {
     const key = locked.splice(Math.floor(roll() * locked.length), 1)[0];
-    cards.push({ kind: 'unlock', key, name: D.UNITS[key].name, note: D.UNITS[key].note });
+    cards.push({
+      kind: 'unlock', key, hero: isHero(key),
+      name: isHero(key) ? `영웅 ${D.UNITS[key].name}` : D.UNITS[key].name,
+      note: D.UNITS[key].note,
+    });
   }
   const purse = Math.max(2, Math.round(scale(stage) * 0.8));
   cards.push({ kind: 'gems', amount: purse, name: `보석 ${purse}`, note: '레벨을 올리는 데 쓴다' });
@@ -225,7 +252,8 @@ function settle(save, stage, run, rand) {
 
 const Meta = {
   KEY, PERKS, ITEM_POOL, ITEM_NAME, LEVEL_STEP, LEVEL_HP, GEM_GROWTH, SLOTS_BASE,
-  blank, patch, load, store, modsOf, modsWith, gainOf, slotsOf, levelOf, levelCost, perkCost,
+  blank, patch, load, store, modsOf, modsWith, gainOf, rosterOf, chooseHero, isHero,
+  slotsOf, levelOf, levelCost, perkCost,
   buyLevel, buyPerk, grant, toggleTeam, fillTeam, gemsFor, cardsFor, takeCard,
   useItem, settle,
 };

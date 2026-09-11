@@ -222,8 +222,10 @@ for (let i = 0; i < 30; i++) {
 check('한 틱에 들어가는 지속 피해는 값 그대로', was - slowly.hp < 6, true);
 
 // --- 바닥 얼음 ---
-check('빙결술사의 쿨타임이 가장 길다',
-  Object.keys(D.UNITS).every((k) => D.UNITS[k].skill.cd <= D.UNITS.frost.skill.cd), true);
+// 영웅은 더 길어도 된다 — 한 판에 한 번뿐이라 다른 자에 선다.
+check('일반 캐릭터 중에서는 빙결술사가 가장 길다',
+  Object.keys(D.UNITS).filter((k) => !D.UNITS[k].hero)
+    .every((k) => D.UNITS[k].skill.cd <= D.UNITS.frost.skill.cd), true);
 
 const icy = make(field, { mods: { startGold: 10 } });
 icy.timer = 9999;
@@ -332,13 +334,36 @@ R.place(win, 'archer', 2, 1);
 R.run(win, 120);
 check('웨이브를 다 막으면 이긴다', win.over, 'won');
 
-// --- 영웅 자리 ---
-D.UNITS.testHero = { name: '시험 영웅', cost: 10, damage: 5, range: 2, rate: 1, hp: 50, kind: 'single', hero: true };
-const hero = make(field, { roster: ['testHero'] });
-R.place(hero, 'testHero', 1, 1);
+// --- 영웅 ---
+const hero = make(field, { roster: D.HERO_KEYS, mods: { startGold: 10 } });
+R.place(hero, 'blade', 1, 1);
 check('영웅을 부르면 통계에 남는다', hero.stats.heroUsed, true);
-check('영웅은 한 판에 한 번', R.canPlace(hero, 'testHero', 2, 1), '영웅은 한 판에 한 번');
-delete D.UNITS.testHero;
+check('영웅은 한 판에 한 번', R.canPlace(hero, 'blade', 2, 1), '영웅은 한 판에 한 번');
+check('다른 영웅도 못 부른다', R.canPlace(hero, 'saint', 2, 1), '영웅은 한 판에 한 번');
+check('셋 다 영웅 표시를 달고 있다', D.HERO_KEYS.every((k) => D.UNITS[k].hero), true);
+
+// 회전베기는 목표가 아니라 **자기를 가운데로** 삼는다.
+const spin = make(field, { roster: D.HERO_KEYS, mods: { startGold: 10 } });
+spin.timer = 9999;
+R.place(spin, 'blade', 2, 2);
+const near1 = stand(spin, 'grunt', 9000, 2, 1);
+const near2 = stand(spin, 'grunt', 9000, 1, 2);
+const outside = stand(spin, 'grunt', 9000, 4, 4);
+R.step(spin, R.TICK);
+check('회전베기는 둘레를 통째로 벤다', [near1.hp < near1.max, near2.hp < near2.max], [true, true]);
+check('둘레 밖은 맞지 않는다', outside.hp, outside.max);
+
+// 성기사의 치유는 다친 아군을 한꺼번에 되살린다.
+const bless = make(field, { roster: [...D.HERO_KEYS, 'shield'], mods: { startGold: 20 } });
+bless.timer = 9999;
+const hurtA = R.place(bless, 'shield', 1, 1);
+const hurtB = R.place(bless, 'shield', 3, 1);
+R.place(bless, 'saint', 2, 2);
+hurtA.hp = 20;
+hurtB.hp = 20;
+R.run(bless, 2);
+check('치유의 빛은 여럿을 한꺼번에', [hurtA.hp > 20, hurtB.hp > 20], [true, true]);
+check('되살린 양이 기여도에 남는다', R.tally(bless, 'saint').healed > 0, true);
 
 // --- 시간 ---
 const clamp = make(field);
