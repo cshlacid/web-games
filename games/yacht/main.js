@@ -31,7 +31,6 @@ const el = {
   roll: document.getElementById('roll'),
   round: document.getElementById('round'),
   whose: document.getElementById('whose'),
-  tally: document.getElementById('tally'),
   players: document.getElementById('players'),
   levels: document.getElementById('levels'),
   toast: document.getElementById('toast'),
@@ -111,42 +110,47 @@ function setFace(die, value) {
 
 // --- 판 만들기 ---
 
-function slotNode(label) {
+// 점수판 한 줄. 왼쪽에 칸 이름, 오른쪽에 자리마다 숫자 하나. **줄 전체가 누르는
+// 자리다** — 내 숫자 칸만 누르게 하면 폰에서 40px도 안 되는 과녁이 된다.
+function rowNode(label, cls) {
   const node = document.createElement('button');
   node.type = 'button';
-  node.className = 'slot';
+  node.className = cls || 'row';
+  node.style.setProperty('--cols', String(players));
   const name = document.createElement('span');
   name.className = 'name';
   name.textContent = label;
-  const value = document.createElement('span');
-  value.className = 'value';
-  node.append(name, value);
-  return { node, value };
+  node.append(name);
+
+  const cells = [];
+  for (let player = 1; player <= players; player++) {
+    const cell = document.createElement('span');
+    cell.className = `cell p${player}`;
+    node.append(cell);
+    cells.push(cell);
+  }
+  return { node, cells };
 }
 
 function build() {
   el.sheet.textContent = '';
   el.dice.textContent = '';
 
-  const slots = {};
-  const upper = R.CATEGORIES.filter((cat) => cat.upper);
-  const lower = R.CATEGORIES.filter((cat) => !cat.upper);
+  // 머리줄. 어느 칸이 누구 것인지 한 번만 적어 두면 아래 줄에서는 색만으로 읽힌다.
+  const head = rowNode('', 'row head');
+  head.cells.forEach((cell, i) => { cell.textContent = i ? `${i + 1}번` : '나'; });
+  el.sheet.append(head.node);
 
-  // 두 폭을 줄 단위로 번갈아 채운다. 격자가 왼쪽 여섯 · 오른쪽 여섯으로 보이려면
-  // 순서를 이렇게 엮어야 한다.
-  for (let i = 0; i < 6; i++) {
-    for (const cat of [upper[i], lower[i]]) {
-      const slot = slotNode(cat.upper ? `${cat.face}의 눈` : cat.label);
-      slot.node.dataset.key = cat.key;
-      slots[cat.key] = slot;
-      el.sheet.append(slot.node);
-    }
+  const rows = {};
+  for (const cat of R.CATEGORIES) {
+    const row = rowNode(cat.upper ? `${cat.face}의 눈` : cat.label);
+    row.node.dataset.key = cat.key;
+    rows[cat.key] = row;
+    el.sheet.append(row.node);
   }
 
-  const bonus = slotNode(`보너스 (${R.BONUS_AT})`);
-  bonus.node.className = 'slot sum';
-  const total = slotNode('합계');
-  total.node.className = 'slot sum total';
+  const bonus = rowNode(`보너스 (${R.BONUS_AT})`, 'row sum');
+  const total = rowNode('합계', 'row sum total');
   el.sheet.append(bonus.node, total.node);
 
   const dice = [];
@@ -157,42 +161,63 @@ function build() {
     dice.push(die);
   }
 
-  view = { slots, bonus, total, dice };
+  view = { head, rows, bonus, total, dice };
 }
 
 // --- 그리기 ---
 
-// 점수판은 **지금 차례인 자리의 것**을 보여 준다. 내 것만 보이면 상대가 무엇을 적었는지
-// 숫자 하나로만 알게 되어, 판이 어떻게 흘러가는지가 보이지 않는다.
+// 점수판에는 **모든 자리의 점수가 함께 보인다.** 내 것만 보이면 상대가 무엇을 적었는지
+// 합계 숫자 하나로만 알게 되어, 누가 어느 칸을 남겨 뒀는지가 보이지 않는다 — 그것이
+// 이 놀이에서 상대를 읽는 거의 전부다.
 function paint() {
   const who = game.turn;
   const rolled = game.rollsLeft < R.ROLLS;
-  const sheet = R.sheetOf(game, who);
+
+  view.head.cells.forEach((cell, i) => {
+    cell.classList.toggle('now', i + 1 === who && !game.done);
+  });
 
   for (const cat of R.CATEGORIES) {
-    const slot = view.slots[cat.key];
-    const written = sheet[cat.key];
-    if (written !== undefined) {
-      slot.node.className = 'slot filled';
-      slot.value.textContent = String(written);
-      continue;
+    const row = view.rows[cat.key];
+    let cls = 'row';
+    // 지금 차례인 자리가 이 칸에 적을 수 있는가 — 미리보기는 그 자리에만 띄운다.
+    const open = R.sheetOf(game, who)[cat.key] === undefined;
+    if (!game.done && open && rolled) {
+      const got = R.scoreOf(cat.key, game.dice);
+      cls += got ? ' open' : ' open zero';
+      if (armed === cat.key) cls += ' armed';
     }
-    if (!rolled) {
-      // 굴리기 전에는 미리보기가 없다. 빈칸으로 두면 무엇이 남았는지만 보인다.
-      slot.node.className = 'slot dead';
-      slot.value.textContent = '·';
-      continue;
-    }
-    const got = R.scoreOf(cat.key, game.dice);
-    slot.node.className = got ? 'slot open' : 'slot open zero';
-    if (armed === cat.key) slot.node.classList.add('armed');
-    slot.value.textContent = String(got);
+    row.node.className = cls;
+
+    row.cells.forEach((cell, i) => {
+      const player = i + 1;
+      const written = R.sheetOf(game, player)[cat.key];
+      const turnCell = player === who && !game.done;
+      cell.classList.toggle('now', turnCell);
+      if (written !== undefined) {
+        cell.classList.remove('guess');
+        cell.textContent = String(written);
+        return;
+      }
+      // 아직 빈 칸. 지금 차례인 자리에만 받을 점수를 흐리게 미리 보인다.
+      const guess = turnCell && rolled;
+      cell.classList.toggle('guess', guess);
+      cell.textContent = guess ? String(R.scoreOf(cat.key, game.dice)) : '·';
+    });
   }
 
-  const upper = R.upperSum(game, who);
-  view.bonus.node.className = R.bonus(game, who) ? 'slot sum hit' : 'slot sum';
-  view.bonus.value.textContent = R.bonus(game, who) ? `+${R.BONUS}` : `${upper}`;
-  view.total.value.textContent = String(R.total(game, who));
+  view.bonus.cells.forEach((cell, i) => {
+    const player = i + 1;
+    const got = R.bonus(game, player);
+    cell.classList.toggle('hit', Boolean(got));
+    cell.classList.toggle('now', player === who && !game.done);
+    cell.textContent = got ? `+${R.BONUS}` : String(R.upperSum(game, player));
+  });
+  view.total.cells.forEach((cell, i) => {
+    const player = i + 1;
+    cell.classList.toggle('now', player === who && !game.done);
+    cell.textContent = String(R.total(game, player));
+  });
 
   game.dice.forEach((value, i) => {
     const die = view.dice[i];
@@ -205,10 +230,8 @@ function paint() {
 
   el.round.textContent = game.done ? '끝' : `${game.round} / ${R.CATEGORIES.length}판`;
   el.whose.innerHTML = game.done ? '' : (mine()
-    ? '<b class="p1">내 점수판</b>'
-    : `<b class="p${who}">${who}번</b>의 점수판`);
-
-  paintTally();
+    ? '<b class="p1">내 차례</b>'
+    : `<b class="p${who}">${who}번</b> 차례`);
 
   el.roll.disabled = game.done || rolling || !mine() || game.rollsLeft === 0;
   if (game.done) el.roll.textContent = '판이 끝났습니다';
@@ -216,21 +239,6 @@ function paint() {
   else if (game.rollsLeft === R.ROLLS) el.roll.textContent = '굴리기';
   else if (game.rollsLeft === 0) el.roll.textContent = '적을 칸을 고르세요';
   else el.roll.textContent = `다시 굴리기 · ${game.rollsLeft}번 남음`;
-}
-
-function paintTally() {
-  el.tally.textContent = '';
-  const label = document.createElement('span');
-  label.className = 'label';
-  label.textContent = '합계';
-  el.tally.append(label);
-  for (let player = 1; player <= game.players; player++) {
-    const span = document.createElement('span');
-    span.className = `p${player}`;
-    if (player === game.turn && !game.done) span.classList.add('now');
-    span.textContent = String(R.total(game, player));
-    el.tally.append(span);
-  }
 }
 
 function showBest() {
@@ -391,6 +399,8 @@ function newGame() {
   clearInterval(spinTimer);
   clearTimeout(botTimer);
   game = R.newGame(players);
+  // 자리 수가 바뀌면 점수판의 칸 수도 달라진다.
+  build();
   rolling = false;
   armed = null;
   el.result.hidden = true;
@@ -479,7 +489,6 @@ function bindSoundToggle(node, key, apply) {
 bindSoundToggle(el.toggleBgm, 'bgm', (on) => Sound.setBgm(on));
 bindSoundToggle(el.toggleSfx, 'sfx', (on) => Sound.setSfx(on));
 
-build();
 newGame();
 
 window.YachtDebug = { game: () => game, write, roll: doRoll, bot: runBot };

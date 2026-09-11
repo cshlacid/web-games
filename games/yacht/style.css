@@ -110,17 +110,6 @@ h1 {
 .round { font-size: 12px; font-weight: 700; color: var(--muted); }
 .picker-row #new-game { margin-left: auto; }
 
-/* 합계 줄. 자리 색을 그대로 써서 어느 쪽이 내 것인지 따로 읽지 않아도 되게 한다. */
-.tally { margin-left: auto; display: flex; align-items: baseline; gap: 7px; font-size: 12px; font-weight: 700; }
-.tally .label { color: var(--muted); font-weight: 600; }
-.tally span { font-variant-numeric: tabular-nums; }
-.tally .p1 { color: var(--p1); }
-.tally .p2 { color: var(--p2); }
-.tally .p3 { color: var(--p3); }
-.tally .p4 { color: var(--p4); }
-/* 지금 차례인 자리에만 밑줄. 점수판이 누구 것인지와 짝을 이룬다. */
-.tally .now { text-decoration: underline; text-underline-offset: 3px; }
-
 .whose { margin: 0; font-size: 12px; font-weight: 600; color: var(--muted); }
 .whose .p1 { color: var(--p1); }
 .whose .p2 { color: var(--p2); }
@@ -147,57 +136,71 @@ h1 {
 
 .board-wrap { position: relative; }
 
-/* 점수판. 폰에서 열두 칸을 한 줄로 세우면 스크롤해야 해서 두 폭으로 나눈다 —
-   위 여섯 칸과 아래 여섯 칸이 원래 다른 묶음이라 나누는 자리도 자연스럽다. */
+/* 점수판. **한 줄에 칸 이름과 자리마다의 점수를 함께 놓는다** — 열두 칸을 두 폭으로
+   나누면 자리별 점수를 놓을 자리가 없다. 줄마다 같은 격자를 쓰므로 칸이 저절로
+   맞춰진다(--cols는 자리 수). */
 .sheet-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4px;
-  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 7px;
   border-radius: 14px;
   background: var(--board-bg);
 }
 
-.slot {
-  display: flex; align-items: center; justify-content: space-between; gap: 6px;
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) repeat(var(--cols), minmax(28px, 1fr));
+  align-items: center;
+  gap: 4px;
   width: 100%;
   border: 1px solid transparent;
-  border-radius: 9px;
+  border-radius: 8px;
   background: var(--row-bg);
   color: inherit;
   font-family: inherit;
-  padding: 7px 9px;
-  cursor: pointer;
+  padding: 6px 8px;
+  cursor: default;
   text-align: left;
 }
 
-.slot .name { font-size: 12px; font-weight: 700; }
-.slot .value {
+/* 칸 이름은 줄바꿈하지 않는다. 넉 자리일 때 접히면 줄 높이가 들쭉날쭉해진다. */
+.row .name { font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+.row .cell {
   font-size: 13px; font-weight: 800;
+  text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
-/* 적힌 칸은 또렷하게, 아직 빈 칸의 미리보기는 흐리게. 이 둘이 같은 무게로 보이면
-   무엇이 이미 끝난 칸인지 한눈에 갈리지 않는다. */
-.slot.filled { cursor: default; }
-.slot.filled .value { color: var(--score); }
-.slot.open .value { color: var(--muted); opacity: 0.75; }
-.slot.open.zero .value { opacity: 0.4; }
-.slot.open:hover { border-color: var(--keep); }
-/* 0점을 적으려고 고른 칸. 한 번 더 눌러야 들어간다. */
-.slot.armed { border-color: var(--keep); background: var(--board-bg); }
-.slot.armed .value { color: var(--keep); opacity: 1; }
-.slot.dead { cursor: default; opacity: 0.55; }
+.row.head { background: none; padding-top: 0; padding-bottom: 2px; }
+.row.head .cell { font-size: 11px; font-weight: 700; opacity: 0.75; }
 
-/* 보너스와 합계는 누르는 칸이 아니다. */
-.slot.sum {
-  background: none;
-  border-color: var(--line);
-  cursor: default;
-}
-.slot.sum .name { color: var(--muted); }
-.slot.total .value { font-size: 15px; }
-.slot.sum.hit .value { color: var(--keep); }
+/* 자리 색. 숫자를 색으로 갈라 두면 머리줄을 다시 읽지 않아도 어느 칸이 누구 것인지
+   알 수 있다. */
+.cell.p1 { color: var(--p1); }
+.cell.p2 { color: var(--p2); }
+.cell.p3 { color: var(--p3); }
+.cell.p4 { color: var(--p4); }
+
+/* 지금 차례인 자리. 머리줄과 합계에만 밑줄을 긋는다 — 칸마다 그으면 열두 줄이 모두
+   밑줄이라 아무것도 가리키지 못한다. */
+.row.head .cell.now, .row.sum .cell.now { text-decoration: underline; text-underline-offset: 3px; }
+/* 아직 안 적은 칸의 미리보기. 적힌 점수와 같은 무게로 보이면 무엇이 끝난 칸인지
+   갈리지 않는다. */
+.cell.guess { opacity: 0.5; font-weight: 700; }
+
+/* 지금 차례인 자리가 적을 수 있는 줄. 내 차례에는 눌러서 적는 줄이 된다. */
+.row.open { cursor: pointer; }
+.row.open:hover { border-color: var(--keep); }
+.row.open.zero .cell.guess { opacity: 0.35; }
+/* 0점을 적으려고 고른 줄. 한 번 더 눌러야 들어간다. */
+.row.armed { border-color: var(--keep); background: var(--board-bg); }
+.row.armed .cell.guess { color: var(--keep); opacity: 1; }
+
+.row.sum { background: none; border-color: var(--line); }
+.row.sum .name { color: var(--muted); }
+.row.sum .cell.hit { color: var(--keep); }
+.row.total .cell { font-size: 14px; }
 
 .toast {
   margin: 0; min-height: 20px;
