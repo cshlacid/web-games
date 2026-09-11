@@ -47,7 +47,7 @@ const HERO_RAISE = 1.8;
 const ITEM_NAME = { bomb: '폭탄', freeze: '얼림', purse: '보급', mend: '구호', order: '명령서' };
 
 const blank = () => ({
-  best: 0, gems: 0, levels: {}, perks: { lives: 0, slots: 0, purse: 0 },
+  best: 0, gems: 0, level: 0, perks: { lives: 0, slots: 0, purse: 0 },
   owned: [D.STARTER], team: [D.STARTER], hero: null, items: {}, cleared: {}, goals: {},
 });
 
@@ -60,8 +60,13 @@ function patch(raw) {
   if (!raw || typeof raw !== 'object') return s;
   if (Number.isFinite(raw.best)) s.best = Math.max(0, Math.floor(raw.best));
   if (Number.isFinite(raw.gems)) s.gems = Math.max(0, Math.floor(raw.gems));
-  if (raw.levels) for (const k of Object.keys(D.UNITS)) {
-    if (Number.isFinite(raw.levels[k])) s.levels[k] = Math.max(0, Math.floor(raw.levels[k]));
+  if (Number.isFinite(raw.level)) s.level = Math.max(0, Math.floor(raw.level));
+  // 캐릭터마다 레벨이 따로였던 옛 저장본은 **가장 높은 것 하나로** 받는다. 가진
+  // 보석을 한 명에게 몰았던 사람의 성장을 깎지 않는 쪽이다.
+  else if (raw.levels && typeof raw.levels === 'object') {
+    for (const k of Object.keys(D.UNITS)) {
+      if (Number.isFinite(raw.levels[k])) s.level = Math.max(s.level, Math.floor(raw.levels[k]));
+    }
   }
   if (raw.perks) for (const k of Object.keys(PERKS)) {
     if (Number.isFinite(raw.perks[k])) s.perks[k] = Math.min(PERKS[k].max, Math.max(0, Math.floor(raw.perks[k])));
@@ -94,8 +99,13 @@ function store(save) {
 }
 
 const slotsOf = (save) => SLOTS_BASE + save.perks.slots;
-const levelOf = (save, key) => save.levels[key] || 0;
-const levelCost = (save, key) => LEVEL_COST(levelOf(save, key));
+// **레벨은 부대 하나에 하나다.** 캐릭터마다 따로 두었더니 보석을 한 명에게 몰아
+// 붓는 것이 언제나 정답이었다 — 같은 종류를 판에 여럿 세우니 그 레벨이 머릿수만큼
+// 곱해지는데, 나눠 키우면 여섯으로 쪼개진 채 각각 한 명분씩만 일한다. 실측으로
+// 궁수만 키우는 쪽이 여섯을 고루 키우는 쪽보다 늘 멀리 갔다. 하나로 모으면 **누구를
+// 데려가느냐가 오직 판과 적의 문제**가 된다.
+const levelOf = (save) => save.level || 0;
+const levelCost = (save) => LEVEL_COST(levelOf(save));
 const perkCost = (save, id) => PERKS[id].cost(save.perks[id]);
 
 // 판에 데려가는 전부. 일반 편성에 영웅 한 칸이 더 붙는다.
@@ -132,15 +142,19 @@ const lockedList = (save) => [...D.LOCKED, ...D.HERO_KEYS].filter((k) => !save.o
 const gainOf = (level) => ({ damage: Math.pow(LEVEL_STEP, level), hp: Math.pow(LEVEL_HP, level) });
 
 // 레벨을 하나 더 올렸을 때의 계수. 화면이 "지금 → 올린 뒤"를 나란히 보여 줄 때 쓴다.
-function modsWith(save, key, plus) {
-  const m = modsOf(save);
-  m.unit[key] = gainOf(levelOf(save, key) + (plus || 0));
-  return m;
+function modsWith(save, plus) {
+  return modsFrom(levelOf(save) + (plus || 0), save);
 }
 
-function modsOf(save) {
+const modsOf = (save) => modsFrom(levelOf(save), save);
+
+// `unit`을 캐릭터마다 채우는 것은 규칙(`statOf`)이 거기서 계수를 읽기 때문이다.
+// 값이 전부 같아진 지금도 통로는 그대로 둔다 — 나중에 캐릭터별 축이 다시 생기면
+// 여기만 고치면 된다.
+function modsFrom(level, save) {
+  const gain = gainOf(level);
   const unit = {};
-  for (const key of Object.keys(D.UNITS)) unit[key] = gainOf(levelOf(save, key));
+  for (const key of Object.keys(D.UNITS)) unit[key] = gain;
   return {
     unit,
     lives: save.perks.lives,
@@ -148,11 +162,11 @@ function modsOf(save) {
   };
 }
 
-function buyLevel(save, key) {
-  const cost = levelCost(save, key);
-  if (!save.owned.includes(key) || save.gems < cost) return false;
+function buyLevel(save) {
+  const cost = levelCost(save);
+  if (save.gems < cost) return false;
   save.gems -= cost;
-  save.levels[key] = levelOf(save, key) + 1;
+  save.level = levelOf(save) + 1;
   return true;
 }
 
@@ -167,13 +181,11 @@ function buyPerk(save, id) {
   return true;
 }
 
-// 새 캐릭터는 지금 평균 레벨로 들어온다. 0으로 주면 신참을 영영 쓰지 않는다.
+// 새로 얻은 캐릭터도 곧바로 부대 레벨을 받는다. 레벨이 하나라 신참이 뒤처지는
+// 일이 아예 없어졌다 — 예전에는 평균 레벨로 넣어 주는 손질이 따로 필요했다.
 function grant(save, key) {
   if (!D.UNITS[key] || save.owned.includes(key)) return false;
-  const levels = save.owned.map((k) => levelOf(save, k));
-  const mean = levels.length ? Math.round(levels.reduce((a, b) => a + b, 0) / levels.length) : 0;
   save.owned.push(key);
-  save.levels[key] = mean;
   if (isHero(key)) {
     if (!save.hero) save.hero = key;
   } else if (save.team.length < slotsOf(save)) {

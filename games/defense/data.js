@@ -31,7 +31,7 @@ const UNITS = {
     note: '멀리서 한 놈씩',
   },
   shield: {
-    name: '방패병', cost: 70, damage: 5, rate: 1.0, hp: 320,
+    name: '방패병', front: true, cost: 70, damage: 5, rate: 1.0, hp: 320,
     range: { min: 1, max: 1 },
     skill: { name: '후려치기', cd: 3.5, shape: 'single', mul: 1.2, stunFor: 1.2, note: '때려서 멈춰 세운다' },
     note: '앞을 막고 버틴다. 체력이 아주 높다',
@@ -39,6 +39,10 @@ const UNITS = {
   cannon: {
     name: '포수', cost: 110, damage: 10, rate: 0.8, hp: 70,
     range: { min: 2, max: 5 },
+    // **기본 공격도 작은 범위다.** 쿨타임 6초짜리라 대부분의 시간을 한 놈씩 때리고
+    // 있었고, 그러면 이름만 포수다. 반지름 1이라 맞닿은 칸까지만 번져 운석(2)과
+    // 겹치지 않는다. 무리 판에서 포수가 답이 되는 자리가 여기서 나온다.
+    basic: { shape: 'splash', splash: 1 },
     skill: { name: '포격', cd: 6, shape: 'splash', mul: 2.6, splash: 1.2, note: '한 발이 주변까지' },
     note: '코앞은 못 친다',
   },
@@ -47,7 +51,7 @@ const UNITS = {
     range: { min: 1, max: 3 },
     skill: {
       name: '얼음 지대', cd: 9, shape: 'field', mul: 0.5,
-      fieldR: 1.3, fieldDps: 1.3, fieldFor: 4, slow: 0.45,
+      fieldR: 1.3, fieldDps: 0.8, fieldFor: 4, slow: 0.45,
       note: '바닥을 얼려 둔다. 밟는 동안 깎이고 느려진다',
     },
     note: '오래 기다리는 대신 판을 바꾼다',
@@ -74,7 +78,7 @@ const UNITS = {
 // 따로 한 칸을 차지한다.
 const HEROES = {
   blade: {
-    name: '검성', who: '레안', cost: 220, damage: 26, rate: 1.2, hp: 500, hero: true,
+    name: '검성', who: '레안', front: true, cost: 220, damage: 26, rate: 1.2, hp: 500, hero: true,
     range: { min: 1, max: 1 },
     // **기본 공격도 둘레를 벤다.** 회전베기가 도는 5초 사이에는 한 놈씩 때리는
     // 창병과 다를 것이 없었다. 반지름 1.1이라 대각선(1.41)은 빠지고 맞닿은 넷만
@@ -97,7 +101,7 @@ const HEROES = {
     note: '판 끝에서 끝까지 닿는다. 코앞은 못 친다',
   },
   saint: {
-    name: '성기사', who: '가론', cost: 240, damage: 18, rate: 1, hp: 260, hero: true,
+    name: '성기사', who: '가론', front: true, cost: 240, damage: 18, rate: 1, hp: 260, hero: true,
     range: { min: 1, max: 4 },
     // **때리면서 되살린다.** 치유의 빛이 6초에 한 번이라 그 사이에는 공격력 14짜리
     // 잡캐였다. 회복량은 고정값이 아니라 제 공격력에 대한 비율이라 레벨을 따라
@@ -144,24 +148,39 @@ const HIT = { single: 'single', area: 'area', dot: 'dot' };
 
 // 적. hp는 그 스테이지 기준 체력에 곱하는 배수다.
 //
-// **`resist`는 "한 놈씩 때리는 공격"에만 걸리는 감소율이다.** 수치로 된 방어는
-// 소용이 없었다 — 보석을 한 캐릭터에 몰면 레벨 60을 넘겨 어떤 방어값도 뚫는다.
-// 그래서 막는 것을 값이 아니라 **공격의 종류**로 바꿨다. 중장병은 궁수가 아무리
-// 세도 거의 안 통하고, 범위(포격·회전베기)·관통(꿰뚫기)·지속(출혈·얼음)이라야
-// 제값이 들어간다. 조합이 필요해지는 자리가 여기다.
+// **`resist`는 공격의 종류마다 다른 감소율이다**(`single`·`area`·`dot`). 수치로 된
+// 방어 하나는 소용이 없었다 — 보석을 한 캐릭터에 몰면 레벨 60을 넘겨 어떤 방어값도
+// 뚫는다. 그래서 막는 것을 값이 아니라 **공격의 종류**로 바꿨다. 적어 두지 않은
+// 종류는 0이다.
+//
+// **표로 넓힌 것은 답을 적마다 다르게 두기 위해서다.** 숫자 하나일 때는 갈리는
+// 적이 중장병 하나뿐이라, 궁수 여섯이면 나머지 다섯 종류가 전부 풀렸다.
 //
 // siege(초당 피해)와 bias(부수는 시간에 곱하는 성향)가 길찾기의 성격을 만든다.
 // 공성병은 둘 다 극단이라 조금만 돌아가야 해도 뚫고 들어온다.
 const FOES = {
-  grunt:   { name: '보병', speed: 1.1, hp: 1, resist: 0, siege: 12, bias: 1, bounty: 8, cost: 1 },
-  swarm:   { name: '무리', speed: 1.35, hp: 0.32, resist: 0, siege: 6, bias: 1, bounty: 4, cost: 0.5 },
-  swift:   { name: '경보병', speed: 2.8, hp: 0.55, resist: 0, siege: 8, bias: 1.2, bounty: 7, cost: 0.9 },
-  // 한 놈씩 때리는 공격은 15%만 들어간다. 궁수를 아무리 키워도 이 벽은 안 넘는다.
-  armored: { name: '중장병', speed: 0.8, hp: 1.5, resist: 0.9, siege: 14, bias: 1, bounty: 22, cost: 1.8 },
-  breaker: { name: '공성병', speed: 0.85, hp: 1.4, resist: 0.35, siege: 60, bias: 0.4, bounty: 16, cost: 2 },
-  // 초당 최대 체력의 6%를 되살린다. 조금씩 깎아서는 따라잡지 못한다.
-  mender:  { name: '치유병', speed: 1, hp: 1, resist: 0.4, siege: 10, bias: 1, bounty: 15, heal: 0.06, healRange: 1.8, cost: 1.9 },
-  boss:    { name: '우두머리', speed: 0.7, hp: 12, resist: 0.55, siege: 70, bias: 0.7, bounty: 90, cost: 0 },
+  grunt:   { name: '보병', speed: 1.1, hp: 1, resist: {}, siege: 12, bias: 1, bounty: 8, cost: 1 },
+  // **한 놈씩 쏘면 반이 낭비된다.** 체력이 3분의 1이라 한 발이 거의 다 넘치는데,
+  // 그 낭비가 마릿수만큼 쌓인다 — 범위로 쓸어야 하는 자리다. 금방 죽어 지속 피해도
+  // 다 들어가기 전에 끝난다.
+  swarm:   { name: '무리', speed: 1.35, hp: 0.32, resist: { single: 0.5, dot: 0.3 }, siege: 6, bias: 1, bounty: 4, cost: 0.5 },
+  // 흩어져 달려 범위에 여럿이 안 걸린다. 그리고 **빠르다** — 사거리 넉 칸을
+  // 1.4초에 지나가 느리게 하지 않으면 한두 발밖에 못 넣는다. 답이 둘인 유일한
+  // 자리다: 한 놈씩 세게 때리는 자와 발을 묶는 자를 같이 세워야 한다.
+  swift:   { name: '경보병', speed: 2.8, hp: 0.55, resist: { area: 0.35 }, siege: 8, bias: 1.2, bounty: 7, cost: 0.9 },
+  // 한 놈씩 때리는 공격은 10%만 들어간다. 궁수를 아무리 키워도 이 벽은 안 넘는다.
+  // **범위도 반만 들어간다** — 범위 하나로 무리와 중장병이 같이 풀리면 포수만 여섯
+  // 세우는 것이 새 정답이 된다(실제로 포수만으로 서른 스테이지를 갔다). 여기 남는
+  // 답은 방어를 통째로 무시하는 지속 피해다 — 창병의 출혈과 얼음 지대.
+  armored: { name: '중장병', speed: 0.8, hp: 1.5, resist: { single: 0.9, area: 0.85 }, chill: 0.6, siege: 14, bias: 1, bounty: 22, cost: 1.8 },
+  // **여기서만 궁수가 답이다.** 두꺼운 가죽이 범위와 지속을 다 먹지만 한 놈씩
+  // 꽂는 것에는 거의 그대로 뚫린다. 초당 60으로 사람을 부수며 들어오므로 시간을
+  // 벌 방패병이 같이 필요하다 — 판이 편성을 요구하는 자리가 여기다.
+  breaker: { name: '공성병', speed: 0.85, hp: 1.4, resist: { single: 0.1, area: 0.5, dot: 0.9 }, chill: 0.25, siege: 60, bias: 0.4, bounty: 16, cost: 2 },
+  // 초당 최대 체력의 6%를 되살린다. 조금씩 깎아서는 따라잡지 못하고, 어느 종류로
+  // 때려도 얼마쯤은 깎인다 — **한 번에 크게 넣는 스킬**이 답인 자리다.
+  mender:  { name: '치유병', speed: 1, hp: 1, resist: { single: 0.35, area: 0.35, dot: 0.5 }, siege: 10, bias: 1, bounty: 15, heal: 0.06, healRange: 1.8, cost: 1.9 },
+  boss:    { name: '우두머리', speed: 0.7, hp: 12, resist: { single: 0.55, area: 0.2 }, chill: 0.2, siege: 70, bias: 0.7, bounty: 90, cost: 0 },
 };
 
 // 종류가 처음 나오는 스테이지. 숫자만 커지면 웨이브 10과 웨이브 80에서 하는 일이
@@ -173,7 +192,7 @@ const FOE_FROM = { grunt: 1, swarm: 2, swift: 3, armored: 5, breaker: 7, mender:
 // 올라가 어떤 수치든 결국 넘긴다. 마릿수를 못 박는 것이 유일하게 확실하다.
 // 여섯이면 한 종류로는 스물두 마리 무리도 중장병 일곱도 감당이 안 되고, 다섯
 // 종류를 섞으면 서른 명이라 넉넉하다.
-const MOST_OF_KIND = 6;
+const MOST_OF_KIND = 4;
 
 // 그 안에서도 겹쳐 세울수록 조금씩 비싸진다. 한도에 닿기 전에도 섞는 쪽이 싸다.
 const RAISE = 1.18;

@@ -66,5 +66,28 @@ check('첫 스테이지는 보병만',
 check('처음 두 웨이브에는 비싼 종류가 없다',
   W.wavesOf(20).slice(0, 2).flatMap((w) => w.groups).every((g) => D.FOES[g.foe].cost <= 1), true);
 
+// --- 판마다 주력 적 ---
+check('주력은 스테이지 씨드로 고정이다', W.themeOf(9), W.themeOf(9));
+check('아직 안 나오는 종류는 주력이 못 된다',
+  [1, 2, 3, 4].every((s) => W.poolAt(s).includes(W.themeOf(s))), true);
+check('우두머리는 주력이 못 된다',
+  [...Array(40)].map((_, i) => W.themeOf(i + 1)).includes('boss'), false);
+
+// 주력이 실제로 앞세워지는가. 종류가 여럿인 스테이지에서 재야 뜻이 있다.
+let leading = 0;
+let stages = 0;
+for (let s = 5; s <= 40; s++) {
+  const theme = W.themeOf(s);
+  const all = W.wavesOf(s).flatMap((w) => w.groups.map((g) => g.foe));
+  const share = all.filter((k) => k === theme).length / all.length;
+  stages++;
+  if (share >= 0.2) leading++;
+}
+check('어느 스테이지에서나 주력이 다섯 중 하나는 된다', leading, stages);
+
+// 판마다 색이 갈리는가. 마흔 판이 전부 같은 주력이면 장치가 없는 것과 같다.
+check('주력이 여러 종류로 갈린다',
+  new Set([...Array(40)].map((_, i) => W.themeOf(i + 11))).size >= 4, true);
+
 console.log(`${passed}개 통과, ${failed}개 실패`);
 if (failed) process.exit(1);

@@ -14,6 +14,7 @@ const M = window.DefenseMap;
 const P = window.DefensePaths;
 const SP = window.DefenseSprites;
 const G = window.DefenseGoals;
+const WV = window.DefenseWaves;
 const T = window.DefenseMeta;
 const Sound = window.DefenseSound;
 
@@ -59,6 +60,17 @@ const idx = (x, y) => y * run.map.w + x;
 // 100 아래에서는 소수 한 자리까지 적는다. 레벨 하나가 올리는 폭이 그 자리에 있어,
 // 반올림해 버리면 올려도 숫자가 그대로인 것처럼 보인다.
 const num = (v) => (v >= 100 ? String(Math.round(v)) : v.toFixed(1));
+
+// **판 성격과 주력 적을 판 시작 전에 알려 준다.** 편성은 판을 열기 전에 정하는데
+// 무엇이 오는지 모르면 고를 수가 없어, 어느 판에서나 통하는 하나를 데려가는 것이
+// 늘 맞는 답이 됐다.
+const SHAPE_NAME = {};
+for (const v of M.SHAPES) SHAPE_NAME[v.id] = v;
+function stageNote(stage) {
+  const shape = SHAPE_NAME[M.build(stage).shape];
+  const foe = D.FOES[WV.themeOf(stage)];
+  return `<b>${shape.name}</b> ${shape.note}` + (foe ? ` · 주력은 <b>${foe.name}</b>` : '');
+}
 
 // **영웅은 제 이름을 가진다.** 직함만 적으면 셋이 "영웅"으로 뭉뚱그려져 어느 판에
 // 누구를 꺼냈는지 기억에 남지 않는다. 일반 캐릭터는 직함이 곧 이름이다.
@@ -294,7 +306,7 @@ function hud() {
 
   const done = G.met(goal, run.stats);
   el.goal.classList.toggle('done', done && !!run.over);
-  el.goal.innerHTML = `목표 <b>${goal.name}</b> · ${goal.note}`;
+  el.goal.innerHTML = `${stageNote(run.stage)}<br>목표 <b>${goal.name}</b> · ${goal.note}`;
 
   for (const node of el.palette.children) {
     const key = node.dataset.key;
@@ -653,7 +665,7 @@ function renderCamp() {
   el.stageDown.disabled = stage <= 1;
   el.stageUp.disabled = stage >= save.best + 1;
   const g = G.goalOf(stage);
-  el.stageNote.textContent = `${save.cleared[stage] ? '클리어함' : '아직'} · 목표 ${g.name}`;
+  el.stageNote.innerHTML = `${save.cleared[stage] ? '클리어함' : '아직'} · 목표 ${g.name}<br>${stageNote(stage)}`;
   el.teamCount.textContent = `${save.team.length}/${T.slotsOf(save)}칸`;
 
   el.teamList.textContent = '';
@@ -723,18 +735,25 @@ function renderCamp() {
     el.lockList.appendChild(node);
   }
 
+  // 레벨은 부대 하나에 하나다. 줄도 하나지만, 올리면 누가 얼마나 세지는지는
+  // 가진 사람마다 달라 데려가는 사람들의 값을 같이 적는다.
   el.levelList.textContent = '';
-  for (const key of save.owned) {
-    const cost = T.levelCost(save, key);
-    const now = R.statOf(key, 1, T.modsOf(save));
-    const next = R.statOf(key, 1, T.modsWith(save, key, 1));
-    const node = row(`<span class="who">${who(key)} <span class="camp-note">레벨 ${T.levelOf(save, key)}</span>`
-      + `<br><span class="camp-note">공격 ${num(now.damage)}→${num(next.damage)} · 체력 ${now.hp}→${next.hp}</span></span>`
+  {
+    const cost = T.levelCost(save);
+    const now = T.modsOf(save);
+    const next = T.modsWith(save, 1);
+    const rows = save.owned.map((key) => {
+      const a = R.statOf(key, 1, now);
+      const b = R.statOf(key, 1, next);
+      return `${D.UNITS[key].name} ${num(a.damage)}→${num(b.damage)}`;
+    });
+    const node = row(`<span class="who">부대 레벨 <b>${T.levelOf(save)}</b>`
+      + `<br><span class="camp-note">가진 사람 전부의 공격과 체력이 같이 오른다</span>`
+      + `<br><span class="camp-note">${rows.join(' · ')}</span></span>`
       + `<span class="sub price">보석 ${cost}</span>`);
-    node.prepend(spriteNode(key, 26));
     node.disabled = save.gems < cost;
     node.addEventListener('click', () => {
-      if (!T.buyLevel(save, key)) return;
+      if (!T.buyLevel(save)) return;
       T.store(save);
       renderCamp();
       Sound.play('place');

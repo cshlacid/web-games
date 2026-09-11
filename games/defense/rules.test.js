@@ -279,24 +279,36 @@ R.run(idle, 3);
 check('되살릴 이가 없으면 힐러도 적을 친다', poked.hp < poked.max, true);
 
 // --- 막는 것은 값이 아니라 공격의 종류다 ---
-// 중장병은 한 놈씩 때리는 공격에 강하다. 범위·관통·지속은 제값이 들어간다.
-check('중장병은 한 놈씩 때리는 공격에 강하다', D.FOES.armored.resist > 0.5, true);
-check('보병에게는 그런 것이 없다', D.FOES.grunt.resist, 0);
+// 적마다 통하는 공격의 종류가 다르다. **한 종류가 모든 적을 풀면 안 된다** —
+// 그 종류를 가진 자만 여섯 세우는 것이 새 정답이 된다.
+check('중장병은 한 놈씩 때리는 공격에 강하다', D.FOES.armored.resist.single > 0.5, true);
+check('중장병은 범위에도 강하다', D.FOES.armored.resist.area > 0.5, true);
+check('중장병에게 남는 답은 지속 피해다', D.FOES.armored.resist.dot || 0, 0);
+check('보병에게는 그런 것이 없다', D.FOES.grunt.resist, {});
+check('무리는 한 발씩 쏘면 반이 낭비된다', D.FOES.swarm.resist.single > 0.3, true);
+check('무리에게는 범위가 답이다', D.FOES.swarm.resist.area || 0, 0);
+check('공성병은 지속 피해를 태운다', D.FOES.breaker.resist.dot > 0.5, true);
+check('공성병에게는 한 놈씩 꽂는 것이 답이다', D.FOES.breaker.resist.single < 0.2, true);
+// 공격 종류 셋 모두에 벽이 하나씩 있어야 한 종류로 끝까지 갈 수 없다.
+for (const kind of ['single', 'area', 'dot']) {
+  check(`${kind}을 크게 막는 적이 있다`,
+    Object.values(D.FOES).some((f) => (f.resist[kind] || 0) >= 0.8), true);
+}
 
-const single = make(field, { mods: { startGold: 10 } });
-single.timer = 9999;
-R.place(single, 'archer', 2, 0);
-const tanky = stand(single, 'armored', 90000, 2, 1);
-R.run(single, 1);
-const throughSingle = tanky.max - tanky.hp;
-
+// 창병이 중장병을 맡는 자리는 출혈(지속)이다. 한 방이 아니라 몇 초를 재야 보인다.
 const wide = make(field, { mods: { startGold: 10 } });
 wide.timer = 9999;
 R.place(wide, 'spear', 2, 0);
-const same = stand(wide, 'armored', 90000, 2, 1);
-R.step(wide, R.TICK);
-const throughArea = same.max - same.hp;
-check('관통은 같은 적에게 훨씬 많이 들어간다', throughArea > throughSingle * 2, true);
+const same = stand(wide, 'armored', 900000, 2, 1);
+R.run(wide, 6);
+const throughBleed = same.max - same.hp;
+const longSingle = make(field, { mods: { startGold: 10 } });
+longSingle.timer = 9999;
+R.place(longSingle, 'archer', 2, 0);
+const tanky2 = stand(longSingle, 'armored', 900000, 2, 1);
+R.run(longSingle, 6);
+check('창병이 중장병에게 훨씬 많이 넣는다',
+  throughBleed > (tanky2.max - tanky2.hp) * 2, true);
 
 // --- 대마법사의 기본 공격은 범위다 ---
 // 스킬이 아니라 기본 공격이 둘레까지 닿는지 본다. 쿨타임을 밀어 두어 운석이
@@ -325,7 +337,8 @@ R.step(plain, R.TICK);
 check('궁수의 기본은 그대로 한 놈만', arrowNear.hp, arrowNear.max);
 check('그 한 놈은 맞는다', arrowTarget.hp < arrowTarget.max, true);
 
-// 범위는 `single`이 아니라 `area`로 들어가므로 중장병의 저항을 타지 않는다.
+// 범위는 `single`이 아니라 `area`로 들어간다 — 중장병은 둘 다 막지만 깎는 값이
+// 달라, 같은 공격력이라도 범위 쪽이 더 들어간다.
 const mageHeavy = make(field, { roster: D.HERO_KEYS, mods: { startGold: 10 } });
 mageHeavy.timer = 9999;
 R.place(mageHeavy, 'arch', 2, 0).scd = 9999;
@@ -333,8 +346,8 @@ const heavyA = stand(mageHeavy, 'armored', 90000, 2, 2);
 R.step(mageHeavy, R.TICK);
 const mageThrough = heavyA.max - heavyA.hp;
 const mageStat = R.statOf('arch', 1, mageHeavy.mods);
-check('대마법사의 기본은 중장병의 저항을 안 탄다',
-  mageThrough > mageStat.damage * 0.9, true);
+check('중장병에게도 범위가 한 놈씩보다 낫다',
+  mageThrough > mageStat.damage * (1 - D.FOES.armored.resist.single) * 1.2, true);
 
 // --- 검성의 기본 공격은 둘레다 ---
 // 반지름 1.1이라 맞닿은 칸만 맞고 대각선(1.41)은 빠진다.
@@ -355,8 +368,9 @@ R.place(bladeHeavy, 'blade', 2, 2).scd = 9999;
 const heavyB = stand(bladeHeavy, 'armored', 90000, 2, 3);
 R.step(bladeHeavy, R.TICK);
 const bladeStat = R.statOf('blade', 1, bladeHeavy.mods);
-check('검성의 기본도 중장병의 저항을 안 탄다',
-  bladeHeavy.foes[0].max - bladeHeavy.foes[0].hp > bladeStat.damage * 0.9, true);
+check('검성의 기본도 범위로 들어간다',
+  bladeHeavy.foes[0].max - bladeHeavy.foes[0].hp
+    > bladeStat.damage * (1 - D.FOES.armored.resist.single) * 1.2, true);
 check('그 적이 중장병이 맞다', heavyB.key, 'armored');
 
 // --- 성기사의 기본 공격은 때리면서 되살린다 ---
@@ -529,6 +543,21 @@ function played() {
   return [r.over, r.lives, Math.round(r.time * 100), r.gold];
 }
 check('같은 손이면 같은 판', played(), played());
+
+// --- 얼음이 먹히는 정도는 적마다 다르다 ---
+check('공성병은 잘 안 얼어붙는다', D.FOES.breaker.chill < 0.5, true);
+check('보병에게는 그대로 먹힌다', D.FOES.grunt.chill == null, true);
+
+function crawl(key) {
+  const ice = make(field, { mods: { startGold: 10 } });
+  ice.timer = 9999;
+  R.place(ice, 'frost', 2, 0);
+  const e = stand(ice, key, 900000, 2, 1, false);
+  R.run(ice, 3);
+  return e.slowBy;
+}
+check('얼음 지대는 발을 묶는다', crawl('grunt') < 0.6, true);
+check('공성병은 얼음 위에서도 거의 그대로 온다', crawl('breaker') > 0.8, true);
 
 console.log(`${passed}개 통과, ${failed}개 실패`);
 if (failed) process.exit(1);

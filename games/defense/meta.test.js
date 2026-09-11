@@ -32,22 +32,23 @@ check('모르는 칸은 무시한다', T.patch({ 옛날칸: 1 }).gems, 0);
 const grow = fresh();
 check('레벨이 없으면 계수는 1', T.modsOf(grow).unit.archer.damage, 1);
 grow.gems = 1000;
-T.buyLevel(grow, 'archer');
+T.buyLevel(grow);
 check('레벨은 곱으로 붙는다', +T.modsOf(grow).unit.archer.damage.toFixed(4), +T.LEVEL_STEP.toFixed(4));
 check('레벨을 올리면 값이 나간다', grow.gems < 1000, true);
 check('레벨은 체력도 올린다', +T.modsOf(grow).unit.archer.hp.toFixed(4), +T.LEVEL_HP.toFixed(4));
 check('체력이 피해보다 천천히 오른다', T.LEVEL_HP < T.LEVEL_STEP, true);
 // 화면이 "지금 → 올린 뒤"를 나란히 보이려면 한 레벨 위의 계수가 필요하다.
 check('한 레벨 위의 계수를 내준다',
-  +T.modsWith(grow, 'archer', 1).unit.archer.damage.toFixed(4),
-  +Math.pow(T.LEVEL_STEP, T.levelOf(grow, 'archer') + 1).toFixed(4));
-check('다른 캐릭터는 건드리지 않는다',
-  T.modsWith(grow, 'archer', 1).unit.cannon.damage, T.modsOf(grow).unit.cannon.damage);
-check('비용은 레벨마다 오른다', T.levelCost(grow, 'archer') > T.levelCost(fresh(), 'archer'), true);
-check('가지지 않은 캐릭터는 못 올린다', T.buyLevel(grow, 'cannon'), false);
+  +T.modsWith(grow, 1).unit.archer.damage.toFixed(4),
+  +Math.pow(T.LEVEL_STEP, T.levelOf(grow) + 1).toFixed(4));
+// **레벨은 부대 하나에 하나다.** 가지지 않은 캐릭터까지 같은 계수를 들고 있어야
+// 새로 얻은 사람이 곧바로 제 몫을 한다.
+check('한 레벨이 모두를 같이 올린다',
+  T.modsOf(grow).unit.cannon.damage, T.modsOf(grow).unit.archer.damage);
+check('비용은 레벨마다 오른다', T.levelCost(grow) > T.levelCost(fresh()), true);
 
 const poor = fresh();
-check('보석이 없으면 못 올린다', T.buyLevel(poor, 'archer'), false);
+check('보석이 없으면 못 올린다', T.buyLevel(poor), false);
 
 const perk = fresh();
 perk.gems = 100000;
@@ -60,9 +61,12 @@ check('시작 골드 축도 mods로', T.modsOf(T.patch({ perks: { purse: 5 } }))
 // --- 새 캐릭터 ---
 const hire = fresh();
 hire.gems = 100000;
-for (let i = 0; i < 5; i++) T.buyLevel(hire, 'archer');
+for (let i = 0; i < 5; i++) T.buyLevel(hire);
 T.grant(hire, 'cannon');
-check('새 캐릭터는 평균 레벨로 들어온다', T.levelOf(hire, 'cannon'), 5);
+check('새 캐릭터도 곧바로 부대 레벨을 받는다',
+  T.modsOf(hire).unit.cannon.damage, T.modsOf(hire).unit.archer.damage);
+check('옛 저장본은 가장 높은 레벨 하나로 받는다',
+  T.patch({ levels: { archer: 12, spear: 3 } }).level, 12);
 check('이미 가진 캐릭터는 다시 못 받는다', T.grant(hire, 'cannon'), false);
 check('받으면 편성에 자리가 있으면 들어간다', hire.team.includes('cannon'), true);
 

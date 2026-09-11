@@ -231,8 +231,8 @@ h1 {
 
 .help-list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; line-height: 1.55; }
 
-.goal-row { display: flex; align-items: center; gap: 10px; font-size: 12px; }
-.goal { color: var(--muted); font-weight: 600; }
+.goal-row { display: flex; align-items: flex-start; gap: 10px; font-size: 12px; }
+.goal { flex: 1; text-align: left; color: var(--muted); font-weight: 600; line-height: 1.45; }
 .goal b { color: var(--fg); }
 .goal.done { color: var(--exit); }
 

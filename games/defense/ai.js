@@ -45,11 +45,20 @@ function bestSpot(run, key, style) {
   let best = null;
   for (const c of freeCells(run, key)) {
     const here = onPath.has(`${c.x},${c.y}`);
-    // 막는 손버릇은 **방패병만** 길 위에 세운다. 나머지까지 길에 세우면 맞고
-    // 죽으라고 내보내는 꼴이라, 그것을 봉쇄 전략이라고 부를 수 없다.
-    const mayBlock = style === 'wall' && key === 'shield';
-    if (mayBlock !== here) continue;
-    const score = coverage(run, route, c.x, c.y, stat) + (here ? 3 : 0);
+    // **길 위에 서는 것은 앞을 맡는 자뿐이다.** 나머지까지 길에 세우면 맞고 죽으라고
+    // 내보내는 꼴이라, 그것을 봉쇄 전략이라고 부를 수 없다.
+    //
+    // 예전에는 막는 손버릇(`wall`)에서만 길 위에 세웠는데, 그러면 트인 손은 공성병
+    // 판에서 무엇을 해도 진다 — 초당 60으로 부수며 들어오는 것을 몸으로 받을 자가
+    // 없기 때문이다. 실제로 어느 계수를 줘도 스테이지 21에서 똑같이 멈췄다.
+    // 이제 앞을 맡는 자는 어느 손버릇에서나 길에 서고, 막는 손은 그 자리를 더
+    // 좋아할 뿐이다.
+    if (here && !D.UNITS[key].front) continue;
+    // **공성병 판에서는 막는 손버릇도 막지 않는다.** 초당 60으로 부수며 들어오는
+    // 것 앞에 길을 막고 서면 앞줄이 통째로 녹는다 — 사람도 그 판에서는 흘린다.
+    const siege = mainFoe(run) === 'breaker';
+    const score = coverage(run, route, c.x, c.y, stat)
+      + (here ? (style === 'wall' && !siege ? 4 : 2) : 0);
     if (score <= 0) continue;
     if (!best || score > best.score) best = { x: c.x, y: c.y, score };
   }
@@ -58,8 +67,43 @@ function bestSpot(run, key, style) {
 
 // 차례를 무한히 돈다. **개수를 정해 두면 안 된다** — 목록 길이만큼 세우고 나면
 // 골드가 남아도 아무것도 사지 않고 죽는 손이 된다(실제로 그렇게 짰다가 잡았다).
+// **적마다 답이 다르다.** 이 표가 없으면 이 손은 판을 안 보고 늘 같은 것을 사서,
+// "조합이 필요한 게임인가"를 재려 해도 조합을 할 줄 모르는 손으로 재게 된다.
+// 근거는 `FOES[].resist`와 속도다 — 무리는 한 놈씩 쏘면 반이 낭비되고, 중장병은
+// 단일에 90%를 깎고, 경보병은 느리게 하지 않으면 사거리를 지나간다.
+const COUNTER = {
+  grunt: ['archer', 'spear'],
+  swarm: ['cannon', 'archer'],
+  swift: ['frost', 'archer'],
+  armored: ['frost', 'spear'],
+  breaker: ['archer', 'shield', 'healer'],
+  mender: ['cannon', 'archer'],
+};
+
+// 이 판에 가장 무겁게 오는 적. `waves.js`의 주력을 직접 읽지 않고 판이 들고 있는
+// 웨이브에서 세면, 손으로 짠 판에서도 같은 손이 돈다. **마릿수가 아니라 예산으로
+// 센다** — 무리는 한 무더기가 스물둘이라 머릿수로 세면 늘 무리가 주력이 된다.
+function mainFoe(run) {
+  const n = {};
+  for (const w of run.waves) {
+    for (const g of w.groups) {
+      if (g.foe === 'boss') continue;
+      n[g.foe] = (n[g.foe] || 0) + g.count * (D.FOES[g.foe].cost || 1);
+    }
+  }
+  let top = null;
+  for (const k of Object.keys(n)) if (!top || n[k] > n[top]) top = k;
+  return top;
+}
+
 function wanted(run, style) {
-  const list = (style === 'wall' ? ['shield', ...WANT] : WANT).filter((k) => run.roster.includes(k));
+  // 막는 손버릇이거나 미로판이면 방패병을 앞에 둔다. 좁은 목이 많은 판에서만
+  // 막는 것이 이득이라, 판을 보고 정하는 것이 이 한 줄이다. **공성병 판은 빼고** —
+  // 초당 60으로 부수며 들어오는 것 앞에 벽을 세우면 앞줄이 통째로 녹는다.
+  const foe = mainFoe(run);
+  const front = (style === 'wall' || run.map.shape === 'maze') && foe !== 'breaker' ? ['shield'] : [];
+  const plan = [...front, ...(COUNTER[foe] || []), ...WANT];
+  const list = plan.filter((k) => run.roster.includes(k));
   if (!list.length) return run.roster[0];
   return list[run.units.length % list.length];
 }
@@ -110,7 +154,6 @@ function play(stage, save, opts) {
 // **데려가는 사람만 키운다.** 가진 것 전부에 골고루 부으면 정작 판에 세우는
 // 사람들의 레벨이 반으로 깎인다 — 사람도 그렇게 쓰지 않는다.
 function spend(save, only) {
-  const grow = only || T.rosterOf(save);
   let moved = true;
   let bought = false;
   while (moved) {
@@ -131,14 +174,8 @@ function spend(save, only) {
         continue;
       }
     }
-    let cheapest = null;
-    for (const key of save.owned) {
-      if (grow.length && !grow.includes(key)) continue;
-      const cost = T.levelCost(save, key);
-      if (cost > save.gems) continue;
-      if (!cheapest || cost < cheapest.cost) cheapest = { key, cost };
-    }
-    if (cheapest) { moved = T.buyLevel(save, cheapest.key); bought = bought || moved; }
+    // 레벨은 부대 하나에 하나라 고를 것이 없다. 올릴 수 있으면 올린다.
+    if (T.buyLevel(save)) { moved = true; bought = true; }
   }
   return bought;
 }
@@ -222,7 +259,7 @@ function climb(opts) {
   return { save, log, reached: save.best };
 }
 
-const AI = { WANT, bestSpot, act, play, spend, climb, rngOf };
+const AI = { WANT, COUNTER, mainFoe, bestSpot, act, play, spend, climb, rngOf };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = AI;
 if (typeof window !== 'undefined') window.DefenseAI = AI;

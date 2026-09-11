@@ -23,18 +23,27 @@ check('입구는 맨 윗줄, 출구는 맨 아랫줄', [one.entry.y, one.exit.y]
 // 스테이지가 아무리 올라가도 규격을 벗어나지 않는가. 무한히 이어지는 게임이라
 // 200번째 판도 1번째와 같은 검사를 통과해야 한다.
 let bad = 0;
-let minWalls = Infinity;
-let maxWalls = 0;
-for (let s = 1; s <= 200; s++) {
+// 성격마다 벽 수가 제 범위 안에 드는가. 범위가 겹치면 판이 안 갈린다.
+const seen = {};
+for (let s = 1; s <= 400; s++) {
   const m = M.build(s);
   if (!M.wellFormed(m)) bad++;
   const n = m.walls.filter(Boolean).length;
-  if (n < minWalls) minWalls = n;
-  if (n > maxWalls) maxWalls = n;
+  const box = seen[m.shape] || (seen[m.shape] = { lo: Infinity, hi: 0, n: 0 });
+  box.lo = Math.min(box.lo, n);
+  box.hi = Math.max(box.hi, n);
+  box.n++;
 }
-check('200판 모두 규격을 지킨다', bad, 0);
-check('벽이 목표 범위를 넘지 않는다', maxWalls <= 20, true);
-check('벽이 아주 없는 판은 없다', minWalls >= 8, true);
+check('400판 모두 규격을 지킨다', bad, 0);
+check('성격 셋이 모두 나온다', M.SHAPES.map((v) => v.id).filter((id) => seen[id]).length, 3);
+check('벽 수가 제 범위 안에 든다',
+  M.SHAPES.every((v) => seen[v.id].lo >= v.walls[0] && seen[v.id].hi <= v.walls[1]), true);
+// 성격끼리 벽 수가 겹치지 않아야 판을 보고 무엇인지 알 수 있다.
+check('들판과 미로는 겹치지 않는다', seen.plain.hi < seen.maze.lo, true);
+// 벌판이 가장 흔하다. 극단이 기본값처럼 느껴지면 성격이 없어진다.
+check('벌판이 가장 흔하다', seen.rough.n > seen.plain.n && seen.rough.n > seen.maze.n, true);
+check('성격은 씨드로 고정이다', [M.build(7).shape, M.build(7).shape], [M.build(7).shape, M.build(7).shape]);
+check('성격이 틀리면 틀린 판', M.wellFormed({ ...M.build(1), shape: 'nope' }), false);
 
 check('올바른 판', M.wellFormed(one), true);
 check('입구가 벽이면 틀린 판', M.wellFormed({

@@ -7,6 +7,7 @@
 // 두는 손으로 스테이지를 올려 가며 난이도가 평평한지 본다.
 const D = require('./data.js');
 const W = require('./waves.js');
+const M = require('./mapgen.js');
 const T = require('./meta.js');
 const AI = require('./ai.js');
 
@@ -89,8 +90,36 @@ check('한 웨이브가 상한을 넘지 않는다', most <= W.CAP, true);
 // 같은 종류를 겹쳐 세우지 못하게 막는 것이 조합을 요구하는 뼈대다.
 check('같은 종류에 한도가 있다', D.MOST_OF_KIND > 0 && D.MOST_OF_KIND <= 10, true);
 check('겹쳐 세울수록 비싸진다', D.RAISE > 1, true);
-check('중장병은 한 놈씩 때리는 공격에 강하다', D.FOES.armored.resist >= 0.8, true);
+check('중장병은 한 놈씩 때리는 공격에 강하다', D.FOES.armored.resist.single >= 0.8, true);
 check('그 강함은 지속 피해에는 걸리지 않는다', D.HIT.dot !== D.HIT.single, true);
+
+// --- 판과 적이 편성을 정하는가 ---
+// **공격 종류 셋 모두에 큰 벽이 하나씩 있어야 한다.** 하나라도 비면 그 종류로
+// 때리는 자만 넷 세우는 것이 새 정답이 된다 — 포수에게 범위 기본 공격을 준 뒤
+// 실제로 그렇게 됐다(포수만으로 서른 스테이지).
+for (const kind of ['single', 'area', 'dot']) {
+  check(`${kind}을 크게 막는 적이 있다`,
+    Object.values(D.FOES).some((f) => (f.resist[kind] || 0) >= 0.8), true);
+}
+// 그 벽들이 한 적에게 몰려 있으면 안 된다. 그 적만 피하면 되는 게임이 된다.
+check('벽이 여러 적에게 흩어져 있다',
+  new Set(['single', 'area', 'dot'].map((kind) =>
+    Object.keys(D.FOES).find((k) => (D.FOES[k].resist[kind] || 0) >= 0.8))).size >= 2, true);
+// 판 성격이 갈려야 "막을까 흘릴까"가 판마다 다른 답이 된다.
+check('판 성격이 셋이다', M.SHAPES.length, 3);
+check('판마다 주력 적이 있다', [...Array(30)].every((_, i) => !!W.themeOf(i + 1)), true);
+
+// **레벨은 부대 하나에 하나다.** 캐릭터마다 따로면 보석을 한 명에게 몰아 붓는 것이
+// 언제나 정답이 되어(같은 종류를 여럿 세우니 레벨이 머릿수만큼 곱해진다) 편성이
+// 판을 보지 않게 된다.
+const flat = T.blank();
+flat.gems = 100000;
+T.grant(flat, 'cannon');
+T.buyLevel(flat);
+check('레벨 하나가 가진 사람 모두를 올린다',
+  T.modsOf(flat).unit.cannon.damage, T.modsOf(flat).unit.archer.damage);
+check('아직 못 얻은 사람도 같은 계수를 받는다',
+  T.modsOf(flat).unit.spear.damage, T.modsOf(flat).unit.archer.damage);
 check('보상이 값보다 빨리 오른다', T.GEM_GROWTH > 1, true);
 check('고용비는 스테이지와 무관하다', D.UNITS.archer.cost, D.UNITS.archer.cost);
 

@@ -20,7 +20,7 @@ const GROWTH = 1.12;
 // **사거리와 스킬을 손보면 여기부터 다시 잰다.** 궁수의 사거리를 2.6에서 4로
 // 넓혔더니 서른 스테이지를 한 판씩에 다 깨서, 자동 플레이로 다시 맞춘 값이 50이다
 // (30이면 전부 한 판, 60이면 한 스테이지에 열 판, 75면 중앙값이 네 판이 된다).
-const BASE = 40;
+const BASE = 44;
 // 같은 스테이지 안에서도 뒤 웨이브가 무겁다. 판 하나에도 기울기가 있어야 한다.
 const STEP = 0.08;
 
@@ -60,8 +60,23 @@ function poolAt(stage) {
   return Object.keys(D.FOE_FROM).filter((k) => stage >= D.FOE_FROM[k]);
 }
 
+// **판마다 주력으로 오는 적이 하나 있다.** 종류를 고르게 섞어 보냈더니 판마다
+// "이번에는 무엇이 문제인가"가 뭉개져, 사거리 넓은 자를 여섯 세우는 것이 늘 맞는
+// 답이 됐다. 한 종류를 앞세우면 그 종류의 약점을 아는 것이 편성이 된다 —
+// 무리 판에는 범위, 중장병 판에는 관통, 경보병 판에는 느리게.
+//
+// 목표(goals)와 같이 **스테이지 씨드로 고정**한다. 재도전할 때 같은 적이 와야
+// "이번엔 대비하고"가 성립한다.
+function themeOf(stage) {
+  const pool = poolAt(stage).filter((k) => k !== 'boss');
+  if (!pool.length) return null;
+  const next = createRng(Math.imul(stage * 131 + 7, 0xC2B2AE35));
+  return pool[Math.floor(next() * pool.length)];
+}
+
 function waveOf(stage, wave) {
   const next = createRng(Math.imul(stage * 97 + wave, 0x85EBCA6B));
+  const themed = themeOf(stage);
   const hp = hpOf(stage, wave);
   const groups = [];
 
@@ -80,7 +95,9 @@ function waveOf(stage, wave) {
       const ready = pool.filter((k) => !used.includes(k)
         && D.FOES[k].cost <= budget && wave >= firstWave(k));
       if (!ready.length) break;
-      const foe = ready[Math.floor(next() * ready.length)];
+      // 첫 무더기는 그 판의 주력이다. 아직 나올 수 없는 웨이브면 평소대로 고른다.
+      const theme = slot === 0 && ready.includes(themed) ? themed : null;
+      const foe = theme || ready[Math.floor(next() * ready.length)];
       used.push(foe);
       const share = slot === 0 ? 0.7 : 1;
       let count = Math.max(1, Math.floor((budget * share) / D.FOES[foe].cost));
@@ -108,7 +125,7 @@ const wavesOf = (stage) => {
   return list;
 };
 
-const Waves = { GROWTH, BASE, CAP, MOST, FIRST_MEET, firstWave, hpOf, waveOf, wavesOf, poolAt };
+const Waves = { GROWTH, BASE, CAP, MOST, FIRST_MEET, firstWave, hpOf, waveOf, wavesOf, poolAt, themeOf };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = Waves;
 if (typeof window !== 'undefined') window.DefenseWaves = Waves;

@@ -28,6 +28,24 @@ function createRng(seed) {
 
 const idx = (x, y) => y * W + x;
 
+// **판마다 성격이 있다.** 예전에는 벽 수가 12~20 하나뿐이라 어느 판이나 트인
+// 벌판이었고, 그러면 편성이 판을 안 본다 — 사거리가 긴 자를 여섯 세우는 것이
+// 늘 맞는 답이 된다. 벽 수를 세 갈래로 벌려 **막을 수 있는 판과 없는 판**을
+// 만든다. 재 보면 길 칸 중 좁은 목(이웃한 빈 칸이 둘 이하)의 비율이 들판 12%,
+// 벌판 19%, 미로 42%다.
+//
+// 경로 길이로 가르려던 것은 포기했다. 8×11에서는 최단 경로가 어차피 열 칸이
+// 넘고 벽을 아무리 채워도 평균 14에서 18로 갈 뿐이라, 길이로는 판이 안 갈린다.
+const SHAPES = [
+  { id: 'plain', name: '들판', walls: [6, 10], note: '트여서 막을 데가 없다' },
+  { id: 'rough', name: '벌판', walls: [13, 19], note: '고루 트인 판' },
+  { id: 'maze', name: '미로', walls: [28, 34], note: '좁은 목이 많다' },
+];
+
+// 벌판이 절반이고 양 끝이 4분의 1씩이다. 극단이 자주 나오면 그것이 기본값처럼
+// 느껴져 성격이 없어진다.
+const shapeAt = (roll) => (roll < 0.25 ? SHAPES[0] : (roll < 0.75 ? SHAPES[1] : SHAPES[2]));
+
 // 벽이 아닌 칸이 전부 하나로 이어져 있는가. 입구와 출구가 이어지는지만 보면
 // 판 구석에 적도 나도 쓸 일 없는 빈 구역이 남는다.
 function whole(walls) {
@@ -66,11 +84,14 @@ function build(stage) {
   const exit = { x: Math.floor(next() * W), y: H - 1 };
   const keep = new Set([idx(entry.x, entry.y), idx(exit.x, exit.y)]);
 
-  const target = 12 + Math.floor(next() * 9);
+  // **처음 두 판은 늘 벌판이다.** 배우는 구간에서 미로가 나오면 좁은 목을 막는
+  // 것이 기본값처럼 보이는데, 그것은 판마다 갈리는 성격이지 이 게임의 기본이 아니다.
+  const shape = stage <= 2 ? SHAPES[1] : shapeAt(next());
+  const target = shape.walls[0] + Math.floor(next() * (shape.walls[1] - shape.walls[0] + 1));
   let placed = 0;
   // 시도 상한. 남은 자리가 전부 연결을 끊는 판이면 목표를 못 채우는데, 벽이
   // 몇 개 모자란 판은 그냥 넓은 판이라 버릴 이유가 없다.
-  for (let guard = 0; guard < 400 && placed < target; guard++) {
+  for (let guard = 0; guard < 900 && placed < target; guard++) {
     let c;
     // 이미 놓인 벽에 붙여 키우면 바위 덩어리처럼 보인다. 매번 아무 데나
     // 흩뿌리면 판 전체가 점묘가 되어 돌아갈 길이 너무 많아진다.
@@ -99,7 +120,7 @@ function build(stage) {
     else walls[c] = 0;
   }
 
-  return { stage, w: W, h: H, walls, entry, exit };
+  return { stage, w: W, h: H, walls, entry, exit, shape: shape.id };
 }
 
 // 판이 규격을 지키는가. 생성기를 고칠 때 테스트가 보는 자리다.
@@ -112,10 +133,11 @@ function wellFormed(map) {
   if (map.exit.x < 0 || map.exit.x >= W) return false;
   if (map.walls[idx(map.entry.x, map.entry.y)]) return false;
   if (map.walls[idx(map.exit.x, map.exit.y)]) return false;
+  if (!SHAPES.some((v) => v.id === map.shape)) return false;
   return whole(map.walls);
 }
 
-const MapGen = { W, H, DIRS, idx, build, wellFormed, whole, createRng };
+const MapGen = { W, H, DIRS, SHAPES, shapeAt, idx, build, wellFormed, whole, createRng };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = MapGen;
 if (typeof window !== 'undefined') window.DefenseMap = MapGen;

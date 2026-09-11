@@ -254,14 +254,14 @@ function lead(run, e) {
   return f.dist[at(run.map, e.from.x, e.from.y)];
 }
 
-// `kind`가 `single`이면 그 적의 `resist`만큼 깎여 들어간다. 범위·관통·지속은
-// 그대로다 — 조합을 요구하는 규칙이 이 한 줄에 있다.
+// 그 적이 그 공격 종류(`single`·`area`·`dot`)에 대해 들고 있는 `resist`만큼 깎여
+// 들어간다. 적어 두지 않은 종류는 제값이다 — 조합을 요구하는 규칙이 이 한 줄에 있다.
 //
 // **지속 피해에는 최소 1이 붙지 않는다.** 최소값을 걸어 두면 틱마다 1이 들어가
 // 바닥 얼음이 초당 서른을 깎았다.
 function hurt(run, e, amount, kind, by) {
   const f = D.FOES[e.key];
-  const cut = kind === D.HIT.single ? (f.resist || 0) : 0;
+  const cut = (f.resist && f.resist[kind]) || 0;
   const dealt = kind === D.HIT.dot
     ? Math.max(0, amount)
     : Math.max(1, amount * (1 - cut));
@@ -310,8 +310,14 @@ function tickZones(run) {
       if (Math.hypot(p.x - z.x, p.y - z.y) > z.r) continue;
       hurt(run, e, z.dps * TICK, D.HIT.dot, z.by);
       // 밟고 있는 동안만 느려진다. 나가면 곧 풀린다.
+      //
+      // **얼음이 얼마나 먹히는지는 적마다 다르다**(`chill`). 느리게 하는 것에
+      // 저항하는 축이 없던 동안 빙결술사만 넷 세우는 것이 어떤 계수에서도 끝까지
+      // 갔다 — 길을 얼려 두면 아무도 도착하지 못하니 이길 수밖에 없다. 무겁게
+      // 밀고 들어오는 공성병과 우두머리에게는 거의 안 통한다.
+      const chill = D.FOES[e.key].chill == null ? 1 : D.FOES[e.key].chill;
       e.slowT = 0.25;
-      e.slowBy = z.slow;
+      e.slowBy = 1 - (1 - z.slow) * chill;
     }
   }
   run.zones = run.zones.filter((z) => z.t > 0);
