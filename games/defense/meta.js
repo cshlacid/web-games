@@ -21,7 +21,7 @@ const KEY = 'web-games.defense.save';
 const LEVEL_STEP = 1.06;                                  // 레벨 하나가 올리는 피해
 const LEVEL_COST = (l) => Math.round(12 * Math.pow(1.15, l));
 const GEM_BASE = 10;
-const GEM_GROWTH = 1.25;                                  // 스테이지마다 오르는 보상
+const GEM_GROWTH = 1.31;                                  // 스테이지마다 오르는 보상
 const SLOTS_BASE = 3;
 
 // 상한이 있는 축들. 무한히 사는 것은 캐릭터 레벨뿐이다.
