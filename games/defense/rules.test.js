@@ -298,6 +298,44 @@ R.step(wide, R.TICK);
 const throughArea = same.max - same.hp;
 check('관통은 같은 적에게 훨씬 많이 들어간다', throughArea > throughSingle * 2, true);
 
+// --- 대마법사의 기본 공격은 범위다 ---
+// 스킬이 아니라 기본 공격이 둘레까지 닿는지 본다. 쿨타임을 밀어 두어 운석이
+// 섞이지 않게 한다.
+const blast = make(field, { roster: D.HERO_KEYS, mods: { startGold: 10 } });
+blast.timer = 9999;
+const mage = R.place(blast, 'arch', 2, 0);
+mage.scd = 9999;
+// 출구에 가장 가까운 (2,3)이 표적이고, (3,3)은 그 옆, (0,0)은 사거리 안이지만
+// 표적에서 멀다.
+const meteorTarget = stand(blast, 'grunt', 9000, 2, 3);
+const meteorNear = stand(blast, 'grunt', 9000, 3, 3);
+const meteorFar = stand(blast, 'grunt', 9000, 0, 0);
+R.step(blast, R.TICK);
+check('대마법사의 기본 공격이 둘레의 적도 맞힌다',
+  [meteorTarget.hp < meteorTarget.max, meteorNear.hp < meteorNear.max], [true, true]);
+check('둘레라도 범위 밖은 안 맞는다', meteorFar.hp, meteorFar.max);
+
+const plain = make(field, { mods: { startGold: 10 } });
+plain.timer = 9999;
+const shooter = R.place(plain, 'archer', 2, 0);
+shooter.scd = 9999;
+const arrowTarget = stand(plain, 'grunt', 9000, 2, 2);
+const arrowNear = stand(plain, 'grunt', 9000, 3, 2);
+R.step(plain, R.TICK);
+check('궁수의 기본은 그대로 한 놈만', arrowNear.hp, arrowNear.max);
+check('그 한 놈은 맞는다', arrowTarget.hp < arrowTarget.max, true);
+
+// 범위는 `single`이 아니라 `area`로 들어가므로 중장병의 저항을 타지 않는다.
+const mageHeavy = make(field, { roster: D.HERO_KEYS, mods: { startGold: 10 } });
+mageHeavy.timer = 9999;
+R.place(mageHeavy, 'arch', 2, 0).scd = 9999;
+const heavyA = stand(mageHeavy, 'armored', 90000, 2, 2);
+R.step(mageHeavy, R.TICK);
+const mageThrough = heavyA.max - heavyA.hp;
+const mageStat = R.statOf('arch', 1, mageHeavy.mods);
+check('대마법사의 기본은 중장병의 저항을 안 탄다',
+  mageThrough > mageStat.damage * 0.9, true);
+
 // --- 같은 종류는 여섯까지 ---
 const crowd = make(field, { mods: { startGold: 40 } });
 let put = 0;

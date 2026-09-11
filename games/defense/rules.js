@@ -40,6 +40,8 @@ function statOf(key, tier, mods) {
     near: Math.max(0, d.range.min - 0.5),
     far: d.range.max + 0.5 + D.UP.range * step + (mods.range || 0),
     rate: d.rate,
+    // 기본 공격은 대개 한 놈이지만, 자료에 적어 두면 범위로도 나간다.
+    basic: d.basic || SINGLE,
     // 스킬은 단계에 따라 리듬이 바뀌므로 그때그때 만들어 준다. 원본을 건드리면
     // 판마다 값이 누적된다.
     skill: skillAt(d.skill, step),
@@ -56,6 +58,8 @@ function skillAt(sk, step) {
   if (sk.stunFor) got.stunFor = sk.stunFor * hold;
   return got;
 }
+
+const SINGLE = { shape: 'single' };
 
 const inRange = (stat, dist) => dist <= stat.far && dist >= stat.near;
 
@@ -425,6 +429,17 @@ function tickUnits(run) {
       tally(run, u.key).skills++;
       useSkill(run, u, stat, target, spot);
       emit(run, { type: 'skill', key: u.key, from: { x: u.x, y: u.y }, to: spot });
+    } else if (stat.basic.shape === 'splash') {
+      // 기본 공격부터 범위인 자리. 범위는 한 놈씩 때리는 것이 아니라 `area`로
+      // 들어가 중장병의 저항을 타지 않는다.
+      hurt(run, target, stat.damage, D.HIT.area, u.key);
+      const r = stat.basic.splash * mul(run.mods, 'splash');
+      for (const e of run.foes) {
+        if (e === target || e.dead) continue;
+        const p = foeXY(e);
+        if (Math.hypot(p.x - spot.x, p.y - spot.y) <= r) hurt(run, e, stat.damage * 0.6, D.HIT.area, u.key);
+      }
+      emit(run, { type: 'shot', key: u.key, from: { x: u.x, y: u.y }, to: spot });
     } else {
       // 쿨타임 중에는 기본 공격. 한 놈만 때린다.
       hurt(run, target, stat.damage, D.HIT.single, u.key);

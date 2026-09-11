@@ -318,7 +318,7 @@ function hud() {
         : `<b>${num(now.damage * (sk.mul == null ? 1 : sk.mul))}</b>`);
     const hold = now.skill.fieldFor || now.skill.bleedFor || now.skill.stunFor;
     el.barStats.innerHTML = `체력 <b>${Math.round(picked.hp)}/${now.hp}</b> · `
-      + `공격 <b>${num(now.damage)}</b> · 사거리 <b>${d.range.min}-${d.range.max}</b><br>`
+      + `공격 <b>${num(now.damage)}</b>${now.basic.shape === 'splash' ? '(범위)' : ''} · 사거리 <b>${d.range.min}-${d.range.max}</b><br>`
       + `${d.skill.name} ${power} · 쿨타임 <b>${num(now.skill.cd)}초</b>`
       + (hold ? ` · 지속 <b>${num(hold)}초</b>` : '') + ' · '
       + (wait > 0.1 ? `<b>${Math.ceil(wait)}초 남음</b>` : '<b>준비됨</b>');
@@ -455,7 +455,8 @@ function buildPalette() {
     cost.className = 'cost';
     cost.textContent = String(d.cost);
     node.appendChild(cost);
-    node.title = `${d.name} · 사거리 ${d.range.min}-${d.range.max} · ${d.skill.name}(${d.skill.cd}초)`
+    const basic = d.basic && d.basic.shape === 'splash' ? ' · 기본 공격이 범위' : '';
+    node.title = `${d.name} · 사거리 ${d.range.min}-${d.range.max}${basic} · ${d.skill.name}(${d.skill.cd}초)`
     + ` — ${d.skill.note} · 같은 종류는 ${D.MOST_OF_KIND}명까지, 겹칠수록 값이 오른다`;
     node.addEventListener('click', () => {
       chosen = chosen === key ? null : key;
