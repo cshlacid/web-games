@@ -199,26 +199,30 @@ h1 {
 }
 .toast b { color: var(--fg); }
 
-/* 칠하기 방식. 두 개뿐이라 접어 두지 않고 늘 펼쳐 둔다 — 한 판에 수십 번 오간다. */
-.modes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.mode {
-  display: flex; align-items: center; justify-content: center; gap: 6px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: none;
-  color: inherit;
-  font-family: inherit;
-  padding: 9px 12px;
-  cursor: pointer;
+/* 도움말의 차례 그림. 판에서 쓰는 것과 같은 모양이라야 설명이 된다. */
+.cycle-row { list-style: none; margin-left: -18px; }
+.cycle { display: inline-flex; align-items: center; gap: 20px; padding-left: 2px; }
+.cycle-box {
+  position: relative;
+  width: 24px; height: 24px;
+  background: var(--cell-bg);
+  border: 1px solid var(--rule-strong);
+  border-radius: 3px;
 }
-.mode[aria-pressed="true"] {
-  background: var(--btn-bg);
-  border-color: var(--btn-bg);
-  color: var(--btn-fg);
+.cycle-box + .cycle-box::before {
+  content: '→';
+  position: absolute; left: -16px; top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted); font-size: 11px;
 }
-.mode-icon { display: block; }
-.mode-icon svg { width: 17px; height: 17px; display: block; }
-.mode-label { font-size: 13px; font-weight: 700; }
+.cycle-box.on { background: var(--cell-on); }
+.cycle-box.off::after {
+  content: '';
+  position: absolute; inset: 0;
+  background:
+    linear-gradient(to bottom right, transparent calc(50% - 1px), var(--cell-mark) calc(50% - 1px), var(--cell-mark) calc(50% + 1px), transparent calc(50% + 1px)),
+    linear-gradient(to bottom left, transparent calc(50% - 1px), var(--cell-mark) calc(50% - 1px), var(--cell-mark) calc(50% + 1px), transparent calc(50% + 1px));
+}
 
 .pad { display: flex; }
 .tools { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; width: 100%; }

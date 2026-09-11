@@ -26,8 +26,6 @@ const el = {
   best: document.getElementById('best'),
   timer: document.getElementById('timer'),
   toast: document.getElementById('toast'),
-  modeFill: document.getElementById('mode-fill'),
-  modeMark: document.getElementById('mode-mark'),
   undo: document.getElementById('undo'),
   clear: document.getElementById('clear'),
   hint: document.getElementById('hint'),
@@ -44,7 +42,6 @@ const el = {
 };
 
 let size = Number(localStorage.getItem(SIZE_KEY)) || 10;
-let mode = R.FILL;      // 지금 칠하는 것: 칠함이냐 아님 표시냐
 let game = null;
 let view = null;
 let clock = null;
@@ -243,6 +240,11 @@ function finish() {
   Sound.play('win');
 }
 
+// 한 칸을 누를 때 도는 차례: 빈칸 → 칠함 → 아님 → 빈칸. **칠하는 방식을 따로 고르지
+// 않는다** — 모드 단추를 두었더니 X를 치려고 화면 아래를 보고 단추를 누르고 다시 판으로
+// 올라오는 일이 한 판에 수십 번이었다.
+const NEXT = { [R.EMPTY]: R.FILL, [R.FILL]: R.MARK, [R.MARK]: R.EMPTY };
+
 // 칸 하나를 그 값으로 만든다. 이미 그 값이면 아무것도 하지 않는다 — 끌 때 같은 칸을
 // 여러 번 지나므로 여기서 걸러야 소리가 겹치고 되돌리기가 지저분해진다.
 function apply(at, value) {
@@ -287,9 +289,9 @@ el.board.addEventListener('pointerdown', (event) => {
   if (at === null) return;
   event.preventDefault();
 
-  // 시작한 칸이 이미 그 값이면 지우는 손질이 된다. 칠한 것을 지우려고 모드를 바꾸지
-  // 않아도 되게 하려는 것이다.
-  const value = game.cells[at] === mode ? R.EMPTY : mode;
+  // **끄는 동안에는 시작한 칸이 된 값을 그대로 바른다.** 칸마다 제각기 돌면 한 번
+  // 쓸고 지나간 자리가 칠함과 아님으로 얼룩진다.
+  const value = NEXT[game.cells[at]];
   push();
   stroke = { value, from: at, axis: null, changed: false };
   stroke.changed = apply(at, value);
@@ -365,16 +367,6 @@ el.hint.addEventListener('click', () => {
   toast(step.state === R.FILL ? '이 칸은 <b>칠하는</b> 칸입니다' : '이 칸은 <b>비는</b> 칸입니다');
 });
 
-function setMode(next) {
-  mode = next;
-  el.modeFill.setAttribute('aria-pressed', String(mode === R.FILL));
-  el.modeMark.setAttribute('aria-pressed', String(mode === R.MARK));
-  Sound.play('click');
-}
-
-el.modeFill.addEventListener('click', () => setMode(R.FILL));
-el.modeMark.addEventListener('click', () => setMode(R.MARK));
-
 el.newGame.addEventListener('click', () => { Sound.play('click'); newGame(); });
 el.again.addEventListener('click', () => { Sound.play('click'); newGame(); });
 
@@ -424,8 +416,6 @@ function bindSoundToggle(node, key, apply2) {
 bindSoundToggle(el.toggleBgm, 'bgm', (on) => Sound.setBgm(on));
 bindSoundToggle(el.toggleSfx, 'sfx', (on) => Sound.setSfx(on));
 
-window.SharedIcons.paint();
-window.NonoIcons.paint();
 newGame();
 
 // 풀이기는 화면에서 쓰지 않지만, 판이 이상할 때 콘솔에서 바로 확인할 수 있게 열어 둔다.

@@ -55,15 +55,6 @@
 
   <p class="toast" id="toast" role="status" aria-live="polite"></p>
 
-  <div class="modes" id="modes" role="group" aria-label="칠하기 방식">
-    <button class="mode" id="mode-fill" type="button" aria-pressed="true">
-      <span class="mode-icon" data-game-icon="fill"></span><span class="mode-label">칠하기</span>
-    </button>
-    <button class="mode" id="mode-mark" type="button" aria-pressed="false">
-      <span class="mode-icon" data-game-icon="cross"></span><span class="mode-label">아님</span>
-    </button>
-  </div>
-
   <div class="pad">
     <div class="tools">
       <button class="tool" id="undo" type="button">
@@ -86,9 +77,15 @@
     <ul class="help-list">
       <li>가장자리 숫자는 그 줄에서 <b>이어서 칠해진 칸의 길이</b>를 차례로 적은 것입니다.
         <b>3 1</b>이면 셋을 칠하고 한 칸 이상 띄운 뒤 하나를 칠합니다.</li>
-      <li>칸을 <b>누르거나 쓸어서</b> 칠합니다. 이미 칠한 칸을 다시 쓸면 지워집니다.</li>
-      <li><b>아님</b>으로 바꾸면 비어 있는 것이 확실한 칸에 가위표를 칩니다. 판정에는
-        들어가지 않는 <b>메모</b>지만, 이것을 쳐 두어야 다음 칸이 보입니다.</li>
+      <li>칸을 누를 때마다 <b>빈칸 → 칠함 → 아님 → 빈칸</b>으로 돕니다.</li>
+      <li class="cycle-row">
+        <span class="cycle"><span class="cycle-box"></span><span class="cycle-box on"></span><span class="cycle-box off"></span><span class="cycle-box"></span></span>
+      </li>
+      <li><b>아님</b>(가위표)은 비어 있는 것이 확실한 칸에 쳐 두는 <b>메모</b>입니다.
+        판정에는 들어가지 않지만, 이것을 쳐 두어야 다음 칸이 보입니다.</li>
+      <li><b>쓸면 여러 칸을 한 번에</b> 바꿉니다. 처음 누른 칸이 된 것과 같은 것으로
+        지나간 자리를 모두 바꿉니다 — 빈칸에서 시작하면 칠하고, 칠한 칸에서 시작하면
+        가위표를 칩니다.</li>
       <li>숫자를 다 맞춘 줄은 <b>숫자가 흐려집니다.</b></li>
       <li><b>모든 판은 찍지 않고 논리로만 풀립니다.</b> 막히면 한 줄만 다시 보세요 —
         그 줄 안에서 반드시 정해지는 칸이 있습니다.</li>
@@ -102,8 +99,6 @@
 </main>
 
 <script src="../../shared/base.js"></script>
-<script src="../../shared/icons.js"></script>
-<script src="icons.js"></script>
 <script src="rules.js"></script>
 <script src="solver.js"></script>
 <script src="pictures.js"></script>
