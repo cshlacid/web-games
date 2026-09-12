@@ -27,12 +27,16 @@ const LEVEL_COST = (l) => Math.round(12 * Math.pow(1.15, l));
 const GEM_BASE = 10;
 const GEM_GROWTH = 1.31;                                  // 스테이지마다 오르는 보상
 const SLOTS_BASE = 3;
+const HERO_BASE = 1;
 
 // 상한이 있는 축들. 무한히 사는 것은 캐릭터 레벨뿐이다.
 const PERKS = {
   lives: { name: '목숨', note: '판을 시작할 때 목숨이 하나 는다', max: 5, cost: (l) => Math.round(80 * Math.pow(2, l)) },
   slots: { name: '편성 칸', note: '판에 데려가는 사람이 하나 는다', max: 3, cost: (l) => Math.round(140 * Math.pow(2.2, l)) },
   purse: { name: '시작 골드', note: '시작 골드가 10% 는다', max: 5, cost: (l) => Math.round(60 * Math.pow(1.8, l)) },
+  // **영웅 칸은 비싸다.** 영웅 하나가 판 일감의 절반을 하므로, 둘째·셋째 칸은
+  // 편성 칸보다 비싸야 "언제 여느냐"가 판단이 된다.
+  hero: { name: '영웅 칸', note: '판에 데려가는 영웅이 하나 는다', max: 2, cost: (l) => Math.round(400 * Math.pow(2.6, l)) },
 };
 
 const ITEM_POOL = ['bomb', 'freeze', 'purse', 'mend', 'order'];
@@ -47,8 +51,8 @@ const HERO_RAISE = 1.8;
 const ITEM_NAME = { bomb: '폭탄', freeze: '얼림', purse: '보급', mend: '구호', order: '명령서' };
 
 const blank = () => ({
-  best: 0, gems: 0, level: 0, perks: { lives: 0, slots: 0, purse: 0 },
-  owned: [D.STARTER], team: [D.STARTER], hero: null, items: {}, cleared: {}, goals: {},
+  best: 0, gems: 0, level: 0, perks: { lives: 0, slots: 0, purse: 0, hero: 0 },
+  owned: [D.STARTER], team: [D.STARTER], heroes: [], items: {}, cleared: {}, goals: {},
 });
 
 const isHero = (key) => !!(D.UNITS[key] && D.UNITS[key].hero);
@@ -86,7 +90,9 @@ function patch(raw) {
     const keep = raw.team.filter((k) => s.owned.includes(k) && !isHero(k));
     if (keep.length) s.team = keep.slice(0, SLOTS_BASE + s.perks.slots);
   }
-  if (isHero(raw.hero) && s.owned.includes(raw.hero)) s.hero = raw.hero;
+  // 영웅 칸이 하나였던 옛 저장본은 그 한 명을 그대로 받는다.
+  const picked = Array.isArray(raw.heroes) ? raw.heroes : (raw.hero ? [raw.hero] : []);
+  s.heroes = [...new Set(picked)].filter((k) => isHero(k) && s.owned.includes(k)).slice(0, heroSlots(s));
   return s;
 }
 
@@ -109,12 +115,20 @@ const levelCost = (save) => LEVEL_COST(levelOf(save));
 const perkCost = (save, id) => PERKS[id].cost(save.perks[id]);
 
 // 판에 데려가는 전부. 일반 편성에 영웅 한 칸이 더 붙는다.
-const rosterOf = (save) => (save.hero ? [...save.team, save.hero] : save.team.slice());
+// **영웅 칸은 여럿이다.** 하나였던 동안 둘째·셋째 영웅은 창고에 쌓이기만 했고,
+// 무엇보다 영웅끼리 서로를 강하게 하는 규칙(공명)이 성립할 자리가 없었다.
+const heroSlots = (save) => HERO_BASE + (save.perks.hero || 0);
+const rosterOf = (save) => [...save.team, ...save.heroes];
 
 // 영웅은 한 명만 데려간다. 같은 것을 다시 누르면 빼는 것으로 본다.
 function chooseHero(save, key) {
   if (key != null && (!isHero(key) || !save.owned.includes(key))) return false;
-  save.hero = save.hero === key ? null : key;
+  const at = save.heroes.indexOf(key);
+  if (at >= 0) save.heroes.splice(at, 1);
+  else {
+    if (save.heroes.length >= heroSlots(save)) return false;
+    save.heroes.push(key);
+  }
   return true;
 }
 
@@ -187,7 +201,7 @@ function grant(save, key) {
   if (!D.UNITS[key] || save.owned.includes(key)) return false;
   save.owned.push(key);
   if (isHero(key)) {
-    if (!save.hero) save.hero = key;
+    if (save.heroes.length < heroSlots(save)) save.heroes.push(key);
   } else if (save.team.length < slotsOf(save)) {
     save.team.push(key);
   }
@@ -200,7 +214,11 @@ function fillTeam(save) {
     if (isHero(k) || save.team.includes(k)) continue;
     save.team.push(k);
   }
-  if (!save.hero) save.hero = save.owned.find(isHero) || null;
+  // 영웅 칸이 비어 있으면 가진 영웅으로 채운다.
+  for (const k of save.owned) {
+    if (save.heroes.length >= heroSlots(save)) break;
+    if (isHero(k) && !save.heroes.includes(k)) save.heroes.push(k);
+  }
 }
 
 function toggleTeam(save, key) {
@@ -294,9 +312,9 @@ function settle(save, stage, run, rand) {
 }
 
 const Meta = {
-  KEY, PERKS, ITEM_POOL, ITEM_NAME, LEVEL_STEP, LEVEL_HP, GEM_GROWTH, SLOTS_BASE,
+  KEY, PERKS, ITEM_POOL, ITEM_NAME, LEVEL_STEP, LEVEL_HP, GEM_GROWTH, SLOTS_BASE, HERO_BASE,
   blank, patch, load, store, modsOf, modsWith, gainOf, rosterOf, chooseHero, isHero,
-  slotsOf, levelOf, levelCost, perkCost,
+  slotsOf, heroSlots, levelOf, levelCost, perkCost,
   buyLevel, buyPerk, grant, toggleTeam, fillTeam, gemsFor, cardsFor, takeCard,
   unlockCost, buyUnit, lockedList, OPEN_COST, HERO_COST,
   useItem, settle,

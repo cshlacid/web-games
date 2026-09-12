@@ -84,18 +84,36 @@ check('마지막 하나는 뺄 수 없다', T.toggleTeam(solo, D.STARTER), false
 // --- 영웅 ---
 const heroSave = T.blank();
 T.grant(heroSave, 'blade');
-check('영웅을 받으면 바로 데려간다', heroSave.hero, 'blade');
+check('영웅을 받으면 바로 데려간다', heroSave.heroes, ['blade']);
 check('영웅은 일반 편성 칸을 쓰지 않는다', heroSave.team.includes('blade'), false);
-check('데려가는 것은 편성에 영웅 한 칸', T.rosterOf(heroSave), [D.STARTER, 'blade']);
+check('데려가는 것은 편성에 영웅 칸', T.rosterOf(heroSave), [D.STARTER, 'blade']);
 T.chooseHero(heroSave, 'blade');
-check('다시 고르면 두고 간다', heroSave.hero, null);
+check('다시 고르면 두고 간다', heroSave.heroes, []);
 check('영웅 없이도 데려갈 것은 있다', T.rosterOf(heroSave), [D.STARTER]);
 T.grant(heroSave, 'saint');
-check('이미 하나를 데려가면 새 영웅은 대기', heroSave.hero, 'saint');
+check('빈 칸이 있으면 새 영웅이 들어간다', heroSave.heroes, ['saint']);
 check('가지지 않은 영웅은 못 고른다', T.chooseHero(heroSave, 'arch'), false);
 check('영웅은 일반 편성에 못 넣는다', T.toggleTeam(heroSave, 'saint'), false);
-check('저장본은 가지지 않은 영웅을 버린다', T.patch({ hero: 'arch' }).hero, null);
-check('저장본은 가진 영웅만 남긴다', T.patch({ owned: ['archer', 'blade'], hero: 'blade' }).hero, 'blade');
+
+// 영웅 칸은 기본 하나이고 축으로 늘린다.
+check('영웅 칸은 기본 하나', T.heroSlots(T.blank()), T.HERO_BASE);
+const many = T.blank();
+for (const k of D.HERO_KEYS) T.grant(many, k);
+check('칸이 하나면 하나만 데려간다', many.heroes.length, 1);
+check('칸이 찼으면 더 못 넣는다', T.chooseHero(many, D.HERO_KEYS[1]), false);
+many.gems = 100000;
+T.buyPerk(many, 'hero');
+check('칸을 사면 하나 는다', T.heroSlots(many), T.HERO_BASE + 1);
+check('그제야 둘째가 들어간다', T.chooseHero(many, D.HERO_KEYS[1]), true);
+check('둘을 데려간다', many.heroes.length, 2);
+T.buyPerk(many, 'hero');
+check('칸은 상한에서 멈춘다', T.heroSlots(many), T.HERO_BASE + T.PERKS.hero.max);
+
+check('저장본은 가지지 않은 영웅을 버린다', T.patch({ hero: 'arch' }).heroes, []);
+check('영웅 칸 하나짜리 옛 저장본을 그대로 받는다',
+  T.patch({ owned: ['archer', 'blade'], hero: 'blade' }).heroes, ['blade']);
+check('칸보다 많이 적힌 저장본은 칸만큼만 받는다',
+  T.patch({ owned: ['archer', ...D.HERO_KEYS], heroes: D.HERO_KEYS }).heroes.length, T.HERO_BASE);
 
 const early = T.cardsFor(T.blank(), D.HERO_FROM - 1, 4, () => 0.3);
 check('영웅 카드는 이른 스테이지에 안 나온다', early.some((c) => c.hero), false);

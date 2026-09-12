@@ -572,6 +572,31 @@ FIGURES.arch = (() => {
 })();
 
 // 성기사 — 흰 판금과 날개 달린 고리. 옆을 통째로 되살린다.
+// 깃발. 사령관의 실루엣을 머리 위로 뻗게 만드는 조각이다 — 34px에서 영웅 넷을
+// 가르는 것은 손에 든 것이고, 깃대는 검·지팡이·철퇴와 겹치지 않는다.
+const banner = (k, c) => `
+  <g stroke="${c.ink}" stroke-width="3.4" stroke-linejoin="round">
+    <rect x="146" y="-4" width="9" height="150" rx="4" fill="url(#wd${k})"/>
+    <path d="M155 6 L196 22 L155 40 Z" fill="url(#cl${k})"/>
+    <path d="M155 12 L184 22 L155 30 Z" fill="${c.light}" opacity="0.7" stroke="none"/>
+    <circle cx="150" cy="-6" r="7" fill="${c.glow}"/>
+  </g>`;
+
+// 사령관 — 뿔나팔과 깃발. 스스로 때리기보다 곁을 부린다.
+FIGURES.warden = (() => {
+  const k = 'wa';
+  const c = { ...ALLY, main: '#3f7d6e', light: '#6fb9a3', dark: '#25544a', glow: '#9be8c8' };
+  const cloak = { ...c, dark: '#1d3f39', ink: c.ink };
+  return figure(k, c, cape(k, cloak) + banner(k, c) + boots(k, c) + torso(k, c, 4) + belt(k, c)
+    + arms(k, c, '#c6b896')
+    + `<g stroke="${c.ink}" stroke-width="3.2" stroke-linejoin="round">
+         <path d="M44 104 Q26 92 22 106 Q30 118 48 118 Q62 116 62 108 Q54 108 44 104 Z" fill="url(#lt${k})"/>
+         <ellipse cx="24" cy="106" rx="7" ry="9" fill="${c.glow}"/>
+       </g>`
+    + pauldrons(k, c) + head(k, c) + openHelm(k, c)
+    + face(c, { iris: '#2f6f62' }) + rim(k), true);
+})();
+
 FIGURES.saint = (() => {
   const k = 'st';
   const c = { ...ALLY, main: '#e2bd5c', light: '#fff0c0', dark: '#9c7524', glow: '#ffe9a8' };
@@ -585,7 +610,7 @@ FIGURES.saint = (() => {
 const ORDER = [
   'archer', 'shield', 'cannon', 'frost', 'spear', 'healer',
   'grunt', 'swarm', 'swift', 'armored', 'breaker', 'mender', 'bone', 'wraith', 'boss',
-  'blade', 'arch', 'saint',
+  'blade', 'arch', 'warden', 'saint',
 ];
 
 module.exports = { CELL, COLS, FIGURES, ORDER };

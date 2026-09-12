@@ -120,7 +120,7 @@ function createRun(stage, opts) {
     over: null,
     seq: 1,
     events: [],
-    heroUsed: false,
+    heroesUsed: {},
     stats: {
       livesLost: 0, goldSpent: 0, upgrades: 0, sold: 0,
       kinds: {}, placed: 0, heroUsed: false, bossFrom: null, bossAt: null, time: 0, goldLeft: 0,
@@ -150,6 +150,9 @@ function occupied(run, x, y) {
     || (e.to && e.to.x === x && e.to.y === y));
 }
 
+// 몇 번째 영웅을 몇 웨이브부터 부를 수 있는가. 골드가 아니라 이것이 영웅의 값이다.
+const heroWave = (called) => D.HERO_CALL.from + called * D.HERO_CALL.gap;
+
 function canPlace(run, key, x, y) {
   if (run.over) return '판이 끝났다';
   if (!D.UNITS[key]) return '없는 캐릭터';
@@ -166,7 +169,12 @@ function canPlace(run, key, x, y) {
   // 여기서 막는다. 출구는 반대다 — 모두의 마지막 칸이라 제일 많이 맞는 자리라
   // 그대로 둔다.
   if (x === run.map.entry.x && y === run.map.entry.y) return '적이 나오는 자리';
-  if (D.UNITS[key].hero && run.heroUsed) return '영웅은 한 판에 한 번';
+  if (D.UNITS[key].hero) {
+    if (run.heroesUsed[key]) return '그 영웅은 이미 불렀다';
+    const called = Object.keys(run.heroesUsed).length;
+    const ready = heroWave(called);
+    if (run.wave < ready) return `웨이브 ${ready}부터 부른다`;
+  }
   if (standing(run, key) >= D.MOST_OF_KIND) return `${D.UNITS[key].name}는 ${D.MOST_OF_KIND}명까지`;
   if (run.gold < costOf(run, key)) return '골드가 모자라다';
   return null;
@@ -187,7 +195,10 @@ function place(run, key, x, y) {
   const row = tally(run, key);
   row.hired++;
   row.spent += cost;
-  if (D.UNITS[key].hero) { run.heroUsed = true; run.stats.heroUsed = true; }
+  // **영웅마다 한 판에 한 번이다.** 편성의 영웅 칸이 여럿이 되면서 "한 판에 하나"가
+  // 아니라 "저마다 하나"로 바뀌었다. 판 통계의 `heroUsed`는 목표가 읽는 값이라
+  // 하나라도 불렀는가로 남긴다.
+  if (D.UNITS[key].hero) { run.heroesUsed[key] = true; run.stats.heroUsed = true; }
   clearFields(run);
   emit(run, { type: 'place', key, x, y });
   return unit;
@@ -377,6 +388,44 @@ function useSkill(run, u, stat, target, spot) {
     }
   } else if (sk.shape === 'field') {
     dropZone(run, spot.x, spot.y, sk, u.key, stat.damage * sk.fieldDps);
+  } else if (sk.shape === 'rally') {
+    // **호령은 피해가 아니라 시간을 준다.** 사거리 안의 아군 스킬 쿨타임을 한꺼번에
+    // 당기고, 영웅에게는 더 크게 당긴다. 사령관이 혼자서는 제일 약한데 곁에 누가
+    // 있을수록 세지는 자리가 여기서 나온다.
+    for (const o of run.units) {
+      if (o === u) continue;
+      if (!inRange(stat, Math.hypot(o.x - u.x, o.y - u.y))) continue;
+      const cut = D.UNITS[o.key].hero ? sk.heroCut : sk.cut;
+      if (o.scd > 0) o.scd = Math.max(0, o.scd - cut);
+      emit(run, { type: 'bond', from: { x: u.x, y: u.y }, to: { x: o.x, y: o.y } });
+    }
+  }
+  resonate(run, u);
+}
+
+// **공명.** 영웅이 스킬을 쓸 때마다 둘레의 다른 영웅이 그만큼 빨리 돌아온다.
+// 여기 한 곳만 있으면 영웅이 몇이든 자동으로 얽힌다 — 짝마다 규칙을 따로 두면
+// 영웅이 늘 때마다 표가 제곱으로 불어난다.
+// 둘레의 다른 영웅 수만큼 쿨타임이 빨리 돈다. 사령관은 두 명분이다.
+function bondOf(run, u) {
+  if (!D.UNITS[u.key].hero) return 1;
+  let gain = 0;
+  for (const o of run.units) {
+    if (o === u || !D.UNITS[o.key].hero) continue;
+    if (Math.hypot(o.x - u.x, o.y - u.y) > D.BOND.r) continue;
+    gain += D.BOND.gain * (D.UNITS[o.key].lead ? 2 : 1);
+  }
+  return 1 + gain;
+}
+
+// 공명은 값이 아니라 **화면에만** 남기는 자리다. 실제로 빠르게 도는 것은 위에서
+// 하고, 여기서는 스킬이 나갈 때 누구와 얽혀 있는지 선으로 알린다.
+function resonate(run, u) {
+  if (!D.UNITS[u.key].hero) return;
+  for (const o of run.units) {
+    if (o === u || !D.UNITS[o.key].hero) continue;
+    if (Math.hypot(o.x - u.x, o.y - u.y) > D.BOND.r) continue;
+    emit(run, { type: 'bond', from: { x: u.x, y: u.y }, to: { x: o.x, y: o.y } });
   }
 }
 
@@ -444,9 +493,12 @@ function hurtAlly(run, u, stat) {
 function tickUnits(run) {
   for (const u of run.units) {
     u.cd -= TICK;
-    u.scd -= TICK;
+    u.scd -= TICK * bondOf(run, u);
     if (u.cd > 0) continue;
     const stat = statOf(u.key, u.tier, run.mods);
+    // 공명. 곁의 영웅 수만큼 쿨타임이 빨리 돌고 피해가 오른다.
+    const bond = bondOf(run, u);
+    if (bond > 1) stat.damage *= bond;
     const sk = stat.skill;
     const ready = u.scd <= 0;
 
@@ -482,6 +534,7 @@ function tickUnits(run) {
         const row = tally(run, u.key);
         row.skills++;
         row.healed += back;
+        resonate(run, u);
         continue;
       }
     }
@@ -706,7 +759,7 @@ function run(state, seconds) {
 
 const Rules = {
   TICK, ITEMS, statOf, upCost, createRun, canPlace, place, sell, upgrade, useItem,
-  step, run, foeXY, occupied, fieldFor, lead, drain, spawn, startWave, inRange, toLine, tally, costOf, standing,
+  step, run, foeXY, occupied, fieldFor, lead, drain, spawn, startWave, inRange, toLine, tally, costOf, standing, heroWave,
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = Rules;

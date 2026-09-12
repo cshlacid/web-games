@@ -40,8 +40,15 @@ const hall = mapOf(['#I#', '#.#', '#.#', '#.#', '#.#', '#O#']);
 // 칸에는 세울 수 없으므로, 사거리와 스킬을 재는 자리가 입구와 겹치면 안 된다.
 const field = mapOf(['....I', '.....', '.....', '.....', '..O..']);
 
-const quiet = [{ index: 1, hp: 100, groups: [], boss: false, reward: 0 }];
-const make = (map, extra) => R.createRun(1, Object.assign({ map, waves: quiet, mods: {} }, extra || {}));
+// 빈 웨이브 열 개. 하나만 두면 웨이브 번호를 손으로 밀 때 판이 끝나 버린다.
+const quiet = [...Array(D.RUN.waves)].map((_, i) => ({ index: i + 1, hp: 100, groups: [], boss: false, reward: 0 }));
+// **영웅은 웨이브가 지나야 부를 수 있다**(`HERO_CALL`). 실험대에서는 그 시계를
+// 지나 보낸 것으로 두고 배치와 전투만 본다 — 부를 수 있는 때는 따로 검사한다.
+const make = (map, extra) => {
+  const run = R.createRun(1, Object.assign({ map, waves: quiet, mods: {} }, extra || {}));
+  run.wave = 8;
+  return run;
+};
 
 const base = make(field);
 check('시작 골드와 목숨', [base.gold, base.lives], [D.RUN.gold, D.RUN.lives]);
@@ -510,9 +517,70 @@ check('웨이브를 다 막으면 이긴다', win.over, 'won');
 const hero = make(field, { roster: D.HERO_KEYS, mods: { startGold: 10 } });
 R.place(hero, 'blade', 1, 1);
 check('영웅을 부르면 통계에 남는다', hero.stats.heroUsed, true);
-check('영웅은 한 판에 한 번', R.canPlace(hero, 'blade', 2, 1), '영웅은 한 판에 한 번');
-check('다른 영웅도 못 부른다', R.canPlace(hero, 'saint', 2, 1), '영웅은 한 판에 한 번');
-check('셋 다 영웅 표시를 달고 있다', D.HERO_KEYS.every((k) => D.UNITS[k].hero), true);
+check('같은 영웅은 한 판에 한 번', R.canPlace(hero, 'blade', 2, 1), '그 영웅은 이미 불렀다');
+// **영웅 칸이 여럿이 되면서 "한 판에 하나"가 "저마다 하나"로 바뀌었다.**
+check('데려온 다른 영웅은 부를 수 있다', R.canPlace(hero, 'saint', 2, 1), null);
+check('영웅 넷 다 표시를 달고 있다', D.HERO_KEYS.every((k) => D.UNITS[k].hero), true);
+
+// --- 영웅은 골드가 아니라 웨이브로 막는다 ---
+// 골드로 사는 동안에는 둘째 영웅이 영영 값을 못 했다 — 그 골드로 못 세운 일반
+// 서넛과 맞바꾸는 것이라 총량이 그대로였다.
+check('영웅은 고용비가 없다', D.HERO_KEYS.every((k) => D.UNITS[k].cost === 0), true);
+check('부를 수 있는 웨이브는 하나씩 미뤄진다',
+  [0, 1, 2].map((n) => R.heroWave(n)),
+  [D.HERO_CALL.from, D.HERO_CALL.from + D.HERO_CALL.gap, D.HERO_CALL.from + D.HERO_CALL.gap * 2]);
+
+const early = R.createRun(1, { map: field, waves: quiet, roster: D.HERO_KEYS, mods: {} });
+check('첫 웨이브 전에는 못 부른다', R.canPlace(early, 'blade', 1, 1), `웨이브 ${R.heroWave(0)}부터 부른다`);
+early.wave = R.heroWave(0);
+check('때가 되면 부른다', R.canPlace(early, 'blade', 1, 1), null);
+R.place(early, 'blade', 1, 1);
+check('골드는 그대로다', early.gold, D.RUN.gold);
+check('둘째는 더 기다린다', R.canPlace(early, 'arch', 2, 1), `웨이브 ${R.heroWave(1)}부터 부른다`);
+early.wave = R.heroWave(1);
+check('그때가 되면 둘째도 부른다', R.canPlace(early, 'arch', 2, 1), null);
+
+// --- 공명 ---
+// **영웅끼리 붙여 세우면 쿨타임이 빨리 돈다.** 몇 초를 깎는 방식이었을 때는 남은
+// 쿨타임보다 깎는 값이 크면 그 몫이 버려져, 둘을 붙여도 스무 초에 스킬이 한 번 더
+// 나가는 데 그쳤다. 비율이라 버려지는 몫이 없다.
+function bonded(who, dx, ticks) {
+  const run = make(field, { roster: D.HERO_KEYS, mods: { startGold: 20 } });
+  run.timer = 9999;
+  const a = R.place(run, 'arch', 0, 2);
+  if (who) R.place(run, who, dx, 2);
+  a.scd = 9;
+  for (let i = 0; i < ticks; i++) R.step(run, R.TICK);
+  return 9 - a.scd;
+}
+const alone9 = bonded(null, 0, 30);
+check('혼자면 흐른 시간만큼 돈다', Math.abs(alone9 - 1) < 0.05, true);
+check('붙여 세우면 더 빨리 돈다', bonded('blade', 2, 30) > alone9 * 1.3, true);
+check('멀면 안 걸린다', Math.abs(bonded('blade', 4, 30) - alone9) < 0.02, true);
+// 사령관은 두 명분으로 친다 — 곁에 서는 것 자체가 그의 값이다.
+check('사령관 곁이 가장 빨리 돈다',
+  bonded('warden', 2, 30) > bonded('blade', 2, 30), true);
+check('공명 반경과 몫은 자료에 있다', D.BOND.r > 0 && D.BOND.gain > 0, true);
+check('사령관만 두 명분 표시를 단다',
+  D.HERO_KEYS.filter((k) => D.UNITS[k].lead), ['warden']);
+
+// 사령관의 호령은 피해가 아니라 시간을 준다.
+const rally = make(field, { roster: [...D.HERO_KEYS, 'archer'], mods: { startGold: 20 } });
+rally.timer = 9999;
+const boss = R.place(rally, 'warden', 2, 2);
+const mate = R.place(rally, 'archer', 2, 1);
+const ally = R.place(rally, 'saint', 3, 2);
+mate.scd = 5;
+ally.scd = 6;
+stand(rally, 'grunt', 900000, 2, 3);
+R.step(rally, R.TICK);
+check('호령은 둘레 아군의 쿨타임을 당긴다', mate.scd < 5 - R.TICK, true);
+check('영웅에게는 더 크게 당긴다',
+  (6 - ally.scd) > (5 - mate.scd) * 1.5, true);
+check('사령관은 스스로 때리기보다 곁을 부린다',
+  D.UNITS.warden.damage < D.UNITS.blade.damage / 2, true);
+check('사령관이 가장 싸다',
+  D.HERO_KEYS.every((k) => k === 'warden' || D.UNITS.warden.cost <= D.UNITS[k].cost), true);
 
 // 회전베기는 목표가 아니라 **자기를 가운데로** 삼는다.
 const spin = make(field, { roster: D.HERO_KEYS, mods: { startGold: 10 } });

@@ -22,7 +22,7 @@ const SHEET = {
   order: [
     'archer', 'shield', 'cannon', 'frost', 'spear', 'healer',
     'grunt', 'swarm', 'swift', 'armored', 'breaker', 'mender', 'bone', 'wraith', 'boss',
-    'blade', 'arch', 'saint',
+    'blade', 'arch', 'warden', 'saint',
   ],
 };
 
@@ -45,6 +45,7 @@ const TINT = {
   boss: { main: '#5a2942', light: '#ff5d4d' },
   blade: { main: '#8e2f3c', light: '#ffcf5c' },
   arch: { main: '#5b4a9e', light: '#c8b4ff' },
+  warden: { main: '#3f7d6e', light: '#9be8c8' },
   saint: { main: '#e2bd5c', light: '#ffe9a8' },
 };
 

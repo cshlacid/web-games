@@ -67,9 +67,19 @@ function bestSpot(run, key, style) {
     // 떨어졌다(25 → 24). 한 판에 하나뿐이라 자리를 고를 여유가 없는 영웅만 이렇게
     // 고른다.
     const blocker = D.UNITS[key].front && D.UNITS[key].hero;
+    // **영웅은 다른 영웅 곁을 좋아한다.** 공명이 둘레 2.4칸에서만 걸리므로, 그 안에
+    // 서는 것이 스킬 빈도로 곧장 돌아온다.
+    const near = D.UNITS[key].hero
+      ? run.units.filter((o) => D.UNITS[o.key].hero
+        && Math.hypot(o.x - c.x, o.y - c.y) <= D.BOND.r).length
+      : 0;
+    // 공명 값이 크게 붙는 이유: 곁에 서면 둘의 스킬이 통째로 빨라진다. 무게를
+    // 작게 뒀더니 검성은 길목으로, 나머지는 시야 좋은 구석으로 흩어져 **열두 판에
+    // 얽힌 짝이 넷뿐**이었다 — 규칙을 넣어 놓고 재는 손이 안 쓰는 꼴이었다.
     const score = (blocker && !siege)
-      ? (here ? 100 - route.findIndex((r) => r.x === c.x && r.y === c.y) : 1)
-      : coverage(run, route, c.x, c.y, stat) + (here ? (style === 'wall' && !siege ? 4 : 2) : 0);
+      ? (here ? 100 - route.findIndex((r) => r.x === c.x && r.y === c.y) : 1) + near * 12
+      : coverage(run, route, c.x, c.y, stat) + (here ? (style === 'wall' && !siege ? 4 : 2) : 0)
+        + near * 14;
     if (score <= 0) continue;
     if (!best || score > best.score) best = { x: c.x, y: c.y, score };
   }
@@ -101,6 +111,17 @@ const HERO_FOR = {
   breaker: 'blade', mender: 'arch', bone: 'saint', wraith: 'saint',
 };
 
+// 영웅 칸이 남으면 채우는 차례. **사령관이 먼저다** — 주는 것이 피해가 아니라
+// 시간이라 곁에 누가 있을수록 값이 커지고, 둘째 칸의 값이 거기서 가장 크다.
+const HERO_FILL = ['warden', 'blade', 'arch', 'saint'];
+
+// 그 판에 데려갈 영웅 목록. 판에 맞는 하나를 앞에 두고 칸만큼 채운다.
+function heroPlan(stage, slots, owned, themeOf) {
+  const first = HERO_FOR[themeOf(stage)];
+  const want = [first, ...HERO_FILL].filter((k) => k && owned.includes(k));
+  return [...new Set(want)].slice(0, slots);
+}
+
 // 이 판에 가장 무겁게 오는 적. `waves.js`의 주력을 직접 읽지 않고 판이 들고 있는
 // 웨이브에서 세면, 손으로 짠 판에서도 같은 손이 돈다. **마릿수가 아니라 예산으로
 // 센다** — 무리는 한 무더기가 스물둘이라 머릿수로 세면 늘 무리가 주력이 된다.
@@ -131,22 +152,15 @@ function wanted(run, style) {
 
 // 한 번의 판단. 돈이 되면 세우고, 더 세울 자리가 없으면 올린다.
 function act(run, style) {
-  // **영웅을 부르려면 골드를 아껴야 한다.** 이 손은 싼 것부터 쉬지 않고 사느라
-  // 골드가 220까지 모이는 순간이 오지 않아, 영웅 셋을 **한 번도 세우지 않았다** —
-  // 계수 재기에서 통째로 빠져 있었다. 앞줄 넷이 선 뒤부터 여섯 번째 웨이브까지는
-  // 영웅 말고는 아무것도 사지 않고 모은다.
-  //
-  // 셋째 웨이브를 기다리는 것은 **여는 값을 영웅에 쓰면 판이 통째로 무너지기**
-  // 때문이다 — 두 번째 웨이브부터 모으게 했더니 성기사를 데려간 판이 스테이지
-  // 2를 못 넘었다(240골드면 앞줄 넷이다). 여섯에서 푸는 것은 그때까지 못 모았으면
-  // 그 판은 영웅을 부를 판이 아니기 때문이다.
-  const hero = run.roster.find((k) => D.UNITS[k].hero);
-  if (hero && !run.heroUsed && run.units.length >= 4 && run.wave >= 3 && run.wave <= 6) {
-    if (run.gold >= R.costOf(run, hero)) {
-      const spot = bestSpot(run, hero, style);
-      if (spot) { R.place(run, hero, spot.x, spot.y); return true; }
+  // **영웅은 골드를 쓰지 않는다.** 웨이브가 오면 부른다 — 이 손이 영웅을 한 번도
+  // 세우지 않던 것도, 둘째 영웅이 값을 못 하던 것도 전부 골드 때문이었다.
+  const called = Object.keys(run.heroesUsed).length;
+  if (run.wave >= R.heroWave(called)) {
+    const key = run.roster.find((k) => D.UNITS[k].hero && !run.heroesUsed[k]);
+    if (key) {
+      const spot = bestSpot(run, key, style);
+      if (spot && R.place(run, key, spot.x, spot.y)) return true;
     }
-    return false;
   }
   const first = wanted(run, style);
   // 차례가 비싸면 살 수 있는 것 중 가장 비싼 것으로 대신한다. 기다리기만 하면
@@ -244,7 +258,7 @@ function climb(opts) {
     if (!only) return;
     save.team = only.filter((k) => save.owned.includes(k));
     if (!save.team.length) save.team = [D.STARTER];
-    save.hero = null;
+    save.heroes = [];
   };
   keepTeam();
   const log = [];
@@ -297,7 +311,7 @@ function climb(opts) {
   return { save, log, reached: save.best };
 }
 
-const AI = { WANT, COUNTER, HERO_FOR, mainFoe, bestSpot, act, play, spend, climb, rngOf };
+const AI = { WANT, COUNTER, HERO_FOR, HERO_FILL, heroPlan, mainFoe, bestSpot, act, play, spend, climb, rngOf };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = AI;
 if (typeof window !== 'undefined') window.DefenseAI = AI;

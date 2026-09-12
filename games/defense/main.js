@@ -27,7 +27,7 @@ for (const [name, id] of [
   ['result', 'result'], ['resultTitle', 'result-title'], ['resultNote', 'result-note'],
   ['cards', 'cards'], ['again', 'again'],
   ['camp', 'camp'], ['campOpen', 'camp-open'], ['campClose', 'camp-close'], ['campGems', 'camp-gems'],
-  ['stageDown', 'stage-down'], ['stageUp', 'stage-up'], ['stageNow', 'stage-now'], ['stageNote', 'stage-note'],
+  ['heroCount', 'hero-count'], ['stageDown', 'stage-down'], ['stageUp', 'stage-up'], ['stageNow', 'stage-now'], ['stageNote', 'stage-note'],
   ['teamCount', 'team-count'], ['teamList', 'team-list'], ['levelList', 'level-list'], ['perkList', 'perk-list'],
   ['help', 'help'], ['helpOpen', 'help-open'], ['helpClose', 'help-close'],
   ['toggleBgm', 'toggle-bgm'], ['toggleSfx', 'toggle-sfx'],
@@ -277,12 +277,16 @@ function paint() {
 
   for (const s of shots) {
     ctx.globalAlpha = Math.max(0, s.t / SHOT_LIFE) * 0.85;
-    ctx.strokeStyle = s.kind === 'heal' ? SP.TINT.healer.light : ((SP.TINT[s.kind] || {}).main || theme.fg);
-    ctx.lineWidth = s.kind === 'cannon' ? 3 : 1.5;
+    ctx.strokeStyle = s.kind === 'heal' ? SP.TINT.healer.light
+      : (s.kind === 'bond' ? SP.TINT.warden.light : ((SP.TINT[s.kind] || {}).main || theme.fg));
+    ctx.lineWidth = s.kind === 'cannon' ? 3 : (s.kind === 'bond' ? 2.5 : 1.5);
+    // 공명은 점선으로 긋는다 — 사격선과 같은 실선이면 누가 누구를 쏜 것인지 섞인다.
+    ctx.setLineDash(s.kind === 'bond' ? [4, 4] : []);
     ctx.beginPath();
     ctx.moveTo(s.from.x * cell + cell / 2, s.from.y * cell + cell / 2);
     ctx.lineTo(s.to.x * cell + cell / 2, s.to.y * cell + cell / 2);
     ctx.stroke();
+    ctx.setLineDash([]);
   }
   ctx.globalAlpha = 1;
 }
@@ -318,10 +322,17 @@ function hud() {
     // 적힌 값이 다르면, 눌러 놓고 왜 안 되는지 알 수 없다.
     const cost = R.costOf(run, key);
     const tag = node.querySelector('.cost');
-    if (tag.textContent !== String(cost)) tag.textContent = String(cost);
-    node.classList.toggle('poor', run.gold < cost);
+    // **영웅은 골드가 아니라 웨이브로 막는다.** 값 자리에 0을 적어 두면 왜 안
+    // 세워지는지 알 수 없어, 부를 수 있는 웨이브를 대신 적는다.
+    const hero = !!D.UNITS[key].hero;
+    const ready = hero ? R.heroWave(Object.keys(run.heroesUsed).length) : 0;
+    const label = hero
+      ? (run.heroesUsed[key] ? '부름' : (run.wave >= ready ? '지금' : `${ready}웨이브`))
+      : String(cost);
+    if (tag.textContent !== label) tag.textContent = label;
+    node.classList.toggle('poor', hero ? run.wave < ready : run.gold < cost);
     // 더 못 세우는 자리는 회색으로 둔다 — 이미 부른 영웅과 한도에 닿은 종류다.
-    const full = (!!D.UNITS[key].hero && run.heroUsed) || R.standing(run, key) >= D.MOST_OF_KIND;
+    const full = (hero && !!run.heroesUsed[key]) || R.standing(run, key) >= D.MOST_OF_KIND;
     node.classList.toggle('used', full);
     node.setAttribute('aria-pressed', String(chosen === key));
   }
@@ -382,6 +393,10 @@ function handle(events) {
       if (now - lastShotSound > 70) { Sound.play('shot', PITCH[ev.key] || 660); lastShotSound = now; }
     } else if (ev.type === 'heal') {
       shots.push({ from: ev.from, to: ev.to, t: SHOT_LIFE * 2, kind: 'heal' });
+    } else if (ev.type === 'bond') {
+      // **공명은 눈에 보여야 한다.** 쿨타임이 당겨지는 것은 숫자로만 나서,
+      // 선을 긋지 않으면 붙여 세운 보람이 화면에 하나도 안 남는다.
+      shots.push({ from: ev.from, to: ev.to, t: SHOT_LIFE * 2.4, kind: 'bond' });
     } else if (ev.type === 'skill') {
       // 스킬이 나간 자리에 고리를 남긴다. 쿨타임이 돌아온 것을 눈으로 알린다.
       shots.push({ from: ev.from, to: ev.to, t: SHOT_LIFE * 1.6, kind: ev.key });
@@ -487,7 +502,8 @@ function buildPalette() {
     cost.className = 'cost';
     cost.textContent = String(d.cost);
     node.appendChild(cost);
-    const basic = (d.basic ? ` · ${BASIC_NOTE[d.basic.shape]}` : '') + holyOf(d);
+    const basic = (d.basic ? ` · ${BASIC_NOTE[d.basic.shape]}` : '') + holyOf(d)
+      + (d.hero ? ` · 골드가 들지 않는다. 다른 영웅 곁에 서면 피해와 쿨타임이 한 명당 +${Math.round(D.BOND.gain * 100)}%${d.lead ? '(사령관은 두 배)' : ''}` : '');
     node.title = `${who(key)} · 사거리 ${d.range.min}-${d.range.max}${basic} · ${d.skill.name}(${d.skill.cd}초)`
     + ` — ${d.skill.note} · 같은 종류는 ${D.MOST_OF_KIND}명까지, 겹칠수록 값이 오른다`;
     node.addEventListener('click', () => {
@@ -698,14 +714,15 @@ function renderCamp() {
     none.textContent = `아직 없습니다. 스테이지 ${D.HERO_FROM}부터 목표를 채우면 카드로 나옵니다.`;
     el.heroList.appendChild(none);
   }
+  el.heroCount.textContent = `${save.heroes.length}/${T.heroSlots(save)}칸`;
   for (const key of heroes) {
-    const on = save.hero === key;
+    const on = save.heroes.includes(key);
     const node = row(`<span class="who">${who(key)}<br><span class="camp-note">${D.UNITS[key].skill.name} · ${D.UNITS[key].note}</span></span>`
       + `<span class="sub">${on ? '데려감' : `고용 ${D.UNITS[key].cost}`}</span>`);
     node.prepend(spriteNode(key, 26));
     node.setAttribute('aria-pressed', String(on));
     node.addEventListener('click', () => {
-      T.chooseHero(save, key);
+      if (!T.chooseHero(save, key)) { toast('영웅 칸이 찼다'); return; }
       T.store(save);
       buildPalette();
       renderCamp();
