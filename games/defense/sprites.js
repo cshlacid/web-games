@@ -21,7 +21,7 @@ const SHEET = {
   cols: 7,
   order: [
     'archer', 'shield', 'cannon', 'frost', 'spear', 'healer',
-    'grunt', 'swarm', 'swift', 'armored', 'breaker', 'mender', 'boss',
+    'grunt', 'swarm', 'swift', 'armored', 'breaker', 'mender', 'bone', 'wraith', 'boss',
     'blade', 'arch', 'saint',
   ],
 };
@@ -40,6 +40,8 @@ const TINT = {
   armored: { main: '#6d727a', light: '#ff7a5c' },
   breaker: { main: '#5e3d4b', light: '#e0555f' },
   mender: { main: '#584a7e', light: '#9fe6b4' },
+  bone: { main: '#8b8477', light: '#7fe08a' },
+  wraith: { main: '#4a3b63', light: '#8ce0ff' },
   boss: { main: '#5a2942', light: '#ff5d4d' },
   blade: { main: '#8e2f3c', light: '#ffcf5c' },
   arch: { main: '#5b4a9e', light: '#c8b4ff' },

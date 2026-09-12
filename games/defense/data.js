@@ -68,47 +68,61 @@ const UNITS = {
   healer: {
     name: '힐러', cost: 100, damage: 5, rate: 1.0, hp: 70,
     range: { min: 1, max: 3 },
-    skill: { name: '치유', cd: 3.5, shape: 'heal', heal: 30, note: '가장 다친 아군을 되살린다' },
-    note: '되살릴 이가 없으면 같이 싸운다',
+    // 때리는 것은 신성이다. 산 것에게는 5짜리 잡타지만 **언데드에게는 두 배**로
+    // 들어가고 언데드의 두꺼운 저항도 타지 않는다 — 일반 여섯 중 언데드를 맡는
+    // 자리가 여기다.
+    basic: { shape: 'single', kind: 'holy' },
+    skill: {
+      name: '치유', cd: 3.5, shape: 'heal', heal: 30, smite: 1.6,
+      note: '가장 다친 아군을 되살리고 둘레의 언데드를 태운다',
+    },
+    note: '되살릴 이가 없으면 같이 싸운다. 언데드에 강하다',
   },
 };
 
 // 영웅. **한 판에 한 번만 부를 수 있다**(`hero`). 값이 비싸 첫 웨이브부터 세울 수
 // 없고, 어느 웨이브에 꺼내느냐가 그 판의 판단이 된다. 편성에서 일반 다섯 칸과는
 // 따로 한 칸을 차지한다.
+// **한 명뿐이므로 일반과 같은 값당 효율이면 데려갈 이유가 없다.** 실제로 그랬다 —
+// 값당 초당 피해가 대마법사 24.5, 성기사 5.6으로 궁수(22.1)·포수(25.5)와 같거나
+// 아래였고, 스테이지 40까지 누적 판 수가 영웅 없이 166, 검성 174(손해),
+// 대마법사 145, 성기사는 스테이지 1에서 막혔다. 그래서 **셋 다 제 자리에서는
+// 일반의 두세 배**가 되게 올리고, 대신 그 자리를 좁게 못 박았다.
 const HEROES = {
   blade: {
-    name: '검성', who: '레안', front: true, cost: 220, damage: 26, rate: 1.2, hp: 500, hero: true,
+    name: '검성', who: '레안', front: true, cost: 120, damage: 46, rate: 1.3, hp: 620, hero: true,
     range: { min: 1, max: 1 },
-    // **기본 공격도 둘레를 벤다.** 회전베기가 도는 5초 사이에는 한 놈씩 때리는
-    // 창병과 다를 것이 없었다. 반지름 1.1이라 대각선(1.41)은 빠지고 맞닿은 넷만
-    // 맞는다 — 스킬(1.7)이 더 넓은 자리는 그대로 남는다.
+    // **가까운 소수를 처리하는 자리다.** 기본도 스킬도 자기를 가운데로 삼아 둘레를
+    // 베고, 반지름이 좁아 맞닿은 것만 맞는다(1.1은 대각선 1.41을 뺀다). 넓히지 않는
+    // 것이 성격이다 — 멀리 있는 다수는 대마법사의 자리다.
     basic: { shape: 'ring', ring: 1.1 },
-    skill: { name: '회전베기', cd: 5, shape: 'ring', mul: 1.6, ring: 1.7, note: '둘레를 통째로 벤다' },
-    note: '길목에 서서 베고 버틴다',
+    skill: { name: '회전베기', cd: 4.5, shape: 'ring', mul: 2.2, ring: 1.6, note: '둘레를 통째로 벤다' },
+    note: '길목에 세워야 값이 나온다. 맞닿은 것만 벤다',
   },
   arch: {
-    name: '대마법사', who: '모르윈', cost: 260, damage: 28, rate: 0.55, hp: 90, hero: true,
+    name: '대마법사', who: '모르윈', cost: 140, damage: 40, rate: 0.6, hp: 90, hero: true,
     range: { min: 2, max: 6 },
-    // **기본 공격부터 범위다.** 영웅인데 한 놈씩 때리는 초당 11이라 궁수와 다를 것이
-    // 없었다. 범위는 `single`이 아니라 `area`로 들어가므로 중장병의 저항도 타지
-    // 않는다 — 값이 네 배인 자리가 이것으로 설명된다.
-    basic: { shape: 'splash', splash: 1.2 },
+    // **멀리 있는 다수를 처리하는 자리다.** 기본부터 범위이고 반지름이 넓다. 대신
+    // 코앞(두 칸 안)은 못 치고 체력이 종잇장이라 앞에 세울 수 없다.
+    basic: { shape: 'splash', splash: 1.8 },
     skill: {
-      name: '운석', cd: 10, shape: 'splash', mul: 3.6, splash: 2, bleedDps: 0.5, bleedFor: 3,
+      name: '운석', cd: 9, shape: 'splash', mul: 4, splash: 2.6, bleedDps: 0.5, bleedFor: 3,
       note: '떨어뜨려 태운다',
     },
     note: '판 끝에서 끝까지 닿는다. 코앞은 못 친다',
   },
   saint: {
-    name: '성기사', who: '가론', front: true, cost: 240, damage: 18, rate: 1, hp: 260, hero: true,
+    name: '성기사', who: '가론', front: true, cost: 130, damage: 26, rate: 1, hp: 300, hero: true,
     range: { min: 1, max: 4 },
-    // **때리면서 되살린다.** 치유의 빛이 6초에 한 번이라 그 사이에는 공격력 14짜리
-    // 잡캐였다. 회복량은 고정값이 아니라 제 공격력에 대한 비율이라 레벨을 따라
-    // 같이 오른다.
-    basic: { shape: 'smite', heal: 0.9 },
-    skill: { name: '치유의 빛', cd: 6, shape: 'heal', heal: 110, all: true, note: '둘레의 아군을 한꺼번에' },
-    note: '옆을 통째로 되살리고 같이 싸운다',
+    // **언데드를 처리하는 자리다.** 때리는 것이 신성이라 언데드에게 두 배로
+    // 들어가고 그들의 두꺼운 저항을 타지 않는다. 산 것에게는 평범한 값이고,
+    // 언데드 판에서만 압도적인 것이 이 영웅의 성격이다.
+    basic: { shape: 'smite', heal: 0.9, kind: 'holy' },
+    skill: {
+      name: '치유의 빛', cd: 6, shape: 'heal', heal: 140, all: true, smite: 3.2,
+      note: '둘레의 아군을 한꺼번에 되살리고 언데드를 태운다',
+    },
+    note: '되살리며 싸운다. 언데드에 아주 강하다',
   },
 };
 
@@ -144,7 +158,10 @@ const UP = {
 // 공격이 닿는 종류. `resist`는 `single`에만 걸린다 — 범위·관통·지속은 제값이
 // 들어간다. **지속 피해에는 최소 1이 붙지 않는다**(직접 때리는 값에만 붙는 바닥이라,
 // 그대로 두면 틱마다 1이 들어가 초당 서른이 된다).
-const HIT = { single: 'single', area: 'area', dot: 'dot' };
+// **신성은 언데드를 태우는 네 번째 종류다.** 산 것에게는 다른 종류와 다를 것이
+// 없고(어느 적도 저항을 적어 두지 않았다), 언데드에게만 두 배로 들어간다.
+// 힐러와 성기사가 이 종류로 때린다 — 되살리는 쪽이 언데드를 맡는 자리다.
+const HIT = { single: 'single', area: 'area', dot: 'dot', holy: 'holy' };
 
 // 적. hp는 그 스테이지 기준 체력에 곱하는 배수다.
 //
@@ -180,12 +197,21 @@ const FOES = {
   // 초당 최대 체력의 6%를 되살린다. 조금씩 깎아서는 따라잡지 못하고, 어느 종류로
   // 때려도 얼마쯤은 깎인다 — **한 번에 크게 넣는 스킬**이 답인 자리다.
   mender:  { name: '치유병', speed: 1, hp: 1, resist: { single: 0.35, area: 0.35, dot: 0.5 }, siege: 10, bias: 1, bounty: 15, heal: 0.06, healRange: 1.8, cost: 1.9 },
+  // **언데드 둘.** 산 것을 잡는 수단이 전부 어정쩡하게 통하는 대신 신성에는
+  // 두 배로 탄다(`resist.holy`가 음수다 — 음수는 저항이 아니라 약점이다).
+  // 되살리는 쪽(힐러·성기사)이 여기서 딜러가 되는 것이 이 계열의 뜻이다.
+  //
+  // 저항을 고르게 준 것은 일부러다. 한 종류만 크게 막으면 나머지로 밀어 버리면
+  // 되는데, 고르게 막으면 **신성을 데려왔는가**가 그 판의 답이 된다.
+  bone:    { name: '해골병', undead: true, speed: 1.0, hp: 1.3, resist: { single: 0.55, area: 0.55, dot: 0.7, holy: -1 }, chill: 0.5, siege: 14, bias: 1, bounty: 20, cost: 1.6 },
+  // 형체가 없어 때리는 것이 거의 지나간다. 빠르고 사람을 부수러 돌아온다.
+  wraith:  { name: '망령', undead: true, speed: 1.9, hp: 0.8, resist: { single: 0.75, area: 0.75, dot: 0.75, holy: -1.2 }, chill: 0.3, siege: 18, bias: 1.3, bounty: 24, cost: 1.9 },
   boss:    { name: '우두머리', speed: 0.7, hp: 12, resist: { single: 0.55, area: 0.2 }, chill: 0.2, siege: 70, bias: 0.7, bounty: 90, cost: 0 },
 };
 
 // 종류가 처음 나오는 스테이지. 숫자만 커지면 웨이브 10과 웨이브 80에서 하는 일이
 // 같아져 무한이 지루함이 된다 — 대응이 바뀌는 자리를 여기서 만든다.
-const FOE_FROM = { grunt: 1, swarm: 2, swift: 3, armored: 5, breaker: 7, mender: 10 };
+const FOE_FROM = { grunt: 1, swarm: 2, swift: 3, armored: 5, breaker: 7, bone: 8, mender: 10, wraith: 13 };
 
 // **같은 종류는 판에 여섯까지만 세운다.** 값으로 막으려 해 봤지만(겹칠수록 비싸게,
 // 방어를 세게, 적을 세게) 전부 칼날 위였다 — 한 종류만 키우면 레벨이 두 배로

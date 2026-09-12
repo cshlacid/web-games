@@ -450,6 +450,69 @@ FIGURES.boss = (() => {
 })();
 
 
+// --- 언데드 둘. 밀려오는 쪽의 자주·회색에서 **한 겹 더 창백한 쪽**으로 민다. ---
+// 34px에서 산 것과 가르는 것은 색이 아니라 **얼굴이다** — 눈이 없고 구멍에서
+// 빛이 난다. 둘 다 그 하나로 언데드임을 알린다.
+
+// 해골 얼굴. 눈구멍은 검게 파고 그 안에서 불이 돈다.
+const skullFace = (k, c) => `
+  <g stroke="none">
+    ${pair(`<ellipse cx="${MID - 17}" cy="68" rx="11" ry="12.5" fill="#140f14"/>`)}
+    ${pair(`<circle cx="${MID - 16}" cy="69" r="5.5" fill="${c.glow}"/>`)}
+    <path d="M${MID - 5} 84 L${MID} 76 L${MID + 5} 84 Z" fill="#140f14"/>
+    <path d="M70 96 Q96 104 122 96" fill="none" stroke="#140f14" stroke-width="4" stroke-linecap="round"/>
+    ${[-18, -6, 6, 18].map((dx) => `<rect x="${MID + dx - 3}" y="92" width="6" height="11" rx="2" fill="#140f14"/>`).join('')}
+  </g>`;
+
+// 갈비뼈. 살이 없는 몸통이라 옷 대신 이것이 실루엣을 만든다.
+const ribs = (k, c) => `
+  <g stroke="${c.ink}" stroke-width="3" stroke-linecap="round" fill="none">
+    ${[0, 1, 2].map((i) => `<path d="M74 ${118 + i * 15} Q96 ${126 + i * 15} 118 ${118 + i * 15}"
+        stroke="#efe8d6" stroke-width="7"/>`).join('')}
+    <rect x="91" y="112" width="10" height="56" rx="4" fill="#efe8d6" stroke="${c.ink}" stroke-width="2.6"/>
+  </g>`;
+
+// 아래가 찢어져 흩어지는 옷자락. **망령은 다리가 없다** — 34px에서 산 것과 가르는
+// 두 번째 표시가 이 밑단이라, 몸통 위에 덮어 그리고 깊게 판다.
+const tatters = (k, c) => `
+  <g stroke="${c.ink}" stroke-width="3.4" stroke-linejoin="round">
+    <path d="M58 98 Q42 146 48 182 Q60 152 70 180 Q82 150 96 182 Q110 150 122 180
+             Q132 152 144 182 Q150 146 134 98 Z" fill="url(#cl${k})"/>
+    <path d="M66 118 Q96 134 126 118" fill="none" stroke="${c.dark}" stroke-width="4.5" opacity="0.85"/>
+    <path d="M70 100 Q96 92 122 100" fill="none" stroke="#ffffff" stroke-opacity="0.25" stroke-width="5"/>
+  </g>`;
+
+// 낡은 검. 해골병이 든 것이라 날이 이 빠지게 꺾어 둔다.
+const rustSword = (k, c) => `
+  <g stroke="${c.ink}" stroke-width="3.2" stroke-linejoin="round">
+    <path d="M152 18 L164 40 L162 116 L142 116 L142 40 Z" fill="url(#mt${k})"/>
+    <path d="M148 34 L148 112" stroke="#ffffff" stroke-opacity="0.45" stroke-width="4"/>
+    <rect x="130" y="112" width="44" height="10" rx="4" fill="#4a301a"/>
+    <rect x="146" y="120" width="14" height="26" rx="5" fill="url(#wd${k})"/>
+  </g>`;
+
+// 해골병 — 뼈만 남은 병사. 빈 눈구멍과 갈비뼈, 이 빠진 검.
+FIGURES.bone = (() => {
+  const k = 'bn';
+  const c = { ...FOE('#efe8d6', '#fffaf0', '#c9c0ab'), main: '#8b8477', light: '#b3ab9c', dark: '#5d574c', glow: '#7fe08a' };
+  return figure(k, c, rustSword(k, c) + boots(k, c) + ribs(k, c) + belt(k, c, 150)
+    + arms(k, c, '#efe8d6') + head(k, c, 44) + skullFace(k, c) + rim(k));
+})();
+
+// 망령 — 다리 없이 떠 온다. 후드 안에 얼굴 대신 불 두 점만 있다.
+FIGURES.wraith = (() => {
+  const k = 'wr';
+  const c = { ...FOE('#3b2f4a', '#5a4a6e', '#241c2e'), main: '#4a3b63', light: '#6f5c8e', dark: '#291f38', glow: '#8ce0ff' };
+  // 땅에 닿지 않는다는 것을 그림자를 띄워 알린다. 옷자락은 몸통 위에 덮는다.
+  return figure(k, c, `<ellipse cx="${MID}" cy="182" rx="34" ry="7" fill="${c.glow}" opacity="0.28"/>`
+    + torso(k, c, -10) + tatters(k, c) + arms(k, c, '#291f38')
+    + head(k, c, 40) + hood(k, c)
+    + `<g stroke="none">${pair(`<ellipse cx="${MID - 15}" cy="70" rx="8.5" ry="10" fill="#140f14"/>`)}
+       ${pair(`<circle cx="${MID - 15}" cy="70" r="4.8" fill="${c.glow}"/>`)}
+       <circle cx="${MID}" cy="72" r="38" fill="url(#gl${k})" opacity="0.55"/></g>`
+    + rim(k));
+})();
+
 // --- 영웅 셋. 한 판에 한 번만 부를 수 있어 한눈에 달라 보여야 한다. ---
 // 금색 테와 망토, 그리고 머리 위로 뻗는 것으로 일반 캐릭터와 가른다.
 
@@ -521,7 +584,7 @@ FIGURES.saint = (() => {
 
 const ORDER = [
   'archer', 'shield', 'cannon', 'frost', 'spear', 'healer',
-  'grunt', 'swarm', 'swift', 'armored', 'breaker', 'mender', 'boss',
+  'grunt', 'swarm', 'swift', 'armored', 'breaker', 'mender', 'bone', 'wraith', 'boss',
   'blade', 'arch', 'saint',
 ];
 

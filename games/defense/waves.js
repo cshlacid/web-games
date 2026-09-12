@@ -42,11 +42,11 @@ function createRng(seed) {
 
 // 마리 사이 간격. 무리는 쏟아지고 중장병은 뚝뚝 떨어져야 같은 예산이라도
 // 다른 판이 된다.
-const GAP = { swarm: 0.25, swift: 0.42, grunt: 0.7, mender: 0.9, armored: 1.0, breaker: 1.1, boss: 0 };
+const GAP = { swarm: 0.25, swift: 0.42, grunt: 0.7, wraith: 0.5, bone: 0.8, mender: 0.9, armored: 1.0, breaker: 1.1, boss: 0 };
 
 // 한 무더기의 상한. 예산만 보고 나누면 싼 종류가 스무 마리씩 쏟아져 다른 종류가
 // 낄 자리가 없어진다.
-const MOST = { swarm: 22, swift: 14, grunt: 12, armored: 9, breaker: 6, mender: 5 };
+const MOST = { swarm: 22, swift: 14, grunt: 12, bone: 10, armored: 9, wraith: 7, breaker: 6, mender: 5 };
 // 그 종류를 처음 만나는 스테이지에서는 몇 마리만 섞어 보낸다. 처음 보는 적이
 // 떼로 오면 무엇이 달라졌는지 배울 틈이 없다.
 

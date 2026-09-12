@@ -57,8 +57,19 @@ function bestSpot(run, key, style) {
     // **공성병 판에서는 막는 손버릇도 막지 않는다.** 초당 60으로 부수며 들어오는
     // 것 앞에 길을 막고 서면 앞줄이 통째로 녹는다 — 사람도 그 판에서는 흘린다.
     const siege = mainFoe(run) === 'breaker';
-    const score = coverage(run, route, c.x, c.y, stat)
-      + (here ? (style === 'wall' && !siege ? 4 : 2) : 0);
+    // **앞을 맡는 자는 길 칸 수로 재면 안 된다.** 사거리 1이라 보이는 길 칸이
+    // 한둘뿐이어서, 커버리지로 고르면 길 밖의 구석에 선다. 그러면 검성처럼 붙어야
+    // 값이 나오는 영웅이 판 내내 아무도 못 만난다 — 부른 열세 판 중 길 위에 선 것이
+    // 둘뿐이었고, 그래서 검성을 데려간 쪽이 안 데려간 쪽보다 판 수가 더 들었다.
+    // 이들은 **길 위에서 얼마나 앞쪽이냐**로 고른다.
+    // **일반 방패병에게는 이 자를 대지 않는다.** 옮겨 보니 트인 손버릇이 늘 길을
+    // 막는 손이 되어 손버릇 둘을 나눠 둔 뜻이 없어졌고, 막는 손의 도달도 오히려
+    // 떨어졌다(25 → 24). 한 판에 하나뿐이라 자리를 고를 여유가 없는 영웅만 이렇게
+    // 고른다.
+    const blocker = D.UNITS[key].front && D.UNITS[key].hero;
+    const score = (blocker && !siege)
+      ? (here ? 100 - route.findIndex((r) => r.x === c.x && r.y === c.y) : 1)
+      : coverage(run, route, c.x, c.y, stat) + (here ? (style === 'wall' && !siege ? 4 : 2) : 0);
     if (score <= 0) continue;
     if (!best || score > best.score) best = { x: c.x, y: c.y, score };
   }
@@ -78,6 +89,16 @@ const COUNTER = {
   armored: ['frost', 'spear'],
   breaker: ['archer', 'shield', 'healer'],
   mender: ['cannon', 'archer'],
+  // 언데드는 산 것을 잡는 수단이 전부 반쯤 통한다. 신성을 든 힐러가 답이다.
+  bone: ['healer', 'spear'],
+  wraith: ['healer', 'frost'],
+};
+
+// **그 판에 데려갈 영웅.** 셋이 저마다 다른 자리를 맡으므로 영웅 칸도 판을 보고
+// 골라야 한다 — 멀리 다수면 대마법사, 붙어서 소수면 검성, 언데드면 성기사다.
+const HERO_FOR = {
+  grunt: 'blade', swarm: 'arch', swift: 'arch', armored: 'blade',
+  breaker: 'blade', mender: 'arch', bone: 'saint', wraith: 'saint',
 };
 
 // 이 판에 가장 무겁게 오는 적. `waves.js`의 주력을 직접 읽지 않고 판이 들고 있는
@@ -276,7 +297,7 @@ function climb(opts) {
   return { save, log, reached: save.best };
 }
 
-const AI = { WANT, COUNTER, mainFoe, bestSpot, act, play, spend, climb, rngOf };
+const AI = { WANT, COUNTER, HERO_FOR, mainFoe, bestSpot, act, play, spend, climb, rngOf };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = AI;
 if (typeof window !== 'undefined') window.DefenseAI = AI;

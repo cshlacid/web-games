@@ -559,5 +559,51 @@ function crawl(key) {
 check('얼음 지대는 발을 묶는다', crawl('grunt') < 0.6, true);
 check('공성병은 얼음 위에서도 거의 그대로 온다', crawl('breaker') > 0.8, true);
 
+// --- 언데드와 신성 ---
+check('언데드는 표시를 달고 있다', [D.FOES.bone.undead, D.FOES.wraith.undead], [true, true]);
+check('산 것에는 그 표시가 없다', !D.FOES.grunt.undead, true);
+// 음수 저항은 저항이 아니라 약점이다. 신성만 음수인 것이 이 계열의 전부다.
+check('언데드는 신성에 약하다', D.FOES.bone.resist.holy < 0, true);
+check('신성에 약한 것은 언데드뿐',
+  Object.keys(D.FOES).filter((k) => (D.FOES[k].resist.holy || 0) < 0).sort(), ['bone', 'wraith']);
+check('언데드는 나머지 셋을 고르게 막는다',
+  ['single', 'area', 'dot'].every((kind) => D.FOES.bone.resist[kind] >= 0.5), true);
+
+function into(key, foe, sec) {
+  const run = make(field, { roster: [...D.HERO_KEYS, 'healer', 'archer'], mods: { startGold: 20 } });
+  run.timer = 9999;
+  R.place(run, key, 2, 0);
+  const e = stand(run, foe, 9000000, 2, 2);
+  R.run(run, sec);
+  return e.max - e.hp;
+}
+check('힐러는 언데드에게 산 것보다 훨씬 많이 넣는다',
+  into('healer', 'bone', 6) > into('healer', 'grunt', 6) * 2, true);
+check('궁수는 언데드에게 오히려 덜 넣는다',
+  into('archer', 'bone', 6) < into('archer', 'grunt', 6), true);
+check('성기사는 언데드를 태운다', into('saint', 'bone', 6) > into('saint', 'grunt', 6) * 2.5, true);
+// 신성은 산 것에게는 다른 종류와 다를 것이 없다 — 저항을 적어 둔 적이 없다.
+check('신성이 산 것에게 특별히 세지는 않다',
+  into('healer', 'grunt', 6) < into('archer', 'grunt', 6), true);
+
+// 되살릴 이가 없어도 언데드가 있으면 치유의 빛을 쓴다.
+const burn = make(field, { roster: [...D.HERO_KEYS], mods: { startGold: 20 } });
+burn.timer = 9999;
+const paladin = R.place(burn, 'saint', 2, 0);
+const skull = stand(burn, 'bone', 9000000, 2, 2);
+R.step(burn, R.TICK);
+check('멀쩡한 판에서도 언데드가 있으면 빛을 쓴다', R.tally(burn, 'saint').skills, 1);
+const scorch = skull.max - skull.hp;
+const saintStat = R.statOf('saint', 1, burn.mods);
+check('그 빛이 기본 공격보다 훨씬 크다', scorch > saintStat.damage * 2, true);
+check('영웅은 멀쩡하다', paladin.hp, paladin.max);
+
+const quietBurn = make(field, { roster: [...D.HERO_KEYS], mods: { startGold: 20 } });
+quietBurn.timer = 9999;
+R.place(quietBurn, 'saint', 2, 0);
+stand(quietBurn, 'grunt', 9000000, 2, 2);
+R.step(quietBurn, R.TICK);
+check('산 것만 있으면 빛을 아낀다', R.tally(quietBurn, 'saint').skills, 0);
+
 console.log(`${passed}개 통과, ${failed}개 실패`);
 if (failed) process.exit(1);

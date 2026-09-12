@@ -61,6 +61,12 @@ function skillAt(sk, step) {
 
 const SINGLE = { shape: 'single' };
 
+// 그 공격이 어떤 종류로 들어가는가. 자료에 `kind`를 적어 두면 그대로 쓰고(힐러와
+// 성기사의 신성), 안 적으면 모양에서 고른다 — 한 놈을 겨누는 것은 `single`,
+// 나머지는 `area`다.
+const kindOf = (spec) => spec.kind
+  || ((spec.shape === 'single' || spec.shape === 'smite') ? D.HIT.single : D.HIT.area);
+
 const inRange = (stat, dist) => dist <= stat.far && dist >= stat.near;
 
 const upCost = (key, tier) => Math.round(D.UNITS[key].cost * D.UP.cost[tier - 1]);
@@ -330,7 +336,8 @@ function useSkill(run, u, stat, target, spot) {
   // 지속 피해는 그 사람의 공격력에 대한 비율이다. 고정값으로 두면 레벨이 올라도
   // 그대로라, 방어를 무시하는 수단이 후반에 의미를 잃는다.
   const dot = sk.bleedDps ? { dps: stat.damage * sk.bleedDps, t: sk.bleedFor, by: u.key } : null;
-  hurt(run, target, power, sk.shape === 'single' ? D.HIT.single : D.HIT.area, u.key);
+  const kind = kindOf(sk);
+  hurt(run, target, power, kind, u.key);
   if (sk.stunFor) target.stunT = sk.stunFor;
   if (dot) target.bleed = { ...dot };
 
@@ -341,7 +348,7 @@ function useSkill(run, u, stat, target, spot) {
       if (e === target || e.dead) continue;
       const p = foeXY(e);
       if (Math.hypot(p.x - u.x, p.y - u.y) > sk.ring) continue;
-      hurt(run, e, power, D.HIT.area, u.key);
+      hurt(run, e, power, kind, u.key);
       if (dot) e.bleed = { ...dot };
     }
   } else if (sk.shape === 'line') {
@@ -351,7 +358,7 @@ function useSkill(run, u, stat, target, spot) {
       const p = foeXY(e);
       if (toLine(p.x, p.y, u.x, u.y, spot.x, spot.y) > 0.55) continue;
       if (Math.hypot(p.x - u.x, p.y - u.y) > stat.far) continue;
-      hurt(run, e, power, D.HIT.area, u.key);
+      hurt(run, e, power, kind, u.key);
       if (dot) e.bleed = { ...dot };
     }
   } else if (sk.shape === 'splash') {
@@ -359,7 +366,7 @@ function useSkill(run, u, stat, target, spot) {
     for (const e of run.foes) {
       if (e === target || e.dead) continue;
       const p = foeXY(e);
-      if (Math.hypot(p.x - spot.x, p.y - spot.y) <= r) hurt(run, e, power * 0.6, D.HIT.area, u.key);
+      if (Math.hypot(p.x - spot.x, p.y - spot.y) <= r) hurt(run, e, power * 0.6, kind, u.key);
     }
   } else if (sk.shape === 'field') {
     dropZone(run, spot.x, spot.y, sk, u.key, stat.damage * sk.fieldDps);
@@ -370,27 +377,28 @@ function useSkill(run, u, stat, target, spot) {
 // 일반 캐릭터와 같으면 값이 네 배인 이유가 판에서 보이지 않는다.
 function useBasic(run, u, stat, target, spot) {
   const b = stat.basic;
+  const kind = kindOf(b);
   if (b.shape === 'splash') {
     // 범위는 한 놈씩 때리는 것이 아니라 `area`로 들어가 중장병의 저항을 타지 않는다.
-    hurt(run, target, stat.damage, D.HIT.area, u.key);
+    hurt(run, target, stat.damage, kind, u.key);
     const r = b.splash * mul(run.mods, 'splash');
     for (const e of run.foes) {
       if (e === target || e.dead) continue;
       const p = foeXY(e);
-      if (Math.hypot(p.x - spot.x, p.y - spot.y) <= r) hurt(run, e, stat.damage * 0.6, D.HIT.area, u.key);
+      if (Math.hypot(p.x - spot.x, p.y - spot.y) <= r) hurt(run, e, stat.damage * 0.6, kind, u.key);
     }
   } else if (b.shape === 'ring') {
     // 스킬의 `ring`과 같이 **표적이 아니라 자기를 가운데로** 삼는다. 길목을 막고
     // 선 채로 둘러싼 것을 통째로 벤다.
-    hurt(run, target, stat.damage, D.HIT.area, u.key);
+    hurt(run, target, stat.damage, kind, u.key);
     for (const e of run.foes) {
       if (e === target || e.dead) continue;
       const p = foeXY(e);
-      if (Math.hypot(p.x - u.x, p.y - u.y) <= b.ring) hurt(run, e, stat.damage, D.HIT.area, u.key);
+      if (Math.hypot(p.x - u.x, p.y - u.y) <= b.ring) hurt(run, e, stat.damage, kind, u.key);
     }
   } else if (b.shape === 'smite') {
     // 때리면서 가장 다친 아군을 되살린다. 되살릴 이가 없어도 공격은 나간다.
-    hurt(run, target, stat.damage, D.HIT.single, u.key);
+    hurt(run, target, stat.damage, kind, u.key);
     const worst = hurtAlly(run, u, stat);
     if (worst) {
       const was = worst.hp;
@@ -399,9 +407,20 @@ function useBasic(run, u, stat, target, spot) {
       emit(run, { type: 'heal', from: { x: u.x, y: u.y }, to: { x: worst.x, y: worst.y } });
     }
   } else {
-    hurt(run, target, stat.damage, D.HIT.single, u.key);
+    hurt(run, target, stat.damage, kind, u.key);
   }
   emit(run, { type: 'shot', key: u.key, from: { x: u.x, y: u.y }, to: spot });
+}
+
+// 사거리 안의 언데드. 되살리는 빛이 태우는 대상이다.
+function undeadIn(run, u, stat) {
+  const list = [];
+  for (const e of run.foes) {
+    if (e.dead || !D.FOES[e.key].undead) continue;
+    const p = foeXY(e);
+    if (inRange(stat, Math.hypot(p.x - u.x, p.y - u.y))) list.push(e);
+  }
+  return list;
 }
 
 // 사거리 안에서 가장 많이 깎인 아군. 힐러의 스킬이 향하는 곳이다.
@@ -429,18 +448,26 @@ function tickUnits(run) {
     // 아무것도 하지 않는다.
     if (ready && sk.shape === 'heal') {
       const worst = hurtAlly(run, u, stat);
-      if (worst) {
+      // **되살리는 빛은 언데드를 태운다**(`skill.smite`). 그래서 되살릴 이가 없어도
+      // 사거리에 언데드가 있으면 쿨타임을 쓴다 — 멀쩡한 판이라고 쉬면 언데드 판에서
+      // 힐러와 성기사가 가진 가장 큰 한 방을 영영 못 쓴다.
+      const burn = sk.smite ? undeadIn(run, u, stat) : [];
+      if (worst || burn.length) {
         // `all`이면 사거리 안의 다친 아군을 한꺼번에 되살린다.
         const crowd = sk.all
           ? run.units.filter((o) => o !== u && o.hp < o.max
             && inRange(stat, Math.hypot(o.x - u.x, o.y - u.y)))
-          : [worst];
+          : (worst ? [worst] : []);
         let back = 0;
         for (const o of crowd) {
           const was = o.hp;
           o.hp = Math.min(o.max, o.hp + sk.heal * mul(run.mods, 'heal'));
           back += o.hp - was;
           emit(run, { type: 'heal', from: { x: u.x, y: u.y }, to: { x: o.x, y: o.y } });
+        }
+        for (const e of burn) {
+          hurt(run, e, stat.damage * sk.smite, D.HIT.holy, u.key);
+          emit(run, { type: 'skill', key: u.key, from: { x: u.x, y: u.y }, to: foeXY(e) });
         }
         u.cd = 1 / stat.rate;
         u.scd = sk.cd;

@@ -85,7 +85,11 @@ const BASIC_NOTE = {
   splash: '기본 공격이 범위',
   ring: '기본 공격도 둘레를 벤다',
   smite: '기본 공격도 아군을 되살린다',
+  single: '기본 공격이 한 놈',
 };
+// 신성으로 때리는지는 모양이 아니라 종류에 달렸다. 언데드 판에서 누구를 데려갈지
+// 가르는 값이라 따로 적는다.
+const holyOf = (d) => (d.basic && d.basic.kind === 'holy' ? ' · 신성이라 언데드에 두 배' : '');
 const big = (v) => Math.round(v).toLocaleString('ko-KR');
 // 단추와 목록의 작은 그림은 배경으로 얹는다 — 시트가 아직 안 왔어도 브라우저가
 // 알아서 채운다.
@@ -345,7 +349,8 @@ function hud() {
         : `<b>${num(now.damage * (sk.mul == null ? 1 : sk.mul))}</b>`);
     const hold = now.skill.fieldFor || now.skill.bleedFor || now.skill.stunFor;
     el.barStats.innerHTML = `체력 <b>${Math.round(picked.hp)}/${now.hp}</b> · `
-      + `공격 <b>${num(now.damage)}</b>${BASIC_TAG[now.basic.shape] || ''} · 사거리 <b>${d.range.min}-${d.range.max}</b><br>`
+      + `공격 <b>${num(now.damage)}</b>${now.basic.kind === 'holy' ? '(신성)' : (BASIC_TAG[now.basic.shape] || '')}`
+      + ` · 사거리 <b>${d.range.min}-${d.range.max}</b><br>`
       + `${d.skill.name} ${power} · 쿨타임 <b>${num(now.skill.cd)}초</b>`
       + (hold ? ` · 지속 <b>${num(hold)}초</b>` : '') + ' · '
       + (wait > 0.1 ? `<b>${Math.ceil(wait)}초 남음</b>` : '<b>준비됨</b>');
@@ -482,7 +487,7 @@ function buildPalette() {
     cost.className = 'cost';
     cost.textContent = String(d.cost);
     node.appendChild(cost);
-    const basic = d.basic ? ` · ${BASIC_NOTE[d.basic.shape]}` : '';
+    const basic = (d.basic ? ` · ${BASIC_NOTE[d.basic.shape]}` : '') + holyOf(d);
     node.title = `${who(key)} · 사거리 ${d.range.min}-${d.range.max}${basic} · ${d.skill.name}(${d.skill.cd}초)`
     + ` — ${d.skill.note} · 같은 종류는 ${D.MOST_OF_KIND}명까지, 겹칠수록 값이 오른다`;
     node.addEventListener('click', () => {
