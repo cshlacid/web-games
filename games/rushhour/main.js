@@ -11,9 +11,10 @@ const R = window.RushRules;
 const S = window.RushSolver;
 const G = window.RushGenerator;
 const Sound = window.RushSound;
+const t = SharedI18n.t;
 const NS = 'http://www.w3.org/2000/svg';
 
-const LEVELS = [{ label: '쉬움', key: 'easy' }, { label: '보통', key: 'normal' }, { label: '어려움', key: 'hard' }];
+const LEVELS = [{ labelKey: 'ui.easy', key: 'easy' }, { labelKey: 'ui.medium', key: 'normal' }, { labelKey: 'ui.hard', key: 'hard' }];
 const LEVEL_KEY = 'web-games.rushhour.level';
 const BEST_KEY = 'web-games.rushhour.best';
 // 칸 크기의 위아래. 폰에서 손가락이 차 한 대를 덮지 않을 만큼은 되어야 한다.
@@ -63,7 +64,7 @@ function loadBest() {
 
 function showBest() {
   const best = loadBest()[level] || 0;
-  el.best.textContent = best ? `최소 수로 푼 판 ${best}` : '';
+  el.best.textContent = best ? t('rushhour.bestCount', { count: best }) : '';
 }
 
 function markBest() {
@@ -154,7 +155,7 @@ function place(id, offset) {
 
 function paint() {
   for (let id = 0; id < game.puzzle.cars.length; id++) place(id);
-  el.count.innerHTML = `${game.moves}수 <b>/ 최소 ${game.puzzle.moves}수</b>`;
+  el.count.innerHTML = t('rushhour.count', { moves: game.moves, best: game.puzzle.moves });
   el.undo.disabled = game.done || !game.undo.length;
   el.reset.disabled = game.done || !game.moves;
   el.hint.disabled = game.done;
@@ -185,10 +186,12 @@ function finish() {
   drag = null;
   const best = game.moves <= game.puzzle.moves && !game.hinted;
   if (best) markBest();
-  el.resultTitle.textContent = '빠져나갔습니다';
-  el.resultNote.textContent = best
-    ? `${game.moves}수 · 최소 수로 풀었습니다`
-    : `${game.moves}수 · 최소는 ${game.puzzle.moves}수${game.hinted ? ' · 힌트를 썼습니다' : ''}`;
+  el.resultTitle.textContent = t('rushhour.done');
+  const note = best
+    ? [t('rushhour.noteOptimal', { moves: game.moves })]
+    : [t('rushhour.note', { moves: game.moves, best: game.puzzle.moves })];
+  if (!best && game.hinted) note.push(t('rushhour.noteHinted'));
+  el.resultNote.textContent = note.join(' · ');
   el.result.hidden = false;
   paint();
   Sound.play('win');
@@ -326,7 +329,7 @@ el.hint.addEventListener('click', () => {
   node.classList.add('hinted');
   setTimeout(() => node.classList.remove('hinted'), 700);
   apply(step.id, step.pos);
-  toast('최단 풀이의 다음 한 수입니다');
+  toast(t('rushhour.hint'));
 });
 
 el.newGame.addEventListener('click', () => { Sound.play('click'); newGame(); });
@@ -336,7 +339,7 @@ for (const item of LEVELS) {
   const button = document.createElement('button');
   button.className = 'pick';
   button.type = 'button';
-  button.textContent = item.label;
+  button.textContent = t(item.labelKey);
   button.setAttribute('aria-pressed', String(item.key === level));
   button.addEventListener('click', () => {
     level = item.key;
