@@ -12,9 +12,10 @@ const R = window.HashiRules;
 const G = window.HashiGenerator;
 const S = window.HashiSolver;
 const Sound = window.HashiSound;
+const t = SharedI18n.t;
 const NS = 'http://www.w3.org/2000/svg';
 
-const SIZES = [{ label: '작게', n: 9 }, { label: '보통', n: 11 }, { label: '크게', n: 13 }];
+const SIZES = [{ labelKey: 'ui.small', n: 9 }, { labelKey: 'ui.medium', n: 11 }, { labelKey: 'ui.large', n: 13 }];
 const SIZE_KEY = 'web-games.hashi.size';
 const BEST_KEY = 'web-games.hashi.best';
 
@@ -77,7 +78,7 @@ function saveBest(best) {
 
 function showBest() {
   const best = loadBest()[size];
-  el.best.textContent = best ? `최고 ${formatTime(best)}` : '';
+  el.best.textContent = best ? t('record.best', { time: formatTime(best) }) : '';
 }
 
 function toast(text) {
@@ -183,7 +184,7 @@ function newGame() {
   };
   picked = null;
   el.result.hidden = true;
-  el.toast.textContent = '점선을 누르거나, 섬을 누르고 이어질 섬을 누르세요.';
+  el.toast.textContent = t('hashi.howTo');
   el.timer.textContent = '0:00';
   showBest();
   build();
@@ -269,18 +270,18 @@ function finish() {
   tick();
 
   const best = loadBest();
-  let note = `${formatTime(game.elapsed)}`;
+  const note = [formatTime(game.elapsed)];
   if (game.hinted) {
-    note += ' · 힌트를 써서 기록에는 넣지 않습니다';
+    note.push(t('record.hintedShort'));
   } else if (!best[size] || game.elapsed < best[size]) {
     best[size] = game.elapsed;
     saveBest(best);
     showBest();
-    note += ' · 최고 기록';
+    note.push(t('record.bestMark'));
   }
 
-  el.resultTitle.textContent = '다 이었습니다';
-  el.resultNote.textContent = note;
+  el.resultTitle.textContent = t('hashi.done');
+  el.resultNote.textContent = note.join(' · ');
   el.result.hidden = false;
   Sound.play('win');
 }
@@ -296,7 +297,7 @@ function place(li) {
   const after = R.cycle(game.board, game.state, li);
   if (after === before) {
     game.undo.pop();
-    toast('여기에는 더 놓을 수 없습니다');
+    toast(t('hashi.noRoom'));
     return;
   }
   startClock();
@@ -430,7 +431,7 @@ el.hint.addEventListener('click', () => {
   game.state[link.id] = answer[link.id];
   startClock();
   Sound.play('hint');
-  toast(wrong ? '어긋난 다리를 치웠습니다' : '다리 하나를 놓았습니다');
+  toast(wrong ? t('hashi.hintCleared') : t('hashi.hintPlaced'));
   paint();
   if (R.isDone(board, game.state)) finish();
 });
@@ -439,7 +440,7 @@ for (const item of SIZES) {
   const button = document.createElement('button');
   button.className = 'pick';
   button.type = 'button';
-  button.textContent = item.label;
+  button.textContent = t(item.labelKey);
   button.setAttribute('aria-pressed', String(item.n === size));
   button.addEventListener('click', () => {
     size = item.n;
