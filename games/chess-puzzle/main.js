@@ -7,6 +7,26 @@
   const Icons = window.SharedIcons;
   const Data = window.ChessPuzzleData;
   const Sound = window.ChessSound;
+
+  const t = SharedI18n.t;
+
+  // 제목 몇 개는 말 이름이 문장 한가운데 들어간다. 한국어에서만 조사가 갈리고,
+  // 목적어로 받는 것은 '내준다' 하나다.
+  const OBJECT_TITLES = new Set(['sacrifice']);
+  const NO_FINAL = new Set(['n']);   // 받침이 없는 이름은 나이트뿐이다
+
+  function pieceName(kind, key) {
+    const name = t('cp.piece.' + kind);
+    if (SharedI18n.lang !== 'ko') return name;
+    if (OBJECT_TITLES.has(key)) return name + (NO_FINAL.has(kind) ? '를' : '을');
+    return name + (NO_FINAL.has(kind) ? '가' : '이');
+  }
+
+  function titleOf(puzzle) {
+    const vars = puzzle.piece ? { piece: pieceName(puzzle.piece, puzzle.title) } : undefined;
+    return t('cp.title.' + puzzle.title, vars);
+  }
+
   const SAVE_KEY = 'web-games.chess-puzzle.progress';
 
   const el = {
@@ -35,7 +55,6 @@
 
   const Pieces = window.ChessPieces;
   const PROMOTION_ORDER = ['q', 'r', 'b', 'n'];
-  const PROMOTION_NAMES = { q: '퀸', r: '룩', b: '비숍', n: '나이트' };
 
   const store = {
     get(fallback) {
@@ -46,8 +65,7 @@
     },
   };
 
-  const LEVELS = { easy: '쉬움', medium: '보통', hard: '어려움' };
-  const LEVEL_NAMES = Object.keys(LEVELS);
+  const LEVEL_NAMES = ['easy', 'medium', 'hard'];
 
   // 문제는 난이도별로 나뉘어 있고, 몇 개인지는 목차가 알려 준다. 실제 자료는
   // 그 문제가 나올 때 data.js가 받아 온다.
@@ -155,12 +173,10 @@
     }
   }
 
-  const PIECE_NAMES = { k: '킹', q: '퀸', r: '룩', b: '비숍', n: '나이트', p: '폰' };
-
   function describe(square, piece) {
-    if (!piece) return `${square} 빈 칸`;
-    const color = L.colorOf(piece) === L.WHITE ? '백' : '흑';
-    return `${square} ${color} ${PIECE_NAMES[piece.toLowerCase()]}`;
+    if (!piece) return t('cp.emptySquare', { square });
+    const color = t(L.colorOf(piece) === L.WHITE ? 'cp.white' : 'cp.black');
+    return t('cp.pieceAt', { square, color, piece: t('cp.piece.' + piece.toLowerCase()) });
   }
 
   function render() {
@@ -198,7 +214,7 @@
   function renderInfo() {
     // 푼 표시는 문제 번호 옆에 둔다. "다음 문제" 버튼에 달면 지금 문제가 푼
     // 것인지 다음 문제가 푼 것인지 읽는 사람이 알 수 없다.
-    el.count.textContent = `문제 ${index + 1} / ${countOf(level)}`;
+    el.count.textContent = t('cp.count', { index: index + 1, total: countOf(level) });
 
     if (!state) {
       el.count.classList.remove('solved');
@@ -211,10 +227,10 @@
 
     const puzzle = state.puzzle;
     el.count.classList.toggle('solved', solved.has(puzzle.id));
-    el.rating.textContent = `레이팅 ${puzzle.rating}`;
-    el.side.textContent = state.color === L.WHITE ? '내가 백' : '내가 흑';
-    el.title.textContent = puzzle.title;
-    el.themes.textContent = puzzle.themes.join(' · ');
+    el.rating.textContent = t('cp.rating', { rating: puzzle.rating });
+    el.side.textContent = t(state.color === L.WHITE ? 'cp.sideWhite' : 'cp.sideBlack');
+    el.title.textContent = titleOf(puzzle);
+    el.themes.textContent = puzzle.themes.map((name) => t('cp.theme.' + name)).join(' · ');
   }
 
   function setMessage(text, kind) {
@@ -230,7 +246,7 @@
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'pick';
-      button.textContent = LEVELS[name];
+      button.textContent = t('ui.' + (name === 'medium' ? 'medium' : name));
       button.dataset.level = name;
       button.disabled = countOf(name) === 0;
       button.setAttribute('aria-pressed', String(name === level));
@@ -279,12 +295,12 @@
     if (!puzzle) {
       clearBoard();
       renderInfo();
-      setMessage('문제를 불러오는 중…');
+      setMessage(t('cp.loading'));
       try {
         puzzle = await Data.load(level, at);
       } catch {
         if (token !== loadToken) return;
-        setMessage('문제를 불러오지 못했습니다. 연결을 확인하고 다시 눌러 보세요.', 'wrong');
+        setMessage(t('cp.loadFailed'), 'wrong');
         return;
       }
       if (token !== loadToken) return;   // 기다리는 사이 다른 문제로 넘어갔다
@@ -298,8 +314,7 @@
     buildBoard();
     renderInfo();
     render();
-    setMessage(state.color === L.WHITE ? '백 차례입니다. 가장 강한 수를 찾아보세요.'
-      : '흑 차례입니다. 가장 강한 수를 찾아보세요.');
+    setMessage(t(state.color === L.WHITE ? 'cp.turnWhite' : 'cp.turnBlack'));
     // 다음 문제가 다른 덩이에 있으면 지금 받아 둔다. 그래야 "다음 문제"를
     // 눌렀을 때 덩이 경계에서만 기다리는 일이 없다.
     Data.prefetch(level, order[(index + 1) % total]);
@@ -384,7 +399,7 @@
       button.dataset.promotion = kind;
       const color = state.color === L.WHITE ? 'white' : 'black';
       button.innerHTML = `<span class="piece ${color}">${Pieces.svg(kind)}</span>`;
-      button.setAttribute('aria-label', PROMOTION_NAMES[kind]);
+      button.setAttribute('aria-label', t('cp.piece.' + kind));
       button.addEventListener('click', () => {
         const move = pending;
         pending = null;
@@ -411,10 +426,10 @@
       state = result.state;
       if (result.reason === 'illegal') {
         // 화면이 이미 막고 있으므로 여기 오면 판과 규칙이 어긋난 것이다.
-        setMessage('그 수는 체스 규칙에 맞지 않습니다.', 'wrong');
+        setMessage(t('cp.illegal'), 'wrong');
       } else {
         Sound.play('wrong');
-        setMessage('규칙에는 맞지만 가장 강한 수가 아닙니다. 다시 보세요.', 'wrong');
+        setMessage(t('cp.notBest'), 'wrong');
       }
       render();
       return;
@@ -426,14 +441,14 @@
 
     if (state.status === 'solved') { finish(); return; }
 
-    setMessage('상대가 최선으로 응수합니다…');
+    setMessage(t('cp.reply'));
     replyTimer = setTimeout(() => {
       const previous = state.position;
       state = L.playReply(state);
       moveSound(previous, state.position, state.lastMove.to);
       render();
       if (state.status === 'solved') finish();
-      else setMessage('계속해서 가장 강한 수를 두세요.');
+      else setMessage(t('cp.keepGoing'));
     }, 560);
   }
 
@@ -443,7 +458,7 @@
     renderInfo();
     Sound.play('solved');
     const mate = L.positionStatus(state.position) === 'checkmate';
-    setMessage(mate ? '체크메이트! 문제를 풀었습니다.' : '정답입니다! 문제를 풀었습니다.', 'solved');
+    setMessage(t(mate ? 'cp.solvedMate' : 'cp.solved'), 'solved');
     showAfter();
   }
 
@@ -453,11 +468,11 @@
    */
   function showAfter() {
     const puzzle = state.puzzle;
-    el.why.textContent = puzzle.why || '';
+    el.why.textContent = puzzle.why ? t('cp.why.' + puzzle.why, { gain: puzzle.gain }) : '';
     const hasLine = Array.isArray(puzzle.line) && puzzle.line.length > 0;
     el.replay.hidden = !hasLine;
     el.replay.disabled = false;
-    el.replay.textContent = '이어지는 수순 보기';
+    el.replay.textContent = t('cp.replay');
     el.after.hidden = !puzzle.why && !hasLine;
   }
 
@@ -473,7 +488,7 @@
     clearTimeout(reviewTimer);
     review = { position: state.position, lastMove: state.lastMove, at: 0 };
     el.replay.disabled = true;
-    el.replay.textContent = '두는 중…';
+    el.replay.textContent = t('cp.replaying');
     render();
     reviewTimer = setTimeout(stepReview, 500);
   }
@@ -482,7 +497,7 @@
     const line = state.puzzle.line || [];
     if (!review || review.at >= line.length) {
       el.replay.disabled = false;
-      el.replay.textContent = '다시 보기';
+      el.replay.textContent = t('cp.replayAgain');
       return;
     }
     const uci = line[review.at++];
@@ -509,7 +524,7 @@
     // 도착 칸까지 알려 주면 문제가 사라진다. 어떤 말을 볼지까지만 짚는다.
     selectSquare(move.slice(0, 2));
     Sound.play('hint');
-    setMessage(`${state.puzzle.hint} 움직일 말을 표시했습니다.`, 'hint');
+    setMessage(t('cp.hintShown', { hint: t('cp.hint.' + state.puzzle.hint) }), 'hint');
   });
 
   el.replay.addEventListener('click', () => { Sound.unlock(); startReview(); });
@@ -525,7 +540,7 @@
         clearTimeout(reviewTimer);
         review = null;
         el.replay.disabled = false;
-        el.replay.textContent = '다시 보기';
+        el.replay.textContent = t('cp.replayAgain');
         render();
         return;
       }

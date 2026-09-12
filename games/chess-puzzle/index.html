@@ -3,38 +3,41 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>체스 퍼즐</title>
-<meta name="description" content="한 수로 판을 뒤집는 전술을 찾는 체스 퍼즐">
+<title data-i18n="game.chess-puzzle">체스 퍼즐</title>
+<meta name="description" content="한 수로 판을 뒤집는 전술을 찾는 체스 퍼즐" data-i18n-attr="content=meta.desc">
 <meta name="color-scheme" content="light dark">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2355637a'><circle cx='12' cy='5.2' r='3.9'/><path d='M9 8.8 C9 11.6 7.6 12.6 7.6 14.2 H16.4 C16.4 12.6 15 11.6 15 8.8 Z'/><rect x='6.2' y='14.2' width='11.6' height='2.6' rx='1'/><path d='M4 22 C4 18.6 7.2 17.2 12 17.2 C16.8 17.2 20 18.6 20 22 Z'/></svg>">
 <link rel="manifest" href="../../manifest.json">
 <link rel="apple-touch-icon" href="../../icons/icon-180.png">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="체스 퍼즐">
+<meta name="apple-mobile-web-app-title" content="체스 퍼즐" data-i18n-attr="content=game.chess-puzzle">
 <meta name="theme-color" content="#f4f6f9" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#171b21" media="(prefers-color-scheme: dark)">
 <link rel="stylesheet" href="../../shared/base.css">
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="../../shared/sheet.css">
 <script src="../../shared/analytics.js"></script>
+<script src="../../shared/i18n.js"></script>
+<script src="../../shared/strings.js"></script>
+<script src="strings.js"></script>
 </head>
 <body>
 <main class="app">
   <header class="head">
     <div class="title-row">
       <div class="head-nav">
-        <a class="back" href="../../">← 목록</a>
-        <button class="toggle" id="help-open" type="button" aria-pressed="false">도움말</button>
+        <a class="back" href="../../" data-i18n="ui.back">← 목록</a>
+        <button class="toggle" id="help-open" type="button" aria-pressed="false" data-i18n="ui.help">도움말</button>
       </div>
-      <h1>체스 퍼즐</h1>
+      <h1 data-i18n="game.chess-puzzle">체스 퍼즐</h1>
       <div class="head-actions">
-        <button class="toggle sound" id="toggle-bgm" type="button" aria-pressed="true">BGM</button>
-        <button class="toggle sound" id="toggle-sfx" type="button" aria-pressed="true">효과음</button>
+        <button class="toggle sound" id="toggle-bgm" type="button" aria-pressed="true" data-i18n="ui.bgm">BGM</button>
+        <button class="toggle sound" id="toggle-sfx" type="button" aria-pressed="true" data-i18n="ui.sfx">효과음</button>
       </div>
     </div>
     <div class="sub-row">
-      <div class="picker" id="levels" role="group" aria-label="난이도"></div>
+      <div class="picker" id="levels" role="group" aria-label="난이도" data-i18n-attr="aria-label=ui.difficulty"></div>
       <span class="count" id="count"></span>
       <span class="rating" id="rating"></span>
       <span class="side" id="side"></span>
@@ -47,9 +50,9 @@
   </section>
 
   <div class="board-wrap">
-    <div class="board" id="board" role="grid" aria-label="체스판"></div>
+    <div class="board" id="board" role="grid" aria-label="체스판" data-i18n-attr="aria-label=cp.board"></div>
     <div class="promotion" id="promotion" hidden>
-      <p class="promotion-title">무엇으로 승격할까요?</p>
+      <p class="promotion-title" data-i18n="cp.promotionTitle">무엇으로 승격할까요?</p>
       <div class="promotion-keys" id="promotion-keys"></div>
     </div>
   </div>
@@ -58,54 +61,54 @@
 
   <div class="after" id="after" hidden>
     <p class="why" id="why"></p>
-    <button class="btn ghost" id="replay" type="button">이어지는 수순 보기</button>
+    <button class="btn ghost" id="replay" type="button" data-i18n="cp.replay">이어지는 수순 보기</button>
   </div>
 
   <div class="pad">
     <button class="tool" id="hint" type="button">
-      <span class="tool-icon" data-icon="hint"></span><span class="tool-label">힌트</span>
+      <span class="tool-icon" data-icon="hint"></span><span class="tool-label" data-i18n="ui.hint">힌트</span>
     </button>
     <button class="tool" id="retry" type="button">
-      <span class="tool-icon" data-icon="restart"></span><span class="tool-label">다시</span>
+      <span class="tool-icon" data-icon="restart"></span><span class="tool-label" data-i18n="ui.restart">다시</span>
     </button>
     <button class="tool" id="next" type="button">
-      <span class="tool-icon" data-icon="next"></span><span class="tool-label">다음 문제</span>
+      <span class="tool-icon" data-icon="next"></span><span class="tool-label" data-i18n="cp.next">다음 문제</span>
     </button>
   </div>
 
-  <p class="source">퍼즐 출처: Lichess Puzzle Database · CC0</p>
+  <p class="source" data-i18n="cp.source">퍼즐 출처: Lichess Puzzle Database · CC0</p>
 
   <div class="sheet" id="help" hidden>
-    <p class="sheet-title">규칙</p>
+    <p class="sheet-title" data-i18n="ui.rules">규칙</p>
     <ul class="help-list">
-      <li>각 문제는 실제로 둔 대국에서 나온 자리입니다. <b>상대가 방금 실수를
+      <li data-i18n-html="cp.rule1">각 문제는 실제로 둔 대국에서 나온 자리입니다. <b>상대가 방금 실수를
         두었고, 그 자리에서 가장 강한 수를 찾는 것</b>이 목표입니다.</li>
-      <li><b>난이도는 세 단계이고, 레이팅으로 나뉩니다.</b> 레이팅은 그 문제를
+      <li data-i18n-html="cp.rule2"><b>난이도는 세 단계이고, 레이팅으로 나뉩니다.</b> 레이팅은 그 문제를
         푼 수많은 사람들의 성적으로 매겨진 값입니다 — 쉬움은 1200 아래, 보통은
         1400~1900, 어려움은 2000 위입니다. 난이도를 고르면 그 난이도의 문제만
         나옵니다.</li>
-      <li><b>판은 항상 내 쪽이 아래입니다.</b> 내가 흑이면 판이 뒤집혀 보입니다.
+      <li data-i18n-html="cp.rule3"><b>판은 항상 내 쪽이 아래입니다.</b> 내가 흑이면 판이 뒤집혀 보입니다.
         지금 어느 쪽인지는 위에 적혀 있습니다.</li>
-      <li>말을 누르면 <b>갈 수 있는 칸이 점으로 표시</b>됩니다. 체스 규칙에
+      <li data-i18n-html="cp.rule4">말을 누르면 <b>갈 수 있는 칸이 점으로 표시</b>됩니다. 체스 규칙에
         어긋나는 수는 애초에 둘 수 없습니다.</li>
-      <li>규칙에 맞아도 <b>가장 강한 수가 아니면 정답이 아닙니다.</b> 다만
+      <li data-i18n-html="cp.rule5">규칙에 맞아도 <b>가장 강한 수가 아니면 정답이 아닙니다.</b> 다만
         <b>메이트가 여럿인 자리에서는 어느 메이트든 정답</b>으로 봅니다.</li>
-      <li>정답을 두면 <b>상대가 최선으로 응수</b>하고, 수순이 끝날 때까지
+      <li data-i18n-html="cp.rule6">정답을 두면 <b>상대가 최선으로 응수</b>하고, 수순이 끝날 때까지
         이어집니다.</li>
-      <li><b>다 풀고 나면 왜 그 수가 이겼는지</b>를 알려 줍니다. 수순을 끝까지
+      <li data-i18n-html="cp.rule7"><b>다 풀고 나면 왜 그 수가 이겼는지</b>를 알려 줍니다. 수순을 끝까지
         둔 자리에서 말을 얼마나 벌었는지, 메이트로 이어지는지를 세어 적은
         것입니다 — 특히 손해처럼 보이는 수를 두는 문제에서, 두고 나도 무엇을
         얻었는지 안 보일 때를 위한 것입니다.</li>
-      <li><b>힌트</b>는 어떤 말을 움직여야 하는지까지만 알려 줍니다.
+      <li data-i18n-html="cp.rule8"><b>힌트</b>는 어떤 말을 움직여야 하는지까지만 알려 줍니다.
         <b>다시</b>는 지금 문제를 처음부터 놓습니다.</li>
-      <li>노란 테두리는 <b>직전에 움직인 수</b>, 붉은 테두리는 <b>체크를 받고
+      <li data-i18n-html="cp.rule9">노란 테두리는 <b>직전에 움직인 수</b>, 붉은 테두리는 <b>체크를 받고
         있는 킹</b>입니다.</li>
-      <li><b>문제는 무작위 순서로 나옵니다.</b> 다만 그 순서는 한 번 정해지면
+      <li data-i18n-html="cp.rule10"><b>문제는 무작위 순서로 나옵니다.</b> 다만 그 순서는 한 번 정해지면
         그대로라, 창을 닫았다 열어도 풀던 자리에서 이어집니다.</li>
       <li>푼 문제는 기억해 두므로, 창을 닫았다 열어도 이어서 풀 수 있습니다.</li>
     </ul>
     <div class="sheet-actions">
-      <button class="btn" id="help-close" type="button">닫기</button>
+      <button class="btn" id="help-close" type="button" data-i18n="ui.close">닫기</button>
     </div>
   </div>
 </main>
@@ -120,5 +123,6 @@
 <script src="audio.js"></script>
 <script src="../../shared/sheet.js"></script>
 <script src="main.js"></script>
+<script>SharedI18n.apply();</script>
 </body>
 </html>
