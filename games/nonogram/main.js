@@ -11,8 +11,9 @@ const R = window.NonoRules;
 const S = window.NonoSolver;
 const G = window.NonoGenerator;
 const Sound = window.NonoSound;
+const t = SharedI18n.t;
 
-const SIZES = [{ label: '작게', n: 5 }, { label: '보통', n: 10 }, { label: '크게', n: 15 }];
+const SIZES = [{ labelKey: 'ui.small', n: 5 }, { labelKey: 'ui.medium', n: 10 }, { labelKey: 'ui.large', n: 15 }];
 const SIZE_KEY = 'web-games.nonogram.size';
 const BEST_KEY = 'web-games.nonogram.best';
 // 칸이 이보다 작으면 손가락이 두 칸을 덮는다. 큰 판에서 판이 화면을 넘치면 넘치는 대로
@@ -72,7 +73,7 @@ function saveBest(best) {
 
 function showBest() {
   const best = loadBest()[size];
-  el.best.textContent = best ? `최고 ${formatTime(best)}` : '';
+  el.best.textContent = best ? t('record.best', { time: formatTime(best) }) : '';
 }
 
 // --- 판 만들기 ---
@@ -224,18 +225,20 @@ function finish() {
   el.board.classList.add('solved');
 
   const best = loadBest();
-  let note = `${formatTime(game.elapsed)} 걸렸습니다`;
+  const note = [t('nonogram.took', { time: formatTime(game.elapsed) })];
   if (game.hinted) {
-    note += ' · 힌트를 써서 기록에는 넣지 않습니다';
+    note.push(t('record.hintedShort'));
   } else if (!best[size] || game.elapsed < best[size]) {
     best[size] = game.elapsed;
     saveBest(best);
     showBest();
-    note += ' · 최고 기록';
+    note.push(t('record.bestMark'));
   }
 
-  el.resultTitle.textContent = game.puzzle.name ? `${game.puzzle.name}!` : '다 풀었습니다';
-  el.resultNote.textContent = note;
+  el.resultTitle.textContent = game.puzzle.name
+    ? t('nonogram.found', { name: t('nonogram.pic.' + game.puzzle.name) })
+    : t('nonogram.solved');
+  el.resultNote.textContent = note.join(' · ');
   el.result.hidden = false;
   Sound.play('win');
 }
@@ -356,7 +359,7 @@ el.hint.addEventListener('click', () => {
     game.hinted = true;
     Sound.play('erase');
     paint();
-    toast(`잘못 칠한 칸 <b>${wrong.length}개</b>를 지웠습니다`);
+    toast(t('nonogram.cleared', { count: wrong.length }));
     return;
   }
   const step = S.nextCell(game.puzzle, game.cells);
@@ -364,7 +367,7 @@ el.hint.addEventListener('click', () => {
   game.hinted = true;
   startClock();
   apply(step.at, step.state);
-  toast(step.state === R.FILL ? '이 칸은 <b>칠하는</b> 칸입니다' : '이 칸은 <b>비는</b> 칸입니다');
+  toast(step.state === R.FILL ? t('nonogram.hintFill') : t('nonogram.hintEmpty'));
 });
 
 el.newGame.addEventListener('click', () => { Sound.play('click'); newGame(); });
@@ -374,7 +377,7 @@ for (const item of SIZES) {
   const button = document.createElement('button');
   button.className = 'pick';
   button.type = 'button';
-  button.textContent = item.label;
+  button.textContent = t(item.labelKey);
   button.setAttribute('aria-pressed', String(item.n === size));
   button.addEventListener('click', () => {
     size = item.n;
