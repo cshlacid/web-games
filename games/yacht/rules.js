@@ -12,19 +12,20 @@ const BONUS_AT = 63;
 const BONUS = 35;
 
 // 점수 칸. 위 여섯 칸은 눈의 개수로, 아래 여섯 칸은 모양으로 매긴다.
+// 화면에 쓸 이름은 여기 두지 않는다 — 여섯 언어로 갈리므로 key를 사전 열쇠로 쓴다.
 const CATEGORIES = [
-  { key: 'ones', label: '1', face: 1, upper: true },
-  { key: 'twos', label: '2', face: 2, upper: true },
-  { key: 'threes', label: '3', face: 3, upper: true },
-  { key: 'fours', label: '4', face: 4, upper: true },
-  { key: 'fives', label: '5', face: 5, upper: true },
-  { key: 'sixes', label: '6', face: 6, upper: true },
-  { key: 'choice', label: '초이스', note: '다섯 눈의 합' },
-  { key: 'four', label: '4다이스', note: '같은 눈 넷 이상이면 합' },
-  { key: 'full', label: '풀하우스', note: '셋 + 둘이면 합' },
-  { key: 'small', label: 'S.스트레이트', note: '넉 줄이면 15' },
-  { key: 'large', label: 'L.스트레이트', note: '닷 줄이면 30' },
-  { key: 'yacht', label: '야추', note: '다섯이 같으면 50' },
+  { key: 'ones', face: 1, upper: true },
+  { key: 'twos', face: 2, upper: true },
+  { key: 'threes', face: 3, upper: true },
+  { key: 'fours', face: 4, upper: true },
+  { key: 'fives', face: 5, upper: true },
+  { key: 'sixes', face: 6, upper: true },
+  { key: 'choice' },
+  { key: 'four' },
+  { key: 'full' },
+  { key: 'small' },
+  { key: 'large' },
+  { key: 'yacht' },
 ];
 
 function counts(dice) {

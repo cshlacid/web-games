@@ -10,10 +10,11 @@
 const R = window.YachtRules;
 const A = window.YachtAI;
 const Sound = window.YachtSound;
+const t = SharedI18n.t;
 const NS = 'http://www.w3.org/2000/svg';
 
-const PLAYERS = [{ label: '2인', n: 2 }, { label: '3인', n: 3 }, { label: '4인', n: 4 }];
-const LEVELS = [{ label: '쉬움', key: 'easy' }, { label: '보통', key: 'normal' }, { label: '어려움', key: 'hard' }];
+const PLAYERS = [{ n: 2 }, { n: 3 }, { n: 4 }];
+const LEVELS = [{ labelKey: 'ui.easy', key: 'easy' }, { labelKey: 'ui.medium', key: 'normal' }, { labelKey: 'ui.hard', key: 'hard' }];
 const PLAYERS_KEY = 'web-games.yacht.players';
 const LEVEL_KEY = 'web-games.yacht.level';
 const BEST_KEY = 'web-games.yacht.best';
@@ -138,19 +139,19 @@ function build() {
 
   // 머리줄. 어느 칸이 누구 것인지 한 번만 적어 두면 아래 줄에서는 색만으로 읽힌다.
   const head = rowNode('', 'row head');
-  head.cells.forEach((cell, i) => { cell.textContent = i ? `${i + 1}번` : '나'; });
+  head.cells.forEach((cell, i) => { cell.textContent = i ? t('yacht.other', { n: i + 1 }) : t('yacht.me'); });
   el.sheet.append(head.node);
 
   const rows = {};
   for (const cat of R.CATEGORIES) {
-    const row = rowNode(cat.upper ? `${cat.face}의 눈` : cat.label);
+    const row = rowNode(nameOf(cat.key));
     row.node.dataset.key = cat.key;
     rows[cat.key] = row;
     el.sheet.append(row.node);
   }
 
-  const bonus = rowNode(`보너스 (${R.BONUS_AT})`, 'row sum');
-  const total = rowNode('합계', 'row sum total');
+  const bonus = rowNode(t('yacht.bonus', { at: R.BONUS_AT }), 'row sum');
+  const total = rowNode(t('yacht.total'), 'row sum total');
   el.sheet.append(bonus.node, total.node);
 
   const dice = [];
@@ -228,17 +229,16 @@ function paint() {
     die.node.disabled = !rolled || game.done || rolling || !mine();
   });
 
-  el.round.textContent = game.done ? '끝' : `${game.round} / ${R.CATEGORIES.length}판`;
-  el.whose.innerHTML = game.done ? '' : (mine()
-    ? '<b class="p1">내 차례</b>'
-    : `<b class="p${who}">${who}번</b> 차례`);
+  el.round.textContent = game.done ? t('yacht.end')
+    : t('yacht.round', { round: game.round, total: R.CATEGORIES.length });
+  el.whose.innerHTML = game.done ? '' : (mine() ? t('yacht.myTurn') : t('yacht.otherTurn', { n: who }));
 
   el.roll.disabled = game.done || rolling || !mine() || game.rollsLeft === 0;
-  if (game.done) el.roll.textContent = '판이 끝났습니다';
-  else if (!mine()) el.roll.textContent = `${who}번 차례…`;
-  else if (game.rollsLeft === R.ROLLS) el.roll.textContent = '굴리기';
-  else if (game.rollsLeft === 0) el.roll.textContent = '적을 칸을 고르세요';
-  else el.roll.textContent = `다시 굴리기 · ${game.rollsLeft}번 남음`;
+  if (game.done) el.roll.textContent = t('yacht.over');
+  else if (!mine()) el.roll.textContent = t('yacht.waiting', { n: who });
+  else if (game.rollsLeft === R.ROLLS) el.roll.textContent = t('yacht.roll');
+  else if (game.rollsLeft === 0) el.roll.textContent = t('yacht.pickCell');
+  else el.roll.textContent = t('yacht.reroll', { left: game.rollsLeft });
 }
 
 function showBest() {
@@ -295,10 +295,10 @@ function doRoll() {
   if (game.done || rolling || !mine() || game.rollsLeft === 0) return;
   armed = null;
   rollNow(() => {
-    if (game.rollsLeft === 0) toast('마지막 굴림입니다. 적을 칸을 고르세요.');
+    if (game.rollsLeft === 0) toast(t('yacht.lastRoll'));
     // 주사위를 눌러 잡는다는 것은 화면만 봐서는 모른다. 첫 굴림 뒤 한 번 일러 준다.
     else if (game.rollsLeft === R.ROLLS - 1 && !game.keep.some(Boolean)) {
-      toast('남길 주사위를 눌러 잡아 두세요.');
+      toast(t('yacht.holdHint'));
     }
   });
 }
@@ -307,7 +307,7 @@ function doRoll() {
 
 const nameOf = (key) => {
   const cat = R.CATEGORIES.find((one) => one.key === key);
-  return cat.upper ? `${cat.face}의 눈` : cat.label;
+  return cat.upper ? t('yacht.face', { face: cat.face }) : t('yacht.cat.' + cat.key);
 };
 
 function write(key) {
@@ -318,7 +318,7 @@ function write(key) {
   // 0점은 한 번 더 눌러야 들어간다.
   if (got === 0 && armed !== key) {
     armed = key;
-    toast(`<b>${nameOf(key)}</b>에 0점을 적습니다. 한 번 더 누르면 확정됩니다.`);
+    toast(t('yacht.zeroConfirm', { name: nameOf(key) }));
     paint();
     return;
   }
@@ -328,11 +328,11 @@ function write(key) {
   const done = R.pick(game, key);
   if (!done) return;
 
-  toast(`<b>${nameOf(key)}</b>에 ${done.score}점`);
+  toast(t('yacht.wrote', { name: nameOf(key), score: done.score }));
   Sound.play('write', done.score);
   if (!before && R.bonus(game, 1)) {
     setTimeout(() => Sound.play('bonus'), 260);
-    toast(`위 칸 63점을 넘겨 <b>보너스 ${R.BONUS}점</b>`);
+    toast(t('yacht.bonusGot', { at: R.BONUS_AT, bonus: R.BONUS }));
   }
   paint();
   if (game.done) { finish(); return; }
@@ -354,7 +354,7 @@ function runBot() {
       const who = game.turn;
       const done = R.pick(game, move.write);
       paint();
-      toast(`<b class="p${who}">${who}번</b>이 ${nameOf(move.write)}에 ${done.score}점`);
+      toast(t('yacht.otherWrote', { n: who, name: nameOf(move.write), score: done.score }));
       Sound.play('write', done.score);
       if (game.done) { botTimer = setTimeout(finish, 700); return; }
       botTimer = setTimeout(() => { paint(); if (!mine()) step(); }, BOT_STEP * 1.6);
@@ -385,9 +385,11 @@ function finish() {
   const best = saveBest(my);
   const rank = board.findIndex((one) => one.player === 1) + 1;
 
-  el.resultTitle.textContent = rank === 1 ? `이겼습니다 · ${my}점` : `${rank}등 · ${my}점`;
-  const line = board.map((one) => (one.player === 1 ? `나 ${one.total}` : `${one.player}번 ${one.total}`)).join(' · ');
-  el.resultNote.textContent = best ? `${line} · 내 최고 기록입니다` : line;
+  el.resultTitle.textContent = rank === 1 ? t('yacht.win', { score: my }) : t('yacht.rank', { rank, score: my });
+  const line = board.map((one) => (one.player === 1
+    ? t('yacht.lineMe', { total: one.total })
+    : t('yacht.lineOther', { n: one.player, total: one.total }))).join(' · ');
+  el.resultNote.textContent = best ? `${line} · ${t('yacht.bestNote')}` : line;
   el.result.hidden = false;
   paint();
   Sound.play(rank === 1 ? 'finish' : 'write', rank === 1 ? 1 : 0);
@@ -427,7 +429,7 @@ el.sheet.addEventListener('click', (event) => {
   if (!node) return;
   if (!mine() || game.done) return;
   if (game.rollsLeft === R.ROLLS) {
-    toast('먼저 주사위를 굴리세요.');
+    toast(t('yacht.rollFirst'));
     return;
   }
   write(node.dataset.key);
@@ -441,7 +443,7 @@ for (const item of PLAYERS) {
   const button = document.createElement('button');
   button.className = 'pick';
   button.type = 'button';
-  button.textContent = item.label;
+  button.textContent = t('yacht.playerCount', { n: item.n });
   button.setAttribute('aria-pressed', String(item.n === players));
   button.addEventListener('click', () => {
     players = item.n;
@@ -461,7 +463,7 @@ for (const item of LEVELS) {
   const button = document.createElement('button');
   button.className = 'pick';
   button.type = 'button';
-  button.textContent = item.label;
+  button.textContent = t(item.labelKey);
   button.setAttribute('aria-pressed', String(item.key === level));
   button.addEventListener('click', () => {
     level = item.key;

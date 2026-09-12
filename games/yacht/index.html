@@ -3,15 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>야추</title>
-<meta name="description" content="주사위 다섯 개를 세 번 굴려 열두 칸을 채우는 점수 놀이">
+<title data-i18n="game.yacht">야추</title>
+<meta name="description" content="주사위 다섯 개를 세 번 굴려 열두 칸을 채우는 점수 놀이" data-i18n-attr="content=meta.desc">
 <meta name="color-scheme" content="light dark">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><rect x='2.5' y='2.5' width='19' height='19' rx='4.5' fill='%23f3ede2' stroke='%235b4a36' stroke-width='1.6'/><circle cx='8' cy='8' r='1.9' fill='%235b4a36'/><circle cx='16' cy='8' r='1.9' fill='%235b4a36'/><circle cx='12' cy='12' r='1.9' fill='%235b4a36'/><circle cx='8' cy='16' r='1.9' fill='%235b4a36'/><circle cx='16' cy='16' r='1.9' fill='%235b4a36'/></svg>">
 <link rel="manifest" href="../../manifest.json">
 <link rel="apple-touch-icon" href="../../icons/icon-180.png">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="야추">
+<meta name="apple-mobile-web-app-title" content="야추" data-i18n-attr="content=game.yacht">
 <meta name="theme-color" content="#f6f3ee" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#171614" media="(prefers-color-scheme: dark)">
 <link rel="stylesheet" href="../../shared/base.css">
@@ -19,29 +19,32 @@
 <link rel="stylesheet" href="../../shared/result.css">
 <link rel="stylesheet" href="../../shared/sheet.css">
 <script src="../../shared/analytics.js"></script>
+<script src="../../shared/i18n.js"></script>
+<script src="../../shared/strings.js"></script>
+<script src="strings.js"></script>
 </head>
 <body>
 <main class="app">
   <header class="head">
     <div class="title-row">
       <div class="head-nav">
-        <a class="back" href="../../">← 목록</a>
-        <button class="toggle" id="help-open" type="button" aria-pressed="false">도움말</button>
+        <a class="back" href="../../" data-i18n="ui.back">← 목록</a>
+        <button class="toggle" id="help-open" type="button" aria-pressed="false" data-i18n="ui.help">도움말</button>
       </div>
-      <h1>야추</h1>
+      <h1 data-i18n="game.yacht">야추</h1>
       <div class="head-actions">
-        <button class="toggle sound" id="toggle-bgm" type="button" aria-pressed="true">BGM</button>
-        <button class="toggle sound" id="toggle-sfx" type="button" aria-pressed="true">효과음</button>
+        <button class="toggle sound" id="toggle-bgm" type="button" aria-pressed="true" data-i18n="ui.bgm">BGM</button>
+        <button class="toggle sound" id="toggle-sfx" type="button" aria-pressed="true" data-i18n="ui.sfx">효과음</button>
       </div>
     </div>
     <div class="picker-row">
-      <div class="picker" id="players" role="group" aria-label="인원"></div>
+      <div class="picker" id="players" role="group" aria-label="인원" data-i18n-attr="aria-label=yacht.players"></div>
       <span class="round" id="round"></span>
-      <button class="pick" id="new-game" type="button">새 판</button>
+      <button class="pick" id="new-game" type="button" data-i18n="ui.newBoard">새 판</button>
     </div>
     <div class="picker-row">
-      <span class="row-label">난이도</span>
-      <div class="picker" id="levels" role="group" aria-label="난이도"></div>
+      <span class="row-label" data-i18n="ui.difficulty">난이도</span>
+      <div class="picker" id="levels" role="group" aria-label="난이도" data-i18n-attr="aria-label=ui.difficulty"></div>
     </div>
   </header>
 
@@ -54,7 +57,7 @@
         <p class="sheet-title" id="result-title"></p>
         <p class="sheet-note" id="result-note"></p>
         <div class="sheet-actions">
-          <button class="btn" id="again" type="button">한 판 더</button>
+          <button class="btn" id="again" type="button" data-i18n="ui.again">한 판 더</button>
         </div>
       </div>
     </div>
@@ -65,33 +68,33 @@
   <div class="dice-row" id="dice"></div>
 
   <div class="pad">
-    <button class="btn" id="roll" type="button">굴리기</button>
+    <button class="btn" id="roll" type="button" data-i18n="yacht.roll">굴리기</button>
   </div>
 
   <div class="sheet" id="help" hidden>
-    <p class="sheet-title">규칙</p>
+    <p class="sheet-title" data-i18n="ui.rules">규칙</p>
     <ul class="help-list">
-      <li>주사위 다섯 개를 <b>한 판에 세 번까지</b> 굴립니다. 남기고 싶은 주사위를 눌러
+      <li data-i18n-html="yacht.rule1">주사위 다섯 개를 <b>한 판에 세 번까지</b> 굴립니다. 남기고 싶은 주사위를 눌러
         <b>잡아 두고</b> 나머지만 다시 굴립니다.</li>
-      <li>굴린 뒤 <b>점수판의 빈 칸</b>을 누르면 그 칸에 적히고 다음 판으로 넘어갑니다.
+      <li data-i18n-html="yacht.rule2">굴린 뒤 <b>점수판의 빈 칸</b>을 누르면 그 칸에 적히고 다음 판으로 넘어갑니다.
         빈 칸에는 지금 주사위로 받을 점수가 <b>흐리게</b> 미리 보입니다.</li>
-      <li>차례는 <b>돌아가며</b> 옵니다. 모두가 열두 칸을 채우면 끝나고, <b>합계가 가장
+      <li data-i18n-html="yacht.rule3">차례는 <b>돌아가며</b> 옵니다. 모두가 열두 칸을 채우면 끝나고, <b>합계가 가장
         높은 자리가 이깁니다.</b> <b>0점으로 버리는 칸</b>을 언제 쓸지가 이 놀이의
         전부입니다.</li>
-      <li>판 위의 점수판은 <b>지금 차례인 자리의 것</b>입니다. 상대 차례에는 상대가 무엇을
+      <li data-i18n-html="yacht.rule4">판 위의 점수판은 <b>지금 차례인 자리의 것</b>입니다. 상대 차례에는 상대가 무엇을
         적는지 그대로 보입니다.</li>
-      <li><b>위 여섯 칸</b>은 그 눈의 개수만큼 받습니다(3이 셋이면 9점). 위 칸 합이
+      <li data-i18n-html="yacht.rule5"><b>위 여섯 칸</b>은 그 눈의 개수만큼 받습니다(3이 셋이면 9점). 위 칸 합이
         <b>63점을 넘기면 보너스 35점</b>이 붙습니다 — 눈마다 셋씩 채우면 딱 63점입니다.</li>
-      <li><b>초이스</b>는 다섯 눈의 합, <b>4다이스</b>는 같은 눈이 넷 이상일 때 다섯 눈의
+      <li data-i18n-html="yacht.rule6"><b>초이스</b>는 다섯 눈의 합, <b>4다이스</b>는 같은 눈이 넷 이상일 때 다섯 눈의
         합, <b>풀하우스</b>는 셋 + 둘일 때 다섯 눈의 합입니다.</li>
-      <li><b>S.스트레이트</b>는 넉 줄로 이어지면 15점, <b>L.스트레이트</b>는 닷 줄이면
+      <li data-i18n-html="yacht.rule7"><b>S.스트레이트</b>는 넉 줄로 이어지면 15점, <b>L.스트레이트</b>는 닷 줄이면
         30점, <b>야추</b>는 다섯이 모두 같으면 50점입니다.</li>
-      <li><b>0점을 적을 때만</b> 한 번 더 눌러 확인합니다. 값비싼 칸을 손이 미끄러져
+      <li data-i18n-html="yacht.rule8"><b>0점을 적을 때만</b> 한 번 더 눌러 확인합니다. 값비싼 칸을 손이 미끄러져
         버리는 일을 막으려는 것입니다.</li>
-      <li><b>난이도</b>는 판을 다시 만들지 않고 언제든 바꿀 수 있습니다.</li>
+      <li data-i18n-html="yacht.rule9"><b>난이도</b>는 판을 다시 만들지 않고 언제든 바꿀 수 있습니다.</li>
     </ul>
     <div class="sheet-actions">
-      <button class="btn" id="help-close" type="button">닫기</button>
+      <button class="btn" id="help-close" type="button" data-i18n="ui.close">닫기</button>
     </div>
   </div>
 </main>
@@ -103,5 +106,6 @@
 <script src="audio.js"></script>
 <script src="../../shared/sheet.js"></script>
 <script src="main.js"></script>
+<script>SharedI18n.apply();</script>
 </body>
 </html>
