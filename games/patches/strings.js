@@ -1,0 +1,95 @@
+// 이 게임에만 나오는 문구. 기록 안내와 도구 이름은 shared/strings.js에 있다.
+(function () {
+  SharedI18n.add({
+    ko: {
+      'meta.desc': '격자를 직사각형 조각으로 남김없이 나누는 퍼즐',
+      'patches.note': '{size}×{size}, 조각 {count}개.',
+      'patches.hintCleared': '어긋난 조각 {count}개를 걷어 내고 다음 조각을 놓았습니다.',
+      'patches.hintPlaced': '지금 알아낼 수 있는 조각을 놓았습니다.',
+      'patches.rule1': '격자를 <b>직사각형 조각으로 남김없이</b> 나눕니다. 빈 칸도, 겹치는 칸도 없어야 합니다.',
+      'patches.rule2': '조각 하나에 <b>단서가 정확히 하나</b> 들어갑니다.',
+      'patches.rule3': '단서를 두른 <b>테두리가 조각의 모양</b>입니다. 정사각형, 가로로 긴 것, 세로로 긴 것 셋 중 하나이고, <b>점선이면 모양은 자유</b>입니다.',
+      'patches.rule4': '단서의 <b>숫자는 그 조각의 칸 수</b>입니다. 6이면 여섯 칸짜리 조각입니다. 숫자는 알려 줄 때만 있습니다 — 점선에 숫자도 없는 단서는 "여기에 조각이 하나 있다"만 말합니다.',
+      'patches.rule5': '칸에서 칸으로 <b>끌어서</b> 조각을 그립니다. 이미 있는 조각 위로 그리면 그 조각은 지워집니다. 조각을 <b>톡 누르면</b> 지워집니다.',
+      'patches.rule6': '규칙을 어긴 조각은 <b>붉게</b> 표시됩니다. 단서가 없거나 둘 이상이거나, 칸 수나 모양이 맞지 않는 경우입니다.',
+      'patches.rule7': '<b>이 게임의 모든 판은 답이 하나뿐이고, 찍지 않고 논리만으로 풀립니다.</b>',
+      'patches.rule8': '<b>힌트</b>는 어긋난 조각을 걷어 내고, 지금 알아낼 수 있는 조각 하나를 놓아 줍니다. 힌트를 쓴 판은 최고 기록으로 남기지 않습니다.',
+      'patches.rule9': '키보드: <b>방향키</b>로 칸을 옮기고, <b>스페이스</b>로 한 귀퉁이를 찍은 뒤 다시 눌러 조각을 그립니다. <b>Backspace</b>로 되돌립니다.'
+    },
+    en: {
+      'meta.desc': 'Cut the grid into rectangular patches with nothing left over',
+      'patches.note': '{size}×{size}, {count} patches.',
+      'patches.hintCleared': 'Removed {count} wrong patches and placed the next one.',
+      'patches.hintPlaced': 'Placed a patch that logic can settle now.',
+      'patches.rule1': 'Divide the grid <b>completely into rectangular patches</b>. No empty cell, no overlap.',
+      'patches.rule2': 'Each patch contains <b>exactly one clue</b>.',
+      'patches.rule3': 'The <b>border around a clue is the patch shape</b>: a square, a wide rectangle or a tall one. A <b>dashed border means any shape</b>.',
+      'patches.rule4': 'The <b>number on a clue is how many cells</b> the patch has. A 6 means a six-cell patch. Numbers only appear when they are given away — a dashed clue with no number says only "one patch lives here".',
+      'patches.rule5': '<b>Drag</b> from cell to cell to draw a patch. Drawing over an existing patch erases it. <b>Tap a patch</b> to remove it.',
+      'patches.rule6': 'A patch that breaks a rule turns <b>red</b>: no clue, more than one clue, or a size or shape that does not match.',
+      'patches.rule7': '<b>Every board here has exactly one solution and is solvable by logic alone.</b>',
+      'patches.rule8': 'A <b>Hint</b> removes wrong patches and places one that logic can settle. Boards solved with hints are not recorded.',
+      'patches.rule9': 'Keyboard: <b>arrow keys</b> to move, <b>Space</b> to mark one corner and again to draw the patch, <b>Backspace</b> to undo.'
+    },
+    ja: {
+      'meta.desc': '格子を長方形のピースで余さず分けるパズル',
+      'patches.note': '{size}×{size}、ピース {count} 個。',
+      'patches.hintCleared': 'ずれたピース{count}個を取り除き、次のピースを置きました。',
+      'patches.hintPlaced': 'いま確定できるピースを置きました。',
+      'patches.rule1': '格子を<b>長方形のピースで余さず</b>分けます。空きマスも重なりもあってはいけません。',
+      'patches.rule2': 'ひとつのピースに<b>手がかりがちょうどひとつ</b>入ります。',
+      'patches.rule3': '手がかりを囲む<b>枠がピースの形</b>です。正方形・横長・縦長のいずれかで、<b>点線なら形は自由</b>です。',
+      'patches.rule4': '手がかりの<b>数字はそのピースのマス数</b>です。6なら六マスのピース。数字は教えるときだけ付きます — 点線で数字もない手がかりは「ここにピースがひとつある」とだけ言います。',
+      'patches.rule5': 'マスからマスへ<b>引いて</b>ピースを描きます。すでにあるピースの上に描くとそれは消えます。ピースを<b>軽く押す</b>と消えます。',
+      'patches.rule6': 'ルール違反のピースは<b>赤く</b>なります。手がかりがない、二つ以上ある、マス数や形が合わない場合です。',
+      'patches.rule7': '<b>この盤はすべて答えがひとつだけで、当てずっぽう抜きに論理だけで解けます。</b>',
+      'patches.rule8': '<b>ヒント</b>はずれたピースを取り除き、いま確定できるピースをひとつ置きます。ヒントを使った盤はベスト記録に残しません。',
+      'patches.rule9': 'キーボード：<b>矢印キー</b>で移動し、<b>スペース</b>で角を決めてもう一度押すとピースを描きます。<b>Backspace</b>で戻します。'
+    },
+    'zh-CN': {
+      'meta.desc': '把方格全部切成矩形块的逻辑谜题',
+      'patches.note': '{size}×{size}，块 {count} 个。',
+      'patches.hintCleared': '移走了 {count} 个切错的块，并放好了下一个。',
+      'patches.hintPlaced': '放好了当前可以确定的块。',
+      'patches.rule1': '把方格<b>全部切成矩形块</b>，不能留空，也不能重叠。',
+      'patches.rule2': '每个块里<b>恰好有一个线索</b>。',
+      'patches.rule3': '线索外面的<b>边框就是块的形状</b>：正方形、横长或竖长。<b>虚线表示形状不限</b>。',
+      'patches.rule4': '线索上的<b>数字是这个块的格数</b>。写 6 就是六格的块。数字只在要告诉你时才有 —— 虚线又没数字的线索，只说明“这里有一个块”。',
+      'patches.rule5': '从一格<b>拖到另一格</b>来画块。画到已有的块上，那个块会被擦掉。<b>轻点一个块</b>也会擦掉它。',
+      'patches.rule6': '违反规则的块会变<b>红</b>：没有线索、有两个以上线索，或者格数、形状不对。',
+      'patches.rule7': '<b>这里的每一盘都只有一个答案，而且只靠推理就能解开。</b>',
+      'patches.rule8': '<b>提示</b>会移走切错的块，并放上一个当前可确定的块。用过提示的盘面不计入最好成绩。',
+      'patches.rule9': '键盘：<b>方向键</b>移动，<b>空格</b>定下一个角再按一次画出块，<b>Backspace</b> 撤销。'
+    },
+    'zh-TW': {
+      'meta.desc': '把方格全部切成矩形塊的邏輯謎題',
+      'patches.note': '{size}×{size}，塊 {count} 個。',
+      'patches.hintCleared': '移走了 {count} 個切錯的塊，並放好了下一個。',
+      'patches.hintPlaced': '放好了目前可以確定的塊。',
+      'patches.rule1': '把方格<b>全部切成矩形塊</b>，不能留空，也不能重疊。',
+      'patches.rule2': '每個塊裡<b>恰好有一個線索</b>。',
+      'patches.rule3': '線索外面的<b>邊框就是塊的形狀</b>：正方形、橫長或直長。<b>虛線表示形狀不限</b>。',
+      'patches.rule4': '線索上的<b>數字是這個塊的格數</b>。寫 6 就是六格的塊。數字只在要告訴你時才有 —— 虛線又沒數字的線索，只說明「這裡有一個塊」。',
+      'patches.rule5': '從一格<b>拖到另一格</b>來畫塊。畫到已有的塊上，那個塊會被擦掉。<b>輕點一個塊</b>也會擦掉它。',
+      'patches.rule6': '違反規則的塊會變<b>紅</b>：沒有線索、有兩個以上線索，或者格數、形狀不對。',
+      'patches.rule7': '<b>這裡的每一盤都只有一個答案，而且只靠推理就能解開。</b>',
+      'patches.rule8': '<b>提示</b>會移走切錯的塊，並放上一個目前可確定的塊。用過提示的盤面不計入最佳成績。',
+      'patches.rule9': '鍵盤：<b>方向鍵</b>移動，<b>空白鍵</b>定下一個角再按一次畫出塊，<b>Backspace</b> 復原。'
+    },
+    es: {
+      'meta.desc': 'Divide la cuadrícula en piezas rectangulares sin que sobre nada',
+      'patches.note': '{size}×{size}, {count} piezas.',
+      'patches.hintCleared': 'Se quitaron {count} piezas mal puestas y se colocó la siguiente.',
+      'patches.hintPlaced': 'Se colocó una pieza que la lógica ya fija.',
+      'patches.rule1': 'Divide la cuadrícula <b>entera en piezas rectangulares</b>. Sin casillas vacías y sin solapes.',
+      'patches.rule2': 'Cada pieza contiene <b>exactamente una pista</b>.',
+      'patches.rule3': 'El <b>borde alrededor de una pista es la forma de la pieza</b>: cuadrada, ancha o alta. Un <b>borde discontinuo significa forma libre</b>.',
+      'patches.rule4': 'El <b>número de la pista es cuántas casillas</b> tiene la pieza. Un 6 es una pieza de seis casillas. El número solo aparece cuando se te da — una pista discontinua y sin número solo dice «aquí hay una pieza».',
+      'patches.rule5': '<b>Arrastra</b> de casilla a casilla para dibujar una pieza. Si dibujas sobre una pieza existente, esa se borra. <b>Toca una pieza</b> para quitarla.',
+      'patches.rule6': 'Una pieza que rompe una regla se pone <b>roja</b>: sin pista, con más de una, o con un tamaño o forma que no cuadra.',
+      'patches.rule7': '<b>Todos los tableros tienen una única solución y salen solo con lógica.</b>',
+      'patches.rule8': 'Una <b>Pista</b> retira las piezas mal puestas y coloca una que la lógica ya fija. Los tableros con pistas no cuentan para el récord.',
+      'patches.rule9': 'Teclado: <b>flechas</b> para moverte, <b>Espacio</b> para fijar una esquina y otra vez para dibujar la pieza, <b>Retroceso</b> para deshacer.'
+    }
+  });
+})();
