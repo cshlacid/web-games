@@ -72,7 +72,7 @@ function formatTime(seconds) {
 
 function showBest() {
   const best = loadBest()[game.size];
-  el.best.textContent = best ? t('zip.best', { time: formatTime(best) }) : '';
+  el.best.textContent = best ? t('record.best', { time: formatTime(best) }) : '';
 }
 
 // --- 판 그리기 ---
@@ -286,17 +286,17 @@ function finishIfDone() {
   // 달라 어긋난다 — 조각을 모아 join으로 붙인다.
   const note = [t('zip.note', { size: game.size, count: game.puzzle.hints.length })];
   if (game.hinted) {
-    note.push(t('zip.noteHinted', { count: game.hinted }));
+    note.push(t('record.hinted', { count: game.hinted }));
   } else if (!previous || game.elapsed < previous) {
     best[game.size] = game.elapsed;
     saveBest(best);
-    note.push(previous ? t('zip.noteImproved', { time: formatTime(previous) }) : t('zip.noteFirst'));
+    note.push(previous ? t('record.improved', { time: formatTime(previous) }) : t('record.first'));
     showBest();
   } else {
-    note.push(t('zip.noteBest', { time: formatTime(previous) }));
+    note.push(t('record.bestIs', { time: formatTime(previous) }));
   }
 
-  el.resultTitle.textContent = t('zip.done', { time: formatTime(game.elapsed) });
+  el.resultTitle.textContent = t('record.done', { time: formatTime(game.elapsed) });
   el.resultNote.textContent = note.join(' ');
   el.result.hidden = false;
 }
@@ -350,7 +350,7 @@ function newGame() {
     const puzzle = G.generate(game.size) || G.generate(game.size);
     if (!puzzle) {
       el.veil.hidden = true;
-      toast(t('zip.genFail'));
+      toast(t('record.genFail'));
       return;
     }
     game.puzzle = puzzle;

@@ -45,7 +45,15 @@
       'ui.medium': '보통',
       'ui.hard': '어려움',
       'ui.small': '작게',
-      'ui.large': '크게'
+      'ui.large': '크게',
+      'ui.boardSize': '판 크기',
+      'record.best': '최고 {time}',
+      'record.done': '완성! {time}',
+      'record.hinted': '힌트를 {count}번 썼으니 기록은 남기지 않습니다.',
+      'record.improved': '최고 기록을 {time}에서 줄였습니다.',
+      'record.first': '첫 기록입니다.',
+      'record.bestIs': '최고 기록은 {time}입니다.',
+      'record.genFail': '판을 만들지 못했습니다. 새 판을 눌러 다시 시도해 주세요.'
     },
     en: {
       'game.2048': '2048',
@@ -89,7 +97,15 @@
       'ui.medium': 'Medium',
       'ui.hard': 'Hard',
       'ui.small': 'Small',
-      'ui.large': 'Large'
+      'ui.large': 'Large',
+      'ui.boardSize': 'Board size',
+      'record.best': 'Best {time}',
+      'record.done': 'Done! {time}',
+      'record.hinted': 'You used {count} hints, so this one is not recorded.',
+      'record.improved': 'Your best time is down from {time}.',
+      'record.first': 'Your first record.',
+      'record.bestIs': 'Your best time is {time}.',
+      'record.genFail': 'Could not build a board. Tap New board to try again.'
     },
     ja: {
       'game.2048': '2048',
@@ -133,7 +149,15 @@
       'ui.medium': 'ふつう',
       'ui.hard': 'むずかしい',
       'ui.small': '小さめ',
-      'ui.large': '大きめ'
+      'ui.large': '大きめ',
+      'ui.boardSize': '盤の大きさ',
+      'record.best': 'ベスト {time}',
+      'record.done': '完成！{time}',
+      'record.hinted': 'ヒントを{count}回使ったので記録には残しません。',
+      'record.improved': 'ベスト記録を {time} から縮めました。',
+      'record.first': '初めての記録です。',
+      'record.bestIs': 'ベスト記録は {time} です。',
+      'record.genFail': '盤を作れませんでした。「新しい盤」を押してもう一度お試しください。'
     },
     'zh-CN': {
       'game.2048': '2048',
@@ -177,7 +201,15 @@
       'ui.medium': '普通',
       'ui.hard': '困难',
       'ui.small': '小',
-      'ui.large': '大'
+      'ui.large': '大',
+      'ui.boardSize': '盘面大小',
+      'record.best': '最高 {time}',
+      'record.done': '完成！{time}',
+      'record.hinted': '用了 {count} 次提示，这一局不计入记录。',
+      'record.improved': '最好成绩从 {time} 提升了。',
+      'record.first': '这是第一条记录。',
+      'record.bestIs': '最好成绩是 {time}。',
+      'record.genFail': '没能生成盘面。点“新一局”再试一次。'
     },
     'zh-TW': {
       'game.2048': '2048',
@@ -221,7 +253,15 @@
       'ui.medium': '普通',
       'ui.hard': '困難',
       'ui.small': '小',
-      'ui.large': '大'
+      'ui.large': '大',
+      'ui.boardSize': '盤面大小',
+      'record.best': '最高 {time}',
+      'record.done': '完成！{time}',
+      'record.hinted': '用了 {count} 次提示，這一局不計入紀錄。',
+      'record.improved': '最佳成績從 {time} 提升了。',
+      'record.first': '這是第一筆紀錄。',
+      'record.bestIs': '最佳成績是 {time}。',
+      'record.genFail': '沒能產生盤面。點「新一局」再試一次。'
     },
     es: {
       'game.2048': '2048',
@@ -265,7 +305,15 @@
       'ui.medium': 'Media',
       'ui.hard': 'Difícil',
       'ui.small': 'Pequeño',
-      'ui.large': 'Grande'
+      'ui.large': 'Grande',
+      'ui.boardSize': 'Tamaño del tablero',
+      'record.best': 'Mejor {time}',
+      'record.done': '¡Completado! {time}',
+      'record.hinted': 'Usaste {count} pistas, así que no cuenta para el récord.',
+      'record.improved': 'Has bajado tu mejor marca de {time}.',
+      'record.first': 'Tu primera marca.',
+      'record.bestIs': 'Tu mejor marca es {time}.',
+      'record.genFail': 'No se pudo generar el tablero. Pulsa Nuevo tablero para reintentar.'
     }
   });
 })();
