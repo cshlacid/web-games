@@ -55,7 +55,9 @@
       'record.bestIs': '최고 기록은 {time}입니다.',
       'record.genFail': '판을 만들지 못했습니다. 새 판을 눌러 다시 시도해 주세요.',
       'record.hintedShort': '힌트를 써서 기록에는 넣지 않습니다',
-      'record.bestMark': '최고 기록'
+      'record.bestMark': '최고 기록',
+      'ui.toStart': '처음으로',
+      'ui.nextBoard': '다음 판'
     },
     en: {
       'game.2048': '2048',
@@ -109,7 +111,9 @@
       'record.bestIs': 'Your best time is {time}.',
       'record.genFail': 'Could not build a board. Tap New board to try again.',
       'record.hintedShort': 'hints used, so this one is not recorded',
-      'record.bestMark': 'best time'
+      'record.bestMark': 'best time',
+      'ui.toStart': 'Restart',
+      'ui.nextBoard': 'Next board'
     },
     ja: {
       'game.2048': '2048',
@@ -163,7 +167,9 @@
       'record.bestIs': 'ベスト記録は {time} です。',
       'record.genFail': '盤を作れませんでした。「新しい盤」を押してもう一度お試しください。',
       'record.hintedShort': 'ヒントを使ったので記録には残しません',
-      'record.bestMark': 'ベスト記録'
+      'record.bestMark': 'ベスト記録',
+      'ui.toStart': '最初から',
+      'ui.nextBoard': '次の盤'
     },
     'zh-CN': {
       'game.2048': '2048',
@@ -217,7 +223,9 @@
       'record.bestIs': '最好成绩是 {time}。',
       'record.genFail': '没能生成盘面。点“新一局”再试一次。',
       'record.hintedShort': '用了提示，不计入记录',
-      'record.bestMark': '最好成绩'
+      'record.bestMark': '最好成绩',
+      'ui.toStart': '从头开始',
+      'ui.nextBoard': '下一局'
     },
     'zh-TW': {
       'game.2048': '2048',
@@ -271,7 +279,9 @@
       'record.bestIs': '最佳成績是 {time}。',
       'record.genFail': '沒能產生盤面。點「新一局」再試一次。',
       'record.hintedShort': '用了提示，不計入紀錄',
-      'record.bestMark': '最佳成績'
+      'record.bestMark': '最佳成績',
+      'ui.toStart': '從頭開始',
+      'ui.nextBoard': '下一局'
     },
     es: {
       'game.2048': '2048',
@@ -325,7 +335,9 @@
       'record.bestIs': 'Tu mejor marca es {time}.',
       'record.genFail': 'No se pudo generar el tablero. Pulsa Nuevo tablero para reintentar.',
       'record.hintedShort': 'con pistas, no cuenta para el récord',
-      'record.bestMark': 'mejor marca'
+      'record.bestMark': 'mejor marca',
+      'ui.toStart': 'Desde el principio',
+      'ui.nextBoard': 'Siguiente tablero'
     }
   });
 })();
