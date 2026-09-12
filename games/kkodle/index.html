@@ -3,39 +3,42 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>꼬들</title>
-<meta name="description" content="두 글자 한글 단어를 여섯 번 안에 맞히는 게임">
+<title data-i18n="game.kkodle">꼬들</title>
+<meta name="description" content="두 글자 한글 단어를 여섯 번 안에 맞히는 게임" data-i18n-attr="content=meta.desc">
 <meta name="color-scheme" content="light dark">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%235f9e57'><rect x='3' y='3' width='18' height='18' rx='3'/></svg>">
 <link rel="manifest" href="../../manifest.json">
 <link rel="apple-touch-icon" href="../../icons/icon-180.png">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="꼬들">
+<meta name="apple-mobile-web-app-title" content="꼬들" data-i18n-attr="content=game.kkodle">
 <meta name="theme-color" content="#faf8ef" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#1a1714" media="(prefers-color-scheme: dark)">
 <link rel="stylesheet" href="../../shared/base.css">
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="../../shared/sheet.css">
 <script src="../../shared/analytics.js"></script>
+<script src="../../shared/i18n.js"></script>
+<script src="../../shared/strings.js"></script>
+<script src="strings.js"></script>
 </head>
 <body>
 <main class="app">
   <header class="head">
     <div class="title-row">
       <div class="head-nav">
-        <a class="back" href="../../">← 목록</a>
-        <button class="toggle" id="help-open" type="button" aria-pressed="false">도움말</button>
+        <a class="back" href="../../" data-i18n="ui.back">← 목록</a>
+        <button class="toggle" id="help-open" type="button" aria-pressed="false" data-i18n="ui.help">도움말</button>
       </div>
-      <h1>꼬들</h1>
+      <h1 data-i18n="game.kkodle">꼬들</h1>
       <div class="head-actions">
-        <button class="toggle sound" id="toggle-bgm" type="button" aria-pressed="true">BGM</button>
-        <button class="toggle sound" id="toggle-sfx" type="button" aria-pressed="true">효과음</button>
+        <button class="toggle sound" id="toggle-bgm" type="button" aria-pressed="true" data-i18n="ui.bgm">BGM</button>
+        <button class="toggle sound" id="toggle-sfx" type="button" aria-pressed="true" data-i18n="ui.sfx">효과음</button>
       </div>
     </div>
     <div class="sub-row">
-      <p class="subtitle" id="subtitle">두 글자 단어를 여섯 번 안에</p>
-      <button class="toggle" id="mode" type="button" aria-pressed="true">오늘의 단어</button>
+      <p class="subtitle" id="subtitle" data-i18n="kkodle.subtitle">두 글자 단어를 여섯 번 안에</p>
+      <button class="toggle" id="mode" type="button" aria-pressed="true" data-i18n="kkodle.daily">오늘의 단어</button>
     </div>
   </header>
 
@@ -48,28 +51,28 @@
     <p class="sheet-answer" id="result-answer"></p>
     <dl class="stats" id="stats"></dl>
     <div class="sheet-actions">
-      <button class="btn" id="share" type="button">결과 복사</button>
-      <button class="btn ghost" id="again" type="button">연습 한 판 더</button>
+      <button class="btn" id="share" type="button" data-i18n="kkodle.share">결과 복사</button>
+      <button class="btn ghost" id="again" type="button" data-i18n="kkodle.againPractice">연습 한 판 더</button>
     </div>
   </div>
 
   <div class="keyboard" id="keyboard"></div>
 
   <div class="sheet" id="help" hidden>
-    <p class="sheet-title">규칙</p>
+    <p class="sheet-title" data-i18n="ui.rules">규칙</p>
     <ul class="help-list">
-      <li>두 글자 단어를 여섯 번 안에 맞힙니다.</li>
-      <li>판정은 글자가 아니라 <b>자모 단위</b>입니다. 한 글자는 초성·중성·종성
+      <li data-i18n-html="kkodle.rule1">두 글자 단어를 여섯 번 안에 맞힙니다.</li>
+      <li data-i18n-html="kkodle.rule2">판정은 글자가 아니라 <b>자모 단위</b>입니다. 한 글자는 초성·중성·종성
         세 칸으로 나뉘고, 칸마다 따로 색이 매겨집니다.</li>
-      <li><span class="chip correct"></span> 자리까지 맞음
-        &nbsp;<span class="chip present"></span> 단어에 있지만 자리가 다름
-        &nbsp;<span class="chip absent"></span> 없음</li>
-      <li>받침이 없는 것도 하나의 답입니다. 받침 칸이 초록이면 그 자리에 받침이
+      <li><span class="chip correct"></span> <span data-i18n="kkodle.legendCorrect">자리까지 맞음</span>
+        &nbsp;<span class="chip present"></span> <span data-i18n="kkodle.legendPresent">단어에 있지만 자리가 다름</span>
+        &nbsp;<span class="chip absent"></span> <span data-i18n="kkodle.legendAbsent">없음</span></li>
+      <li data-i18n-html="kkodle.rule4">받침이 없는 것도 하나의 답입니다. 받침 칸이 초록이면 그 자리에 받침이
         없다는 뜻입니다.</li>
-      <li>오늘의 단어는 매일 자정(KST)에 바뀌고, 모두에게 같습니다.</li>
+      <li data-i18n-html="kkodle.rule5">오늘의 단어는 매일 자정(KST)에 바뀌고, 모두에게 같습니다.</li>
     </ul>
     <div class="sheet-actions">
-      <button class="btn" id="help-close" type="button">닫기</button>
+      <button class="btn" id="help-close" type="button" data-i18n="ui.close">닫기</button>
     </div>
   </div>
 </main>
@@ -83,5 +86,6 @@
 <script src="audio.js"></script>
 <script src="../../shared/sheet.js"></script>
 <script src="main.js"></script>
+<script>SharedI18n.apply();</script>
 </body>
 </html>
