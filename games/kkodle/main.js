@@ -6,6 +6,7 @@
   const L = window.KkodleLogic;
   const WORDS = window.KkodleWords;
   const Sound = window.KkodleSound;
+  const t = SharedI18n.t;
 
   const DAILY_KEY = 'web-games.kkodle.daily';
   const STATS_KEY = 'web-games.kkodle.stats';
@@ -140,7 +141,7 @@
           button.innerHTML = Icons.svg('backspace');
           button.dataset.action = 'back';
         } else if (key === 'enter') {
-          button.textContent = '입력';
+          button.textContent = t('kkodle.enter');
           button.classList.add('wide');
           button.dataset.action = 'enter';
         } else {
@@ -206,7 +207,7 @@
     if (state.status !== 'playing' || state.locked) return;
     const text = H.blocksToText(state.blocks);
     if (!L.isValidGuess(text)) {
-      toast(H.blocksToText(state.blocks).length < 2 ? '두 글자를 채워주세요' : '완성된 두 글자여야 해요');
+      toast(H.blocksToText(state.blocks).length < 2 ? t('kkodle.tooShort') : t('kkodle.notAWord'));
       Sound.play('invalid');
       shake();
       return;
@@ -245,8 +246,8 @@
 
   function showResult() {
     const won = state.status === 'won';
-    el.resultTitle.textContent = won ? `${state.rows.length}번 만에 맞혔어요` : '아쉬워요';
-    el.resultAnswer.textContent = `정답은 "${state.answer}"`;
+    el.resultTitle.textContent = won ? t('kkodle.won', { tries: state.rows.length }) : t('kkodle.lost');
+    el.resultAnswer.textContent = t('kkodle.answer', { word: state.answer });
     el.share.hidden = !state.daily;
     renderStats();
     el.result.hidden = false;
@@ -306,7 +307,12 @@
   function renderStats() {
     const stats = store.get(STATS_KEY, { played: 0, wins: 0, streak: 0, best: 0 });
     const rate = stats.played ? Math.round((stats.wins / stats.played) * 100) : 0;
-    const items = [['판수', stats.played], ['승률', `${rate}%`], ['연속', stats.streak], ['최고 연속', stats.best]];
+    const items = [
+      [t('kkodle.played'), stats.played],
+      [t('kkodle.winRate'), `${rate}%`],
+      [t('kkodle.streak'), stats.streak],
+      [t('kkodle.bestStreak'), stats.best],
+    ];
     el.stats.replaceChildren();
     for (const [label, value] of items) {
       const group = document.createElement('div');
@@ -330,11 +336,11 @@
     state.shiftOn = false;
     el.result.hidden = true;
     el.keyboard.hidden = false;
-    el.mode.textContent = daily ? '오늘의 단어' : '연습';
+    el.mode.textContent = daily ? t('kkodle.daily') : t('kkodle.practice');
     el.mode.setAttribute('aria-pressed', String(daily));
     el.subtitle.textContent = daily
-      ? `오늘의 단어 · ${L.dateKey()}`
-      : '연습 · 아무 때나 새 단어';
+      ? t('kkodle.dailyNote', { date: L.dateKey() })
+      : t('kkodle.practiceNote');
     buildBoard();
     paintKeyboard();
     if (daily) restoreDaily();
@@ -389,13 +395,13 @@
   window.SharedSheet.bind({ sheet: el.help, opener: el.helpOpen, closer: el.helpClose });
 
   el.share.addEventListener('click', async () => {
-    const text = L.shareText(state.rows, L.dateKey(), state.status === 'won');
+    const text = L.shareText(state.rows, L.dateKey(), state.status === 'won', t('game.kkodle'));
     try {
       await navigator.clipboard.writeText(text);
-      toast('결과를 복사했어요');
+      toast(t('kkodle.copied'));
     } catch {
       // 클립보드 권한이 없거나 http로 열린 경우. 복사 대신 보여주기라도 한다.
-      toast('복사할 수 없어 결과를 아래에 표시했어요');
+      toast(t('kkodle.copyFailed'));
       el.resultAnswer.textContent = text;
     }
   });
