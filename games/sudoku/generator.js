@@ -8,7 +8,7 @@ const S = (typeof require !== 'undefined' && typeof module !== 'undefined')
 // — 단서가 적어도 쉬운 판이 있고 그 반대도 있다.
 const LEVELS = {
   easy: {
-    label: '쉬움',
+    labelKey: 'ui.easy',
     allowed: ['nakedSingle', 'hiddenSingle'],
     // 기법만으로 난이도를 나누면 세 등급이 다 단서 20여 개짜리가 된다. 한 수
     // 한 수가 쉬워도 빈칸이 60개면 쉬운 판이 아니다. 그래서 남길 단서의 하한을
@@ -19,13 +19,13 @@ const LEVELS = {
     require: null,
   },
   medium: {
-    label: '보통',
+    labelKey: 'ui.medium',
     allowed: ['nakedSingle', 'hiddenSingle', 'pointing', 'claiming', 'nakedPair', 'hiddenPair'],
     minGivens: 30,
     require: 'pointing',
   },
   hard: {
-    label: '어려움',
+    labelKey: 'ui.hard',
     allowed: S.TECHNIQUE_NAMES,
     minGivens: 0, // 뺄 수 있는 데까지 뺀다
     require: 'nakedPair',
@@ -115,7 +115,7 @@ function generate(level = 'easy', options = {}) {
     const hardest = S.hardestTechnique(puzzle, config.allowed);
     const result = {
       level,
-      label: config.label,
+      labelKey: config.labelKey,
       puzzle,
       solution,
       hardest,

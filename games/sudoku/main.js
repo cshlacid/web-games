@@ -5,19 +5,13 @@
   const Icons = window.SharedIcons;
   const G = window.SudokuGenerator;
   const Sound = window.SudokuSound;
+  const t = SharedI18n.t;
   const SAVE_KEY = 'web-games.sudoku.game';
 
-  const TECHNIQUE_LABEL = {
-    nakedSingle: '이 칸에 들어갈 수 있는 숫자가 하나뿐',
-    hiddenSingle: '이 줄에서 그 숫자가 들어갈 칸이 여기뿐',
-    pointing: '상자 안에서 그 숫자의 자리가 한 줄에 몰려 있음',
-    claiming: '줄에서 그 숫자의 자리가 한 상자에 몰려 있음',
-    nakedPair: '두 칸이 같은 두 숫자를 나눠 가짐',
-    hiddenPair: '두 숫자가 두 칸에만 들어갈 수 있음',
-    nakedTriple: '세 칸이 같은 세 숫자를 나눠 가짐',
-    hiddenTriple: '세 숫자가 세 칸에만 들어갈 수 있음',
-    xWing: 'X-Wing',
-  };
+  // X-Wing만 사전에 없다 — 어느 언어에서도 그대로 쓰는 기법 이름이라 옮길 말이 없다.
+  function techniqueLabel(name) {
+    return name === 'xWing' ? 'X-Wing' : (t('sudoku.' + name) || name);
+  }
 
   const el = {
     board: document.getElementById('board'),
@@ -226,8 +220,8 @@
     for (let i = 0; i < 81; i++) if (state.values[i] !== Number(state.solution[i])) return;
     state.done = true;
     state.running = false;
-    el.resultTitle.textContent = '다 풀었어요';
-    el.resultNote.textContent = `${G.LEVELS[state.level].label} · ${formatTime(state.elapsed)}`;
+    el.resultTitle.textContent = t('sudoku.solved');
+    el.resultNote.textContent = `${t(G.LEVELS[state.level].labelKey)} · ${formatTime(state.elapsed)}`;
     el.result.hidden = false;
     Sound.play('win');
     save();
@@ -247,13 +241,13 @@
         state.selected = i;
         render();
         Sound.play('conflict');
-        toast('여기 숫자가 정답과 달라요. 먼저 고쳐야 이어서 풀 수 있어요');
+        toast(t('sudoku.wrong'));
         return;
       }
     }
 
     const step = S.nextPlacement(boardString());
-    if (!step) { toast('더 짚어줄 칸을 찾지 못했어요'); return; }
+    if (!step) { toast(t('sudoku.noStep')); return; }
 
     snapshot();
     state.values[step.index] = step.digit;
@@ -265,7 +259,7 @@
     setTimeout(() => { delete cells[step.index].dataset.hinted; render(); }, 900);
 
     Sound.play('hint');
-    toast(`${step.digit} — ${TECHNIQUE_LABEL[step.technique] || step.technique}`);
+    toast(`${step.digit} — ${techniqueLabel(step.technique)}`);
     afterChange();
   }
 
@@ -299,8 +293,8 @@
     if (state.selected < 0) state.selected = 0;
     state.running = !state.done;
     if (state.done) {
-      el.resultTitle.textContent = '다 풀었어요';
-      el.resultNote.textContent = `${G.LEVELS[state.level].label} · ${formatTime(state.elapsed)}`;
+      el.resultTitle.textContent = t('sudoku.solved');
+      el.resultNote.textContent = `${t(G.LEVELS[state.level].labelKey)} · ${formatTime(state.elapsed)}`;
       el.result.hidden = false;
     }
     return true;
@@ -341,7 +335,7 @@
     button.type = 'button';
     button.className = 'level';
     button.dataset.level = level;
-    button.textContent = config.label;
+    button.textContent = t(config.labelKey);
     button.addEventListener('click', () => newGame(level));
     el.levels.appendChild(button);
   }
