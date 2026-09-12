@@ -125,7 +125,7 @@ for (let i = 0; i < 200 && !sampleClues; i++) {
 }
 check('설명 확인용 판을 찾았다', sampleClues !== null, true);
 const firstHint = S.nextHint(5, sampleClues.rowClues, sampleClues.colClues, new Int8Array(25).fill(R.UNKNOWN));
-check('힌트에 근거가 붙는다', typeof (firstHint && firstHint.detail), 'string');
+check('힌트에 근거가 붙는다', typeof (firstHint && firstHint.why && firstHint.why.code), 'string');
 check('힌트에 기법 이름이 붙는다', S.TECHNIQUE_NAMES.includes(firstHint && firstHint.technique), true);
 
 // 아래 판은 힌트가 "배치가 5가지 남았다"는 한 문장으로 추론 네 단계를 건너뛰어
@@ -138,7 +138,7 @@ const chainFirst = S.nextHint(6, chainRows, chainCols, chainEmpty, new Uint16Arr
 check('긴 사슬에서는 확정 대신 후보 좁히기부터 준다', chainFirst.kind, 'narrow');
 check('첫 힌트가 사슬의 첫 고리를 짚는다', `${chainFirst.line.kind}${chainFirst.line.index}`, 'row1');
 check('좁히기 힌트가 칸을 짚는다', chainFirst.cells.length > 0, true);
-check('좁히기 힌트에 빠지는 값이 적힌다', chainFirst.detail.includes('빠집니다'), true);
+check('좁히기 힌트에 빠지는 값이 적힌다', chainFirst.removals.some((r) => r.values.length > 0), true);
 
 // 받아 적은 뒤 같은 말을 또 하면 힌트를 눌러도 제자리인 것처럼 보인다.
 const chainMarks = new Uint16Array(36);
@@ -237,7 +237,7 @@ check('맞물림이 가장 어려운 기법이다',
   check('맞물림이 필요한 판도 힌트만으로 끝난다', board.some((v) => v === R.UNKNOWN), false);
   check('맞물림 힌트가 실제로 나온다', crossSeen !== null, true);
   check('맞물림 힌트에 근거가 붙는다',
-    Boolean(crossSeen && crossSeen.detail.includes('줄에 남은 자리 수와 정확히 같으니')), true);
+    Boolean(crossSeen && crossSeen.why && crossSeen.why.code === 'cross' && crossSeen.why.demand > 0), true);
 }
 
 // --- 모순된 판 ---

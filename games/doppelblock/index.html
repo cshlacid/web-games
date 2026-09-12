@@ -3,15 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>더블블록</title>
-<meta name="description" content="줄마다 검은 칸 두 개. 그 사이 숫자의 합을 맞히는 퍼즐">
+<title data-i18n="game.doppelblock">더블블록</title>
+<meta name="description" content="줄마다 검은 칸 두 개. 그 사이 숫자의 합을 맞히는 퍼즐" data-i18n-attr="content=meta.desc">
 <meta name="color-scheme" content="light dark">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%235f6d87'><rect x='2' y='7' width='7.5' height='10' rx='1.5'/><rect x='14.5' y='7' width='7.5' height='10' rx='1.5'/></svg>">
 <link rel="manifest" href="../../manifest.json">
 <link rel="apple-touch-icon" href="../../icons/icon-180.png">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="더블블록">
+<meta name="apple-mobile-web-app-title" content="더블블록" data-i18n-attr="content=game.doppelblock">
 <meta name="theme-color" content="#f4f6f9" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#171b21" media="(prefers-color-scheme: dark)">
 <link rel="stylesheet" href="../../shared/base.css">
@@ -19,23 +19,26 @@
 <link rel="stylesheet" href="../../shared/result.css">
 <link rel="stylesheet" href="../../shared/sheet.css">
 <script src="../../shared/analytics.js"></script>
+<script src="../../shared/i18n.js"></script>
+<script src="../../shared/strings.js"></script>
+<script src="strings.js"></script>
 </head>
 <body>
 <main class="app">
   <header class="head">
     <div class="title-row">
       <div class="head-nav">
-        <a class="back" href="../../">← 목록</a>
-        <button class="toggle" id="help-open" type="button" aria-pressed="false">도움말</button>
+        <a class="back" href="../../" data-i18n="ui.back">← 목록</a>
+        <button class="toggle" id="help-open" type="button" aria-pressed="false" data-i18n="ui.help">도움말</button>
       </div>
-      <h1>더블블록</h1>
+      <h1 data-i18n="game.doppelblock">더블블록</h1>
       <div class="head-actions">
-        <button class="toggle sound" id="toggle-bgm" type="button" aria-pressed="true">BGM</button>
-        <button class="toggle sound" id="toggle-sfx" type="button" aria-pressed="true">효과음</button>
+        <button class="toggle sound" id="toggle-bgm" type="button" aria-pressed="true" data-i18n="ui.bgm">BGM</button>
+        <button class="toggle sound" id="toggle-sfx" type="button" aria-pressed="true" data-i18n="ui.sfx">효과음</button>
       </div>
     </div>
     <div class="picker-row">
-      <div class="picker" id="levels" role="group" aria-label="난이도"></div>
+      <div class="picker" id="levels" role="group" aria-label="난이도" data-i18n-attr="aria-label=ui.difficulty"></div>
       <span class="size" id="size">6×6</span>
       <span class="timer" id="timer">0:00</span>
     </div>
@@ -43,13 +46,13 @@
 
   <div class="board-wrap">
     <div class="board" id="board"></div>
-    <div class="veil" id="veil" hidden>만드는 중…</div>
+    <div class="veil" id="veil" hidden data-i18n="ui.making">만드는 중…</div>
     <div class="result" id="result" role="status" aria-live="polite" hidden>
       <div class="result-card">
         <p class="sheet-title" id="result-title"></p>
         <p class="sheet-note" id="result-note"></p>
         <div class="sheet-actions">
-          <button class="btn" id="again" type="button">한 판 더</button>
+          <button class="btn" id="again" type="button" data-i18n="ui.again">한 판 더</button>
         </div>
       </div>
     </div>
@@ -63,64 +66,65 @@
     <div class="digits" id="digits"></div>
     <div class="tools">
       <button class="tool" id="pencil" type="button" aria-pressed="false">
-        <span class="tool-icon" data-icon="pencil"></span><span class="tool-label">연필</span>
+        <span class="tool-icon" data-icon="pencil"></span><span class="tool-label" data-i18n="ui.pencil">연필</span>
       </button>
       <button class="tool" id="erase" type="button">
-        <span class="tool-icon" data-icon="backspace"></span><span class="tool-label">지우기</span>
+        <span class="tool-icon" data-icon="backspace"></span><span class="tool-label" data-i18n="ui.erase">지우기</span>
       </button>
       <button class="tool" id="undo" type="button">
-        <span class="tool-icon" data-icon="undo"></span><span class="tool-label">되돌리기</span>
+        <span class="tool-icon" data-icon="undo"></span><span class="tool-label" data-i18n="ui.undo">되돌리기</span>
       </button>
       <button class="tool" id="hint" type="button">
-        <span class="tool-icon" data-icon="hint"></span><span class="tool-label">힌트</span>
+        <span class="tool-icon" data-icon="hint"></span><span class="tool-label" data-i18n="ui.hint">힌트</span>
       </button>
       <button class="tool" id="new-game" type="button">
-        <span class="tool-icon" data-icon="plus"></span><span class="tool-label">새 판</span>
+        <span class="tool-icon" data-icon="plus"></span><span class="tool-label" data-i18n="ui.newBoard">새 판</span>
       </button>
     </div>
   </div>
 
 
   <div class="sheet" id="help" hidden>
-    <p class="sheet-title">규칙</p>
+    <p class="sheet-title" data-i18n="ui.rules">규칙</p>
     <ul class="help-list">
-      <li>모든 <b>가로줄과 세로줄에 검은 칸이 정확히 두 개</b>씩 들어갑니다.</li>
-      <li>나머지 칸에는 <b id="help-range">1~4</b>를 줄마다 한 번씩 채웁니다.</li>
-      <li>줄 끝의 숫자는 <b>검은 칸 두 개 사이에 있는 숫자들의 합</b>입니다.
+      <li data-i18n-html="doppel.rule1">모든 <b>가로줄과 세로줄에 검은 칸이 정확히 두 개</b>씩 들어갑니다.</li>
+      <li data-i18n-html="doppel.rule2">나머지 칸에는 <b id="help-range">1~4</b>를 줄마다 한 번씩 채웁니다.</li>
+      <li data-i18n-html="doppel.rule3">줄 끝의 숫자는 <b>검은 칸 두 개 사이에 있는 숫자들의 합</b>입니다.
         바깥쪽 숫자는 세지 않습니다.</li>
-      <li>합이 <b>0</b>이면 두 검은 칸이 붙어 있다는 뜻이고, 합이 최대값이면
+      <li data-i18n-html="doppel.rule4">합이 <b>0</b>이면 두 검은 칸이 붙어 있다는 뜻이고, 합이 최대값이면
         검은 칸이 양 끝에 있다는 뜻입니다.</li>
-      <li><b>이 게임의 모든 판은 주어진 단서만으로 풀립니다.</b> 찍어야만 넘어가는
+      <li data-i18n-html="doppel.rule5"><b>이 게임의 모든 판은 주어진 단서만으로 풀립니다.</b> 찍어야만 넘어가는
         판은 나오지 않습니다.</li>
-      <li><b>난이도는 판의 크기가 아니라 필요한 논리로 정합니다.</b> 쉬움은
+      <li data-i18n-html="doppel.rule6"><b>난이도는 판의 크기가 아니라 필요한 논리로 정합니다.</b> 쉬움은
         한 줄만 봐도 풀리고, 보통은 한 줄의 가능한 배치를 모두 따져야 하며,
         어려움은 가로줄과 세로줄을 맞물려 봐야 풀립니다. <b>판 크기는 난이도에
         맞는 것 중에서 매번 무작위로 고릅니다.</b> 다만 <b>8×8은 필요한 논리가
         보통과 같은데도 어려움에 넣었습니다</b> — 64칸에 줄마다 숫자가 여섯
         개라, 따질 것의 양 자체가 벽이기 때문입니다.</li>
-      <li>칸을 고르면 그 줄의 합을 만들 수 있는 <b>숫자 조합</b>이 아래에 표시됩니다.</li>
-      <li><b>연필 표시에는 검은 칸(■)도 넣을 수 있습니다.</b> 아직 숫자인지 검은
+      <li data-i18n-html="doppel.rule7">칸을 고르면 그 줄의 합을 만들 수 있는 <b>숫자 조합</b>이 아래에 표시됩니다.</li>
+      <li data-i18n-html="doppel.rule8"><b>연필 표시에는 검은 칸(■)도 넣을 수 있습니다.</b> 아직 숫자인지 검은
         칸인지 모르는 자리를 그대로 적어 둘 수 있습니다.</li>
-      <li><b>칸을 두 번 톡톡 두드리면</b> 가로·세로에 아직 안 쓰인 숫자가 연필로
+      <li data-i18n-html="doppel.rule9"><b>칸을 두 번 톡톡 두드리면</b> 가로·세로에 아직 안 쓰인 숫자가 연필로
         적히고, 한 번 더 하면 검은 칸, 한 번 더 하면 빈 칸으로 돌아옵니다. 적을
         숫자가 없으면 바로 검은 칸이 됩니다. 숫자를 확정한 칸은 실수로 지워지지
         않도록 순환에서 빠집니다.</li>
-      <li><b>그 줄의 검은 칸 두 개를 모두 정한 뒤 줄 끝의 단서 숫자를 누르면</b>
+      <li data-i18n-html="doppel.rule10"><b>그 줄의 검은 칸 두 개를 모두 정한 뒤 줄 끝의 단서 숫자를 누르면</b>
         아직 비어 있는 칸에 후보가 한꺼번에 적힙니다. 두 번 두드리기를 칸마다
         반복하는 것과 같고, <b>이미 연필로 적어 둔 칸은 건드리지 않습니다.</b></li>
-      <li><b>힌트</b>는 한 걸음씩만 알려 줍니다. 칸이 바로 확정되지 않는 단계에서는
+      <li data-i18n-html="doppel.rule11"><b>힌트</b>는 한 걸음씩만 알려 줍니다. 칸이 바로 확정되지 않는 단계에서는
         "이 줄의 이 단서 때문에 여기서 이 값이 빠진다"까지만 짚고 그 결과를 연필로
         적어 둡니다. 여러 번 누르면 근거가 쌓여 칸이 확정됩니다.</li>
-      <li>키보드: 방향키 이동, <b id="help-keys">1~4</b> 입력, <b>0</b> 또는 <b>B</b> 검은 칸,
+      <li data-i18n-html="doppel.rule12">키보드: 방향키 이동, <b id="help-keys">1~4</b> 입력, <b>0</b> 또는 <b>B</b> 검은 칸,
         <b>Shift+숫자</b> 연필, <b>Shift+B</b> 검은 칸 연필, <b>Backspace</b> 지우기,
         <b>스페이스</b> 연필 전환.</li>
     </ul>
     <div class="sheet-actions">
-      <button class="btn" id="help-close" type="button">닫기</button>
+      <button class="btn" id="help-close" type="button" data-i18n="ui.close">닫기</button>
     </div>
   </div>
 </main>
 
+<script>SharedI18n.apply();</script>
 <script src="../../shared/base.js"></script>
 <script src="rules.js"></script>
 <script src="solver.js"></script>
