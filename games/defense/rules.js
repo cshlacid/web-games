@@ -159,6 +159,13 @@ function canPlace(run, key, x, y) {
   if (run.map.walls[c]) return '벽';
   if (run.cells[c]) return '이미 서 있다';
   if (occupied(run, x, y)) return '적이 밟고 있다';
+  // **적이 나오는 칸에는 세울 수 없다.** 거기 선 사람은 규칙상 **절대 맞지 않는다** —
+  // 적은 제가 들어갈 다음 칸에 선 사람만 때리는데, 입구는 출구에서 가장 먼 칸이라
+  // 누구의 다음 칸도 되지 않는다. 실제로 검성을 입구에 세워 두면 체력이 한 번도
+  // 깎이지 않으면서 갓 나온 것들을 계속 벤다. 판마다 공짜로 하나씩 생기는 자리라
+  // 여기서 막는다. 출구는 반대다 — 모두의 마지막 칸이라 제일 많이 맞는 자리라
+  // 그대로 둔다.
+  if (x === run.map.entry.x && y === run.map.entry.y) return '적이 나오는 자리';
   if (D.UNITS[key].hero && run.heroUsed) return '영웅은 한 판에 한 번';
   if (standing(run, key) >= D.MOST_OF_KIND) return `${D.UNITS[key].name}는 ${D.MOST_OF_KIND}명까지`;
   if (run.gold < costOf(run, key)) return '골드가 모자라다';

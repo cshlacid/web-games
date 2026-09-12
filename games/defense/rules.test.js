@@ -36,7 +36,9 @@ function mapOf(rows) {
 // 바로 보인다.
 const hall = mapOf(['#I#', '#.#', '#.#', '#.#', '#.#', '#O#']);
 // 넓은 판. 돌아갈 자리가 있어 배치와 사거리를 본다.
-const field = mapOf(['..I..', '.....', '.....', '.....', '..O..']);
+// **입구를 오른쪽 끝에 둔 것은 (2,0)과 (0,0)을 비워 두기 위해서다** — 적이 나오는
+// 칸에는 세울 수 없으므로, 사거리와 스킬을 재는 자리가 입구와 겹치면 안 된다.
+const field = mapOf(['....I', '.....', '.....', '.....', '..O..']);
 
 const quiet = [{ index: 1, hp: 100, groups: [], boss: false, reward: 0 }];
 const make = (map, extra) => R.createRun(1, Object.assign({ map, waves: quiet, mods: {} }, extra || {}));
@@ -60,6 +62,11 @@ check('같은 칸에는 둘을 못 세운다', R.canPlace(placing, 'archer', 1, 
 check('통계에 남는다', [placing.stats.placed, placing.stats.kinds.archer], [1, 1]);
 
 R.spawn(placing, 'grunt', 100);
+// 입구는 누구의 다음 칸도 되지 않아, 거기 선 사람은 절대 맞지 않는다.
+check('적이 나오는 자리에는 못 세운다',
+  R.canPlace(make(field), 'archer', field.entry.x, field.entry.y), '적이 나오는 자리');
+check('출구에는 세울 수 있다', R.canPlace(make(field), 'archer', field.exit.x, field.exit.y), null);
+
 check('적이 밟고 있는 칸에는 못 세운다',
   R.canPlace(placing, 'archer', placing.map.entry.x, placing.map.entry.y), '적이 밟고 있다');
 
@@ -604,6 +611,25 @@ R.place(quietBurn, 'saint', 2, 0);
 stand(quietBurn, 'grunt', 9000000, 2, 2);
 R.step(quietBurn, R.TICK);
 check('산 것만 있으면 빛을 아낀다', R.tally(quietBurn, 'saint').skills, 0);
+
+// --- 입구를 둘러싸 막는 손 ---
+// **막는 것은 허용하되 몰아서 막는 것은 스스로 무너진다.** 한 칸에 겹쳐 선 적이
+// 전부 같은 사람을 때리므로 받는 피해가 마릿수만큼 곱해진다 — 입구 이웃이 한
+// 칸뿐인 판에서 실제로 열 마리가 방패병 하나를 초당 120으로 갈아 25초에 무너뜨렸다.
+function gnaw(many) {
+  const box = mapOf(['#I#', '#.#', '#.#', '#O#']);
+  const run = R.createRun(1, { map: box, waves: quiet, mods: { startGold: 10 } });
+  run.timer = 9999;
+  const wall = R.place(run, 'shield', 1, 1);
+  for (let i = 0; i < many; i++) R.spawn(run, 'grunt', 900000);
+  R.run(run, 2);
+  return wall.max - wall.hp;
+}
+const oneBite = gnaw(1);
+const manyBites = gnaw(5);
+check('여럿이 몰리면 한 사람이 받는 피해가 곱해진다', manyBites > oneBite * 4, true);
+check('그래서 한 칸을 막는 것으로는 오래 못 버틴다',
+  manyBites > R.statOf('shield', 1, {}).hp * 0.3, true);
 
 console.log(`${passed}개 통과, ${failed}개 실패`);
 if (failed) process.exit(1);
