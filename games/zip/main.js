@@ -5,6 +5,7 @@
 const R = window.ZipRules;
 const G = window.ZipGenerator;
 const Sound = window.ZipSound;
+const t = SharedI18n.t;
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
 const SIZE_KEY = 'web-games.zip.size';
@@ -71,7 +72,7 @@ function formatTime(seconds) {
 
 function showBest() {
   const best = loadBest()[game.size];
-  el.best.textContent = best ? `최고 ${formatTime(best)}` : '';
+  el.best.textContent = best ? t('zip.best', { time: formatTime(best) }) : '';
 }
 
 // --- 판 그리기 ---
@@ -281,20 +282,22 @@ function finishIfDone() {
 
   const best = loadBest();
   const previous = best[game.size];
-  let note = `${game.size}×${game.size}, ${game.puzzle.hints.length}개의 숫자.`;
+  // 앞뒤 문장을 이어 붙일 때 사이 공백을 문장 쪽에 넣어 두면 언어마다 빈칸 규칙이
+  // 달라 어긋난다 — 조각을 모아 join으로 붙인다.
+  const note = [t('zip.note', { size: game.size, count: game.puzzle.hints.length })];
   if (game.hinted) {
-    note += ` 힌트를 ${game.hinted}번 썼으니 기록은 남기지 않습니다.`;
+    note.push(t('zip.noteHinted', { count: game.hinted }));
   } else if (!previous || game.elapsed < previous) {
     best[game.size] = game.elapsed;
     saveBest(best);
-    note += previous ? ` 최고 기록을 ${formatTime(previous)}에서 줄였습니다.` : ' 첫 기록입니다.';
+    note.push(previous ? t('zip.noteImproved', { time: formatTime(previous) }) : t('zip.noteFirst'));
     showBest();
   } else {
-    note += ` 최고 기록은 ${formatTime(previous)}입니다.`;
+    note.push(t('zip.noteBest', { time: formatTime(previous) }));
   }
 
-  el.resultTitle.textContent = `완성! ${formatTime(game.elapsed)}`;
-  el.resultNote.textContent = note;
+  el.resultTitle.textContent = t('zip.done', { time: formatTime(game.elapsed) });
+  el.resultNote.textContent = note.join(' ');
   el.result.hidden = false;
 }
 
@@ -327,7 +330,7 @@ function hint() {
   startClock();
   Sound.play('hint');
   paint();
-  toast(trimmed ? `어긋난 ${trimmed}칸을 지우고 다음 칸을 놓았습니다.` : '다음 칸을 놓았습니다.');
+  toast(trimmed ? t('zip.hintTrim', { count: trimmed }) : t('zip.hintPlaced'));
   finishIfDone();
 }
 
@@ -347,7 +350,7 @@ function newGame() {
     const puzzle = G.generate(game.size) || G.generate(game.size);
     if (!puzzle) {
       el.veil.hidden = true;
-      toast('판을 만들지 못했습니다. 새 판을 눌러 다시 시도해 주세요.');
+      toast(t('zip.genFail'));
       return;
     }
     game.puzzle = puzzle;
