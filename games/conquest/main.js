@@ -12,11 +12,12 @@ const L = window.ConquestLogic;
 const G = window.ConquestMap;
 const AI = window.ConquestAI;
 const Sound = window.ConquestSound;
+const t = SharedI18n.t;
 const NS = 'http://www.w3.org/2000/svg';
 
-const SIZES = [{ label: '작게', n: 9 }, { label: '보통', n: 12 }, { label: '크게', n: 15 }];
-const RATIOS = [{ label: '절반', v: 0.5 }, { label: '전부', v: 1 }];
-const LEVELS = [{ label: '쉬움', key: 'easy' }, { label: '보통', key: 'normal' }, { label: '어려움', key: 'hard' }];
+const SIZES = [{ labelKey: 'ui.small', n: 9 }, { labelKey: 'ui.medium', n: 12 }, { labelKey: 'ui.large', n: 15 }];
+const RATIOS = [{ labelKey: 'conquest.half', v: 0.5 }, { labelKey: 'conquest.all', v: 1 }];
+const LEVELS = [{ labelKey: 'ui.easy', key: 'easy' }, { labelKey: 'ui.medium', key: 'normal' }, { labelKey: 'ui.hard', key: 'hard' }];
 const SIZE_KEY = 'web-games.conquest.size';
 const LEVEL_KEY = 'web-games.conquest.level';
 // 탭을 옮겼다 돌아오면 프레임 간격이 몇 초씩 튄다. 그대로 밀면 그 사이의 전투가
@@ -251,7 +252,11 @@ function paintPanel() {
   el.panelBody.hidden = !a;
   if (!a) return;
 
-  const stats = [['점령력', a.stats.energy], ['공격력', a.stats.strength], ['이동속도', a.stats.speed]];
+  const stats = [
+    [t('conquest.energy'), a.stats.energy],
+    [t('conquest.strength'), a.stats.strength],
+    [t('conquest.speed'), a.stats.speed],
+  ];
   if (el.stats.dataset.id !== String(a.id)) {
     el.stats.dataset.id = String(a.id);
     el.stats.textContent = '';
@@ -275,17 +280,18 @@ function paintPanel() {
   el.factory.disabled = !!world.over || !L.canBuild(world, a.id, 1, 'factory');
   el.turret.disabled = !!world.over || !L.canBuild(world, a.id, 1, 'turret');
   el.rally.disabled = !!world.over;
-  el.rally.textContent = a.rally === null ? '집결지' : '집결 해제';
+  el.rally.textContent = a.rally === null ? t('conquest.rally') : t('conquest.rallyOff');
   el.rally.setAttribute('aria-pressed', String(rallyMode));
-  el.hint.textContent = rallyMode ? '이어 둘 거점을 누르세요'
-    : a.rally === null ? '' : `병력이 ${L.RALLY_KEEP}만 남기고 흘러갑니다`;
+  el.hint.textContent = rallyMode ? t('conquest.rallyPick')
+    : a.rally === null ? '' : t('conquest.rallyOn', { keep: L.RALLY_KEEP });
 }
 
 function paintTally() {
   const stars = [L.holdings(world, 1), L.holdings(world, 2)];
   const units = [Math.floor(L.power(world, 1)), Math.floor(L.power(world, 2))];
-  el.tally.innerHTML =
-    `거점 <b>${stars[0]}</b>:<i>${stars[1]}</i> · 병력 <b>${units[0]}</b>:<i>${units[1]}</i>`;
+  el.tally.innerHTML = t('conquest.tally', {
+    mine: stars[0], theirs: stars[1], myUnits: units[0], theirUnits: units[1],
+  });
 }
 
 function paint() {
@@ -307,10 +313,10 @@ function handle(events) {
 }
 
 function finish(winner) {
-  el.resultTitle.textContent = winner === 1 ? '모두 점령했습니다' : '모두 빼앗겼습니다';
+  el.resultTitle.textContent = winner === 1 ? t('conquest.won') : t('conquest.lost');
   el.resultNote.textContent = winner === 1
-    ? `${Math.round(world.t)}초 만에 상대를 몰아냈습니다.`
-    : '상대가 먼저 모든 거점을 차지했습니다.';
+    ? t('conquest.wonNote', { seconds: Math.round(world.t) })
+    : t('conquest.lostNote');
   el.result.hidden = false;
   Sound.play(winner === 1 ? 'win' : 'lose');
 }
@@ -391,11 +397,15 @@ el.rally.addEventListener('click', () => {
   rallyMode = !rallyMode;
 });
 
+// 건설 값은 로직이 정한다 — 도움말과 단추에 숫자를 따로 적어 두면 한쪽만 어긋난다.
+el.factory.textContent = t('conquest.factory', { cost: L.UNITS_PER_BUILD });
+el.turret.textContent = t('conquest.turret', { cost: L.UNITS_PER_BUILD });
+
 for (const item of SIZES) {
   const button = document.createElement('button');
   button.className = 'pick';
   button.type = 'button';
-  button.textContent = item.label;
+  button.textContent = t(item.labelKey);
   button.setAttribute('aria-pressed', String(item.n === size));
   button.addEventListener('click', () => {
     size = item.n;
@@ -413,7 +423,7 @@ for (const item of LEVELS) {
   const button = document.createElement('button');
   button.className = 'pick';
   button.type = 'button';
-  button.textContent = item.label;
+  button.textContent = t(item.labelKey);
   button.setAttribute('aria-pressed', String(item.key === level));
   // 난이도는 판을 다시 만들지 않고 그 자리에서 바뀐다. 밀린다 싶을 때 물러설 길을
   // 열어 두는 것이 이 손잡이의 목적이다. 생산 배수도 그 자리에서 갈아 끼운다.
@@ -433,7 +443,7 @@ for (const item of RATIOS) {
   const button = document.createElement('button');
   button.className = 'pick';
   button.type = 'button';
-  button.textContent = item.label;
+  button.textContent = t(item.labelKey);
   button.setAttribute('aria-pressed', String(item.v === ratio));
   button.addEventListener('click', () => {
     ratio = item.v;
