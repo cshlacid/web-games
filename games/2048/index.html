@@ -3,45 +3,48 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>2048</title>
-<meta name="description" content="브라우저에서 바로 하는 2048">
+<title data-i18n="game.2048">2048</title>
+<meta name="description" content="브라우저에서 바로 하는 2048" data-i18n-attr="content=meta.desc">
 <meta name="color-scheme" content="light dark">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23edc22e'><rect x='2' y='2.5' width='8.5' height='8.5' rx='2'/><rect x='2' y='13' width='8.5' height='8.5' rx='2'/><rect x='13' y='2.5' width='9' height='19' rx='2'/></svg>">
 <link rel="manifest" href="../../manifest.json">
 <link rel="apple-touch-icon" href="../../icons/icon-180.png">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="2048">
+<meta name="apple-mobile-web-app-title" content="2048" data-i18n-attr="content=game.2048">
 <meta name="theme-color" content="#faf8ef" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#1a1714" media="(prefers-color-scheme: dark)">
 <link rel="stylesheet" href="../../shared/base.css">
 <link rel="stylesheet" href="style.css">
 <script src="../../shared/analytics.js"></script>
+<script src="../../shared/i18n.js"></script>
+<script src="../../shared/strings.js"></script>
+<script src="strings.js"></script>
 </head>
 <body>
 <main class="app">
   <header class="head">
     <div class="title-row">
       <div class="head-nav">
-        <a class="back" href="../../">← 목록</a>
+        <a class="back" href="../../" data-i18n="ui.back">← 목록</a>
       </div>
-      <h1>2048</h1>
+      <h1 data-i18n="game.2048">2048</h1>
       <div class="head-actions">
-        <button class="toggle sound" id="toggle-bgm" type="button" aria-pressed="true">BGM</button>
-        <button class="toggle sound" id="toggle-sfx" type="button" aria-pressed="true">효과음</button>
+        <button class="toggle sound" id="toggle-bgm" type="button" aria-pressed="true" data-i18n="ui.bgm">BGM</button>
+        <button class="toggle sound" id="toggle-sfx" type="button" aria-pressed="true" data-i18n="ui.sfx">효과음</button>
       </div>
     </div>
     <div class="score-row">
       <div class="score-box">
-        <span class="score-label">점수</span>
+        <span class="score-label" data-i18n="ui.score">점수</span>
         <span class="score-value" id="score">0</span>
         <span class="score-gain" id="gain" aria-hidden="true"></span>
       </div>
       <div class="score-box">
-        <span class="score-label">최고</span>
+        <span class="score-label" data-i18n="ui.best">최고</span>
         <span class="score-value" id="best">0</span>
       </div>
-      <button class="btn" id="new-game" type="button">새 게임</button>
+      <button class="btn" id="new-game" type="button" data-i18n="ui.newGame">새 게임</button>
     </div>
   </header>
 
@@ -54,7 +57,7 @@
     </div>
   </div>
 
-  <p class="hint">방향키 · WASD · 스와이프로 조작</p>
+  <p class="hint" data-i18n="g2048.controls">방향키 · WASD · 스와이프로 조작</p>
 </main>
 
 <script src="../../shared/base.js"></script>
@@ -62,5 +65,6 @@
 <script src="../../shared/audio.js"></script>
 <script src="audio.js"></script>
 <script src="main.js"></script>
+<script>SharedI18n.apply();</script>
 </body>
 </html>
