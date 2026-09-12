@@ -3,8 +3,6 @@
   SharedI18n.add({
     ko: {
       'meta.desc': '주사위 다섯 개를 세 번 굴려 열두 칸을 채우는 점수 놀이',
-      'yacht.players': '인원',
-      'yacht.playerCount': '{n}인',
       'yacht.me': '나',
       'yacht.other': '{n}번',
       'yacht.face': '{face}의 눈',
@@ -49,8 +47,6 @@
     },
     en: {
       'meta.desc': 'Roll five dice up to three times and fill twelve scoring boxes',
-      'yacht.players': 'Players',
-      'yacht.playerCount': '{n} players',
       'yacht.me': 'You',
       'yacht.other': 'P{n}',
       'yacht.face': '{face}s',
@@ -95,8 +91,6 @@
     },
     ja: {
       'meta.desc': 'サイコロ五つを三回まで振って十二のマスを埋める得点遊び',
-      'yacht.players': '人数',
-      'yacht.playerCount': '{n}人',
       'yacht.me': '自分',
       'yacht.other': '{n}番',
       'yacht.face': '{face}の目',
@@ -141,8 +135,6 @@
     },
     'zh-CN': {
       'meta.desc': '五颗骰子最多掷三次，填满十二个计分格的点数游戏',
-      'yacht.players': '人数',
-      'yacht.playerCount': '{n} 人',
       'yacht.me': '我',
       'yacht.other': '{n} 号',
       'yacht.face': '{face} 点',
@@ -187,8 +179,6 @@
     },
     'zh-TW': {
       'meta.desc': '五顆骰子最多擲三次，填滿十二個計分格的點數遊戲',
-      'yacht.players': '人數',
-      'yacht.playerCount': '{n} 人',
       'yacht.me': '我',
       'yacht.other': '{n} 號',
       'yacht.face': '{face} 點',
@@ -233,8 +223,6 @@
     },
     es: {
       'meta.desc': 'Tira cinco dados hasta tres veces y rellena doce casillas de puntuación',
-      'yacht.players': 'Jugadores',
-      'yacht.playerCount': '{n} jugadores',
       'yacht.me': 'Yo',
       'yacht.other': 'J{n}',
       'yacht.face': 'Cara {face}',

@@ -57,7 +57,9 @@
       'record.hintedShort': '힌트를 써서 기록에는 넣지 않습니다',
       'record.bestMark': '최고 기록',
       'ui.toStart': '처음으로',
-      'ui.nextBoard': '다음 판'
+      'ui.nextBoard': '다음 판',
+      'ui.players': '인원',
+      'ui.playerCount': '{n}인'
     },
     en: {
       'game.2048': '2048',
@@ -113,7 +115,9 @@
       'record.hintedShort': 'hints used, so this one is not recorded',
       'record.bestMark': 'best time',
       'ui.toStart': 'Restart',
-      'ui.nextBoard': 'Next board'
+      'ui.nextBoard': 'Next board',
+      'ui.players': 'Players',
+      'ui.playerCount': '{n} players'
     },
     ja: {
       'game.2048': '2048',
@@ -169,7 +173,9 @@
       'record.hintedShort': 'ヒントを使ったので記録には残しません',
       'record.bestMark': 'ベスト記録',
       'ui.toStart': '最初から',
-      'ui.nextBoard': '次の盤'
+      'ui.nextBoard': '次の盤',
+      'ui.players': '人数',
+      'ui.playerCount': '{n}人'
     },
     'zh-CN': {
       'game.2048': '2048',
@@ -225,7 +231,9 @@
       'record.hintedShort': '用了提示，不计入记录',
       'record.bestMark': '最好成绩',
       'ui.toStart': '从头开始',
-      'ui.nextBoard': '下一局'
+      'ui.nextBoard': '下一局',
+      'ui.players': '人数',
+      'ui.playerCount': '{n} 人'
     },
     'zh-TW': {
       'game.2048': '2048',
@@ -281,7 +289,9 @@
       'record.hintedShort': '用了提示，不計入紀錄',
       'record.bestMark': '最佳成績',
       'ui.toStart': '從頭開始',
-      'ui.nextBoard': '下一局'
+      'ui.nextBoard': '下一局',
+      'ui.players': '人數',
+      'ui.playerCount': '{n} 人'
     },
     es: {
       'game.2048': '2048',
@@ -337,7 +347,9 @@
       'record.hintedShort': 'con pistas, no cuenta para el récord',
       'record.bestMark': 'mejor marca',
       'ui.toStart': 'Desde el principio',
-      'ui.nextBoard': 'Siguiente tablero'
+      'ui.nextBoard': 'Siguiente tablero',
+      'ui.players': 'Jugadores',
+      'ui.playerCount': '{n} jugadores'
     }
   });
 })();
