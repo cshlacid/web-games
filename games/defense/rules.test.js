@@ -1,0 +1,703 @@
+'use strict';
+
+// 실행: node games/defense/rules.test.js
+const D = require('./data.js');
+const P = require('./paths.js');
+const R = require('./rules.js');
+
+let passed = 0;
+let failed = 0;
+
+function check(name, actual, expected) {
+  const a = JSON.stringify(actual);
+  const e = JSON.stringify(expected);
+  if (a === e) passed++;
+  else { failed++; console.log(`실패: ${name}\n  결과 ${a}\n  기대 ${e}`); }
+}
+
+function mapOf(rows) {
+  const h = rows.length;
+  const w = rows[0].length;
+  const walls = [];
+  let entry = null;
+  let exit = null;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const c = rows[y][x];
+      walls.push(c === '#' ? 1 : 0);
+      if (c === 'I') entry = { x, y };
+      if (c === 'O') exit = { x, y };
+    }
+  }
+  return { w, h, walls, entry, exit };
+}
+
+// 폭이 한 칸인 복도. 여기서는 사람을 세우는 것이 곧 완전 봉쇄라 "뚫고 온다"가
+// 바로 보인다.
+const hall = mapOf(['#I#', '#.#', '#.#', '#.#', '#.#', '#O#']);
+// 넓은 판. 돌아갈 자리가 있어 배치와 사거리를 본다.
+// **입구를 오른쪽 끝에 둔 것은 (2,0)과 (0,0)을 비워 두기 위해서다** — 적이 나오는
+// 칸에는 세울 수 없으므로, 사거리와 스킬을 재는 자리가 입구와 겹치면 안 된다.
+const field = mapOf(['....I', '.....', '.....', '.....', '..O..']);
+
+// 빈 웨이브 열 개. 하나만 두면 웨이브 번호를 손으로 밀 때 판이 끝나 버린다.
+const quiet = [...Array(D.RUN.waves)].map((_, i) => ({ index: i + 1, hp: 100, groups: [], boss: false, reward: 0 }));
+// **영웅은 웨이브가 지나야 부를 수 있다**(`HERO_CALL`). 실험대에서는 그 시계를
+// 지나 보낸 것으로 두고 배치와 전투만 본다 — 부를 수 있는 때는 따로 검사한다.
+const make = (map, extra) => {
+  const run = R.createRun(1, Object.assign({ map, waves: quiet, mods: {} }, extra || {}));
+  run.wave = 8;
+  return run;
+};
+
+const base = make(field);
+check('시작 골드와 목숨', [base.gold, base.lives], [D.RUN.gold, D.RUN.lives]);
+check('한 판은 열 웨이브', R.createRun(1, {}).waves.length, D.RUN.waves);
+
+// --- 배치 ---
+check('벽에는 못 세운다', R.canPlace(make(hall), 'archer', 0, 1), '벽');
+check('판 밖에는 못 세운다', R.canPlace(base, 'archer', -1, 0), '판 밖');
+check('편성에 없으면 못 세운다',
+  R.canPlace(make(field, { roster: ['archer'] }), 'cannon', 1, 1), '편성에 없다');
+check('골드가 모자라면 못 세운다', R.canPlace(make(field, { mods: { startGold: 0 } }), 'archer', 1, 1),
+  '골드가 모자라다');
+
+const placing = make(field);
+R.place(placing, 'archer', 1, 1);
+check('세우면 골드가 준다', placing.gold, D.RUN.gold - D.UNITS.archer.cost);
+check('같은 칸에는 둘을 못 세운다', R.canPlace(placing, 'archer', 1, 1), '이미 서 있다');
+check('통계에 남는다', [placing.stats.placed, placing.stats.kinds.archer], [1, 1]);
+
+R.spawn(placing, 'grunt', 100);
+// 입구는 누구의 다음 칸도 되지 않아, 거기 선 사람은 절대 맞지 않는다.
+check('적이 나오는 자리에는 못 세운다',
+  R.canPlace(make(field), 'archer', field.entry.x, field.entry.y), '적이 나오는 자리');
+check('출구에는 세울 수 있다', R.canPlace(make(field), 'archer', field.exit.x, field.exit.y), null);
+
+check('적이 밟고 있는 칸에는 못 세운다',
+  R.canPlace(placing, 'archer', placing.map.entry.x, placing.map.entry.y), '적이 밟고 있다');
+
+const selling = make(field);
+const sold = R.place(selling, 'archer', 1, 1);
+R.sell(selling, sold.id);
+check('해고하면 일부를 돌려받는다', selling.gold,
+  D.RUN.gold - D.UNITS.archer.cost + Math.round(D.UNITS.archer.cost * D.RUN.refund));
+check('해고하면 칸이 빈다', selling.cells[1 * selling.map.w + 1], null);
+
+// --- 단계 ---
+const up = make(field);
+const one = R.place(up, 'archer', 1, 1);
+const before = up.gold;
+R.upgrade(up, one.id);
+check('올리면 값을 치른다', before - up.gold, R.upCost('archer', 1));
+check('올리면 단계가 오른다', one.tier, 2);
+check('올리면 체력도 오른다', one.max > D.UNITS.archer.hp, true);
+check('피해는 단계마다 곱해진다',
+  +(R.statOf('archer', 2, {}).damage / R.statOf('archer', 1, {}).damage).toFixed(3),
+  +D.UP.damage.toFixed(3));
+check('mods는 규칙 바깥에서 들어온다',
+  R.statOf('archer', 1, { damage: 2, unit: { archer: { damage: 1.5 } } }).damage,
+  D.UNITS.archer.damage * 3);
+
+// --- 누수와 목숨 ---
+const leak = make(hall);
+R.spawn(leak, 'grunt', 10);
+R.run(leak, 30);
+check('끝까지 가면 목숨이 준다', leak.stats.livesLost >= 1, true);
+
+const bossLeak = make(hall);
+R.spawn(bossLeak, 'boss', 1);
+R.run(bossLeak, 60);
+check('우두머리가 새면 셋이 준다', bossLeak.stats.livesLost, 3);
+
+// --- 막아 세우기 ---
+const block = make(hall);
+const wall = R.place(block, 'shield', 1, 3);
+R.spawn(block, 'grunt', 50);
+// 방패병이 스킬로 붙들어 두므로 예전보다 오래 걸린다 — 기절이 풀린 사이에
+// 조금씩 부순다.
+for (let i = 0; i < 300; i++) R.step(block, R.TICK);
+check('막아 세우면 부수기 시작한다', wall.hp < wall.max, true);
+check('부수는 동안은 지나가지 못한다', block.stats.livesLost, 0);
+
+const broken = make(hall);
+const frail = R.place(broken, 'archer', 1, 3);
+R.spawn(broken, 'breaker', 200);
+R.run(broken, 60);
+check('다 부수면 그 사람은 사라진다', broken.units.includes(frail), false);
+check('부수고 나면 지나간다', broken.stats.livesLost, 1);
+
+// --- 사거리 ---
+// 적을 원하는 칸에 세워 놓고 본다. 한 틱만 밀면 그 자리에서 무슨 일이 나는지
+// 그대로 드러난다.
+// `hold`를 주면 그 자리에 붙들어 둔다. 걷게 두면 몇 초 만에 사거리를 벗어나
+// 무엇을 재고 있었는지 알 수 없게 된다.
+function stand(run, key, hp, x, y, hold = true) {
+  R.spawn(run, key, hp);
+  const e = run.foes[run.foes.length - 1];
+  e.from = { x, y };
+  e.to = null;
+  e.p = 0;
+  if (hold) e.stunT = 9999;
+  return e;
+}
+
+const reach = make(field, { mods: { startGold: 10 } });
+reach.timer = 9999;
+const gunner = R.place(reach, 'cannon', 2, 2);
+const hugging = stand(reach, 'grunt', 400, 2, 3);   // 바로 옆
+R.run(reach, 4);
+check('포수는 코앞의 적을 못 친다', hugging.hp, hugging.max);
+
+const afar = make(field, { mods: { startGold: 10 } });
+afar.timer = 9999;
+R.place(afar, 'cannon', 2, 0);
+const away = stand(afar, 'grunt', 400, 2, 3);
+R.run(afar, 4);
+check('포수는 떨어진 적을 친다', away.hp < away.max, true);
+check('안쪽 한계는 자료에서 나온다', R.statOf('cannon', 1, {}).near, D.UNITS.cannon.range.min - 0.5);
+check('붙어 있으면 사거리 밖', R.inRange(R.statOf('cannon', 1, {}), 1), false);
+check('두 칸부터 사거리 안', R.inRange(R.statOf('cannon', 1, {}), 2), true);
+check('궁수는 네 칸까지', R.inRange(R.statOf('archer', 1, {}), 4), true);
+check('대각선 이웃도 한 칸으로 친다', R.inRange(R.statOf('shield', 1, {}), Math.SQRT2), true);
+check('다섯 칸은 못 친다', R.inRange(R.statOf('archer', 1, {}), 5), false);
+check('단계를 올려도 안쪽 한계는 그대로', R.statOf('cannon', 3, {}).near, R.statOf('cannon', 1, {}).near);
+check('단계를 올리면 바깥은 늘어난다', R.statOf('cannon', 3, {}).far > R.statOf('cannon', 1, {}).far, true);
+
+// --- 기본 공격과 스킬 ---
+// 스킬은 제 쿨타임이 돌아올 때만 나가고, 그 사이에는 기본 공격이 대신한다.
+const aim = make(field, { mods: { startGold: 10 } });
+aim.timer = 9999;
+R.place(aim, 'archer', 2, 0);
+const mark = stand(aim, 'grunt', 9000, 2, 1);
+R.step(aim, R.TICK);
+check('첫 발은 스킬이라 배수가 붙는다',
+  Math.abs((mark.max - mark.hp) - D.UNITS.archer.damage * D.UNITS.archer.skill.mul) < 0.01, true);
+mark.hp = mark.max;
+R.run(aim, 1.2);
+check('쿨타임 중에는 기본 피해가 들어간다',
+  Math.abs((mark.max - mark.hp) - D.UNITS.archer.damage) < 0.01, true);
+check('쿨타임 중에도 쉬지 않는다', mark.hp < mark.max, true);
+
+const lineHit = make(field, { mods: { startGold: 10 } });
+lineHit.timer = 9999;
+R.place(lineHit, 'spear', 2, 0);
+// 겨누는 것은 출구에 가장 가까운 놈이다. 여기서는 (2,2)가 그쪽이고 (2,1)은
+// 창이 지나는 줄 위에 있어 덤으로 맞는다.
+const aimed = stand(lineHit, 'grunt', 9000, 2, 2);
+const onWay = stand(lineHit, 'grunt', 9000, 2, 1);
+const aside = stand(lineHit, 'grunt', 9000, 0, 2);
+R.step(lineHit, R.TICK);
+check('창의 스킬은 한 줄을 꿰뚫는다', [aimed.hp < aimed.max, onWay.hp < onWay.max], [true, true]);
+check('줄 밖은 맞지 않는다', aside.hp, aside.max);
+check('꿰뚫린 적에게는 출혈이 남는다', !!onWay.bleed, true);
+
+aimed.hp = aimed.max; onWay.hp = onWay.max;
+aimed.bleed = null; onWay.bleed = null;
+R.run(lineHit, 2.5);
+check('쿨타임 중에는 한 놈만 맞는다', onWay.hp, onWay.max);
+check('그동안에도 겨눈 하나는 맞는다', aimed.hp < aimed.max, true);
+
+const bash = make(hall, { mods: { startGold: 10 } });
+bash.timer = 9999;
+R.place(bash, 'shield', 1, 2);
+const bashed = stand(bash, 'grunt', 9000, 1, 1, false);
+R.step(bash, R.TICK);
+check('방패병의 스킬은 기절시킨다', bashed.stunT > 0, true);
+
+// --- 출혈 ---
+const bleeding = make(field, { mods: { startGold: 10 } });
+bleeding.timer = 9999;
+R.place(bleeding, 'spear', 2, 0);
+const cut = stand(bleeding, 'armored', 9000, 2, 1);
+R.step(bleeding, R.TICK);
+check('맞은 적에게 출혈이 붙는다', !!cut.bleed, true);
+const beforeBleed = cut.hp;
+cut.bleed = { dps: D.UNITS.spear.skill.bleedDps, t: 1 };
+R.run(bleeding, bleeding.time + 1.05);
+check('출혈은 시간이 지나며 깎는다', cut.hp < beforeBleed, true);
+
+// 중장병의 방어는 6이다. 지속 피해가 방어를 탄다면 초당 7은 1 남짓만 들어간다.
+const armorTest = make(field);
+const tough = stand(armorTest, 'armored', 9000, 1, 1);
+const toughWas = tough.hp;
+tough.bleed = { dps: 6, t: 9 };
+R.run(armorTest, 1.05);
+check('지속 피해는 방어를 무시한다', Math.abs((toughWas - tough.hp) - 6) < 1, true);
+
+// **지속 피해에는 최소 1이 붙지 않는다.** 틱마다 1이 들어가면 초당 서른이 된다.
+const drip = make(field);
+const slowly = stand(drip, 'grunt', 9000, 1, 1);
+const was = slowly.hp;
+for (let i = 0; i < 30; i++) {
+  slowly.bleed = { dps: 3, t: 9 };
+  R.step(drip, R.TICK);
+}
+check('한 틱에 들어가는 지속 피해는 값 그대로', was - slowly.hp < 6, true);
+
+// --- 바닥 얼음 ---
+// 영웅은 더 길어도 된다 — 한 판에 한 번뿐이라 다른 자에 선다.
+check('일반 캐릭터 중에서는 빙결술사가 가장 길다',
+  Object.keys(D.UNITS).filter((k) => !D.UNITS[k].hero)
+    .every((k) => D.UNITS[k].skill.cd <= D.UNITS.frost.skill.cd), true);
+
+const icy = make(field, { mods: { startGold: 10 } });
+icy.timer = 9999;
+R.place(icy, 'frost', 2, 0);
+const chilled = stand(icy, 'grunt', 9000, 2, 2);
+R.run(icy, 3);
+check('빙결술사는 바닥을 깐다', icy.zones.length > 0, true);
+check('밟은 적은 느려진다', chilled.slowT > 0, true);
+check('밟은 적은 깎인다', chilled.hp < chilled.max, true);
+check('얼음이 무한히 쌓이지는 않는다', icy.zones.length <= 12, true);
+
+// 쿨타임이 9초이므로 20초를 돌려도 몇 번뿐이다.
+const paced = make(field, { mods: { startGold: 10 } });
+paced.timer = 9999;
+R.place(paced, 'frost', 2, 0);
+stand(paced, 'grunt', 90000, 2, 2);
+R.run(paced, 20);
+check('긴 쿨타임만큼만 쓴다', paced.stats.skills <= Math.ceil(20 / D.UNITS.frost.skill.cd), true);
+check('그 사이에도 때린다', paced.foes[0].hp < paced.foes[0].max, true);
+
+const melt = make(field, { mods: { startGold: 10 } });
+melt.timer = 9999;
+R.place(melt, 'frost', 2, 0);
+stand(melt, 'grunt', 9000, 2, 2);
+R.run(melt, 2);
+melt.foes.length = 0;
+R.run(melt, 2 + D.UNITS.frost.skill.fieldFor + 1);
+check('시간이 지나면 얼음이 녹는다', melt.zones.length, 0);
+
+// --- 회복 ---
+const heal = make(field, { mods: { startGold: 3 } });
+const hurt = R.place(heal, 'shield', 2, 2);
+R.place(heal, 'healer', 2, 3);
+hurt.hp = 10;
+R.run(heal, 5);
+check('힐러는 아군을 되살린다', hurt.hp > 10, true);
+
+const tooFar = make(field, { mods: { startGold: 3 } });
+const lonely = R.place(tooFar, 'shield', 0, 0);
+R.place(tooFar, 'healer', 4, 4);
+lonely.hp = 10;
+R.run(tooFar, 5);
+check('사거리 밖은 되살리지 못한다', lonely.hp, 10);
+
+// 멀쩡한 판에서 치유가 헛돌면 힐러는 그 판 내내 아무것도 하지 않는다.
+const idle = make(field, { mods: { startGold: 10 } });
+idle.timer = 9999;
+R.place(idle, 'healer', 2, 0);
+const poked = stand(idle, 'grunt', 9000, 2, 1);
+R.run(idle, 3);
+check('되살릴 이가 없으면 힐러도 적을 친다', poked.hp < poked.max, true);
+
+// --- 막는 것은 값이 아니라 공격의 종류다 ---
+// 적마다 통하는 공격의 종류가 다르다. **한 종류가 모든 적을 풀면 안 된다** —
+// 그 종류를 가진 자만 여섯 세우는 것이 새 정답이 된다.
+check('중장병은 한 놈씩 때리는 공격에 강하다', D.FOES.armored.resist.single > 0.5, true);
+check('중장병은 범위에도 강하다', D.FOES.armored.resist.area > 0.5, true);
+check('중장병에게 남는 답은 지속 피해다', D.FOES.armored.resist.dot || 0, 0);
+check('보병에게는 그런 것이 없다', D.FOES.grunt.resist, {});
+check('무리는 한 발씩 쏘면 반이 낭비된다', D.FOES.swarm.resist.single > 0.3, true);
+check('무리에게는 범위가 답이다', D.FOES.swarm.resist.area || 0, 0);
+check('공성병은 지속 피해를 태운다', D.FOES.breaker.resist.dot > 0.5, true);
+check('공성병에게는 한 놈씩 꽂는 것이 답이다', D.FOES.breaker.resist.single < 0.2, true);
+// 공격 종류 셋 모두에 벽이 하나씩 있어야 한 종류로 끝까지 갈 수 없다.
+for (const kind of ['single', 'area', 'dot']) {
+  check(`${kind}을 크게 막는 적이 있다`,
+    Object.values(D.FOES).some((f) => (f.resist[kind] || 0) >= 0.8), true);
+}
+
+// 창병이 중장병을 맡는 자리는 출혈(지속)이다. 한 방이 아니라 몇 초를 재야 보인다.
+const wide = make(field, { mods: { startGold: 10 } });
+wide.timer = 9999;
+R.place(wide, 'spear', 2, 0);
+const same = stand(wide, 'armored', 900000, 2, 1);
+R.run(wide, 6);
+const throughBleed = same.max - same.hp;
+const longSingle = make(field, { mods: { startGold: 10 } });
+longSingle.timer = 9999;
+R.place(longSingle, 'archer', 2, 0);
+const tanky2 = stand(longSingle, 'armored', 900000, 2, 1);
+R.run(longSingle, 6);
+check('창병이 중장병에게 훨씬 많이 넣는다',
+  throughBleed > (tanky2.max - tanky2.hp) * 2, true);
+
+// --- 대마법사의 기본 공격은 범위다 ---
+// 스킬이 아니라 기본 공격이 둘레까지 닿는지 본다. 쿨타임을 밀어 두어 운석이
+// 섞이지 않게 한다.
+const blast = make(field, { roster: D.HERO_KEYS, mods: { startGold: 10 } });
+blast.timer = 9999;
+const mage = R.place(blast, 'arch', 2, 0);
+mage.scd = 9999;
+// 출구에 가장 가까운 (2,3)이 표적이고, (3,3)은 그 옆, (0,0)은 사거리 안이지만
+// 표적에서 멀다.
+const meteorTarget = stand(blast, 'grunt', 9000, 2, 3);
+const meteorNear = stand(blast, 'grunt', 9000, 3, 3);
+const meteorFar = stand(blast, 'grunt', 9000, 0, 0);
+R.step(blast, R.TICK);
+check('대마법사의 기본 공격이 둘레의 적도 맞힌다',
+  [meteorTarget.hp < meteorTarget.max, meteorNear.hp < meteorNear.max], [true, true]);
+check('둘레라도 범위 밖은 안 맞는다', meteorFar.hp, meteorFar.max);
+
+const plain = make(field, { mods: { startGold: 10 } });
+plain.timer = 9999;
+const shooter = R.place(plain, 'archer', 2, 0);
+shooter.scd = 9999;
+const arrowTarget = stand(plain, 'grunt', 9000, 2, 2);
+const arrowNear = stand(plain, 'grunt', 9000, 3, 2);
+R.step(plain, R.TICK);
+check('궁수의 기본은 그대로 한 놈만', arrowNear.hp, arrowNear.max);
+check('그 한 놈은 맞는다', arrowTarget.hp < arrowTarget.max, true);
+
+// 범위는 `single`이 아니라 `area`로 들어간다 — 중장병은 둘 다 막지만 깎는 값이
+// 달라, 같은 공격력이라도 범위 쪽이 더 들어간다.
+const mageHeavy = make(field, { roster: D.HERO_KEYS, mods: { startGold: 10 } });
+mageHeavy.timer = 9999;
+R.place(mageHeavy, 'arch', 2, 0).scd = 9999;
+const heavyA = stand(mageHeavy, 'armored', 90000, 2, 2);
+R.step(mageHeavy, R.TICK);
+const mageThrough = heavyA.max - heavyA.hp;
+const mageStat = R.statOf('arch', 1, mageHeavy.mods);
+check('중장병에게도 범위가 한 놈씩보다 낫다',
+  mageThrough > mageStat.damage * (1 - D.FOES.armored.resist.single) * 1.2, true);
+
+// --- 검성의 기본 공격은 둘레다 ---
+// 반지름 1.1이라 맞닿은 칸만 맞고 대각선(1.41)은 빠진다.
+const sweep = make(field, { roster: D.HERO_KEYS, mods: { startGold: 10 } });
+sweep.timer = 9999;
+R.place(sweep, 'blade', 2, 2).scd = 9999;
+const sideA = stand(sweep, 'grunt', 9000, 2, 3);
+const sideB = stand(sweep, 'grunt', 9000, 1, 2);
+const corner = stand(sweep, 'grunt', 9000, 3, 3);
+R.step(sweep, R.TICK);
+check('검성의 기본 공격이 맞닿은 것을 통째로 벤다',
+  [sideA.hp < sideA.max, sideB.hp < sideB.max], [true, true]);
+check('대각선은 기본 공격에 안 맞는다', corner.hp, corner.max);
+
+const bladeHeavy = make(field, { roster: D.HERO_KEYS, mods: { startGold: 10 } });
+bladeHeavy.timer = 9999;
+R.place(bladeHeavy, 'blade', 2, 2).scd = 9999;
+const heavyB = stand(bladeHeavy, 'armored', 90000, 2, 3);
+R.step(bladeHeavy, R.TICK);
+const bladeStat = R.statOf('blade', 1, bladeHeavy.mods);
+check('검성의 기본도 범위로 들어간다',
+  bladeHeavy.foes[0].max - bladeHeavy.foes[0].hp
+    > bladeStat.damage * (1 - D.FOES.armored.resist.single) * 1.2, true);
+check('그 적이 중장병이 맞다', heavyB.key, 'armored');
+
+// --- 성기사의 기본 공격은 때리면서 되살린다 ---
+const smite = make(field, { roster: [...D.HERO_KEYS, 'shield'], mods: { startGold: 20 } });
+smite.timer = 9999;
+const wounded = R.place(smite, 'shield', 1, 2);
+R.place(smite, 'saint', 2, 2).scd = 9999;
+wounded.hp = 20;
+const struck = stand(smite, 'grunt', 9000, 2, 3);
+R.step(smite, R.TICK);
+check('성기사의 기본 공격이 적을 친다', struck.hp < struck.max, true);
+check('같은 번에 아군도 되살린다', wounded.hp > 20, true);
+check('기본으로 되살린 양도 기여도에 남는다', R.tally(smite, 'saint').healed > 0, true);
+
+const alone = make(field, { roster: D.HERO_KEYS, mods: { startGold: 10 } });
+alone.timer = 9999;
+R.place(alone, 'saint', 2, 2).scd = 9999;
+const soloTarget = stand(alone, 'grunt', 9000, 2, 3);
+R.step(alone, R.TICK);
+check('되살릴 이가 없어도 공격은 나간다', soloTarget.hp < soloTarget.max, true);
+
+// --- 같은 종류는 여섯까지 ---
+const crowd = make(field, { mods: { startGold: 40 } });
+let put = 0;
+for (let y = 0; y < field.h; y++) {
+  for (let x = 0; x < field.w; x++) if (R.place(crowd, 'archer', x, y)) put++;
+}
+check('같은 종류는 여섯까지', put, D.MOST_OF_KIND);
+check('한도에 닿으면 이유를 말한다',
+  R.canPlace(crowd, 'archer', 4, 4).includes(String(D.MOST_OF_KIND)), true);
+check('다른 종류는 그대로 세울 수 있다', R.canPlace(crowd, 'shield', 4, 4), null);
+
+// 겹쳐 세울수록 비싸진다. 섞는 쪽이 싸지는 자리다.
+const pricey = make(field, { mods: { startGold: 40 } });
+const first = R.costOf(pricey, 'archer');
+R.place(pricey, 'archer', 1, 1);
+check('둘째부터 값이 오른다', R.costOf(pricey, 'archer') > first, true);
+check('다른 종류 값은 그대로', R.costOf(pricey, 'shield'), D.UNITS.shield.cost);
+const paid = R.costOf(pricey, 'archer');
+const second = R.place(pricey, 'archer', 2, 2);
+check('치른 값을 들고 있는다', second.paid, paid);
+const kept = pricey.gold;
+R.sell(pricey, second.id);
+check('돌려받는 몫은 치른 값 기준', pricey.gold - kept, Math.round(paid * D.RUN.refund));
+
+// --- 단계가 바꾸는 리듬 ---
+// 피해만 오르면 빙결술사처럼 값이 "바닥을 얼려 둔 시간"에 있는 캐릭터는 올려도
+// 체감이 없다.
+const iceOne = R.statOf('frost', 1, {});
+const iceThree = R.statOf('frost', 3, {});
+check('단계를 올리면 쿨타임이 준다', iceThree.skill.cd < iceOne.skill.cd, true);
+check('단계를 올리면 지속이 는다', iceThree.skill.fieldFor > iceOne.skill.fieldFor, true);
+check('얼음이 깔려 있는 비율이 오른다',
+  iceThree.skill.fieldFor / iceThree.skill.cd > iceOne.skill.fieldFor / iceOne.skill.cd, true);
+check('출혈도 길어진다', R.statOf('spear', 3, {}).skill.bleedFor > D.UNITS.spear.skill.bleedFor, true);
+check('기절도 길어진다', R.statOf('shield', 3, {}).skill.stunFor > D.UNITS.shield.skill.stunFor, true);
+check('자료 원본은 그대로다',
+  [D.UNITS.frost.skill.cd, D.UNITS.frost.skill.fieldFor], [9, 4]);
+check('1단계는 자료 그대로', iceOne.skill.cd, D.UNITS.frost.skill.cd);
+
+// 실제로 더 자주 나가는가.
+function zonesIn(tier, seconds) {
+  const r = make(field, { mods: { startGold: 10 } });
+  r.timer = 9999;
+  const u = R.place(r, 'frost', 2, 0);
+  u.tier = tier;
+  stand(r, 'grunt', 900000, 2, 2);
+  R.run(r, seconds);
+  return r.stats.skills;
+}
+check('3단계가 1단계보다 자주 깐다', zonesIn(3, 30) > zonesIn(1, 30), true);
+
+// --- 기여도 ---
+// 판이 끝난 뒤 "누가 얼마나 했는가"를 읽는 자료. 리포트가 이것만 본다.
+const credit = make(field, { mods: { startGold: 10 } });
+credit.timer = 9999;
+R.place(credit, 'archer', 2, 0);
+const shot = stand(credit, 'grunt', 9000, 2, 1);
+R.run(credit, 3);
+check('때린 몫이 그 사람에게 쌓인다', R.tally(credit, 'archer').dealt > 0, true);
+check('때린 값과 적이 잃은 값이 같다',
+  Math.abs(R.tally(credit, 'archer').dealt - (shot.max - shot.hp)) < 0.01, true);
+check('고용한 수가 남는다', R.tally(credit, 'archer').hired, 1);
+check('쓴 골드가 남는다', R.tally(credit, 'archer').spent, D.UNITS.archer.cost);
+
+// **넘치는 몫은 세지 않는다.** 마지막 한 방이 판 전체의 피해를 가져가면 리포트가
+// 누가 일했는지가 아니라 누가 막타를 쳤는지를 말하게 된다.
+const overkill = make(field, { mods: { startGold: 10 } });
+overkill.timer = 9999;
+R.place(overkill, 'archer', 2, 0);
+const tiny = stand(overkill, 'swarm', 1, 2, 1);
+R.run(overkill, 1);
+check('넘치는 피해는 세지 않는다', R.tally(overkill, 'archer').dealt <= tiny.max, true);
+check('잡은 수가 남는다', R.tally(overkill, 'archer').kills, 1);
+
+const soaked = make(hall, { mods: { startGold: 10 } });
+soaked.timer = 9999;
+R.place(soaked, 'shield', 1, 3);
+R.spawn(soaked, 'grunt', 400);
+R.run(soaked, 20);
+check('몸으로 받아 낸 피해가 남는다', R.tally(soaked, 'shield').taken > 0, true);
+
+const mended = make(field, { mods: { startGold: 3 } });
+const scarred = R.place(mended, 'shield', 2, 2);
+R.place(mended, 'healer', 2, 3);
+scarred.hp = 10;
+R.run(mended, 6);
+check('되살린 양이 남는다', R.tally(mended, 'healer').healed > 0, true);
+check('되살린 양은 실제로 오른 만큼', Math.abs(R.tally(mended, 'healer').healed - (scarred.hp - 10)) < 0.01, true);
+
+// --- 골드와 승패 ---
+const bounty = make(field);
+R.place(bounty, 'archer', 2, 1);
+const purse = bounty.gold;
+R.spawn(bounty, 'swarm', 1);
+R.run(bounty, 10);
+check('잡으면 골드가 들어온다', bounty.gold > purse, true);
+
+const lose = make(hall, { mods: { lives: -4 } });
+R.spawn(lose, 'grunt', 1);
+R.run(lose, 30);
+check('목숨이 다하면 진다', lose.over, 'lost');
+
+const win = make(field, { waves: [{ index: 1, hp: 1, groups: [{ foe: 'swarm', count: 1, gap: 0 }], boss: false, reward: 10 }] });
+R.place(win, 'archer', 2, 1);
+R.run(win, 120);
+check('웨이브를 다 막으면 이긴다', win.over, 'won');
+
+// --- 영웅 ---
+const hero = make(field, { roster: D.HERO_KEYS, mods: { startGold: 10 } });
+R.place(hero, 'blade', 1, 1);
+check('영웅을 부르면 통계에 남는다', hero.stats.heroUsed, true);
+check('같은 영웅은 한 판에 한 번', R.canPlace(hero, 'blade', 2, 1), '그 영웅은 이미 불렀다');
+// **영웅 칸이 여럿이 되면서 "한 판에 하나"가 "저마다 하나"로 바뀌었다.**
+check('데려온 다른 영웅은 부를 수 있다', R.canPlace(hero, 'saint', 2, 1), null);
+check('영웅 넷 다 표시를 달고 있다', D.HERO_KEYS.every((k) => D.UNITS[k].hero), true);
+
+// --- 영웅은 골드가 아니라 웨이브로 막는다 ---
+// 골드로 사는 동안에는 둘째 영웅이 영영 값을 못 했다 — 그 골드로 못 세운 일반
+// 서넛과 맞바꾸는 것이라 총량이 그대로였다.
+check('영웅은 고용비가 없다', D.HERO_KEYS.every((k) => D.UNITS[k].cost === 0), true);
+check('부를 수 있는 웨이브는 하나씩 미뤄진다',
+  [0, 1, 2].map((n) => R.heroWave(n)),
+  [D.HERO_CALL.from, D.HERO_CALL.from + D.HERO_CALL.gap, D.HERO_CALL.from + D.HERO_CALL.gap * 2]);
+
+const early = R.createRun(1, { map: field, waves: quiet, roster: D.HERO_KEYS, mods: {} });
+check('첫 웨이브 전에는 못 부른다', R.canPlace(early, 'blade', 1, 1), `웨이브 ${R.heroWave(0)}부터 부른다`);
+early.wave = R.heroWave(0);
+check('때가 되면 부른다', R.canPlace(early, 'blade', 1, 1), null);
+R.place(early, 'blade', 1, 1);
+check('골드는 그대로다', early.gold, D.RUN.gold);
+check('둘째는 더 기다린다', R.canPlace(early, 'arch', 2, 1), `웨이브 ${R.heroWave(1)}부터 부른다`);
+early.wave = R.heroWave(1);
+check('그때가 되면 둘째도 부른다', R.canPlace(early, 'arch', 2, 1), null);
+
+// --- 공명 ---
+// **영웅끼리 붙여 세우면 쿨타임이 빨리 돈다.** 몇 초를 깎는 방식이었을 때는 남은
+// 쿨타임보다 깎는 값이 크면 그 몫이 버려져, 둘을 붙여도 스무 초에 스킬이 한 번 더
+// 나가는 데 그쳤다. 비율이라 버려지는 몫이 없다.
+function bonded(who, dx, ticks) {
+  const run = make(field, { roster: D.HERO_KEYS, mods: { startGold: 20 } });
+  run.timer = 9999;
+  const a = R.place(run, 'arch', 0, 2);
+  if (who) R.place(run, who, dx, 2);
+  a.scd = 9;
+  for (let i = 0; i < ticks; i++) R.step(run, R.TICK);
+  return 9 - a.scd;
+}
+const alone9 = bonded(null, 0, 30);
+check('혼자면 흐른 시간만큼 돈다', Math.abs(alone9 - 1) < 0.05, true);
+check('붙여 세우면 더 빨리 돈다', bonded('blade', 2, 30) > alone9 * 1.3, true);
+check('멀면 안 걸린다', Math.abs(bonded('blade', 4, 30) - alone9) < 0.02, true);
+// 사령관은 두 명분으로 친다 — 곁에 서는 것 자체가 그의 값이다.
+check('사령관 곁이 가장 빨리 돈다',
+  bonded('warden', 2, 30) > bonded('blade', 2, 30), true);
+check('공명 반경과 몫은 자료에 있다', D.BOND.r > 0 && D.BOND.gain > 0, true);
+check('사령관만 두 명분 표시를 단다',
+  D.HERO_KEYS.filter((k) => D.UNITS[k].lead), ['warden']);
+
+// 사령관의 호령은 피해가 아니라 시간을 준다.
+const rally = make(field, { roster: [...D.HERO_KEYS, 'archer'], mods: { startGold: 20 } });
+rally.timer = 9999;
+const boss = R.place(rally, 'warden', 2, 2);
+const mate = R.place(rally, 'archer', 2, 1);
+const ally = R.place(rally, 'saint', 3, 2);
+mate.scd = 5;
+ally.scd = 6;
+stand(rally, 'grunt', 900000, 2, 3);
+R.step(rally, R.TICK);
+check('호령은 둘레 아군의 쿨타임을 당긴다', mate.scd < 5 - R.TICK, true);
+check('영웅에게는 더 크게 당긴다',
+  (6 - ally.scd) > (5 - mate.scd) * 1.5, true);
+check('사령관은 스스로 때리기보다 곁을 부린다',
+  D.UNITS.warden.damage < D.UNITS.blade.damage / 2, true);
+check('사령관이 가장 싸다',
+  D.HERO_KEYS.every((k) => k === 'warden' || D.UNITS.warden.cost <= D.UNITS[k].cost), true);
+
+// 회전베기는 목표가 아니라 **자기를 가운데로** 삼는다.
+const spin = make(field, { roster: D.HERO_KEYS, mods: { startGold: 10 } });
+spin.timer = 9999;
+R.place(spin, 'blade', 2, 2);
+const near1 = stand(spin, 'grunt', 9000, 2, 1);
+const near2 = stand(spin, 'grunt', 9000, 1, 2);
+const outside = stand(spin, 'grunt', 9000, 4, 4);
+R.step(spin, R.TICK);
+check('회전베기는 둘레를 통째로 벤다', [near1.hp < near1.max, near2.hp < near2.max], [true, true]);
+check('둘레 밖은 맞지 않는다', outside.hp, outside.max);
+
+// 성기사의 치유는 다친 아군을 한꺼번에 되살린다.
+const bless = make(field, { roster: [...D.HERO_KEYS, 'shield'], mods: { startGold: 20 } });
+bless.timer = 9999;
+const hurtA = R.place(bless, 'shield', 1, 1);
+const hurtB = R.place(bless, 'shield', 3, 1);
+R.place(bless, 'saint', 2, 2);
+hurtA.hp = 20;
+hurtB.hp = 20;
+R.run(bless, 2);
+check('치유의 빛은 여럿을 한꺼번에', [hurtA.hp > 20, hurtB.hp > 20], [true, true]);
+check('되살린 양이 기여도에 남는다', R.tally(bless, 'saint').healed > 0, true);
+
+// --- 시간 ---
+const clamp = make(field);
+R.step(clamp, 10);
+check('밀린 시간은 버린다', clamp.time <= 0.1 + R.TICK, true);
+
+// 같은 판을 같은 손으로 두면 같은 결과가 나와야 한다.
+function played() {
+  const r = make(hall, { waves: [{ index: 1, hp: 60, groups: [{ foe: 'grunt', count: 5, gap: 0.5 }], boss: false, reward: 0 }] });
+  R.place(r, 'archer', 1, 2);
+  R.run(r, 200);
+  return [r.over, r.lives, Math.round(r.time * 100), r.gold];
+}
+check('같은 손이면 같은 판', played(), played());
+
+// --- 얼음이 먹히는 정도는 적마다 다르다 ---
+check('공성병은 잘 안 얼어붙는다', D.FOES.breaker.chill < 0.5, true);
+check('보병에게는 그대로 먹힌다', D.FOES.grunt.chill == null, true);
+
+function crawl(key) {
+  const ice = make(field, { mods: { startGold: 10 } });
+  ice.timer = 9999;
+  R.place(ice, 'frost', 2, 0);
+  const e = stand(ice, key, 900000, 2, 1, false);
+  R.run(ice, 3);
+  return e.slowBy;
+}
+check('얼음 지대는 발을 묶는다', crawl('grunt') < 0.6, true);
+check('공성병은 얼음 위에서도 거의 그대로 온다', crawl('breaker') > 0.8, true);
+
+// --- 언데드와 신성 ---
+check('언데드는 표시를 달고 있다', [D.FOES.bone.undead, D.FOES.wraith.undead], [true, true]);
+check('산 것에는 그 표시가 없다', !D.FOES.grunt.undead, true);
+// 음수 저항은 저항이 아니라 약점이다. 신성만 음수인 것이 이 계열의 전부다.
+check('언데드는 신성에 약하다', D.FOES.bone.resist.holy < 0, true);
+check('신성에 약한 것은 언데드뿐',
+  Object.keys(D.FOES).filter((k) => (D.FOES[k].resist.holy || 0) < 0).sort(), ['bone', 'wraith']);
+check('언데드는 나머지 셋을 고르게 막는다',
+  ['single', 'area', 'dot'].every((kind) => D.FOES.bone.resist[kind] >= 0.5), true);
+
+function into(key, foe, sec) {
+  const run = make(field, { roster: [...D.HERO_KEYS, 'healer', 'archer'], mods: { startGold: 20 } });
+  run.timer = 9999;
+  R.place(run, key, 2, 0);
+  const e = stand(run, foe, 9000000, 2, 2);
+  R.run(run, sec);
+  return e.max - e.hp;
+}
+check('힐러는 언데드에게 산 것보다 훨씬 많이 넣는다',
+  into('healer', 'bone', 6) > into('healer', 'grunt', 6) * 2, true);
+check('궁수는 언데드에게 오히려 덜 넣는다',
+  into('archer', 'bone', 6) < into('archer', 'grunt', 6), true);
+check('성기사는 언데드를 태운다', into('saint', 'bone', 6) > into('saint', 'grunt', 6) * 2.5, true);
+// 신성은 산 것에게는 다른 종류와 다를 것이 없다 — 저항을 적어 둔 적이 없다.
+check('신성이 산 것에게 특별히 세지는 않다',
+  into('healer', 'grunt', 6) < into('archer', 'grunt', 6), true);
+
+// 되살릴 이가 없어도 언데드가 있으면 치유의 빛을 쓴다.
+const burn = make(field, { roster: [...D.HERO_KEYS], mods: { startGold: 20 } });
+burn.timer = 9999;
+const paladin = R.place(burn, 'saint', 2, 0);
+const skull = stand(burn, 'bone', 9000000, 2, 2);
+R.step(burn, R.TICK);
+check('멀쩡한 판에서도 언데드가 있으면 빛을 쓴다', R.tally(burn, 'saint').skills, 1);
+const scorch = skull.max - skull.hp;
+const saintStat = R.statOf('saint', 1, burn.mods);
+check('그 빛이 기본 공격보다 훨씬 크다', scorch > saintStat.damage * 2, true);
+check('영웅은 멀쩡하다', paladin.hp, paladin.max);
+
+const quietBurn = make(field, { roster: [...D.HERO_KEYS], mods: { startGold: 20 } });
+quietBurn.timer = 9999;
+R.place(quietBurn, 'saint', 2, 0);
+stand(quietBurn, 'grunt', 9000000, 2, 2);
+R.step(quietBurn, R.TICK);
+check('산 것만 있으면 빛을 아낀다', R.tally(quietBurn, 'saint').skills, 0);
+
+// --- 입구를 둘러싸 막는 손 ---
+// **막는 것은 허용하되 몰아서 막는 것은 스스로 무너진다.** 한 칸에 겹쳐 선 적이
+// 전부 같은 사람을 때리므로 받는 피해가 마릿수만큼 곱해진다 — 입구 이웃이 한
+// 칸뿐인 판에서 실제로 열 마리가 방패병 하나를 초당 120으로 갈아 25초에 무너뜨렸다.
+function gnaw(many) {
+  const box = mapOf(['#I#', '#.#', '#.#', '#O#']);
+  const run = R.createRun(1, { map: box, waves: quiet, mods: { startGold: 10 } });
+  run.timer = 9999;
+  const wall = R.place(run, 'shield', 1, 1);
+  for (let i = 0; i < many; i++) R.spawn(run, 'grunt', 900000);
+  R.run(run, 2);
+  return wall.max - wall.hp;
+}
+const oneBite = gnaw(1);
+const manyBites = gnaw(5);
+check('여럿이 몰리면 한 사람이 받는 피해가 곱해진다', manyBites > oneBite * 4, true);
+check('그래서 한 칸을 막는 것으로는 오래 못 버틴다',
+  manyBites > R.statOf('shield', 1, {}).hp * 0.3, true);
+
+console.log(`${passed}개 통과, ${failed}개 실패`);
+if (failed) process.exit(1);

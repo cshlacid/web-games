@@ -1,0 +1,277 @@
+:root {
+  --bg: #f6f3ee;
+  --fg: #2f2a22;
+  --muted: #8b8073;
+  --line: #ded6c9;
+  --board-bg: #efeae1;
+  --row-bg: #ffffff;
+  --die: #fbf7f1;
+  --die-line: #b9ac99;
+  --pip: #2f2a22;
+  --keep: #b5761f;
+  --score: #3f7a5c;
+  --btn-bg: #4d4234;
+  --btn-fg: #f8f4ef;
+  --sheet-bg: #ffffff;
+
+  /* 자리 색. 넷이 서로 멀찍이 떨어진 색조여야 합계 줄이 한눈에 읽힌다. */
+  --p1: #3f7a5c;
+  --p2: #b5561f;
+  --p3: #8a6d1f;
+  --p4: #5a5bb5;
+
+  --pad-x: clamp(10px, 4vmin, 28px);
+  --app-max: 440px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #171614;
+    --fg: #e7e0d5;
+    --muted: #948a7c;
+    --line: #33302a;
+    --board-bg: #201d1a;
+    --row-bg: #262220;
+    --die: #efe7db;
+    --die-line: #6c6255;
+    --pip: #201d1a;
+    --keep: #e0a350;
+    --score: #6fbf95;
+    --btn-bg: #453b30;
+    --sheet-bg: #241f1c;
+
+    --p1: #6fbf95;
+    --p2: #e08a55;
+    --p3: #d2ad4a;
+    --p4: #8f90dd;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  display: flex;
+  justify-content: center;
+  padding: clamp(10px, 3vmin, 24px) var(--pad-x);
+}
+
+.app {
+  width: min(100%, var(--app-max));
+  display: flex;
+  flex-direction: column;
+  gap: clamp(8px, 2vmin, 14px);
+}
+
+/* 헤더 배치는 모든 게임이 같다. */
+.title-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 10px;
+}
+
+.title-row h1 { text-align: center; }
+.title-row .head-nav { justify-self: start; }
+.head-nav { display: flex; align-items: center; gap: 14px; }
+.title-row .head-actions { justify-self: end; }
+
+h1 {
+  margin: 0;
+  font-size: clamp(20px, 5.2vmin, 30px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.head-actions { display: flex; align-items: baseline; gap: 14px; }
+
+.toggle {
+  border: 0; background: none; padding: 0;
+  color: inherit; font-family: inherit; font-size: 14px; font-weight: 600;
+  cursor: pointer; opacity: 0.6;
+}
+.toggle:hover { opacity: 1; }
+.toggle.sound { font-size: 12px; }
+.toggle.sound[aria-pressed="false"] { opacity: 0.38; text-decoration: line-through; }
+
+.back {
+  color: inherit; opacity: 0.6; text-decoration: none;
+  font-size: 14px; font-weight: 600;
+}
+.back:hover { opacity: 1; }
+
+.picker-row { display: flex; align-items: center; gap: 10px; }
+.picker { display: flex; gap: 4px; }
+.row-label { font-size: 11px; font-weight: 600; color: var(--muted); }
+.round { font-size: 12px; font-weight: 700; color: var(--muted); }
+.picker-row #new-game { margin-left: auto; }
+
+.whose { margin: 0; font-size: 12px; font-weight: 600; color: var(--muted); }
+.whose .p1 { color: var(--p1); }
+.whose .p2 { color: var(--p2); }
+.whose .p3 { color: var(--p3); }
+.whose .p4 { color: var(--p4); }
+
+.pick {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.pick[aria-pressed="true"] {
+  background: var(--btn-bg);
+  border-color: var(--btn-bg);
+  color: var(--btn-fg);
+}
+
+.board-wrap { position: relative; }
+
+/* 점수판. **한 줄에 칸 이름과 자리마다의 점수를 함께 놓는다** — 열두 칸을 두 폭으로
+   나누면 자리별 점수를 놓을 자리가 없다. 줄마다 같은 격자를 쓰므로 칸이 저절로
+   맞춰진다(--cols는 자리 수). */
+.sheet-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 7px;
+  border-radius: 14px;
+  background: var(--board-bg);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) repeat(var(--cols), minmax(28px, 1fr));
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--row-bg);
+  color: inherit;
+  font-family: inherit;
+  padding: 6px 8px;
+  cursor: default;
+  text-align: left;
+}
+
+/* 칸 이름은 줄바꿈하지 않는다. 넉 자리일 때 접히면 줄 높이가 들쭉날쭉해진다. */
+.row .name { font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+.row .cell {
+  font-size: 13px; font-weight: 800;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.row.head { background: none; padding-top: 0; padding-bottom: 2px; }
+.row.head .cell { font-size: 11px; font-weight: 700; opacity: 0.75; }
+
+/* 자리 색. 숫자를 색으로 갈라 두면 머리줄을 다시 읽지 않아도 어느 칸이 누구 것인지
+   알 수 있다. */
+.cell.p1 { color: var(--p1); }
+.cell.p2 { color: var(--p2); }
+.cell.p3 { color: var(--p3); }
+.cell.p4 { color: var(--p4); }
+
+/* 지금 차례인 자리. 머리줄과 합계에만 밑줄을 긋는다 — 칸마다 그으면 열두 줄이 모두
+   밑줄이라 아무것도 가리키지 못한다. */
+.row.head .cell.now, .row.sum .cell.now { text-decoration: underline; text-underline-offset: 3px; }
+/* 아직 안 적은 칸의 미리보기. 적힌 점수와 같은 무게로 보이면 무엇이 끝난 칸인지
+   갈리지 않는다. */
+.cell.guess { opacity: 0.5; font-weight: 700; }
+
+/* 지금 차례인 자리가 적을 수 있는 줄. 내 차례에는 눌러서 적는 줄이 된다. */
+.row.open { cursor: pointer; }
+.row.open:hover { border-color: var(--keep); }
+.row.open.zero .cell.guess { opacity: 0.35; }
+/* 0점을 적으려고 고른 줄. 한 번 더 눌러야 들어간다. */
+.row.armed { border-color: var(--keep); background: var(--board-bg); }
+.row.armed .cell.guess { color: var(--keep); opacity: 1; }
+
+.row.sum { background: none; border-color: var(--line); }
+.row.sum .name { color: var(--muted); }
+.row.sum .cell.hit { color: var(--keep); }
+.row.total .cell { font-size: 14px; }
+
+.toast {
+  margin: 0; min-height: 20px;
+  font-size: 13px; font-weight: 700; text-align: center; color: var(--muted);
+}
+.toast b { color: var(--fg); }
+
+/* 주사위. 잡아 둔 것은 아래로 내려 앉히고 테두리를 씌운다 — 색만 바꾸면 밝은 화면에서
+   잡았는지가 잘 안 보였다. */
+.dice-row { display: flex; justify-content: center; gap: clamp(6px, 2.4vmin, 12px); }
+
+.die {
+  width: clamp(46px, 15vmin, 62px);
+  height: clamp(46px, 15vmin, 62px);
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  transition: transform 120ms ease;
+}
+.die:disabled { cursor: default; }
+.die.kept { transform: translateY(6px); }
+
+.die-face { fill: var(--die); stroke: var(--die-line); stroke-width: 1.6; }
+.die.kept .die-face { stroke: var(--keep); stroke-width: 3; }
+.die-pip { fill: var(--pip); }
+.die.blank .die-face { fill: none; stroke-dasharray: 4 4; }
+
+@keyframes die-shake {
+  0% { transform: translateY(0) rotate(-7deg); }
+  50% { transform: translateY(-4px) rotate(6deg); }
+  100% { transform: translateY(0) rotate(-7deg); }
+}
+.die.spin { animation: die-shake 0.17s linear infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .die.spin { animation: none; }
+  .die { transition: none; }
+}
+
+.pad { display: flex; gap: 8px; }
+
+.btn {
+  flex: 1;
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  border: 0;
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 15px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+}
+.btn:disabled { opacity: 0.4; cursor: default; }
+
+/* 도움말 시트. 껍데기는 shared/sheet.css, 결과 덮개는 shared/result.css. */
+.sheet {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--sheet-bg);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sheet[hidden] { display: none; }
+
+.sheet-title { margin: 0; font-size: 19px; font-weight: 800; }
+.sheet-note { margin: 0; font-size: 14px; color: var(--muted); }
+.sheet-actions { display: flex; gap: 8px; }
+
+.help-list { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.7; }
+.help-list li { margin-bottom: 6px; }

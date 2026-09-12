@@ -16,6 +16,7 @@
 <meta name="theme-color" content="#1a1714" media="(prefers-color-scheme: dark)">
 <link rel="stylesheet" href="shared/base.css">
 <link rel="stylesheet" href="hub.css">
+<script src="shared/analytics.js"></script>
 </head>
 <body>
 <main class="hub">
@@ -98,15 +99,6 @@
       </a>
     </li>
     <li>
-      <a class="card" href="games/healer/">
-        <span class="card-head">
-          <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3 H14 V10 H21 V14 H14 V21 H10 V14 H3 V10 H10 Z" fill="currentColor" stroke="none"/></svg>
-          <span class="card-title">힐러 <b class="badge">알파</b></span>
-        </span>
-        <span class="card-desc">파티 힐러 맡기</span>
-      </a>
-    </li>
-    <li>
       <a class="card" href="games/conquest/">
         <span class="card-head">
           <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5.4" fill="currentColor" stroke="none"/><circle cx="12" cy="2.6" r="1.9" fill="currentColor" stroke="none" opacity=".55"/><circle cx="20.2" cy="16.8" r="1.9" fill="currentColor" stroke="none" opacity=".55"/><circle cx="3.8" cy="16.8" r="1.9" fill="currentColor" stroke="none" opacity=".55"/></svg>
@@ -124,13 +116,74 @@
         <span class="card-desc">섬을 하나로 잇기</span>
       </a>
     </li>
+    <li>
+      <a class="card" href="games/dicewars/">
+        <span class="card-head">
+          <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="2.5" width="13" height="13" rx="3"/><rect x="8.5" y="8.5" width="13" height="13" rx="3" fill="currentColor" stroke="none"/><circle cx="6" cy="6" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="var(--card-bg)" stroke="none"/><circle cx="18" cy="18" r="1.5" fill="var(--card-bg)" stroke="none"/></svg>
+          <span class="card-title">주사위 영토전</span>
+        </span>
+        <span class="card-desc">굴려서 땅 뺏기</span>
+      </a>
+    </li>
+    <li>
+      <a class="card" href="games/yacht/">
+        <span class="card-head">
+          <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="2.5" width="19" height="19" rx="4.5"/><circle cx="7.5" cy="7.5" r="1.8" fill="currentColor" stroke="none"/><circle cx="16.5" cy="7.5" r="1.8" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.8" fill="currentColor" stroke="none"/><circle cx="7.5" cy="16.5" r="1.8" fill="currentColor" stroke="none"/><circle cx="16.5" cy="16.5" r="1.8" fill="currentColor" stroke="none"/></svg>
+          <span class="card-title">야추</span>
+        </span>
+        <span class="card-desc">주사위로 점수 겨루기</span>
+      </a>
+    </li>
+    <li>
+      <a class="card" href="games/nonogram/">
+        <span class="card-head">
+          <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2" width="20" height="20" rx="2.5"/><path d="M8.7 2 V22" opacity=".45"/><path d="M15.3 2 V22" opacity=".45"/><path d="M2 8.7 H22" opacity=".45"/><path d="M2 15.3 H22" opacity=".45"/><rect x="2" y="2" width="6.7" height="6.7" fill="currentColor" stroke="none"/><rect x="15.3" y="2" width="6.7" height="6.7" fill="currentColor" stroke="none"/><rect x="8.7" y="8.7" width="6.6" height="6.6" fill="currentColor" stroke="none"/><rect x="2" y="15.3" width="6.7" height="6.7" fill="currentColor" stroke="none"/><rect x="15.3" y="15.3" width="6.7" height="6.7" fill="currentColor" stroke="none"/></svg>
+          <span class="card-title">노노그램</span>
+        </span>
+        <span class="card-desc">숫자대로 칠해 그림 찾기</span>
+      </a>
+    </li>
+    <li>
+      <a class="card" href="games/rushhour/">
+        <span class="card-head">
+          <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2" width="20" height="20" rx="2.5"/><rect x="4.5" y="10" width="9" height="4" rx="1.4" fill="currentColor" stroke="none"/><rect x="4.5" y="4.5" width="4" height="3.5" rx="1.2" fill="currentColor" stroke="none" opacity=".5"/><rect x="15.5" y="4.5" width="4" height="7" rx="1.2" fill="currentColor" stroke="none" opacity=".5"/><rect x="9" y="16" width="7" height="3.5" rx="1.2" fill="currentColor" stroke="none" opacity=".5"/></svg>
+          <span class="card-title">차 빼기</span>
+        </span>
+        <span class="card-desc">막힌 길에서 빨간 차 빼내기</span>
+      </a>
+    </li>
   </ul>
+
+  <section class="wip">
+    <h2>알파</h2>
+    <p class="wip-note">아직 다듬는 중입니다. 규칙과 균형이 바뀔 수 있어요.</p>
+    <ul class="games">
+      <li>
+        <a class="card" href="games/healer/">
+          <span class="card-head">
+            <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3 H14 V10 H21 V14 H14 V21 H10 V14 H3 V10 H10 Z" fill="currentColor" stroke="none"/></svg>
+            <span class="card-title">힐러 <b class="badge">알파</b></span>
+          </span>
+          <span class="card-desc">파티 힐러 맡기</span>
+        </a>
+      </li>
+      <li>
+        <a class="card" href="games/defense/">
+          <span class="card-head">
+            <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5 L20 5.5 v6c0 4.6-3.4 7.6-8 9.5-4.6-1.9-8-4.9-8-9.5v-6 Z"/><path d="M12 9 v6"/><path d="M9 12 h6"/></svg>
+            <span class="card-title">길목 지키기 <b class="badge">알파</b></span>
+          </span>
+          <span class="card-desc">길목에 사람을 세워 적을 막기</span>
+        </a>
+      </li>
+    </ul>
+  </section>
 
   <footer>
     <a href="https://github.com/cshlacid/web-games">GitHub</a>
     <!-- 배포 표시. main에 머지할 때마다 올린다 — 규칙은 CLAUDE.md에 있다.
          날짜에 그날의 번호를 붙여, 같은 날 여러 번 올려도 구별된다. -->
-    <span class="deploy">2026-09-09.25</span>
+    <span class="deploy">2026-09-12.5</span>
   </footer>
 </main>
 

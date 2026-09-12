@@ -49,6 +49,9 @@ let game = null;
 let view = null;
 let toastTimer = null;
 let clock = null;
+// 고른 섬. 섬을 누르고 이어질 섬을 누르는 길을 함께 둔다 — 두 통로가 교차하는 자리는
+// 거리로 고르면 어느 쪽인지 애매해서, 섬 두 개로 가리키는 편이 확실하다.
+let picked = null;
 
 function svg(name, attrs, cls) {
   const node = document.createElementNS(NS, name);
@@ -90,14 +93,34 @@ function build() {
   el.board.textContent = '';
   el.board.setAttribute('viewBox', `0 0 ${puzzle.w * CELL} ${puzzle.h * CELL}`);
 
+  const guides = svg('g');
   const bridges = svg('g');
   const islands = svg('g');
-  const hits = svg('g');
-  el.board.append(bridges, islands, hits);
+  el.board.append(guides, bridges, islands);
+
+  // **누르는 자리는 판 전체 하나다.** 자리마다 사각형을 깔았더니 판의 43%만 눌렸고,
+  // 통로를 조금만 벗어나면 아무 일도 일어나지 않았다. 어디를 누르든 가장 가까운
+  // 자리를 찾아 주는 편이 손가락에 맞다(linkAt).
+  el.board.append(svg('rect', {
+    x: 0, y: 0, width: puzzle.w * CELL, height: puzzle.h * CELL,
+  }, 'hit'));
 
   const lines = board.links.map((link) => {
     const a = board.islands[link.a];
     const b = board.islands[link.b];
+    // 놓을 수 있는 자리를 미리 깔아 둔다. 다리와 같은 자리에 그리므로 다리가 놓이면
+    // 가려지지 않게 감춘다(paint).
+    const guide = link.horizontal
+      ? svg('line', {
+        x1: center(a.x) + ISLAND_R, y1: center(a.y),
+        x2: center(b.x) - ISLAND_R, y2: center(b.y),
+      }, 'guide')
+      : svg('line', {
+        x1: center(a.x), y1: center(a.y) + ISLAND_R,
+        x2: center(b.x), y2: center(b.y) - ISLAND_R,
+      }, 'guide');
+    guides.append(guide);
+
     const pair = [];
     for (const side of [-1, 1]) {
       const off = side * GAP;
@@ -127,21 +150,7 @@ function build() {
     single.setAttribute('opacity', '0');
     bridges.append(single);
 
-    // 누르는 자리는 두 섬 사이의 통로만 덮는다. 섬까지 덮으면 옆 자리의 통로와
-    // 겹쳐, 섬 가장자리를 눌렀을 때 엉뚱한 다리가 놓인다.
-    const hit = link.horizontal
-      ? svg('rect', {
-        x: center(a.x) + ISLAND_R, y: center(a.y) - CELL * 0.42,
-        width: center(b.x) - center(a.x) - ISLAND_R * 2, height: CELL * 0.84,
-      }, 'hit')
-      : svg('rect', {
-        x: center(a.x) - CELL * 0.42, y: center(a.y) + ISLAND_R,
-        width: CELL * 0.84, height: center(b.y) - center(a.y) - ISLAND_R * 2,
-      }, 'hit');
-    hit.dataset.link = String(link.id);
-    hits.append(hit);
-
-    return { pair, single, shown: -1 };
+    return { guide, pair, single, shown: -1, guided: null };
   });
 
   const marks = board.islands.map((island) => {
@@ -172,8 +181,9 @@ function newGame() {
     elapsed: 0,
     done: false,
   };
+  picked = null;
   el.result.hidden = true;
-  el.toast.textContent = '';
+  el.toast.textContent = '점선을 누르거나, 섬을 누르고 이어질 섬을 누르세요.';
   el.timer.textContent = '0:00';
   showBest();
   build();
@@ -185,9 +195,17 @@ function newGame() {
 function paint() {
   const { board, state } = game;
 
+  const full = board.islands.map((island) => R.degree(board, state, island.id) === island.need);
+
   board.links.forEach((link, i) => {
     const node = view.lines[i];
     const n = state[link.id];
+    // 안내 점선은 다리 수뿐 아니라 양쪽 섬이 찼는지에 따라서도 바뀌므로 따로 본다.
+    const guided = n === 0 && !(full[link.a] && full[link.b]);
+    if (guided !== node.guided) {
+      node.guided = guided;
+      node.guide.setAttribute('opacity', guided ? '1' : '0');
+    }
     if (n === node.shown) return;
     node.shown = n;
     node.single.setAttribute('opacity', n === 1 ? '1' : '0');
@@ -196,16 +214,39 @@ function paint() {
 
   for (const island of board.islands) {
     const node = view.marks[island.id];
-    const done = R.degree(board, state, island.id) === island.need;
-    if (done === node.done) continue;
-    node.done = done;
-    node.circle.setAttribute('class', done ? 'island done' : 'island');
-    node.text.setAttribute('class', done ? 'count done' : 'count');
+    node.done = full[island.id];
+    node.text.setAttribute('class', node.done ? 'count done' : 'count');
   }
+  paintPick();
 
   el.undo.disabled = game.done || !game.undo.length;
   el.clear.disabled = game.done || !state.some((n) => n > 0);
   el.hint.disabled = game.done;
+}
+
+// 고른 섬과 거기서 이을 수 있는 섬·통로를 표시한다. 섬 하나가 여러 상태를 겹쳐
+// 가지므로(다 참 / 고름 / 이을 수 있음) 클래스는 한 곳에서 만들어 붙인다.
+function paintPick() {
+  const partners = new Set();
+  if (picked !== null) {
+    for (const link of game.board.links) {
+      if (link.a === picked) partners.add(link.b);
+      else if (link.b === picked) partners.add(link.a);
+    }
+  }
+
+  for (const island of game.board.islands) {
+    const node = view.marks[island.id];
+    let cls = node.done ? 'island done' : 'island';
+    if (island.id === picked) cls += ' picked';
+    else if (partners.has(island.id)) cls += ' near';
+    node.circle.setAttribute('class', cls);
+  }
+
+  game.board.links.forEach((link, i) => {
+    const hot = picked !== null && (link.a === picked || link.b === picked);
+    view.lines[i].guide.setAttribute('class', hot ? 'guide hot' : 'guide');
+  });
 }
 
 function tick() {
@@ -259,16 +300,106 @@ function place(li) {
     return;
   }
   startClock();
+  el.toast.textContent = '';
   Sound.play(after === 0 ? 'erase' : 'place', after);
   paint();
   if (R.isDone(game.board, game.state)) finish();
 }
 
+// 누른 자리에서 가장 가까운 다리 자리. 통로에서 이만큼 떨어진 곳까지 받는다 —
+// 나란한 통로는 한 칸씩 떨어져 있으므로 반 칸을 넘겨 잡아도 서로 넘보지 않는다.
+const REACH = CELL * 0.62;
+// 섬을 누른 것으로 치는 거리. 섬 그림보다 조금 넉넉하게 잡는다.
+const ISLAND_REACH = ISLAND_R + 6;
+
+function distanceToLink(link, x, y) {
+  const a = game.board.islands[link.a];
+  const b = game.board.islands[link.b];
+  // 섬에 가린 부분을 뺀 통로만 잰다. 섬까지 넣으면 한 섬에 모인 자리들이 모두 거리
+  // 0이 되어 어느 쪽으로 눌렀는지가 사라진다.
+  const x1 = link.horizontal ? center(a.x) + ISLAND_R : center(a.x);
+  const y1 = link.horizontal ? center(a.y) : center(a.y) + ISLAND_R;
+  const x2 = link.horizontal ? center(b.x) - ISLAND_R : center(b.x);
+  const y2 = link.horizontal ? center(b.y) : center(b.y) - ISLAND_R;
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const len = dx * dx + dy * dy;
+  const t = len ? Math.max(0, Math.min(1, ((x - x1) * dx + (y - y1) * dy) / len)) : 0;
+  return Math.hypot(x - (x1 + dx * t), y - (y1 + dy * t));
+}
+
+// 이 자리에서 무엇이든 일어나는가. 다리가 놓여 있으면 언제나 걷을 수 있고, 빈 자리는
+// 하나를 놓을 수 있어야 한다(가로지르는 다리에 막히면 그렇지 못하다).
+function usable(li) {
+  return game.state[li] > 0 || R.canSet(game.board, game.state, li, 1);
+}
+
+// 누른 자리가 무엇인가. 섬이면 `{ island }`, 통로면 `{ link }`, 아무것도 아니면 null.
+function spotAt(event) {
+  if (event.clientX === undefined) return null;
+  const rect = el.board.getBoundingClientRect();
+  const box = el.board.viewBox.baseVal;
+  if (!rect.width || !rect.height) return null;
+  const x = box.x + (event.clientX - rect.left) / rect.width * box.width;
+  const y = box.y + (event.clientY - rect.top) / rect.height * box.height;
+
+  for (const island of game.board.islands) {
+    if (Math.hypot(center(island.x) - x, center(island.y) - y) <= ISLAND_REACH) {
+      return { island: island.id };
+    }
+  }
+
+  const near = game.board.links
+    .map((link) => ({ id: link.id, gap: distanceToLink(link, x, y) }))
+    .filter((one) => one.gap <= REACH)
+    .sort((one, two) => one.gap - two.gap);
+  if (!near.length) return null;
+  // 막힌 자리가 조금 더 가깝다고 그것을 집으면 누를 때마다 "놓을 수 없습니다"만 뜬다.
+  // 손이 닿은 자리 중에 할 수 있는 것이 있으면 그것을 고른다.
+  const open = near.find((one) => usable(one.id));
+  return { link: (open || near[0]).id };
+}
+
+function linkBetween(a, b) {
+  const link = game.board.links.find((one) =>
+    (one.a === a && one.b === b) || (one.a === b && one.b === a));
+  return link ? link.id : null;
+}
+
+// 섬을 눌렀을 때. 처음이면 고르고, 이을 수 있는 섬을 이어서 누르면 그 자리에 놓는다.
+function tapIsland(id) {
+  if (picked === null || picked === id) {
+    picked = picked === id ? null : id;
+    Sound.play('click');
+    paintPick();
+    return;
+  }
+  const li = linkBetween(picked, id);
+  picked = null;
+  if (li === null) {
+    // 이을 수 없는 두 섬이면 방금 누른 섬을 새로 고른다 — 여기서 아무것도 안 하면
+    // 엇갈려 누를 때마다 고른 것이 사라진다.
+    picked = id;
+    paintPick();
+    Sound.play('click');
+    return;
+  }
+  paintPick();
+  place(li);
+}
+
 el.board.addEventListener('click', (event) => {
   if (game.done) return;
-  const hit = event.target.closest('[data-link]');
-  if (!hit) return;
-  place(Number(hit.dataset.link));
+  const spot = spotAt(event);
+  if (!spot) {
+    if (picked === null) return;
+    picked = null;
+    paintPick();
+    return;
+  }
+  if (spot.island !== undefined) { tapIsland(spot.island); return; }
+  picked = null;
+  place(spot.link);
 });
 
 el.undo.addEventListener('click', () => {
@@ -345,6 +476,6 @@ window.SharedIcons.paint();
 newGame();
 
 // 풀이기는 화면에서 쓰지 않지만, 판이 이상할 때 콘솔에서 바로 확인할 수 있게 열어 둔다.
-window.HashiDebug = { game: () => game, solver: S };
+window.HashiDebug = { game: () => game, solver: S, spotAt, picked: () => picked };
 
 })();

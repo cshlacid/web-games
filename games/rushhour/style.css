@@ -1,0 +1,254 @@
+:root {
+  --bg: #f5f3ee;
+  --fg: #2c3138;
+  --muted: #7e858d;
+  --line: #d6d2c8;
+  --board-bg: #e7e2d8;
+  --cell: #f1ede4;
+  --grid: #d3cdc0;
+  --wall: #b9b2a3;
+  --target: #c0402f;
+  --target-dark: #a1341f;
+  --btn-bg: #3f4750;
+  --btn-fg: #f7f8f9;
+  --sheet-bg: #ffffff;
+
+  /* 차 색. 빨강은 빼낼 차만 쓰므로 여기에는 없다. */
+  --car1: #5b7c8d;
+  --car2: #7a8b5e;
+  --car3: #97795a;
+  --car4: #6f6a8d;
+  --car5: #4f8579;
+  --car6: #8d7b4a;
+
+  --pad-x: clamp(10px, 4vmin, 28px);
+  --app-max: 440px;
+  --size: 54px;   /* 칸 하나. 판을 그릴 때 자바스크립트가 정수로 끊어 채운다 */
+  --gap: 3px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #16181a;
+    --fg: #dfe3e7;
+    --muted: #848b93;
+    --line: #2d3136;
+    --board-bg: #23262a;
+    --cell: #1c1f22;
+    --grid: #33383d;
+    --wall: #444a50;
+    --target: #d8503c;
+    --target-dark: #b03c29;
+    --btn-bg: #353d45;
+    --sheet-bg: #1f2327;
+
+    --car1: #6d90a2;
+    --car2: #8ba06d;
+    --car3: #ab8c6a;
+    --car4: #827ea3;
+    --car5: #5d9b8d;
+    --car6: #a28f58;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  display: flex;
+  justify-content: center;
+  padding: clamp(10px, 3vmin, 24px) var(--pad-x);
+}
+
+.app {
+  width: min(100%, var(--app-max));
+  display: flex;
+  flex-direction: column;
+  gap: clamp(8px, 2vmin, 14px);
+}
+
+/* 헤더 배치는 모든 게임이 같다. */
+.title-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 10px;
+}
+
+.title-row h1 { text-align: center; }
+.title-row .head-nav { justify-self: start; }
+.head-nav { display: flex; align-items: center; gap: 14px; }
+.title-row .head-actions { justify-self: end; }
+
+h1 {
+  margin: 0;
+  font-size: clamp(20px, 5.2vmin, 30px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.head-actions { display: flex; align-items: baseline; gap: 14px; }
+
+.toggle {
+  border: 0; background: none; padding: 0;
+  color: inherit; font-family: inherit; font-size: 14px; font-weight: 600;
+  cursor: pointer; opacity: 0.6;
+}
+.toggle:hover { opacity: 1; }
+.toggle.sound { font-size: 12px; }
+.toggle.sound[aria-pressed="false"] { opacity: 0.38; text-decoration: line-through; }
+
+.back {
+  color: inherit; opacity: 0.6; text-decoration: none;
+  font-size: 14px; font-weight: 600;
+}
+.back:hover { opacity: 1; }
+
+.picker-row { display: flex; align-items: center; gap: 10px; }
+.picker { display: flex; gap: 4px; }
+
+.pick {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.pick[aria-pressed="true"] {
+  background: var(--btn-bg);
+  border-color: var(--btn-bg);
+  color: var(--btn-fg);
+}
+
+.count { margin-left: auto; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.count b { color: var(--target); }
+.best { font-size: 12px; font-weight: 600; color: var(--muted); }
+
+.board-wrap { position: relative; display: flex; justify-content: center; }
+
+/* 판. 칸은 배경으로 깔고 차는 그 위에 절대 위치로 올린다 — 끄는 동안 차만 옮기면
+   되므로 칸을 건드릴 일이 없다. */
+.board {
+  position: relative;
+  padding: var(--gap);
+  border-radius: 14px;
+  background: var(--board-bg);
+  /* 끌어서 옮기므로 스크롤·확대에 넘기지 않는다. 이 자리에는 click으로 도는 조작을
+     두지 않는다 — shared/base.js가 touchend를 취소해 click이 나지 않는다. */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.slot {
+  position: absolute;
+  background: var(--cell);
+  border-radius: 4px;
+}
+
+/* 빠져나가는 자리. 벽이 트인 것이 한눈에 보여야 어디로 빼는지 설명이 필요 없다. */
+.exit {
+  position: absolute;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--target);
+  opacity: 0.55;
+}
+.exit svg { width: 100%; height: 45%; }
+
+.car {
+  position: absolute;
+  border-radius: 8px;
+  background: var(--car1);
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.18);
+  cursor: grab;
+  touch-action: none;
+}
+.car.c1 { background: var(--car1); }
+.car.c2 { background: var(--car2); }
+.car.c3 { background: var(--car3); }
+.car.c4 { background: var(--car4); }
+.car.c5 { background: var(--car5); }
+.car.c6 { background: var(--car6); }
+
+/* 빼낼 차. 색 하나로 알린다 — 화살표나 글씨를 얹으면 차가 작아 읽히지 않는다. */
+.car.target { background: var(--target); box-shadow: inset 0 -2px 0 var(--target-dark); }
+
+/* 끄는 동안에는 그림자를 키워 손에 들린 느낌을 준다. */
+.car.held { cursor: grabbing; filter: brightness(1.08); }
+.car.hinted { outline: 3px solid var(--target); outline-offset: 2px; }
+
+/* 움직일 수 없는 차를 밀면 살짝 떨린다 — 왜 안 가는지 손에 알린다. */
+@keyframes car-stuck {
+  0%, 100% { transform: translate(var(--dx, 0px), var(--dy, 0px)); }
+  25% { transform: translate(calc(var(--dx, 0px) - 2px), var(--dy, 0px)); }
+  75% { transform: translate(calc(var(--dx, 0px) + 2px), var(--dy, 0px)); }
+}
+.car.stuck { animation: car-stuck 0.18s linear; }
+
+@media (prefers-reduced-motion: reduce) {
+  .car.stuck { animation: none; }
+}
+
+.toast {
+  margin: 0; min-height: 20px;
+  font-size: 13px; font-weight: 700; text-align: center; color: var(--muted);
+}
+.toast b { color: var(--fg); }
+
+.pad { display: flex; }
+.tools { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; width: 100%; }
+
+.tool {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  padding: 8px 4px;
+  cursor: pointer;
+}
+.tool-icon { display: block; }
+.tool-icon svg { width: 19px; height: 19px; }
+.tool-label { font-size: 11px; font-weight: 600; opacity: 0.8; }
+.tool:disabled { opacity: 0.35; cursor: default; }
+
+.btn {
+  flex: 1;
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  border: 0;
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 15px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+/* 도움말 시트. 껍데기는 shared/sheet.css, 결과 덮개는 shared/result.css. */
+.sheet {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--sheet-bg);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sheet[hidden] { display: none; }
+
+.sheet-title { margin: 0; font-size: 19px; font-weight: 800; }
+.sheet-note { margin: 0; font-size: 14px; color: var(--muted); }
+.sheet-actions { display: flex; gap: 8px; }
+
+.help-list { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.7; }
+.help-list li { margin-bottom: 6px; }
