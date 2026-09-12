@@ -3,15 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>다리 잇기</title>
-<meta name="description" content="섬에 적힌 숫자만큼 다리를 놓아 모든 섬을 하나로 잇는 퍼즐">
+<title data-i18n="game.hashi">다리 잇기</title>
+<meta name="description" content="섬에 적힌 숫자만큼 다리를 놓아 모든 섬을 하나로 잇는 퍼즐" data-i18n-attr="content=meta.desc">
 <meta name="color-scheme" content="light dark">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232f7d8c' stroke-width='2.2' stroke-linecap='round'><circle cx='5' cy='5' r='2.6' fill='%232f7d8c' stroke='none'/><circle cx='19' cy='5' r='2.6' fill='%232f7d8c' stroke='none'/><circle cx='5' cy='19' r='2.6' fill='%232f7d8c' stroke='none'/><path d='M5 3.4 H19 M5 6.6 H19 M5 8 V19'/></svg>">
 <link rel="manifest" href="../../manifest.json">
 <link rel="apple-touch-icon" href="../../icons/icon-180.png">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="다리 잇기">
+<meta name="apple-mobile-web-app-title" content="다리 잇기" data-i18n-attr="content=game.hashi">
 <meta name="theme-color" content="#f4f7f8" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#151b1d" media="(prefers-color-scheme: dark)">
 <link rel="stylesheet" href="../../shared/base.css">
@@ -19,36 +19,39 @@
 <link rel="stylesheet" href="../../shared/result.css">
 <link rel="stylesheet" href="../../shared/sheet.css">
 <script src="../../shared/analytics.js"></script>
+<script src="../../shared/i18n.js"></script>
+<script src="../../shared/strings.js"></script>
+<script src="strings.js"></script>
 </head>
 <body>
 <main class="app">
   <header class="head">
     <div class="title-row">
       <div class="head-nav">
-        <a class="back" href="../../">← 목록</a>
-        <button class="toggle" id="help-open" type="button" aria-pressed="false">도움말</button>
+        <a class="back" href="../../" data-i18n="ui.back">← 목록</a>
+        <button class="toggle" id="help-open" type="button" aria-pressed="false" data-i18n="ui.help">도움말</button>
       </div>
-      <h1>다리 잇기</h1>
+      <h1 data-i18n="game.hashi">다리 잇기</h1>
       <div class="head-actions">
-        <button class="toggle sound" id="toggle-bgm" type="button" aria-pressed="true">BGM</button>
-        <button class="toggle sound" id="toggle-sfx" type="button" aria-pressed="true">효과음</button>
+        <button class="toggle sound" id="toggle-bgm" type="button" aria-pressed="true" data-i18n="ui.bgm">BGM</button>
+        <button class="toggle sound" id="toggle-sfx" type="button" aria-pressed="true" data-i18n="ui.sfx">효과음</button>
       </div>
     </div>
     <div class="picker-row">
-      <div class="picker" id="sizes" role="group" aria-label="판 크기"></div>
+      <div class="picker" id="sizes" role="group" aria-label="판 크기" data-i18n-attr="aria-label=ui.boardSize"></div>
       <span class="best" id="best"></span>
       <span class="timer" id="timer">0:00</span>
     </div>
   </header>
 
   <div class="board-wrap">
-    <svg class="board" id="board" role="application" aria-label="섬과 다리"></svg>
+    <svg class="board" id="board" role="application" aria-label="섬과 다리" data-i18n-attr="aria-label=hashi.board"></svg>
     <div class="result" id="result" role="status" aria-live="polite" hidden>
       <div class="result-card">
         <p class="sheet-title" id="result-title"></p>
         <p class="sheet-note" id="result-note"></p>
         <div class="sheet-actions">
-          <button class="btn" id="again" type="button">한 판 더</button>
+          <button class="btn" id="again" type="button" data-i18n="ui.again">한 판 더</button>
         </div>
       </div>
     </div>
@@ -59,41 +62,41 @@
   <div class="pad">
     <div class="tools">
       <button class="tool" id="undo" type="button">
-        <span class="tool-icon" data-icon="undo"></span><span class="tool-label">되돌리기</span>
+        <span class="tool-icon" data-icon="undo"></span><span class="tool-label" data-i18n="ui.undo">되돌리기</span>
       </button>
       <button class="tool" id="clear" type="button">
-        <span class="tool-icon" data-icon="backspace"></span><span class="tool-label">지우기</span>
+        <span class="tool-icon" data-icon="backspace"></span><span class="tool-label" data-i18n="ui.erase">지우기</span>
       </button>
       <button class="tool" id="hint" type="button">
-        <span class="tool-icon" data-icon="hint"></span><span class="tool-label">힌트</span>
+        <span class="tool-icon" data-icon="hint"></span><span class="tool-label" data-i18n="ui.hint">힌트</span>
       </button>
       <button class="tool" id="new-game" type="button">
-        <span class="tool-icon" data-icon="plus"></span><span class="tool-label">새 판</span>
+        <span class="tool-icon" data-icon="plus"></span><span class="tool-label" data-i18n="ui.newBoard">새 판</span>
       </button>
     </div>
   </div>
 
   <div class="sheet" id="help" hidden>
-    <p class="sheet-title">규칙</p>
+    <p class="sheet-title" data-i18n="ui.rules">규칙</p>
     <ul class="help-list">
-      <li>섬에 적힌 <b>숫자만큼</b> 그 섬에 다리가 닿아야 합니다.</li>
-      <li>다리는 <b>가로·세로</b>로만 놓고, 이웃한 두 섬을 곧게 잇습니다. 사이에 다른 섬이
+      <li data-i18n-html="hashi.rule1">섬에 적힌 <b>숫자만큼</b> 그 섬에 다리가 닿아야 합니다.</li>
+      <li data-i18n-html="hashi.rule2">다리는 <b>가로·세로</b>로만 놓고, 이웃한 두 섬을 곧게 잇습니다. 사이에 다른 섬이
         있으면 건너뛸 수 없습니다.</li>
-      <li>같은 두 섬 사이에는 <b>최대 두 개</b>까지 놓습니다.</li>
-      <li>다리끼리 <b>교차할 수 없습니다.</b></li>
-      <li>다 놓았을 때 <b>모든 섬이 하나로 이어져</b> 있어야 완성입니다. 숫자를 다 맞춰도
+      <li data-i18n-html="hashi.rule3">같은 두 섬 사이에는 <b>최대 두 개</b>까지 놓습니다.</li>
+      <li data-i18n-html="hashi.rule4">다리끼리 <b>교차할 수 없습니다.</b></li>
+      <li data-i18n-html="hashi.rule5">다 놓았을 때 <b>모든 섬이 하나로 이어져</b> 있어야 완성입니다. 숫자를 다 맞춰도
         섬이 두 덩어리로 갈리면 완성이 아닙니다.</li>
-      <li><b>점선이 다리를 놓을 수 있는 자리</b>입니다. 그 위를 누를 때마다
+      <li data-i18n-html="hashi.rule6"><b>점선이 다리를 놓을 수 있는 자리</b>입니다. 그 위를 누를 때마다
         <b>없음 → 하나 → 둘 → 없음</b>으로 돕니다.</li>
-      <li><b>섬을 누르고 이어질 섬을 눌러도</b> 같은 자리가 돕니다. 고른 섬에서 이을 수
+      <li data-i18n-html="hashi.rule7"><b>섬을 누르고 이어질 섬을 눌러도</b> 같은 자리가 돕니다. 고른 섬에서 이을 수
         있는 섬은 테두리로 알려 줍니다 — 다리가 교차하는 자리처럼 누르기 애매한 곳에
         쓰세요.</li>
-      <li><b>이 게임의 모든 판은 답이 하나뿐이고, 찍지 않고 논리로만 풀립니다.</b></li>
-      <li><b>힌트</b>는 어긋난 다리를 치우거나 다음 한 자리를 놓아 줍니다. 힌트를 쓴 판은
+      <li data-i18n-html="hashi.rule8"><b>이 게임의 모든 판은 답이 하나뿐이고, 찍지 않고 논리로만 풀립니다.</b></li>
+      <li data-i18n-html="hashi.rule9"><b>힌트</b>는 어긋난 다리를 치우거나 다음 한 자리를 놓아 줍니다. 힌트를 쓴 판은
         최고 기록에 넣지 않습니다.</li>
     </ul>
     <div class="sheet-actions">
-      <button class="btn" id="help-close" type="button">닫기</button>
+      <button class="btn" id="help-close" type="button" data-i18n="ui.close">닫기</button>
     </div>
   </div>
 </main>
@@ -107,5 +110,6 @@
 <script src="audio.js"></script>
 <script src="../../shared/sheet.js"></script>
 <script src="main.js"></script>
+<script>SharedI18n.apply();</script>
 </body>
 </html>

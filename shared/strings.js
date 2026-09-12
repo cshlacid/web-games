@@ -53,7 +53,9 @@
       'record.improved': '최고 기록을 {time}에서 줄였습니다.',
       'record.first': '첫 기록입니다.',
       'record.bestIs': '최고 기록은 {time}입니다.',
-      'record.genFail': '판을 만들지 못했습니다. 새 판을 눌러 다시 시도해 주세요.'
+      'record.genFail': '판을 만들지 못했습니다. 새 판을 눌러 다시 시도해 주세요.',
+      'record.hintedShort': '힌트를 써서 기록에는 넣지 않습니다',
+      'record.bestMark': '최고 기록'
     },
     en: {
       'game.2048': '2048',
@@ -105,7 +107,9 @@
       'record.improved': 'Your best time is down from {time}.',
       'record.first': 'Your first record.',
       'record.bestIs': 'Your best time is {time}.',
-      'record.genFail': 'Could not build a board. Tap New board to try again.'
+      'record.genFail': 'Could not build a board. Tap New board to try again.',
+      'record.hintedShort': 'hints used, so this one is not recorded',
+      'record.bestMark': 'best time'
     },
     ja: {
       'game.2048': '2048',
@@ -157,7 +161,9 @@
       'record.improved': 'ベスト記録を {time} から縮めました。',
       'record.first': '初めての記録です。',
       'record.bestIs': 'ベスト記録は {time} です。',
-      'record.genFail': '盤を作れませんでした。「新しい盤」を押してもう一度お試しください。'
+      'record.genFail': '盤を作れませんでした。「新しい盤」を押してもう一度お試しください。',
+      'record.hintedShort': 'ヒントを使ったので記録には残しません',
+      'record.bestMark': 'ベスト記録'
     },
     'zh-CN': {
       'game.2048': '2048',
@@ -209,7 +215,9 @@
       'record.improved': '最好成绩从 {time} 提升了。',
       'record.first': '这是第一条记录。',
       'record.bestIs': '最好成绩是 {time}。',
-      'record.genFail': '没能生成盘面。点“新一局”再试一次。'
+      'record.genFail': '没能生成盘面。点“新一局”再试一次。',
+      'record.hintedShort': '用了提示，不计入记录',
+      'record.bestMark': '最好成绩'
     },
     'zh-TW': {
       'game.2048': '2048',
@@ -261,7 +269,9 @@
       'record.improved': '最佳成績從 {time} 提升了。',
       'record.first': '這是第一筆紀錄。',
       'record.bestIs': '最佳成績是 {time}。',
-      'record.genFail': '沒能產生盤面。點「新一局」再試一次。'
+      'record.genFail': '沒能產生盤面。點「新一局」再試一次。',
+      'record.hintedShort': '用了提示，不計入紀錄',
+      'record.bestMark': '最佳成績'
     },
     es: {
       'game.2048': '2048',
@@ -313,7 +323,9 @@
       'record.improved': 'Has bajado tu mejor marca de {time}.',
       'record.first': 'Tu primera marca.',
       'record.bestIs': 'Tu mejor marca es {time}.',
-      'record.genFail': 'No se pudo generar el tablero. Pulsa Nuevo tablero para reintentar.'
+      'record.genFail': 'No se pudo generar el tablero. Pulsa Nuevo tablero para reintentar.',
+      'record.hintedShort': 'con pistas, no cuenta para el récord',
+      'record.bestMark': 'mejor marca'
     }
   });
 })();
