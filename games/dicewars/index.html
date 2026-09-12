@@ -3,15 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>주사위 영토전</title>
-<meta name="description" content="주사위를 굴려 이웃 영토를 뺏고 가장 큰 덩어리로 보급을 받는 턴제 전략 게임">
+<title data-i18n="game.dicewars">주사위 영토전</title>
+<meta name="description" content="주사위를 굴려 이웃 영토를 뺏고 가장 큰 덩어리로 보급을 받는 턴제 전략 게임" data-i18n-attr="content=meta.desc">
 <meta name="color-scheme" content="light dark">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><rect x='3' y='3' width='18' height='18' rx='4' fill='%23c9603f'/><circle cx='8' cy='8' r='2' fill='%23fff'/><circle cx='16' cy='16' r='2' fill='%23fff'/><circle cx='12' cy='12' r='2' fill='%23fff'/></svg>">
 <link rel="manifest" href="../../manifest.json">
 <link rel="apple-touch-icon" href="../../icons/icon-180.png">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="주사위 영토전">
+<meta name="apple-mobile-web-app-title" content="주사위 영토전" data-i18n-attr="content=game.dicewars">
 <meta name="theme-color" content="#f7f4f1" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#191614" media="(prefers-color-scheme: dark)">
 <link rel="stylesheet" href="../../shared/base.css">
@@ -19,34 +19,37 @@
 <link rel="stylesheet" href="../../shared/result.css">
 <link rel="stylesheet" href="../../shared/sheet.css">
 <script src="../../shared/analytics.js"></script>
+<script src="../../shared/i18n.js"></script>
+<script src="../../shared/strings.js"></script>
+<script src="strings.js"></script>
 </head>
 <body>
 <main class="app">
   <header class="head">
     <div class="title-row">
       <div class="head-nav">
-        <a class="back" href="../../">← 목록</a>
-        <button class="toggle" id="help-open" type="button" aria-pressed="false">도움말</button>
+        <a class="back" href="../../" data-i18n="ui.back">← 목록</a>
+        <button class="toggle" id="help-open" type="button" aria-pressed="false" data-i18n="ui.help">도움말</button>
       </div>
-      <h1>주사위 영토전</h1>
+      <h1 data-i18n="game.dicewars">주사위 영토전</h1>
       <div class="head-actions">
-        <button class="toggle sound" id="toggle-bgm" type="button" aria-pressed="true">BGM</button>
-        <button class="toggle sound" id="toggle-sfx" type="button" aria-pressed="true">효과음</button>
+        <button class="toggle sound" id="toggle-bgm" type="button" aria-pressed="true" data-i18n="ui.bgm">BGM</button>
+        <button class="toggle sound" id="toggle-sfx" type="button" aria-pressed="true" data-i18n="ui.sfx">효과음</button>
       </div>
     </div>
     <div class="picker-row">
-      <div class="picker" id="players" role="group" aria-label="인원"></div>
+      <div class="picker" id="players" role="group" aria-label="인원" data-i18n-attr="aria-label=ui.players"></div>
       <span class="tally" id="tally"></span>
     </div>
     <div class="picker-row">
-      <span class="row-label">난이도</span>
-      <div class="picker" id="levels" role="group" aria-label="난이도"></div>
-      <button class="pick" id="new-game" type="button">새 판</button>
+      <span class="row-label" data-i18n="ui.difficulty">난이도</span>
+      <div class="picker" id="levels" role="group" aria-label="난이도" data-i18n-attr="aria-label=ui.difficulty"></div>
+      <button class="pick" id="new-game" type="button" data-i18n="ui.newBoard">새 판</button>
     </div>
   </header>
 
   <div class="board-wrap">
-    <svg class="board" id="board" role="application" aria-label="영토 지도"></svg>
+    <svg class="board" id="board" role="application" aria-label="영토 지도" data-i18n-attr="aria-label=dice.map"></svg>
     <div class="roll" id="roll" hidden aria-hidden="true">
       <div class="roll-card">
         <div class="roll-row" id="roll-attack"></div>
@@ -59,7 +62,7 @@
         <p class="sheet-title" id="result-title"></p>
         <p class="sheet-note" id="result-note"></p>
         <div class="sheet-actions">
-          <button class="btn" id="again" type="button">한 판 더</button>
+          <button class="btn" id="again" type="button" data-i18n="ui.again">한 판 더</button>
         </div>
       </div>
     </div>
@@ -68,32 +71,32 @@
   <p class="toast" id="toast" role="status" aria-live="polite"></p>
 
   <div class="pad">
-    <button class="btn" id="end-turn" type="button">턴 종료</button>
+    <button class="btn" id="end-turn" type="button" data-i18n="dice.endTurn">턴 종료</button>
   </div>
 
   <div class="sheet" id="help" hidden>
-    <p class="sheet-title">규칙</p>
+    <p class="sheet-title" data-i18n="ui.rules">규칙</p>
     <ul class="help-list">
-      <li>내 영토를 고르고 <b>맞닿은 남의 영토</b>를 누르면 칩니다. 주사위가 <b>둘 이상</b>인
+      <li data-i18n-html="dice.rule1">내 영토를 고르고 <b>맞닿은 남의 영토</b>를 누르면 칩니다. 주사위가 <b>둘 이상</b>인
         영토만 칠 수 있습니다.</li>
-      <li>양쪽 주사위를 <b>모두 굴려 합을 견줍니다.</b> 공격 쪽이 <b>더 커야</b> 이깁니다 —
+      <li data-i18n-html="dice.rule2">양쪽 주사위를 <b>모두 굴려 합을 견줍니다.</b> 공격 쪽이 <b>더 커야</b> 이깁니다 —
         같으면 지키는 쪽이 이깁니다. 굴린 눈은 판 위에 <b>위가 치는 쪽, 아래가 지키는
         쪽</b>으로 뜹니다.</li>
-      <li>이기면 그 영토를 얻고, 친 영토의 주사위를 <b>하나만 남기고</b> 옮깁니다.
+      <li data-i18n-html="dice.rule3">이기면 그 영토를 얻고, 친 영토의 주사위를 <b>하나만 남기고</b> 옮깁니다.
         지면 친 영토가 <b>하나로</b> 줄어듭니다.</li>
-      <li>고른 영토에서 칠 수 있는 곳에는 <b>이길 확률</b>이 뜹니다. 숫자만 보고 두세요.</li>
-      <li>차례를 끝내면 <b>이어져 있는 내 영토 중 가장 큰 덩어리의 크기만큼</b> 주사위를
+      <li data-i18n-html="dice.rule4">고른 영토에서 칠 수 있는 곳에는 <b>이길 확률</b>이 뜹니다. 숫자만 보고 두세요.</li>
+      <li data-i18n-html="dice.rule5">차례를 끝내면 <b>이어져 있는 내 영토 중 가장 큰 덩어리의 크기만큼</b> 주사위를
         받아 내 영토에 무작위로 얹습니다. 넓게 흩어지는 것보다 <b>이어 붙이는 편이
         이득</b>입니다. 여덟이 찬 영토는 건너뛰고, 놓을 자리가 없으면 쌓아 뒀다 다음에
         받습니다.</li>
-      <li><b>먼저 치는 쪽이 유리한 놀이</b>라, 뒤 차례일수록 주사위를 조금 더 갖고
+      <li data-i18n-html="dice.rule6"><b>먼저 치는 쪽이 유리한 놀이</b>라, 뒤 차례일수록 주사위를 조금 더 갖고
         시작합니다. 내가 늘 선공이므로 그만큼을 상대가 받습니다 — 2인은 6개,
         3인은 3·4개, 4인은 1·2·2개입니다.</li>
-      <li>영토를 모두 잃으면 탈락하고, <b>마지막까지 남으면 이깁니다.</b></li>
-      <li><b>난이도</b>는 판을 다시 만들지 않고 언제든 바꿀 수 있습니다.</li>
+      <li data-i18n-html="dice.rule7">영토를 모두 잃으면 탈락하고, <b>마지막까지 남으면 이깁니다.</b></li>
+      <li data-i18n-html="dice.rule8"><b>난이도</b>는 판을 다시 만들지 않고 언제든 바꿀 수 있습니다.</li>
     </ul>
     <div class="sheet-actions">
-      <button class="btn" id="help-close" type="button">닫기</button>
+      <button class="btn" id="help-close" type="button" data-i18n="ui.close">닫기</button>
     </div>
   </div>
 </main>
@@ -107,5 +110,6 @@
 <script src="audio.js"></script>
 <script src="../../shared/sheet.js"></script>
 <script src="main.js"></script>
+<script>SharedI18n.apply();</script>
 </body>
 </html>

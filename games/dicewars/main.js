@@ -13,10 +13,11 @@ const M = window.DiceMap;
 const A = window.DiceAI;
 const O = window.DiceOdds;
 const Sound = window.DiceSound;
+const T = SharedI18n.t;
 const NS = 'http://www.w3.org/2000/svg';
 
-const PLAYERS = [{ label: '2인', n: 2 }, { label: '3인', n: 3 }, { label: '4인', n: 4 }];
-const LEVELS = [{ label: '쉬움', key: 'easy' }, { label: '보통', key: 'normal' }, { label: '어려움', key: 'hard' }];
+const PLAYERS = [{ n: 2 }, { n: 3 }, { n: 4 }];
+const LEVELS = [{ labelKey: 'ui.easy', key: 'easy' }, { labelKey: 'ui.medium', key: 'normal' }, { labelKey: 'ui.hard', key: 'hard' }];
 const PLAYERS_KEY = 'web-games.dicewars.players';
 const LEVEL_KEY = 'web-games.dicewars.level';
 
@@ -239,8 +240,8 @@ function showRoll(result, attacker, defender, mine, then) {
     all.forEach((die) => die.node.classList.remove('spin'));
     result.attackRoll.forEach((value, i) => setFace(attack[i], value));
     result.defendRoll.forEach((value, i) => setFace(defend[i], value));
-    el.rollScore.innerHTML = `${result.attackSum} 대 ${result.defendSum} · `
-      + `<span class="${result.win ? 'win' : 'lose'}">${result.win ? '이겼습니다' : '막혔습니다'}</span>`;
+    el.rollScore.innerHTML = T('dice.rollScore', { attack: result.attackSum, defend: result.defendSum })
+      + `<span class="${result.win ? 'win' : 'lose'}">${result.win ? T('dice.won') : T('dice.blocked')}</span>`;
     // 소리는 **나에게 좋은 일인지**로 고른다. 상대가 뚫으면 내 쪽에서는 나쁜 소식이다.
     Sound.play((mine ? result.win : !result.win) ? 'win' : 'fail', mine ? 1 : 0.6);
     setTimeout(() => {
@@ -349,7 +350,7 @@ function newGame() {
   el.result.hidden = true;
   build();
   paint();
-  say('내 차례입니다. 칠 영토를 고르세요.');
+  say(T('dice.myTurn'));
 }
 
 // --- 그리기 ---
@@ -374,8 +375,8 @@ function paint() {
   const mine = game.turn === 1 && !game.over;
   el.endTurn.disabled = !mine || rolling;
   el.endTurn.textContent = mine
-    ? `턴 종료 · 주사위 ${R.largestGroup(game, 1) + game.stock[1]}개 받기`
-    : '상대 차례…';
+    ? T('dice.endTurnGain', { gain: R.largestGroup(game, 1) + game.stock[1] })
+    : T('dice.foeTurn');
 }
 
 function paintMarks() {
@@ -417,7 +418,7 @@ function paintTally() {
   el.tally.textContent = '';
   const label = document.createElement('span');
   label.className = 'label';
-  label.textContent = '영토';
+  label.textContent = T('dice.territory');
   el.tally.append(label);
   for (let player = 1; player <= game.players; player++) {
     const span = document.createElement('span');
@@ -436,8 +437,8 @@ function say(text) {
 // --- 진행 ---
 
 function describe(result) {
-  const win = result.win ? '이겼습니다' : '막혔습니다';
-  return `${result.attackSum} 대 ${result.defendSum} · <b>${win}</b>`;
+  const outcome = result.win ? T('dice.won') : T('dice.blocked');
+  return T('dice.describe', { attack: result.attackSum, defend: result.defendSum, outcome });
 }
 
 function resolve(fromId, toId, player) {
@@ -451,13 +452,13 @@ function resolve(fromId, toId, player) {
   selected = null;
   clearOdds();
   paintMarks();
-  say(`${before}개로 ${against}개를 칩니다…`);
+  say(T('dice.attacking', { before, against }));
 
   // 주사위가 멎기 전에 판을 고쳐 칠하면 결과가 먼저 새어 나간다.
   showRoll(result, player, beforeOwner, true, () => {
     rolling = false;
     paint();
-    say(`${before}개로 ${against}개를 칩니다 — ${describe(result)}`);
+    say(T('dice.attacked', { before, against, result: describe(result) }));
     if (game.over) { finish(); return; }
     if (game.turn !== 1) runBot();
   });
@@ -470,10 +471,10 @@ function finish() {
   // 판이 끝나는 자리가 여럿이라 여기서 한 번 더 잠근다.
   el.roll.hidden = true;
   const winner = game.over.winner;
-  el.resultTitle.textContent = winner === 1 ? '다 차지했습니다' : '졌습니다';
+  el.resultTitle.textContent = winner === 1 ? T('dice.allYours') : T('dice.lost');
   el.resultNote.textContent = winner === 1
-    ? '마지막까지 남았습니다.'
-    : `${winner}번이 마지막까지 남았습니다.`;
+    ? T('dice.lastStanding')
+    : T('dice.foeLastStanding', { n: winner });
   el.result.hidden = false;
   paint();
   Sound.play(winner === 1 ? 'victory' : 'defeat');
@@ -485,9 +486,9 @@ function runBot() {
   clearTimeout(botTimer);
   if (game.over) { finish(); return; }
   const player = game.turn;
-  if (player === 1) { say('내 차례입니다.'); paint(); return; }
+  if (player === 1) { say(T('dice.myTurnShort')); paint(); return; }
 
-  say(`<b>${player}번</b>이 두는 중…`);
+  say(T('dice.foeThinking', { n: player }));
   paint();
 
   let done = 0;
@@ -498,7 +499,7 @@ function runBot() {
       paint();
       if (game.over) { finish(); return; }
       botTimer = setTimeout(() => {
-        say(`<b>${player}번</b>이 주사위 ${gained.gain}개를 받았습니다.`);
+        say(T('dice.foeGained', { n: player, gain: gained.gain }));
         runBot();
       }, 350);
       return;
@@ -506,10 +507,10 @@ function runBot() {
     done++;
     const foe = game.territories[move.to].owner;
     const result = R.attack(game, move.from, move.to, player, dice);
-    say(`<b>${player}번</b>이 ${move.dice}개로 ${move.against}개를 칩니다…`);
+    say(T('dice.foeAttacking', { n: player, dice: move.dice, against: move.against }));
     showRoll(result, player, foe, false, () => {
       paint();
-      say(`<b>${player}번</b>의 공격 — ${describe(result)}`);
+      say(T('dice.foeAttacked', { n: player, result: describe(result) }));
       if (game.over) { botTimer = setTimeout(finish, 500); return; }
       botTimer = setTimeout(step, BOT_STEP);
     });
@@ -552,7 +553,7 @@ el.board.addEventListener('click', (event) => {
     return;
   }
   if (t.owner === 1) {
-    if (t.dice < 2) { say('주사위가 하나뿐인 영토로는 칠 수 없습니다.'); return; }
+    if (t.dice < 2) { say(T('dice.needTwo')); return; }
     selected = selected === id ? null : id;
     Sound.play('click');
     clearOdds();
@@ -571,7 +572,7 @@ el.endTurn.addEventListener('click', () => {
   const gained = R.endTurn(game, dice);
   Sound.play('turn');
   paint();
-  say(`주사위 ${gained.gain}개를 받았습니다.`);
+  say(T('dice.gained', { gain: gained.gain }));
   runBot();
 });
 
@@ -579,7 +580,7 @@ for (const item of PLAYERS) {
   const button = document.createElement('button');
   button.className = 'pick';
   button.type = 'button';
-  button.textContent = item.label;
+  button.textContent = T('ui.playerCount', { n: item.n });
   button.setAttribute('aria-pressed', String(item.n === players));
   button.addEventListener('click', () => {
     players = item.n;
@@ -597,7 +598,7 @@ for (const item of LEVELS) {
   const button = document.createElement('button');
   button.className = 'pick';
   button.type = 'button';
-  button.textContent = item.label;
+  button.textContent = T(item.labelKey);
   button.setAttribute('aria-pressed', String(item.key === level));
   // 난이도는 판을 다시 만들지 않고 그 자리에서 바뀐다. 밀린다 싶을 때 물러설 길이다.
   button.addEventListener('click', () => {

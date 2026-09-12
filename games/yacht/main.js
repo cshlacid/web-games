@@ -15,7 +15,7 @@ const NS = 'http://www.w3.org/2000/svg';
 
 const PLAYERS = [{ n: 2 }, { n: 3 }, { n: 4 }];
 const LEVELS = [{ labelKey: 'ui.easy', key: 'easy' }, { labelKey: 'ui.medium', key: 'normal' }, { labelKey: 'ui.hard', key: 'hard' }];
-const PLAYERS_KEY = 'web-games.yacht.players';
+const PLAYERS_KEY = 'web-games.ui.players';
 const LEVEL_KEY = 'web-games.yacht.level';
 const BEST_KEY = 'web-games.yacht.best';
 
@@ -443,7 +443,7 @@ for (const item of PLAYERS) {
   const button = document.createElement('button');
   button.className = 'pick';
   button.type = 'button';
-  button.textContent = t('yacht.playerCount', { n: item.n });
+  button.textContent = t('ui.playerCount', { n: item.n });
   button.setAttribute('aria-pressed', String(item.n === players));
   button.addEventListener('click', () => {
     players = item.n;
