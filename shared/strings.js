@@ -27,7 +27,20 @@
       'ui.help': '도움말',
       'ui.close': '닫기',
       'ui.score': '점수',
-      'ui.best': '최고'
+      'ui.best': '최고',
+      'ui.rules': '규칙',
+      'ui.hint': '힌트',
+      'ui.undo': '되돌리기',
+      'ui.erase': '지우기',
+      'ui.pencil': '연필',
+      'ui.newGame': '새 게임',
+      'ui.newBoard': '새 판',
+      'ui.again': '한 판 더',
+      'ui.retry': '다시 하기',
+      'ui.restart': '다시',
+      'ui.next': '다음',
+      'ui.difficulty': '난이도',
+      'ui.making': '만드는 중…'
     },
     en: {
       'game.2048': '2048',
@@ -53,7 +66,20 @@
       'ui.help': 'Help',
       'ui.close': 'Close',
       'ui.score': 'Score',
-      'ui.best': 'Best'
+      'ui.best': 'Best',
+      'ui.rules': 'Rules',
+      'ui.hint': 'Hint',
+      'ui.undo': 'Undo',
+      'ui.erase': 'Erase',
+      'ui.pencil': 'Notes',
+      'ui.newGame': 'New game',
+      'ui.newBoard': 'New board',
+      'ui.again': 'Play again',
+      'ui.retry': 'Try again',
+      'ui.restart': 'Restart',
+      'ui.next': 'Next',
+      'ui.difficulty': 'Difficulty',
+      'ui.making': 'Generating…'
     },
     ja: {
       'game.2048': '2048',
@@ -79,7 +105,20 @@
       'ui.help': 'ヘルプ',
       'ui.close': '閉じる',
       'ui.score': 'スコア',
-      'ui.best': 'ベスト'
+      'ui.best': 'ベスト',
+      'ui.rules': 'ルール',
+      'ui.hint': 'ヒント',
+      'ui.undo': '戻す',
+      'ui.erase': '消す',
+      'ui.pencil': 'メモ',
+      'ui.newGame': '新しいゲーム',
+      'ui.newBoard': '新しい盤',
+      'ui.again': 'もう一局',
+      'ui.retry': 'もう一度',
+      'ui.restart': 'やり直す',
+      'ui.next': '次へ',
+      'ui.difficulty': '難易度',
+      'ui.making': '生成中…'
     },
     'zh-CN': {
       'game.2048': '2048',
@@ -105,7 +144,20 @@
       'ui.help': '帮助',
       'ui.close': '关闭',
       'ui.score': '分数',
-      'ui.best': '最高'
+      'ui.best': '最高',
+      'ui.rules': '规则',
+      'ui.hint': '提示',
+      'ui.undo': '撤销',
+      'ui.erase': '擦除',
+      'ui.pencil': '笔记',
+      'ui.newGame': '新游戏',
+      'ui.newBoard': '新一局',
+      'ui.again': '再来一局',
+      'ui.retry': '再试一次',
+      'ui.restart': '重来',
+      'ui.next': '下一个',
+      'ui.difficulty': '难度',
+      'ui.making': '生成中…'
     },
     'zh-TW': {
       'game.2048': '2048',
@@ -131,7 +183,20 @@
       'ui.help': '說明',
       'ui.close': '關閉',
       'ui.score': '分數',
-      'ui.best': '最高'
+      'ui.best': '最高',
+      'ui.rules': '規則',
+      'ui.hint': '提示',
+      'ui.undo': '復原',
+      'ui.erase': '擦除',
+      'ui.pencil': '筆記',
+      'ui.newGame': '新遊戲',
+      'ui.newBoard': '新一局',
+      'ui.again': '再來一局',
+      'ui.retry': '再試一次',
+      'ui.restart': '重來',
+      'ui.next': '下一個',
+      'ui.difficulty': '難度',
+      'ui.making': '生成中…'
     },
     es: {
       'game.2048': '2048',
@@ -157,7 +222,20 @@
       'ui.help': 'Ayuda',
       'ui.close': 'Cerrar',
       'ui.score': 'Puntos',
-      'ui.best': 'Mejor'
+      'ui.best': 'Mejor',
+      'ui.rules': 'Reglas',
+      'ui.hint': 'Pista',
+      'ui.undo': 'Deshacer',
+      'ui.erase': 'Borrar',
+      'ui.pencil': 'Notas',
+      'ui.newGame': 'Nueva partida',
+      'ui.newBoard': 'Nuevo tablero',
+      'ui.again': 'Otra partida',
+      'ui.retry': 'Reintentar',
+      'ui.restart': 'Reiniciar',
+      'ui.next': 'Siguiente',
+      'ui.difficulty': 'Dificultad',
+      'ui.making': 'Generando…'
     }
   });
 })();
