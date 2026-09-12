@@ -31,12 +31,12 @@ const HERO_BASE = 1;
 
 // 상한이 있는 축들. 무한히 사는 것은 캐릭터 레벨뿐이다.
 const PERKS = {
-  lives: { name: '목숨', note: '판을 시작할 때 목숨이 하나 는다', max: 5, cost: (l) => Math.round(80 * Math.pow(2, l)) },
-  slots: { name: '편성 칸', note: '판에 데려가는 사람이 하나 는다', max: 3, cost: (l) => Math.round(140 * Math.pow(2.2, l)) },
-  purse: { name: '시작 골드', note: '시작 골드가 10% 는다', max: 5, cost: (l) => Math.round(60 * Math.pow(1.8, l)) },
+  lives: { max: 5, cost: (l) => Math.round(80 * Math.pow(2, l)) },
+  slots: { max: 3, cost: (l) => Math.round(140 * Math.pow(2.2, l)) },
+  purse: { max: 5, cost: (l) => Math.round(60 * Math.pow(1.8, l)) },
   // **영웅 칸은 비싸다.** 영웅 하나가 판 일감의 절반을 하므로, 둘째·셋째 칸은
   // 편성 칸보다 비싸야 "언제 여느냐"가 판단이 된다.
-  hero: { name: '영웅 칸', note: '판에 데려가는 영웅이 하나 는다', max: 2, cost: (l) => Math.round(400 * Math.pow(2.6, l)) },
+  hero: { max: 2, cost: (l) => Math.round(400 * Math.pow(2.6, l)) },
 };
 
 const ITEM_POOL = ['bomb', 'freeze', 'purse', 'mend', 'order'];
@@ -48,7 +48,6 @@ const OPEN_COST = 140;
 const OPEN_RAISE = 1.7;
 const HERO_COST = 700;
 const HERO_RAISE = 1.8;
-const ITEM_NAME = { bomb: '폭탄', freeze: '얼림', purse: '보급', mend: '구호', order: '명령서' };
 
 const blank = () => ({
   best: 0, gems: 0, level: 0, perks: { lives: 0, slots: 0, purse: 0, hero: 0 },
@@ -259,13 +258,12 @@ function cardsFor(save, stage, count, rand) {
   for (let i = 0; i < Math.min(2, locked.length) && cards.length < count - 1; i++) {
     const key = locked.splice(Math.floor(roll() * locked.length), 1)[0];
     cards.push({
+      // 카드에 쓸 문장은 담지 않는다 — kind와 key만 있으면 화면이 사전에서 꺼낸다.
       kind: 'unlock', key, hero: isHero(key),
-      name: isHero(key) ? `영웅 ${D.UNITS[key].name}` : D.UNITS[key].name,
-      note: D.UNITS[key].note,
     });
   }
   const purse = Math.max(2, Math.round(scale(stage) * 0.8));
-  cards.push({ kind: 'gems', amount: purse, name: `보석 ${purse}`, note: '레벨을 올리는 데 쓴다' });
+  cards.push({ kind: 'gems', amount: purse });
   // 아무 자리에서 시작해 목록을 한 바퀴 돈다. 매번 새로 뽑아 겹치면 다시 뽑는
   // 방식은, 늘 같은 값을 주는 난수(테스트가 그렇게 넘긴다)에서 영영 끝나지 않는다.
   let spot = Math.floor(roll() * ITEM_POOL.length);
@@ -273,7 +271,6 @@ function cardsFor(save, stage, count, rand) {
     const id = ITEM_POOL[(spot + turn) % ITEM_POOL.length];
     cards.push({
       kind: 'items', id, count: 2,
-      name: `${ITEM_NAME[id]} 2개`, note: '판 안에서 한 번씩 쓴다',
     });
   }
   return cards;
@@ -312,7 +309,7 @@ function settle(save, stage, run, rand) {
 }
 
 const Meta = {
-  KEY, PERKS, ITEM_POOL, ITEM_NAME, LEVEL_STEP, LEVEL_HP, GEM_GROWTH, SLOTS_BASE, HERO_BASE,
+  KEY, PERKS, ITEM_POOL, LEVEL_STEP, LEVEL_HP, GEM_GROWTH, SLOTS_BASE, HERO_BASE,
   blank, patch, load, store, modsOf, modsWith, gainOf, rosterOf, chooseHero, isHero,
   slotsOf, heroSlots, levelOf, levelCost, perkCost,
   buyLevel, buyPerk, grant, toggleTeam, fillTeam, gemsFor, cardsFor, takeCard,

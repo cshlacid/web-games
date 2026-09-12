@@ -14,7 +14,7 @@ function check(name, actual, expected) {
 
 const one = G.goalOf(1);
 check('같은 스테이지는 같은 목표', G.goalOf(1), one);
-check('목표에는 이름과 설명이 있다', [typeof one.name, typeof one.note], ['string', 'string']);
+check('목표에는 id가 붙는다', typeof one.id, 'string');
 
 // 스테이지가 아무리 올라가도 목표가 만들어지는가, 그리고 한쪽으로 쏠리지 않는가.
 const seen = {};

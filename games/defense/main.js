@@ -17,6 +17,7 @@ const G = window.DefenseGoals;
 const WV = window.DefenseWaves;
 const T = window.DefenseMeta;
 const Sound = window.DefenseSound;
+const t = SharedI18n.t;
 
 const el = {};
 for (const [name, id] of [
@@ -64,33 +65,34 @@ const num = (v) => (v >= 100 ? String(Math.round(v)) : v.toFixed(1));
 // **판 성격과 주력 적을 판 시작 전에 알려 준다.** 편성은 판을 열기 전에 정하는데
 // 무엇이 오는지 모르면 고를 수가 없어, 어느 판에서나 통하는 하나를 데려가는 것이
 // 늘 맞는 답이 됐다.
-const SHAPE_NAME = {};
-for (const v of M.SHAPES) SHAPE_NAME[v.id] = v;
+const goalName = (g) => t('def.goal.' + g.id);
+const goalLine = (g) => t('def.goalLine', { name: goalName(g), note: t('def.goal.' + g.id + '.note', { arg: g.arg }) });
+
 function stageNote(stage) {
-  const shape = SHAPE_NAME[M.build(stage).shape];
-  const foe = D.FOES[WV.themeOf(stage)];
-  return `<b>${shape.name}</b> ${shape.note}` + (foe ? ` · 주력은 <b>${foe.name}</b>` : '');
+  const shape = M.build(stage).shape;
+  const line = t('def.mapLine', { name: t('def.map.' + shape), note: t('def.map.' + shape + '.note') });
+  const foe = WV.themeOf(stage);
+  return D.FOES[foe] ? t('def.mainFoe', { map: line, foe: t('def.foe.' + foe) }) : line;
 }
 
 // **영웅은 제 이름을 가진다.** 직함만 적으면 셋이 "영웅"으로 뭉뚱그려져 어느 판에
 // 누구를 꺼냈는지 기억에 남지 않는다. 일반 캐릭터는 직함이 곧 이름이다.
 const who = (key) => {
-  const d = D.UNITS[key];
-  return d.who ? `${d.name} ${d.who}` : d.name;
+  const name = t('def.unit.' + key);
+  const person = t('def.who.' + key);
+  return person ? `${name} ${person}` : name;
 };
 
 // 기본 공격의 모양을 적지 않는 캐릭터가 대부분이라, 다른 자들만 꼬리표를 단다.
-const BASIC_TAG = { splash: '(범위)', ring: '(둘레)', smite: '(+회복)' };
+const BASIC_TAG = { splash: 'def.tagSplash', ring: 'def.tagRing', smite: 'def.tagSmite' };
 const BASIC_NOTE = {
-  splash: '기본 공격이 범위',
-  ring: '기본 공격도 둘레를 벤다',
-  smite: '기본 공격도 아군을 되살린다',
-  single: '기본 공격이 한 놈',
+  splash: 'def.basicSplash', ring: 'def.basicRing',
+  smite: 'def.basicSmite', single: 'def.basicSingle',
 };
 // 신성으로 때리는지는 모양이 아니라 종류에 달렸다. 언데드 판에서 누구를 데려갈지
 // 가르는 값이라 따로 적는다.
-const holyOf = (d) => (d.basic && d.basic.kind === 'holy' ? ' · 신성이라 언데드에 두 배' : '');
-const big = (v) => Math.round(v).toLocaleString('ko-KR');
+const holyOf = (d) => (d.basic && d.basic.kind === 'holy' ? ` · ${t('def.holyNote')}` : '');
+const big = (v) => Math.round(v).toLocaleString(SharedI18n.lang);
 // 단추와 목록의 작은 그림은 배경으로 얹는다 — 시트가 아직 안 왔어도 브라우저가
 // 알아서 채운다.
 const spriteNode = (key, side) => {
@@ -297,14 +299,15 @@ function toast(text) {
 }
 
 function hud() {
-  el.stage.textContent = `스테이지 ${stage}`;
-  el.lives.textContent = `목숨 ${Math.max(0, run.lives)}`;
-  el.gold.textContent = `골드 ${run.gold}`;
+  el.stage.textContent = t('def.stage', { n: stage });
+  el.lives.textContent = t('def.lives', { n: Math.max(0, run.lives) });
+  el.gold.textContent = t('def.gold', { n: run.gold });
   const waiting = run.wave < run.waves.length && !run.pending.length && !run.foes.length;
+  const left = Math.max(0, Math.ceil(run.timer));
   el.wave.textContent = run.wave === 0 && waiting
-    ? `곧 시작 ${Math.max(0, Math.ceil(run.timer))}`
-    : (waiting ? `${run.wave}/${run.waves.length} · 다음 ${Math.max(0, Math.ceil(run.timer))}`
-      : `웨이브 ${run.wave}/${run.waves.length}`);
+    ? t('def.startsIn', { n: left })
+    : (waiting ? t('def.nextWave', { wave: run.wave, total: run.waves.length, n: left })
+      : t('def.wave', { wave: run.wave, total: run.waves.length }));
   el.rush.disabled = !waiting || !!run.over;
 
   // 진행 시간. 속공 목표가 걸린 판에서는 한도까지 같이 적는다.
@@ -314,7 +317,7 @@ function hud() {
 
   const done = G.met(goal, run.stats);
   el.goal.classList.toggle('done', done && !!run.over);
-  el.goal.innerHTML = `${stageNote(run.stage)}<br>목표 <b>${goal.name}</b> · ${goal.note}`;
+  el.goal.innerHTML = `${stageNote(run.stage)}<br>${goalLine(goal)}`;
 
   for (const node of el.palette.children) {
     const key = node.dataset.key;
@@ -327,7 +330,7 @@ function hud() {
     const hero = !!D.UNITS[key].hero;
     const ready = hero ? R.heroWave(Object.keys(run.heroesUsed).length) : 0;
     const label = hero
-      ? (run.heroesUsed[key] ? '부름' : (run.wave >= ready ? '지금' : `${ready}웨이브`))
+      ? (run.heroesUsed[key] ? t('def.called') : (run.wave >= ready ? t('def.callNow') : t('def.callFrom', { n: ready })))
       : String(cost);
     if (tag.textContent !== label) tag.textContent = label;
     node.classList.toggle('poor', hero ? run.wave < ready : run.gold < cost);
@@ -338,7 +341,7 @@ function hud() {
   }
   for (const node of el.items.children) {
     const id = node.dataset.item;
-    node.textContent = `${T.ITEM_NAME[id]} ${save.items[id]}`;
+    node.textContent = `${t('def.item.' + id)} ${save.items[id]}`;
     node.disabled = !save.items[id] || !!run.over;
     node.setAttribute('aria-pressed', String(!!order && order.id == null && order.item === id));
   }
@@ -349,38 +352,43 @@ function hud() {
     const d = D.UNITS[picked.key];
     const now = R.statOf(picked.key, picked.tier, run.mods);
     const wait = Math.max(0, picked.scd);
-    el.barName.textContent = `${who(picked.key)} ${picked.tier}단계`;
+    el.barName.textContent = t('def.tier', { who: who(picked.key), n: picked.tier });
     // 지금 수치를 그대로 적는다. 스킬 칸은 힐러만 회복량이고 나머지는 한 방 피해다.
     // 얼음 지대는 한 방의 크기가 아니라 **초당 얼마를 깎는가**가 뜻 있는 값이다.
     const sk = now.skill;
     const power = sk.shape === 'heal'
-      ? `회복 <b>${num(sk.heal * (run.mods.heal == null ? 1 : run.mods.heal))}</b>`
+      ? t('def.heal', { n: num(sk.heal * (run.mods.heal == null ? 1 : run.mods.heal)) })
       : (sk.shape === 'field'
-        ? `초당 <b>${num(now.damage * sk.fieldDps)}</b>`
+        ? t('def.dps', { n: num(now.damage * sk.fieldDps) })
         : `<b>${num(now.damage * (sk.mul == null ? 1 : sk.mul))}</b>`);
     const hold = now.skill.fieldFor || now.skill.bleedFor || now.skill.stunFor;
-    el.barStats.innerHTML = `체력 <b>${Math.round(picked.hp)}/${now.hp}</b> · `
-      + `공격 <b>${num(now.damage)}</b>${now.basic.kind === 'holy' ? '(신성)' : (BASIC_TAG[now.basic.shape] || '')}`
-      + ` · 사거리 <b>${d.range.min}-${d.range.max}</b><br>`
-      + `${d.skill.name} ${power} · 쿨타임 <b>${num(now.skill.cd)}초</b>`
-      + (hold ? ` · 지속 <b>${num(hold)}초</b>` : '') + ' · '
-      + (wait > 0.1 ? `<b>${Math.ceil(wait)}초 남음</b>` : '<b>준비됨</b>');
+    const tag = now.basic.kind === 'holy' ? t('def.tagHoly')
+      : (BASIC_TAG[now.basic.shape] ? t(BASIC_TAG[now.basic.shape]) : '');
+    el.barStats.innerHTML = t('def.stats', {
+      hp: Math.round(picked.hp), maxHp: now.hp, dmg: num(now.damage), tag,
+      min: d.range.min, max: d.range.max,
+    }) + '<br>'
+      + t('def.skillLine', { skill: t('def.skill.' + picked.key), power, cd: num(now.skill.cd) })
+      + (hold ? ` · ${t('def.hold', { n: num(hold) })}` : '') + ' · '
+      + (wait > 0.1 ? t('def.waitLeft', { n: Math.ceil(wait) }) : t('def.ready'));
     const top = picked.tier >= D.UP.max;
     const cost = R.upCost(picked.key, picked.tier);
     el.barUp.disabled = top || run.gold < cost;
     if (top) {
-      el.barUp.innerHTML = '<b>끝까지 올렸다</b>';
+      el.barUp.innerHTML = t('def.maxed');
     } else {
       // 값을 치르기 전에 무엇이 얼마나 오르는지 나란히 보여 준다.
       const next = R.statOf(picked.key, picked.tier + 1, run.mods);
       const nextHold = next.skill.fieldFor || next.skill.bleedFor || next.skill.stunFor;
-      el.barUp.innerHTML = `<b>올리기 ${cost}</b>`
-        + `<span>공격 ${num(now.damage)}→${num(next.damage)} · 체력 ${now.hp}→${next.hp}`
-        + ` · 사거리 +${(next.far - now.far).toFixed(1)}칸</span>`
-        + `<span>쿨타임 ${num(now.skill.cd)}→${num(next.skill.cd)}초`
-        + (hold ? ` · 지속 ${num(hold)}→${num(nextHold)}초` : '') + '</span>';
+      el.barUp.innerHTML = t('def.upgrade', { cost })
+        + `<span>${t('def.upgradeStats', {
+          a: num(now.damage), b: num(next.damage), c: now.hp, d: next.hp,
+          e: (next.far - now.far).toFixed(1),
+        })}</span>`
+        + `<span>${t('def.upgradeCd', { a: num(now.skill.cd), b: num(next.skill.cd) })}`
+        + (hold ? ` · ${t('def.upgradeHold', { a: num(hold), b: num(nextHold) })}` : '') + '</span>';
     }
-    el.barSell.textContent = `해고 +${Math.round((picked.paid || d.cost) * D.RUN.refund)}`;
+    el.barSell.textContent = t('def.sell', { n: Math.round((picked.paid || d.cost) * D.RUN.refund) });
   }
 }
 
@@ -406,13 +414,13 @@ function handle(events) {
       if (now - lastShotSound > 40) Sound.play('kill');
     } else if (ev.type === 'down') {
       Sound.play('down');
-      toast(`${who(ev.key)}이(가) 무너졌다`);
+      toast(t('def.fell', { who: who(ev.key) }));
     } else if (ev.type === 'leak') {
       Sound.play('leak');
-      toast(ev.lost > 1 ? `우두머리가 지나갔다 · 목숨 −${ev.lost}` : '적이 지나갔다');
+      toast(ev.lost > 1 ? t('def.bossPassed', { n: ev.lost }) : t('def.foePassed'));
     } else if (ev.type === 'wave') {
       Sound.play('wave');
-      toast(`웨이브 ${ev.index}${run.waves[ev.index - 1].boss ? ' · 우두머리' : ''}`);
+      toast(t(run.waves[ev.index - 1].boss ? 'def.waveBoss' : 'def.waveStart', { n: ev.index }));
     } else if (ev.type === 'over') {
       finish(ev.how);
     }
@@ -430,16 +438,16 @@ function showReport() {
   const top = Math.max(...rows.map((r) => r.sum), 1);
   for (const r of rows) {
     const bits = [];
-    if (r.t.dealt >= 1) bits.push(`피해 ${big(r.t.dealt)}`);
-    if (r.t.kills) bits.push(`처치 ${r.t.kills}`);
-    if (r.t.taken >= 1) bits.push(`버팀 ${big(r.t.taken)}`);
-    if (r.t.healed >= 1) bits.push(`회복 ${big(r.t.healed)}`);
-    if (r.t.skills) bits.push(`스킬 ${r.t.skills}`);
+    if (r.t.dealt >= 1) bits.push(t('def.statDealt', { n: big(r.t.dealt) }));
+    if (r.t.kills) bits.push(t('def.statKills', { n: r.t.kills }));
+    if (r.t.taken >= 1) bits.push(t('def.statTaken', { n: big(r.t.taken) }));
+    if (r.t.healed >= 1) bits.push(t('def.statHealed', { n: big(r.t.healed) }));
+    if (r.t.skills) bits.push(t('def.statSkills', { n: r.t.skills }));
     const line = document.createElement('div');
     line.className = 'line';
     line.innerHTML = `<span class="who">${who(r.key)}</span>`
       + `<span class="bar"><i style="width:${Math.round((r.sum / top) * 100)}%;background:${(SP.TINT[r.key] || {}).main || '#888'}"></i></span>`
-      + `<span class="did">${bits.join(' · ') || `${r.t.hired}명 고용`}</span>`;
+      + `<span class="did">${bits.join(' · ') || t('def.statHired', { n: r.t.hired })}</span>`;
     el.report.appendChild(line);
   }
 }
@@ -448,17 +456,26 @@ function finish(how) {
   Sound.play(how === 'won' ? 'win' : 'lose');
   const got = T.settle(save, stage, run, Math.random);
   T.store(save);
-  el.resultTitle.textContent = how === 'won' ? `스테이지 ${stage} 돌파` : '뚫렸다';
+  el.resultTitle.textContent = how === 'won' ? t('def.cleared', { n: stage }) : t('def.failed');
   const bits = [];
-  if (how === 'won') bits.push(`목숨 ${Math.max(0, run.lives)} 남김 · ${Math.round(run.time)}초`);
-  else bits.push(`웨이브 ${run.wave}까지 버텼다`);
-  bits.push(got.goalDone ? `목표 달성 — ${goal.name}` : `목표 ${goal.name}은(는) 다음에`);
-  bits.push(`보석 +${got.gems}`);
+  if (how === 'won') bits.push(t('def.wonNote', { lives: Math.max(0, run.lives), time: Math.round(run.time) }));
+  else bits.push(t('def.lostNote', { n: run.wave }));
+  bits.push(got.goalDone ? t('def.goalDone', { name: goalName(goal) }) : t('def.goalMissed', { name: goalName(goal) }));
+  bits.push(t('def.gemsGot', { n: got.gems }));
   el.resultNote.textContent = bits.join('\n');
-  el.again.textContent = how === 'won' ? '다음 스테이지' : '다시';
+  el.again.textContent = how === 'won' ? t('def.nextStage') : t('ui.restart');
   showReport();
   showCards(got.cards);
   el.result.hidden = false;
+}
+
+function cardText(card) {
+  if (card.kind === 'unlock') {
+    const name = card.hero ? t('def.heroPrefix', { name: who(card.key) }) : t('def.unit.' + card.key);
+    return [name, t('def.unit.' + card.key + '.note')];
+  }
+  if (card.kind === 'gems') return [t('def.cardGems', { n: card.amount }), t('def.cardGemsNote')];
+  return [t('def.cardItems', { name: t('def.item.' + card.id) }), t('def.cardItemsNote')];
 }
 
 function showCards(cards) {
@@ -469,7 +486,9 @@ function showCards(cards) {
     const node = document.createElement('button');
     node.type = 'button';
     node.className = 'card';
-    node.innerHTML = `<b>${card.name}</b><span>${card.note}</span>`;
+        // 카드 문구는 kind와 key로 사전에서 꺼낸다 — meta.js는 자료만 돌려준다.
+    const [name, note] = cardText(card);
+    node.innerHTML = `<b>${name}</b><span>${note}</span>`;
     node.addEventListener('click', () => {
       T.takeCard(save, card);
       T.store(save);
@@ -502,10 +521,13 @@ function buildPalette() {
     cost.className = 'cost';
     cost.textContent = String(d.cost);
     node.appendChild(cost);
-    const basic = (d.basic ? ` · ${BASIC_NOTE[d.basic.shape]}` : '') + holyOf(d)
-      + (d.hero ? ` · 골드가 들지 않는다. 다른 영웅 곁에 서면 피해와 쿨타임이 한 명당 +${Math.round(D.BOND.gain * 100)}%${d.lead ? '(사령관은 두 배)' : ''}` : '');
-    node.title = `${who(key)} · 사거리 ${d.range.min}-${d.range.max}${basic} · ${d.skill.name}(${d.skill.cd}초)`
-    + ` — ${d.skill.note} · 같은 종류는 ${D.MOST_OF_KIND}명까지, 겹칠수록 값이 오른다`;
+    const basic = (d.basic ? ` · ${t(BASIC_NOTE[d.basic.shape])}` : '') + holyOf(d)
+      + (d.hero ? ` · ${t('def.heroTip', { pct: Math.round(D.BOND.gain * 100) })}${d.lead ? t('def.leadTip') : ''}` : '');
+    node.title = t('def.paletteTip', {
+      who: who(key), min: d.range.min, max: d.range.max, basic,
+      skill: t('def.skill.' + key), cd: d.skill.cd, note: t('def.skill.' + key + '.note'),
+      most: D.MOST_OF_KIND,
+    });
     node.addEventListener('click', () => {
       chosen = chosen === key ? null : key;
       picked = null;
@@ -538,11 +560,11 @@ function useItem(id) {
     order = order && order.item === 'order' ? null : { item: 'order', id: null };
     chosen = null;
     picked = null;
-    toast(order ? '옮길 사람을 누르세요' : '');
+    toast(order ? t('def.pickToMove') : '');
     hud();
     return;
   }
-  if (!R.useItem(run, id)) { toast('지금은 쓸 수 없다'); return; }
+  if (!R.useItem(run, id)) { toast(t('def.cannotUse')); return; }
   T.useItem(save, id);
   T.store(save);
   Sound.play(id === 'bomb' ? 'down' : 'place');
@@ -640,7 +662,7 @@ el.canvas.addEventListener('pointerup', (ev) => {
       picked = null;
       if (run.gold < R.costOf(run, it.key)) chosen = null;
     } else if (it.why) {
-      toast(it.why);
+      toast(t('def.why.' + it.why));
     }
   } else {
     picked = it.pick;
@@ -655,13 +677,13 @@ function orderTap(c) {
   if (!c || !order) return;
   const here = run.cells[idx(c.x, c.y)];
   if (order.id == null) {
-    if (!here) { toast('옮길 사람을 누르세요'); return; }
+    if (!here) { toast(t('def.pickToMove')); return; }
     order.id = here.id;
-    toast('갈 자리를 누르세요');
+    toast(t('def.pickTarget'));
     hud();
     return;
   }
-  if (!R.useItem(run, 'order', { id: order.id, x: c.x, y: c.y })) { toast('그 자리에는 못 간다'); return; }
+  if (!R.useItem(run, 'order', { id: order.id, x: c.x, y: c.y })) { toast(t('def.cannotGo')); return; }
   T.useItem(save, 'order');
   T.store(save);
   order = null;
@@ -681,23 +703,26 @@ function row(inner) {
 }
 
 function renderCamp() {
-  el.campGems.textContent = `보석 ${save.gems}`;
+  el.campGems.textContent = t('def.gems', { n: save.gems });
   el.stageNow.textContent = String(stage);
   el.stageDown.disabled = stage <= 1;
   el.stageUp.disabled = stage >= save.best + 1;
   const g = G.goalOf(stage);
-  el.stageNote.innerHTML = `${save.cleared[stage] ? '클리어함' : '아직'} · 목표 ${g.name}<br>${stageNote(stage)}`;
-  el.teamCount.textContent = `${save.team.length}/${T.slotsOf(save)}칸`;
+  el.stageNote.innerHTML = t('def.stageLine', {
+    state: t(save.cleared[stage] ? 'def.stageCleared' : 'def.stageNotYet'),
+    goal: goalName(g),
+  }) + `<br>${stageNote(stage)}`;
+  el.teamCount.textContent = t('def.slots', { used: save.team.length, total: T.slotsOf(save) });
 
   el.teamList.textContent = '';
   // 영웅은 아래 제 칸에서 고른다 — 여기에 섞으면 일반 칸을 쓰는 것처럼 보인다.
   for (const key of save.owned.filter((k) => !T.isHero(k))) {
     const on = save.team.includes(key);
-    const node = row(`<span class="who">${who(key)}</span><span class="sub">${on ? '편성됨' : D.UNITS[key].note}</span>`);
+    const node = row(`<span class="who">${who(key)}</span><span class="sub">${on ? t('def.inTeam') : t('def.unit.' + key + '.note')}</span>`);
     node.prepend(spriteNode(key, 26));
     node.setAttribute('aria-pressed', String(on));
     node.addEventListener('click', () => {
-      if (!T.toggleTeam(save, key)) { toast(on ? '아무도 없이 갈 수는 없다' : '편성 칸이 찼다'); return; }
+      if (!T.toggleTeam(save, key)) { toast(t(on ? 'def.noEmptyTeam' : 'def.teamFull')); return; }
       T.store(save);
       buildPalette();
       renderCamp();
@@ -711,18 +736,18 @@ function renderCamp() {
   if (!heroes.length) {
     const none = document.createElement('p');
     none.className = 'camp-note';
-    none.textContent = `아직 없습니다. 스테이지 ${D.HERO_FROM}부터 목표를 채우면 카드로 나옵니다.`;
+    none.textContent = t('def.noHeroes', { n: D.HERO_FROM });
     el.heroList.appendChild(none);
   }
-  el.heroCount.textContent = `${save.heroes.length}/${T.heroSlots(save)}칸`;
+  el.heroCount.textContent = t('def.slots', { used: save.heroes.length, total: T.heroSlots(save) });
   for (const key of heroes) {
     const on = save.heroes.includes(key);
-    const node = row(`<span class="who">${who(key)}<br><span class="camp-note">${D.UNITS[key].skill.name} · ${D.UNITS[key].note}</span></span>`
-      + `<span class="sub">${on ? '데려감' : `고용 ${D.UNITS[key].cost}`}</span>`);
+    const node = row(`<span class="who">${who(key)}<br><span class="camp-note">${t('def.skill.' + key)} · ${t('def.unit.' + key + '.note')}</span></span>`
+      + `<span class="sub">${on ? t('def.taken') : t('def.hire', { n: D.UNITS[key].cost })}</span>`);
     node.prepend(spriteNode(key, 26));
     node.setAttribute('aria-pressed', String(on));
     node.addEventListener('click', () => {
-      if (!T.chooseHero(save, key)) { toast('영웅 칸이 찼다'); return; }
+      if (!T.chooseHero(save, key)) { toast(t('def.heroFull')); return; }
       T.store(save);
       buildPalette();
       renderCamp();
@@ -736,15 +761,18 @@ function renderCamp() {
   if (!shut.length) {
     const done = document.createElement('p');
     done.className = 'camp-note';
-    done.textContent = '모두 열었습니다.';
+    done.textContent = t('def.allUnlocked');
     el.lockList.appendChild(done);
   }
   for (const key of shut) {
     const cost = T.unlockCost(save, key);
     const d = D.UNITS[key];
-    const node = row(`<span class="who">${d.hero ? `영웅 ${who(key)}` : d.name}`
-      + `<br><span class="camp-note">사거리 ${d.range.min}-${d.range.max} · ${d.skill.name} — ${d.skill.note}</span></span>`
-      + `<span class="sub price">보석 ${cost}</span>`);
+    const node = row(`<span class="who">${d.hero ? t('def.heroPrefix', { name: who(key) }) : t('def.unit.' + key)}`
+      + `<br><span class="camp-note">${t('def.rangeSkill', {
+        min: d.range.min, max: d.range.max,
+        skill: t('def.skill.' + key), note: t('def.skill.' + key + '.note'),
+      })}</span></span>`
+      + `<span class="sub price">${t('def.gemPrice', { n: cost })}</span>`);
     node.prepend(spriteNode(key, 26));
     node.disabled = save.gems < cost;
     node.addEventListener('click', () => {
@@ -767,12 +795,12 @@ function renderCamp() {
     const rows = save.owned.map((key) => {
       const a = R.statOf(key, 1, now);
       const b = R.statOf(key, 1, next);
-      return `${D.UNITS[key].name} ${num(a.damage)}→${num(b.damage)}`;
+      return t('def.levelDelta', { name: t('def.unit.' + key), a: num(a.damage), b: num(b.damage) });
     });
-    const node = row(`<span class="who">부대 레벨 <b>${T.levelOf(save)}</b>`
-      + `<br><span class="camp-note">가진 사람 전부의 공격과 체력이 같이 오른다</span>`
+    const node = row(`<span class="who">${t('def.levelRow', { n: T.levelOf(save) })}`
+      + `<br><span class="camp-note">${t('def.levelNote')}</span>`
       + `<br><span class="camp-note">${rows.join(' · ')}</span></span>`
-      + `<span class="sub price">보석 ${cost}</span>`);
+      + `<span class="sub price">${t('def.gemPrice', { n: cost })}</span>`);
     node.disabled = save.gems < cost;
     node.addEventListener('click', () => {
       if (!T.buyLevel(save)) return;
@@ -788,7 +816,7 @@ function renderCamp() {
     const perk = T.PERKS[id];
     const top = save.perks[id] >= perk.max;
     const cost = T.perkCost(save, id);
-    const node = row(`<span class="who">${perk.name} <span class="camp-note">${save.perks[id]}/${perk.max}</span><br><span class="camp-note">${perk.note}</span></span><span class="sub price">${top ? '끝' : `보석 ${cost}`}</span>`);
+    const node = row(`<span class="who">${t('def.perk.' + id)} <span class="camp-note">${save.perks[id]}/${perk.max}</span><br><span class="camp-note">${t('def.perk.' + id + '.note')}</span></span><span class="sub price">${top ? t('def.perkTop') : t('def.gemPrice', { n: cost })}</span>`);
     node.disabled = top || save.gems < cost;
     node.addEventListener('click', () => {
       if (!T.buyPerk(save, id)) return;
@@ -815,9 +843,13 @@ el.rush.addEventListener('click', () => {
   handle(R.drain(run));
   hud();
 });
+// 배속은 눌러야 바뀌는 값이지만 처음 한 번은 여기서 적는다 — HTML에 적어 두면
+// 그 한 글자만 한국어로 남는다.
+const paintSpeed = () => { el.speed.querySelector('.tool-label').textContent = t('def.speed', { n: speed }); };
+paintSpeed();
 el.speed.addEventListener('click', () => {
   speed = speed === 1 ? 2 : 1;
-  el.speed.querySelector('.tool-label').textContent = `${speed}배속`;
+  paintSpeed();
   Sound.play('click');
 });
 el.restart.addEventListener('click', () => { newRun(stage); Sound.play('click'); });

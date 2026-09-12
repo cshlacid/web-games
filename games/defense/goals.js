@@ -14,44 +14,38 @@ const D = node ? require('./data.js') : window.DefenseData;
 
 // 편성에 무엇이 들었는지 보는 목표는 두지 않았다. 가진 캐릭터가 사람마다 다른데
 // 목표는 스테이지로 고정이라, "궁수 없이"가 궁수밖에 없는 사람에게는 불가능해진다.
+// 이름과 설명은 화면 쪽 사전에 있다 — id가 열쇠이고, arg가 문장에 끼는 값이다.
 const GOALS = [
   {
-    id: 'flawless', name: '무결점', hard: true,
-    note: () => '목숨을 하나도 잃지 않는다',
+    id: 'flawless', hard: true,
     test: (s) => s.livesLost === 0,
   },
   {
-    id: 'swift', name: '속공', hard: false,
+    id: 'swift', hard: false,
     arg: (stage, next) => 150 + Math.floor(next() * 3) * 15,
-    note: (a) => `${a}초 안에 끝낸다`,
     test: (s, a) => s.time <= a,
   },
   {
-    id: 'thrifty', name: '검소', hard: true,
+    id: 'thrifty', hard: true,
     arg: (stage, next) => 4 + Math.floor(next() * 3),
-    note: (a) => `${a}명 이하로 막는다`,
     test: (s, a) => s.placed <= a,
   },
   {
-    id: 'purist', name: '한 우물', hard: false,
-    note: () => '한 종류만 쓴다',
+    id: 'purist', hard: false,
     test: (s) => Object.keys(s.kinds).length <= 1,
   },
   {
-    id: 'saver', name: '알뜰', hard: false,
+    id: 'saver', hard: false,
     arg: (stage, next) => 120 + Math.floor(next() * 4) * 40,
-    note: (a) => `골드를 ${a} 이상 남긴다`,
     test: (s, a) => s.goldLeft >= a,
   },
   {
-    id: 'barehand', name: '맨손', hard: false,
-    note: () => '아무도 올리지 않는다',
+    id: 'barehand', hard: false,
     test: (s) => s.upgrades === 0,
   },
   {
-    id: 'behead', name: '참수', hard: true,
+    id: 'behead', hard: true,
     arg: (stage, next) => 16 + Math.floor(next() * 3) * 6,
-    note: (a) => `우두머리를 ${a}초 안에 잡는다`,
     test: (s, a) => s.bossAt != null && s.bossFrom != null && (s.bossAt - s.bossFrom) <= a,
   },
 ];
@@ -70,7 +64,7 @@ function goalOf(stage) {
   const next = createRng(Math.imul(stage + 13, 0xC2B2AE35));
   const pick = GOALS[Math.floor(next() * GOALS.length)];
   const arg = pick.arg ? pick.arg(stage, next) : null;
-  return { id: pick.id, name: pick.name, hard: pick.hard, arg, note: pick.note(arg) };
+  return { id: pick.id, hard: pick.hard, arg };
 }
 
 const byId = (id) => GOALS.find((g) => g.id === id);

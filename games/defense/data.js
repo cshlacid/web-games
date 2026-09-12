@@ -23,60 +23,52 @@
 //
 // `skill.mul`은 기본 공격 대비 배수다. 값에 이론은 없고 `balance.test.js`의 자동
 // 플레이로 맞춘다.
+// 이름과 설명은 여기 두지 않는다 — 여섯 언어로 갈리므로 id를 사전 열쇠로 쓴다.
 const UNITS = {
   archer: {
-    name: '궁수', cost: 60, damage: 9, rate: 1.1, hp: 60,
+    cost: 60, damage: 9, rate: 1.1, hp: 60,
     range: { min: 1, max: 4 },
-    skill: { name: '정조준', cd: 5, shape: 'single', mul: 2.4, note: '두 배가 넘게 꽂는 한 발' },
-    note: '멀리서 한 놈씩',
+    skill: { cd: 5, shape: 'single', mul: 2.4 },
   },
   shield: {
-    name: '방패병', front: true, cost: 70, damage: 5, rate: 1.0, hp: 320,
+    front: true, cost: 70, damage: 5, rate: 1.0, hp: 320,
     range: { min: 1, max: 1 },
-    skill: { name: '후려치기', cd: 3.5, shape: 'single', mul: 1.2, stunFor: 1.2, note: '때려서 멈춰 세운다' },
-    note: '앞을 막고 버틴다. 체력이 아주 높다',
+    skill: { cd: 3.5, shape: 'single', mul: 1.2, stunFor: 1.2 },
   },
   cannon: {
-    name: '포수', cost: 110, damage: 10, rate: 0.8, hp: 70,
+    cost: 110, damage: 10, rate: 0.8, hp: 70,
     range: { min: 2, max: 5 },
     // **기본 공격도 작은 범위다.** 쿨타임 6초짜리라 대부분의 시간을 한 놈씩 때리고
     // 있었고, 그러면 이름만 포수다. 반지름 1이라 맞닿은 칸까지만 번져 운석(2)과
     // 겹치지 않는다. 무리 판에서 포수가 답이 되는 자리가 여기서 나온다.
     basic: { shape: 'splash', splash: 1 },
-    skill: { name: '포격', cd: 6, shape: 'splash', mul: 2.6, splash: 1.2, note: '한 발이 주변까지' },
-    note: '코앞은 못 친다',
+    skill: { cd: 6, shape: 'splash', mul: 2.6, splash: 1.2 },
   },
   frost: {
-    name: '빙결술사', cost: 90, damage: 6, rate: 0.9, hp: 55,
+    cost: 90, damage: 6, rate: 0.9, hp: 55,
     range: { min: 1, max: 3 },
     skill: {
-      name: '얼음 지대', cd: 9, shape: 'field', mul: 0.5,
+      cd: 9, shape: 'field', mul: 0.5,
       fieldR: 1.3, fieldDps: 0.8, fieldFor: 4, slow: 0.45,
-      note: '바닥을 얼려 둔다. 밟는 동안 깎이고 느려진다',
     },
-    note: '오래 기다리는 대신 판을 바꾼다',
   },
   spear: {
-    name: '창병', cost: 90, damage: 10, rate: 0.9, hp: 110,
+    cost: 90, damage: 10, rate: 0.9, hp: 110,
     range: { min: 1, max: 2 },
     skill: {
-      name: '꿰뚫기', cd: 4, shape: 'line', mul: 1.4, bleedDps: 0.65, bleedFor: 3,
-      note: '한 줄을 꿰고 출혈을 남긴다',
+      cd: 4, shape: 'line', mul: 1.4, bleedDps: 0.65, bleedFor: 3,
     },
-    note: '',
   },
   healer: {
-    name: '힐러', cost: 100, damage: 5, rate: 1.0, hp: 70,
+    cost: 100, damage: 5, rate: 1.0, hp: 70,
     range: { min: 1, max: 3 },
     // 때리는 것은 신성이다. 산 것에게는 5짜리 잡타지만 **언데드에게는 두 배**로
     // 들어가고 언데드의 두꺼운 저항도 타지 않는다 — 일반 여섯 중 언데드를 맡는
     // 자리가 여기다.
     basic: { shape: 'single', kind: 'holy' },
     skill: {
-      name: '치유', cd: 3.5, shape: 'heal', heal: 30, smite: 1.6,
-      note: '가장 다친 아군을 되살리고 둘레의 언데드를 태운다',
+      cd: 3.5, shape: 'heal', heal: 30, smite: 1.6,
     },
-    note: '되살릴 이가 없으면 같이 싸운다. 언데드에 강하다',
   },
 };
 
@@ -119,51 +111,44 @@ const HERO_CALL = { from: 2, gap: 1 };
 // 일반의 두세 배**가 되게 올리고, 대신 그 자리를 좁게 못 박았다.
 const HEROES = {
   blade: {
-    name: '검성', who: '레안', front: true, cost: 0, damage: 46, rate: 1.3, hp: 620, hero: true,
+    front: true, cost: 0, damage: 46, rate: 1.3, hp: 620, hero: true,
     range: { min: 1, max: 1 },
     // **가까운 소수를 처리하는 자리다.** 기본도 스킬도 자기를 가운데로 삼아 둘레를
     // 베고, 반지름이 좁아 맞닿은 것만 맞는다(1.1은 대각선 1.41을 뺀다). 넓히지 않는
     // 것이 성격이다 — 멀리 있는 다수는 대마법사의 자리다.
     basic: { shape: 'ring', ring: 1.1 },
-    skill: { name: '회전베기', cd: 4.5, shape: 'ring', mul: 2.2, ring: 1.6, note: '둘레를 통째로 벤다' },
-    note: '길목에 세워야 값이 나온다. 맞닿은 것만 벤다',
+    skill: { cd: 4.5, shape: 'ring', mul: 2.2, ring: 1.6 },
   },
   arch: {
-    name: '대마법사', who: '모르윈', cost: 0, damage: 40, rate: 0.6, hp: 90, hero: true,
+    cost: 0, damage: 40, rate: 0.6, hp: 90, hero: true,
     range: { min: 2, max: 6 },
     // **멀리 있는 다수를 처리하는 자리다.** 기본부터 범위이고 반지름이 넓다. 대신
     // 코앞(두 칸 안)은 못 치고 체력이 종잇장이라 앞에 세울 수 없다.
     basic: { shape: 'splash', splash: 1.8 },
     skill: {
-      name: '운석', cd: 9, shape: 'splash', mul: 4, splash: 2.6, bleedDps: 0.5, bleedFor: 3,
-      note: '떨어뜨려 태운다',
+      cd: 9, shape: 'splash', mul: 4, splash: 2.6, bleedDps: 0.5, bleedFor: 3,
     },
-    note: '판 끝에서 끝까지 닿는다. 코앞은 못 친다',
   },
   // **혼자서는 영웅 중 제일 약하고, 곁에 누가 있을수록 세진다.** 영웅 칸을 여럿으로
   // 늘리면서 그 구조의 축으로 들인 자다 — 호령이 주는 것은 피해가 아니라 시간이라,
   // 받을 사람이 없으면 값이 0이다. 값이 제일 싼 이유도 그것이다.
   warden: {
-    name: '사령관', who: '베린', lead: true, cost: 0, damage: 14, rate: 1, hp: 280, hero: true,
+    lead: true, cost: 0, damage: 14, rate: 1, hp: 280, hero: true,
     range: { min: 1, max: 5 },
     skill: {
-      name: '호령', cd: 5, shape: 'rally', mul: 1.2, cut: 2.2, heroCut: 4.5,
-      note: '둘레의 스킬을 한꺼번에 당긴다. 영웅은 두 배로',
+      cd: 5, shape: 'rally', mul: 1.2, cut: 2.2, heroCut: 4.5,
     },
-    note: '곁에 누가 있을수록 세진다. 혼자서는 가장 약하다',
   },
   saint: {
-    name: '성기사', who: '가론', front: true, cost: 0, damage: 26, rate: 1, hp: 300, hero: true,
+    front: true, cost: 0, damage: 26, rate: 1, hp: 300, hero: true,
     range: { min: 1, max: 4 },
     // **언데드를 처리하는 자리다.** 때리는 것이 신성이라 언데드에게 두 배로
     // 들어가고 그들의 두꺼운 저항을 타지 않는다. 산 것에게는 평범한 값이고,
     // 언데드 판에서만 압도적인 것이 이 영웅의 성격이다.
     basic: { shape: 'smite', heal: 0.9, kind: 'holy' },
     skill: {
-      name: '치유의 빛', cd: 6, shape: 'heal', heal: 140, all: true, smite: 3.2,
-      note: '둘레의 아군을 한꺼번에 되살리고 언데드를 태운다',
+      cd: 6, shape: 'heal', heal: 140, all: true, smite: 3.2,
     },
-    note: '되살리며 싸운다. 언데드에 아주 강하다',
   },
 };
 
@@ -217,37 +202,37 @@ const HIT = { single: 'single', area: 'area', dot: 'dot', holy: 'holy' };
 // siege(초당 피해)와 bias(부수는 시간에 곱하는 성향)가 길찾기의 성격을 만든다.
 // 공성병은 둘 다 극단이라 조금만 돌아가야 해도 뚫고 들어온다.
 const FOES = {
-  grunt:   { name: '보병', speed: 1.1, hp: 1, resist: {}, siege: 12, bias: 1, bounty: 8, cost: 1 },
+  grunt:   { speed: 1.1, hp: 1, resist: {}, siege: 12, bias: 1, bounty: 8, cost: 1 },
   // **한 놈씩 쏘면 반이 낭비된다.** 체력이 3분의 1이라 한 발이 거의 다 넘치는데,
   // 그 낭비가 마릿수만큼 쌓인다 — 범위로 쓸어야 하는 자리다. 금방 죽어 지속 피해도
   // 다 들어가기 전에 끝난다.
-  swarm:   { name: '무리', speed: 1.35, hp: 0.32, resist: { single: 0.5, dot: 0.3 }, siege: 6, bias: 1, bounty: 4, cost: 0.5 },
+  swarm:   { speed: 1.35, hp: 0.32, resist: { single: 0.5, dot: 0.3 }, siege: 6, bias: 1, bounty: 4, cost: 0.5 },
   // 흩어져 달려 범위에 여럿이 안 걸린다. 그리고 **빠르다** — 사거리 넉 칸을
   // 1.4초에 지나가 느리게 하지 않으면 한두 발밖에 못 넣는다. 답이 둘인 유일한
   // 자리다: 한 놈씩 세게 때리는 자와 발을 묶는 자를 같이 세워야 한다.
-  swift:   { name: '경보병', speed: 2.8, hp: 0.55, resist: { area: 0.35 }, siege: 8, bias: 1.2, bounty: 7, cost: 0.9 },
+  swift:   { speed: 2.8, hp: 0.55, resist: { area: 0.35 }, siege: 8, bias: 1.2, bounty: 7, cost: 0.9 },
   // 한 놈씩 때리는 공격은 10%만 들어간다. 궁수를 아무리 키워도 이 벽은 안 넘는다.
   // **범위도 반만 들어간다** — 범위 하나로 무리와 중장병이 같이 풀리면 포수만 여섯
   // 세우는 것이 새 정답이 된다(실제로 포수만으로 서른 스테이지를 갔다). 여기 남는
   // 답은 방어를 통째로 무시하는 지속 피해다 — 창병의 출혈과 얼음 지대.
-  armored: { name: '중장병', speed: 0.8, hp: 1.5, resist: { single: 0.9, area: 0.85 }, chill: 0.6, siege: 14, bias: 1, bounty: 22, cost: 1.8 },
+  armored: { speed: 0.8, hp: 1.5, resist: { single: 0.9, area: 0.85 }, chill: 0.6, siege: 14, bias: 1, bounty: 22, cost: 1.8 },
   // **여기서만 궁수가 답이다.** 두꺼운 가죽이 범위와 지속을 다 먹지만 한 놈씩
   // 꽂는 것에는 거의 그대로 뚫린다. 초당 60으로 사람을 부수며 들어오므로 시간을
   // 벌 방패병이 같이 필요하다 — 판이 편성을 요구하는 자리가 여기다.
-  breaker: { name: '공성병', speed: 0.85, hp: 1.4, resist: { single: 0.1, area: 0.5, dot: 0.9 }, chill: 0.25, siege: 60, bias: 0.4, bounty: 16, cost: 2 },
+  breaker: { speed: 0.85, hp: 1.4, resist: { single: 0.1, area: 0.5, dot: 0.9 }, chill: 0.25, siege: 60, bias: 0.4, bounty: 16, cost: 2 },
   // 초당 최대 체력의 6%를 되살린다. 조금씩 깎아서는 따라잡지 못하고, 어느 종류로
   // 때려도 얼마쯤은 깎인다 — **한 번에 크게 넣는 스킬**이 답인 자리다.
-  mender:  { name: '치유병', speed: 1, hp: 1, resist: { single: 0.35, area: 0.35, dot: 0.5 }, siege: 10, bias: 1, bounty: 15, heal: 0.06, healRange: 1.8, cost: 1.9 },
+  mender:  { speed: 1, hp: 1, resist: { single: 0.35, area: 0.35, dot: 0.5 }, siege: 10, bias: 1, bounty: 15, heal: 0.06, healRange: 1.8, cost: 1.9 },
   // **언데드 둘.** 산 것을 잡는 수단이 전부 어정쩡하게 통하는 대신 신성에는
   // 두 배로 탄다(`resist.holy`가 음수다 — 음수는 저항이 아니라 약점이다).
   // 되살리는 쪽(힐러·성기사)이 여기서 딜러가 되는 것이 이 계열의 뜻이다.
   //
   // 저항을 고르게 준 것은 일부러다. 한 종류만 크게 막으면 나머지로 밀어 버리면
   // 되는데, 고르게 막으면 **신성을 데려왔는가**가 그 판의 답이 된다.
-  bone:    { name: '해골병', undead: true, speed: 1.0, hp: 1.3, resist: { single: 0.55, area: 0.55, dot: 0.7, holy: -1 }, chill: 0.5, siege: 14, bias: 1, bounty: 20, cost: 1.6 },
+  bone:    { undead: true, speed: 1.0, hp: 1.3, resist: { single: 0.55, area: 0.55, dot: 0.7, holy: -1 }, chill: 0.5, siege: 14, bias: 1, bounty: 20, cost: 1.6 },
   // 형체가 없어 때리는 것이 거의 지나간다. 빠르고 사람을 부수러 돌아온다.
-  wraith:  { name: '망령', undead: true, speed: 1.9, hp: 0.8, resist: { single: 0.75, area: 0.75, dot: 0.75, holy: -1.2 }, chill: 0.3, siege: 18, bias: 1.3, bounty: 24, cost: 1.9 },
-  boss:    { name: '우두머리', speed: 0.7, hp: 12, resist: { single: 0.55, area: 0.2 }, chill: 0.2, siege: 70, bias: 0.7, bounty: 90, cost: 0 },
+  wraith:  { undead: true, speed: 1.9, hp: 0.8, resist: { single: 0.75, area: 0.75, dot: 0.75, holy: -1.2 }, chill: 0.3, siege: 18, bias: 1.3, bounty: 24, cost: 1.9 },
+  boss:    { speed: 0.7, hp: 12, resist: { single: 0.55, area: 0.2 }, chill: 0.2, siege: 70, bias: 0.7, bounty: 90, cost: 0 },
 };
 
 // 종류가 처음 나오는 스테이지. 숫자만 커지면 웨이브 10과 웨이브 80에서 하는 일이

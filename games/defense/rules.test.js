@@ -55,27 +55,27 @@ check('시작 골드와 목숨', [base.gold, base.lives], [D.RUN.gold, D.RUN.liv
 check('한 판은 열 웨이브', R.createRun(1, {}).waves.length, D.RUN.waves);
 
 // --- 배치 ---
-check('벽에는 못 세운다', R.canPlace(make(hall), 'archer', 0, 1), '벽');
-check('판 밖에는 못 세운다', R.canPlace(base, 'archer', -1, 0), '판 밖');
+check('벽에는 못 세운다', R.canPlace(make(hall), 'archer', 0, 1), 'wall');
+check('판 밖에는 못 세운다', R.canPlace(base, 'archer', -1, 0), 'offBoard');
 check('편성에 없으면 못 세운다',
-  R.canPlace(make(field, { roster: ['archer'] }), 'cannon', 1, 1), '편성에 없다');
+  R.canPlace(make(field, { roster: ['archer'] }), 'cannon', 1, 1), 'notInTeam');
 check('골드가 모자라면 못 세운다', R.canPlace(make(field, { mods: { startGold: 0 } }), 'archer', 1, 1),
-  '골드가 모자라다');
+  'noGold');
 
 const placing = make(field);
 R.place(placing, 'archer', 1, 1);
 check('세우면 골드가 준다', placing.gold, D.RUN.gold - D.UNITS.archer.cost);
-check('같은 칸에는 둘을 못 세운다', R.canPlace(placing, 'archer', 1, 1), '이미 서 있다');
+check('같은 칸에는 둘을 못 세운다', R.canPlace(placing, 'archer', 1, 1), 'occupiedByUnit');
 check('통계에 남는다', [placing.stats.placed, placing.stats.kinds.archer], [1, 1]);
 
 R.spawn(placing, 'grunt', 100);
 // 입구는 누구의 다음 칸도 되지 않아, 거기 선 사람은 절대 맞지 않는다.
 check('적이 나오는 자리에는 못 세운다',
-  R.canPlace(make(field), 'archer', field.entry.x, field.entry.y), '적이 나오는 자리');
+  R.canPlace(make(field), 'archer', field.entry.x, field.entry.y), 'entry');
 check('출구에는 세울 수 있다', R.canPlace(make(field), 'archer', field.exit.x, field.exit.y), null);
 
 check('적이 밟고 있는 칸에는 못 세운다',
-  R.canPlace(placing, 'archer', placing.map.entry.x, placing.map.entry.y), '적이 밟고 있다');
+  R.canPlace(placing, 'archer', placing.map.entry.x, placing.map.entry.y), 'foeThere');
 
 const selling = make(field);
 const sold = R.place(selling, 'archer', 1, 1);
@@ -517,7 +517,7 @@ check('웨이브를 다 막으면 이긴다', win.over, 'won');
 const hero = make(field, { roster: D.HERO_KEYS, mods: { startGold: 10 } });
 R.place(hero, 'blade', 1, 1);
 check('영웅을 부르면 통계에 남는다', hero.stats.heroUsed, true);
-check('같은 영웅은 한 판에 한 번', R.canPlace(hero, 'blade', 2, 1), '그 영웅은 이미 불렀다');
+check('같은 영웅은 한 판에 한 번', R.canPlace(hero, 'blade', 2, 1), 'heroUsed');
 // **영웅 칸이 여럿이 되면서 "한 판에 하나"가 "저마다 하나"로 바뀌었다.**
 check('데려온 다른 영웅은 부를 수 있다', R.canPlace(hero, 'saint', 2, 1), null);
 check('영웅 넷 다 표시를 달고 있다', D.HERO_KEYS.every((k) => D.UNITS[k].hero), true);
