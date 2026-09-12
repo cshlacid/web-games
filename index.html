@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>web-games</title>
-<meta name="description" content="브라우저에서 바로 하는 미니 게임 모음">
+<meta name="description" content="브라우저에서 바로 하는 미니 게임 모음" data-i18n-attr="content=hub.tagline">
 <meta name="color-scheme" content="light dark">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23edc22e'><circle cx='12' cy='5.5' r='3.5'/><rect x='11' y='7' width='2' height='9'/><path d='M4 21 L7 15.5 H17 L20 21 Z'/></svg>">
 <link rel="manifest" href="manifest.json">
@@ -17,12 +17,18 @@
 <link rel="stylesheet" href="shared/base.css">
 <link rel="stylesheet" href="hub.css">
 <script src="shared/analytics.js"></script>
+<script src="shared/i18n.js"></script>
+<script src="shared/strings.js"></script>
+<script src="strings.js"></script>
 </head>
 <body>
 <main class="hub">
   <header>
-    <h1>web-games</h1>
-    <p class="tagline">브라우저에서 바로 하는 미니 게임 모음</p>
+    <div class="title-row">
+      <h1>web-games</h1>
+      <select class="lang" data-i18n-picker aria-label="언어" data-i18n-attr="aria-label=hub.lang"></select>
+    </div>
+    <p class="tagline" data-i18n="hub.tagline">브라우저에서 바로 하는 미니 게임 모음</p>
   </header>
 
   <ul class="games">
@@ -30,150 +36,150 @@
       <a class="card" href="games/2048/">
         <span class="card-head">
           <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2.5" width="8.5" height="8.5" rx="2"/><rect x="2" y="13" width="8.5" height="8.5" rx="2"/><rect x="13" y="2.5" width="9" height="19" rx="2" fill="currentColor" stroke="none"/></svg>
-          <span class="card-title">2048</span>
+          <span class="card-title" data-i18n="game.2048">2048</span>
         </span>
-        <span class="card-desc">숫자 합치기</span>
+        <span class="card-desc" data-i18n="desc.2048">숫자 합치기</span>
       </a>
     </li>
     <li>
       <a class="card" href="games/kkodle/">
         <span class="card-head">
           <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="2" width="8" height="6" rx="1.6"/><rect x="13" y="2" width="8" height="6" rx="1.6"/><rect x="3" y="9" width="8" height="6" rx="1.6" fill="currentColor" stroke="none"/><rect x="13" y="9" width="8" height="6" rx="1.6"/><rect x="3" y="16" width="8" height="6" rx="1.6" fill="currentColor" stroke="none"/><rect x="13" y="16" width="8" height="6" rx="1.6" fill="currentColor" stroke="none"/></svg>
-          <span class="card-title">꼬들</span>
+          <span class="card-title" data-i18n="game.kkodle">꼬들</span>
         </span>
-        <span class="card-desc">한글 단어 맞히기</span>
+        <span class="card-desc" data-i18n="desc.kkodle">한글 단어 맞히기</span>
       </a>
     </li>
     <li>
       <a class="card" href="games/sudoku/">
         <span class="card-head">
           <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2" width="20" height="20" rx="2.5"/><path d="M2 8.7 H22" opacity=".45"/><path d="M2 15.3 H22" opacity=".45"/><path d="M8.7 2 V22" opacity=".45"/><path d="M15.3 2 V22" opacity=".45"/><rect x="10" y="10" width="4" height="4" rx="1" fill="currentColor" stroke="none"/></svg>
-          <span class="card-title">스도쿠</span>
+          <span class="card-title" data-i18n="game.sudoku">스도쿠</span>
         </span>
-        <span class="card-desc">1~9 채우기</span>
+        <span class="card-desc" data-i18n="desc.sudoku">1~9 채우기</span>
       </a>
     </li>
     <li>
       <a class="card" href="games/doppelblock/">
         <span class="card-head">
           <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1.5" y="7" width="21" height="10" rx="2"/><path d="M5.7 7 V17" opacity=".45"/><path d="M9.9 7 V17" opacity=".45"/><path d="M14.1 7 V17" opacity=".45"/><path d="M18.3 7 V17" opacity=".45"/><rect x="5.7" y="7" width="4.2" height="10" fill="currentColor" stroke="none"/><rect x="14.1" y="7" width="4.2" height="10" fill="currentColor" stroke="none"/></svg>
-          <span class="card-title">더블블록</span>
+          <span class="card-title" data-i18n="game.doppelblock">더블블록</span>
         </span>
-        <span class="card-desc">숫자 합 맞히기</span>
+        <span class="card-desc" data-i18n="desc.doppelblock">숫자 합 맞히기</span>
       </a>
     </li>
     <li>
       <a class="card" href="games/chess-puzzle/">
         <span class="card-head">
           <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="5.2" r="3.9" fill="currentColor" stroke="none"/><path d="M9 8.8 C9 11.6 7.6 12.6 7.6 14.2 H16.4 C16.4 12.6 15 11.6 15 8.8 Z" fill="currentColor" stroke="none"/><rect x="6.2" y="14.2" width="11.6" height="2.6" rx="1" fill="currentColor" stroke="none"/><path d="M4 22 C4 18.6 7.2 17.2 12 17.2 C16.8 17.2 20 18.6 20 22 Z" fill="currentColor" stroke="none"/></svg>
-          <span class="card-title">체스 퍼즐</span>
+          <span class="card-title" data-i18n="game.chess-puzzle">체스 퍼즐</span>
         </span>
-        <span class="card-desc">최선의 한 수 찾기</span>
+        <span class="card-desc" data-i18n="desc.chess-puzzle">최선의 한 수 찾기</span>
       </a>
     </li>
     <li>
       <a class="card" href="games/zip/">
         <span class="card-head">
           <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 4.5 H19.5 L4.5 12 H19.5 L4.5 19.5 H19.5"/><circle cx="4.5" cy="4.5" r="2.2" fill="currentColor" stroke="none"/><circle cx="19.5" cy="19.5" r="2.2" fill="currentColor" stroke="none"/></svg>
-          <span class="card-title">한붓그리기</span>
+          <span class="card-title" data-i18n="game.zip">한붓그리기</span>
         </span>
-        <span class="card-desc">한 번에 다 지나기</span>
+        <span class="card-desc" data-i18n="desc.zip">한 번에 다 지나기</span>
       </a>
     </li>
     <li>
       <a class="card" href="games/queens/">
         <span class="card-head">
           <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2" width="20" height="20" rx="2.5"/><path d="M2 9.5 H7.5 V2" opacity=".45"/><path d="M22 14.5 H16.5 V22" opacity=".45"/><path d="M7 9.4 L9.6 12.2 L12 8 L14.4 12.2 L17 9.4 L16.2 15.4 H7.8 Z" fill="currentColor" stroke="none"/><rect x="8" y="16.5" width="8" height="2" rx="1" fill="currentColor" stroke="none"/></svg>
-          <span class="card-title">왕관 놓기</span>
+          <span class="card-title" data-i18n="game.queens">왕관 놓기</span>
         </span>
-        <span class="card-desc">행·열·색에 하나씩</span>
+        <span class="card-desc" data-i18n="desc.queens">행·열·색에 하나씩</span>
       </a>
     </li>
     <li>
       <a class="card" href="games/patches/">
         <span class="card-head">
           <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2" width="20" height="20" rx="2.5"/><rect x="4.5" y="4.5" width="6" height="6" rx="1" fill="currentColor" stroke="none"/><rect x="13" y="4.5" width="6.5" height="15" rx="1" fill="currentColor" stroke="none"/><rect x="4.5" y="13" width="6" height="6.5" rx="1" fill="currentColor" stroke="none" opacity=".45"/></svg>
-          <span class="card-title">Patches</span>
+          <span class="card-title" data-i18n="game.patches">Patches</span>
         </span>
-        <span class="card-desc">직사각형으로 다 나누기</span>
+        <span class="card-desc" data-i18n="desc.patches">직사각형으로 다 나누기</span>
       </a>
     </li>
     <li>
       <a class="card" href="games/conquest/">
         <span class="card-head">
           <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5.4" fill="currentColor" stroke="none"/><circle cx="12" cy="2.6" r="1.9" fill="currentColor" stroke="none" opacity=".55"/><circle cx="20.2" cy="16.8" r="1.9" fill="currentColor" stroke="none" opacity=".55"/><circle cx="3.8" cy="16.8" r="1.9" fill="currentColor" stroke="none" opacity=".55"/></svg>
-          <span class="card-title">점령전</span>
+          <span class="card-title" data-i18n="game.conquest">점령전</span>
         </span>
-        <span class="card-desc">거점 차지하기</span>
+        <span class="card-desc" data-i18n="desc.conquest">거점 차지하기</span>
       </a>
     </li>
     <li>
       <a class="card" href="games/hashi/">
         <span class="card-head">
           <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 3.4 H19 M5 6.6 H19 M6.6 8.5 V19" opacity=".55"/><circle cx="5" cy="5" r="2.6" fill="currentColor" stroke="none"/><circle cx="19" cy="5" r="2.6" fill="currentColor" stroke="none"/><circle cx="6.6" cy="19" r="2.6" fill="currentColor" stroke="none"/></svg>
-          <span class="card-title">다리 잇기</span>
+          <span class="card-title" data-i18n="game.hashi">다리 잇기</span>
         </span>
-        <span class="card-desc">섬을 하나로 잇기</span>
+        <span class="card-desc" data-i18n="desc.hashi">섬을 하나로 잇기</span>
       </a>
     </li>
     <li>
       <a class="card" href="games/dicewars/">
         <span class="card-head">
           <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="2.5" width="13" height="13" rx="3"/><rect x="8.5" y="8.5" width="13" height="13" rx="3" fill="currentColor" stroke="none"/><circle cx="6" cy="6" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="var(--card-bg)" stroke="none"/><circle cx="18" cy="18" r="1.5" fill="var(--card-bg)" stroke="none"/></svg>
-          <span class="card-title">주사위 영토전</span>
+          <span class="card-title" data-i18n="game.dicewars">주사위 영토전</span>
         </span>
-        <span class="card-desc">굴려서 땅 뺏기</span>
+        <span class="card-desc" data-i18n="desc.dicewars">굴려서 땅 뺏기</span>
       </a>
     </li>
     <li>
       <a class="card" href="games/yacht/">
         <span class="card-head">
           <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="2.5" width="19" height="19" rx="4.5"/><circle cx="7.5" cy="7.5" r="1.8" fill="currentColor" stroke="none"/><circle cx="16.5" cy="7.5" r="1.8" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.8" fill="currentColor" stroke="none"/><circle cx="7.5" cy="16.5" r="1.8" fill="currentColor" stroke="none"/><circle cx="16.5" cy="16.5" r="1.8" fill="currentColor" stroke="none"/></svg>
-          <span class="card-title">야추</span>
+          <span class="card-title" data-i18n="game.yacht">야추</span>
         </span>
-        <span class="card-desc">주사위로 점수 겨루기</span>
+        <span class="card-desc" data-i18n="desc.yacht">주사위로 점수 겨루기</span>
       </a>
     </li>
     <li>
       <a class="card" href="games/nonogram/">
         <span class="card-head">
           <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2" width="20" height="20" rx="2.5"/><path d="M8.7 2 V22" opacity=".45"/><path d="M15.3 2 V22" opacity=".45"/><path d="M2 8.7 H22" opacity=".45"/><path d="M2 15.3 H22" opacity=".45"/><rect x="2" y="2" width="6.7" height="6.7" fill="currentColor" stroke="none"/><rect x="15.3" y="2" width="6.7" height="6.7" fill="currentColor" stroke="none"/><rect x="8.7" y="8.7" width="6.6" height="6.6" fill="currentColor" stroke="none"/><rect x="2" y="15.3" width="6.7" height="6.7" fill="currentColor" stroke="none"/><rect x="15.3" y="15.3" width="6.7" height="6.7" fill="currentColor" stroke="none"/></svg>
-          <span class="card-title">노노그램</span>
+          <span class="card-title" data-i18n="game.nonogram">노노그램</span>
         </span>
-        <span class="card-desc">숫자대로 칠해 그림 찾기</span>
+        <span class="card-desc" data-i18n="desc.nonogram">숫자대로 칠해 그림 찾기</span>
       </a>
     </li>
     <li>
       <a class="card" href="games/rushhour/">
         <span class="card-head">
           <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2" width="20" height="20" rx="2.5"/><rect x="4.5" y="10" width="9" height="4" rx="1.4" fill="currentColor" stroke="none"/><rect x="4.5" y="4.5" width="4" height="3.5" rx="1.2" fill="currentColor" stroke="none" opacity=".5"/><rect x="15.5" y="4.5" width="4" height="7" rx="1.2" fill="currentColor" stroke="none" opacity=".5"/><rect x="9" y="16" width="7" height="3.5" rx="1.2" fill="currentColor" stroke="none" opacity=".5"/></svg>
-          <span class="card-title">차 빼기</span>
+          <span class="card-title" data-i18n="game.rushhour">차 빼기</span>
         </span>
-        <span class="card-desc">막힌 길에서 빨간 차 빼내기</span>
+        <span class="card-desc" data-i18n="desc.rushhour">막힌 길에서 빨간 차 빼내기</span>
       </a>
     </li>
   </ul>
 
   <section class="wip">
-    <h2>알파</h2>
-    <p class="wip-note">아직 다듬는 중입니다. 규칙과 균형이 바뀔 수 있어요.</p>
+    <h2 data-i18n="hub.alpha">알파</h2>
+    <p class="wip-note" data-i18n="hub.alphaNote">아직 다듬는 중입니다. 규칙과 균형이 바뀔 수 있어요.</p>
     <ul class="games">
       <li>
         <a class="card" href="games/healer/">
           <span class="card-head">
             <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3 H14 V10 H21 V14 H14 V21 H10 V14 H3 V10 H10 Z" fill="currentColor" stroke="none"/></svg>
-            <span class="card-title">힐러 <b class="badge">알파</b></span>
+            <span class="card-title"><span data-i18n="game.healer">힐러</span> <b class="badge" data-i18n="hub.alpha">알파</b></span>
           </span>
-          <span class="card-desc">파티 힐러 맡기</span>
+          <span class="card-desc" data-i18n="desc.healer">파티 힐러 맡기</span>
         </a>
       </li>
       <li>
         <a class="card" href="games/defense/">
           <span class="card-head">
             <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5 L20 5.5 v6c0 4.6-3.4 7.6-8 9.5-4.6-1.9-8-4.9-8-9.5v-6 Z"/><path d="M12 9 v6"/><path d="M9 12 h6"/></svg>
-            <span class="card-title">길목 지키기 <b class="badge">알파</b></span>
+            <span class="card-title"><span data-i18n="game.defense">길목 지키기</span> <b class="badge" data-i18n="hub.alpha">알파</b></span>
           </span>
-          <span class="card-desc">길목에 사람을 세워 적을 막기</span>
+          <span class="card-desc" data-i18n="desc.defense">길목에 사람을 세워 적을 막기</span>
         </a>
       </li>
     </ul>
@@ -183,10 +189,11 @@
     <a href="https://github.com/cshlacid/web-games">GitHub</a>
     <!-- 배포 표시. main에 머지할 때마다 올린다 — 규칙은 CLAUDE.md에 있다.
          날짜에 그날의 번호를 붙여, 같은 날 여러 번 올려도 구별된다. -->
-    <span class="deploy">2026-09-12.5</span>
+    <span class="deploy">2026-09-12.6</span>
   </footer>
 </main>
 
 <script src="shared/base.js"></script>
+<script>SharedI18n.apply();</script>
 </body>
 </html>

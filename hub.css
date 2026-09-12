@@ -48,6 +48,29 @@ h1 {
   opacity: 0.65;
 }
 
+.title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* 고르개는 게임 페이지가 아니라 여기 한 곳에만 둔다 — 고른 값은 저장돼 모든
+   페이지가 같이 읽는다. 항목 이름은 그 언어 스스로의 표기라 번역하지 않는다. */
+.lang {
+  flex: none;
+  padding: 7px 10px;
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  background: var(--card-bg);
+  color: var(--fg);
+  font: inherit;
+  /* 사파리는 16px보다 작은 글자의 입력에 초점이 가면 화면을 당겨 확대한다.
+     확대는 막아 두었지만 당겨지는 것 자체가 남아 값을 내리지 않는다. */
+  font-size: 16px;
+  line-height: 1.2;
+}
+
 /* 한 줄에 하나씩 늘어놓던 것을 격자로 바꿨다. 게임이 여덟 개가 되면서 한 줄
    목록은 화면 하나에 다 들어오지 않았고, 다 들어오지 않는 목록은 훑는 것이
    아니라 스크롤하는 것이 된다. */
