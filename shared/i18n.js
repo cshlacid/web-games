@@ -89,6 +89,13 @@
       var text = t(el.getAttribute('data-i18n'));
       if (text !== null) el.textContent = text;
     });
+    // 도움말 문장처럼 <b>가 문장 한가운데 박히는 자리는 통째로 옮긴다. 강조 앞뒤를
+    // 따로 나누면 어순이 다른 언어에서 문장이 성립하지 않는다. 사전은 우리가 쓴
+    // 글이라 innerHTML로 넣어도 바깥에서 들어온 값이 섞일 자리가 없다.
+    each(scope, '[data-i18n-html]', function (el) {
+      var text = t(el.getAttribute('data-i18n-html'));
+      if (text !== null) el.innerHTML = text;
+    });
     // "content=hub.desc, aria-label=hub.lang" 꼴. 글로 보이지 않는 자리(대체 텍스트,
     // 메타 태그, 문서 제목)도 같은 사전을 타야 해서 속성용 통로를 따로 둔다.
     each(scope, '[data-i18n-attr]', function (el) {

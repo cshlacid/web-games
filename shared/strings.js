@@ -40,7 +40,12 @@
       'ui.restart': '다시',
       'ui.next': '다음',
       'ui.difficulty': '난이도',
-      'ui.making': '만드는 중…'
+      'ui.making': '만드는 중…',
+      'ui.easy': '쉬움',
+      'ui.medium': '보통',
+      'ui.hard': '어려움',
+      'ui.small': '작게',
+      'ui.large': '크게'
     },
     en: {
       'game.2048': '2048',
@@ -79,7 +84,12 @@
       'ui.restart': 'Restart',
       'ui.next': 'Next',
       'ui.difficulty': 'Difficulty',
-      'ui.making': 'Generating…'
+      'ui.making': 'Generating…',
+      'ui.easy': 'Easy',
+      'ui.medium': 'Medium',
+      'ui.hard': 'Hard',
+      'ui.small': 'Small',
+      'ui.large': 'Large'
     },
     ja: {
       'game.2048': '2048',
@@ -118,7 +128,12 @@
       'ui.restart': 'やり直す',
       'ui.next': '次へ',
       'ui.difficulty': '難易度',
-      'ui.making': '生成中…'
+      'ui.making': '生成中…',
+      'ui.easy': 'やさしい',
+      'ui.medium': 'ふつう',
+      'ui.hard': 'むずかしい',
+      'ui.small': '小さめ',
+      'ui.large': '大きめ'
     },
     'zh-CN': {
       'game.2048': '2048',
@@ -157,7 +172,12 @@
       'ui.restart': '重来',
       'ui.next': '下一个',
       'ui.difficulty': '难度',
-      'ui.making': '生成中…'
+      'ui.making': '生成中…',
+      'ui.easy': '简单',
+      'ui.medium': '普通',
+      'ui.hard': '困难',
+      'ui.small': '小',
+      'ui.large': '大'
     },
     'zh-TW': {
       'game.2048': '2048',
@@ -196,7 +216,12 @@
       'ui.restart': '重來',
       'ui.next': '下一個',
       'ui.difficulty': '難度',
-      'ui.making': '生成中…'
+      'ui.making': '生成中…',
+      'ui.easy': '簡單',
+      'ui.medium': '普通',
+      'ui.hard': '困難',
+      'ui.small': '小',
+      'ui.large': '大'
     },
     es: {
       'game.2048': '2048',
@@ -235,7 +260,12 @@
       'ui.restart': 'Reiniciar',
       'ui.next': 'Siguiente',
       'ui.difficulty': 'Dificultad',
-      'ui.making': 'Generando…'
+      'ui.making': 'Generando…',
+      'ui.easy': 'Fácil',
+      'ui.medium': 'Media',
+      'ui.hard': 'Difícil',
+      'ui.small': 'Pequeño',
+      'ui.large': 'Grande'
     }
   });
 })();
