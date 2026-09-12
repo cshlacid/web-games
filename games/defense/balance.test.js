@@ -72,6 +72,20 @@ check('한 종류만으로는 스물다섯을 못 넘는다', solo.reached < 25,
 check('그래도 몇 스테이지는 간다', solo.reached >= 5, true);
 check('섞는 쪽이 훨씬 멀리 간다', Math.max(...reached(opens)) > solo.reached, true);
 
+// --- 영웅이 재기에서 빠져 있지 않은가 ---
+// **이 손은 영웅을 한 번도 세우지 않고 있었다.** 싼 것부터 쉬지 않고 사느라
+// 골드가 220까지 모이는 순간이 오지 않아서다. 영웅 셋이 통째로 계수 재기 밖에
+// 있었다는 뜻이라, 여기서 지킨다.
+const withHero = T.blank();
+for (const k of ['archer', 'shield', 'cannon', 'frost', 'spear', 'healer', 'blade']) T.grant(withHero, k);
+withHero.level = 27;
+withHero.perks.slots = 3;
+withHero.team = ['archer', 'spear', 'cannon'];
+withHero.hero = 'blade';
+let called = 0;
+for (let s = 6; s <= 20; s++) if (AI.play(s, withHero, { style: 'open' }).stats.heroUsed) called++;
+check('영웅을 데려가면 실제로 부른다', called > 0, true);
+
 // --- 한 판이 폰에서 할 만한 길이인가 ---
 const spans = opens.flatMap((r) => r.log.map((row) => row.time));
 const mid = median(spans);

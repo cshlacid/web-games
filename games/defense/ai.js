@@ -110,6 +110,23 @@ function wanted(run, style) {
 
 // 한 번의 판단. 돈이 되면 세우고, 더 세울 자리가 없으면 올린다.
 function act(run, style) {
+  // **영웅을 부르려면 골드를 아껴야 한다.** 이 손은 싼 것부터 쉬지 않고 사느라
+  // 골드가 220까지 모이는 순간이 오지 않아, 영웅 셋을 **한 번도 세우지 않았다** —
+  // 계수 재기에서 통째로 빠져 있었다. 앞줄 넷이 선 뒤부터 여섯 번째 웨이브까지는
+  // 영웅 말고는 아무것도 사지 않고 모은다.
+  //
+  // 셋째 웨이브를 기다리는 것은 **여는 값을 영웅에 쓰면 판이 통째로 무너지기**
+  // 때문이다 — 두 번째 웨이브부터 모으게 했더니 성기사를 데려간 판이 스테이지
+  // 2를 못 넘었다(240골드면 앞줄 넷이다). 여섯에서 푸는 것은 그때까지 못 모았으면
+  // 그 판은 영웅을 부를 판이 아니기 때문이다.
+  const hero = run.roster.find((k) => D.UNITS[k].hero);
+  if (hero && !run.heroUsed && run.units.length >= 4 && run.wave >= 3 && run.wave <= 6) {
+    if (run.gold >= R.costOf(run, hero)) {
+      const spot = bestSpot(run, hero, style);
+      if (spot) { R.place(run, hero, spot.x, spot.y); return true; }
+    }
+    return false;
+  }
   const first = wanted(run, style);
   // 차례가 비싸면 살 수 있는 것 중 가장 비싼 것으로 대신한다. 기다리기만 하면
   // 골드를 쥔 채 뚫린다.
