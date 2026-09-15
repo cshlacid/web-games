@@ -68,7 +68,7 @@ check('다른 씨앗은 다른 판',
   JSON.stringify(G.generate(4, { seed: 12 }).cells) === JSON.stringify(a.cells), false);
 
 check('지원하지 않는 크기는 거절한다', (() => {
-  try { G.generate(7); return false; } catch { return true; }
+  try { G.generate(8); return false; } catch { return true; }
 })(), true);
 
 // --- 언어마다 그 나라 성어로 판이 나오는가 ---
