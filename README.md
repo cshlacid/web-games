@@ -16,6 +16,7 @@
 | [한붓그리기](games/zip/) | 숫자를 순서대로 밟아 모든 칸을 한 번에 지난다 | 순수 HTML/CSS/JS |
 | [왕관 놓기](games/queens/) | 행·열·색마다 왕관을 하나씩 놓는다 | 순수 HTML/CSS/JS |
 | [Patches](games/patches/) | 격자를 직사각형 조각으로 남김없이 나눈다 | 순수 HTML/CSS/JS |
+| [Tango](games/tango/) | 해와 달을 반씩, 셋 연달아 오지 않게 놓는다 | 순수 HTML/CSS/JS |
 | [힐러](games/healer/) | 파티에서 힐러 하나만 맡는다 | 순수 HTML/CSS/JS |
 
 ## 로컬에서 실행
@@ -49,6 +50,9 @@ node games/queens/generator.test.js
 node games/patches/rules.test.js
 node games/patches/solver.test.js
 node games/patches/generator.test.js
+node games/tango/rules.test.js
+node games/tango/solver.test.js
+node games/tango/generator.test.js
 node games/healer/logic.test.js
 node games/healer/ai.test.js
 node games/healer/attrs.test.js
