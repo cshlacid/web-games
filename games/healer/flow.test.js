@@ -237,8 +237,8 @@ function runQuest(progress, seed, autoHeal, questOver) {
   // 오르면 같은 의뢰가 쉬워 보여, 알맞다고 보고 따라나선 동료가 끝나서는
   // 신뢰도를 깎았다. 계약 때의 판단이 그대로 이유에 적혀야 한다.
   check('계약할 때의 난이도로 잰다',
-    out.trustMoves.map((move) => move.parts[0].why),
-    contracts.map((contract) => `${contract.feel.name} 의뢰 완료`));
+    out.trustMoves.map((move) => move.parts[0].why.vars.feel),
+    contracts.map((contract) => contract.feel.id));
 
   // 캐릭터 창에서 올린 스킬이 전투에 그대로 들어간다. 창과 전투가 다른 값을
   // 보면 점수를 넣은 것이 화면의 글자로만 남는다.

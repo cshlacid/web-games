@@ -220,7 +220,7 @@ function spawnWave(state, index) {
     state.units.push(unit);
   });
   emit(state, { type: 'wave', index, total: state.quest.waves.length,
-    text: `${index + 1}번째 무리 (${state.quest.waves.length} 중)` });
+    code: 'hl.log.wave', vars: { index: index + 1, total: state.quest.waves.length } });
 }
 
 // party는 편성 화면이 고른 동료다: [{ defId, level }]. 주인공의 수치는 성장
@@ -349,13 +349,13 @@ function updateAuras(state) {
 // **장판은 여기 없다.** 서 있는 자리에 따라 붙었다 떨어졌다 하는 것이라 초상화에
 // 띄우면 걸어가는 동안 깜빡이고, 어차피 전장 바닥에 그려져 있다.
 const STATUS_KINDS = {
-  stun:       { icon: 'stunned',  css: 'stun', name: '기절' },
-  confuse:    { icon: 'confused', css: 'daze', name: '혼란' },
-  taunt:      { icon: 'taunted',  css: 'pull', name: '도발' },
-  dot:        { icon: 'dotHarm',  css: 'bane', name: '지속 피해' },
-  'heal-dot': { icon: 'dotMend',  css: 'mend', name: '지속 회복' },
-  buff:       { icon: 'boonUp',   css: 'boon', name: '강화' },
-  debuff:     { icon: 'wiltDown', css: 'wilt', name: '약화' },
+  stun:       { icon: 'stunned',  css: 'stun', name: 'hl.st.stun' },
+  confuse:    { icon: 'confused', css: 'daze', name: 'hl.st.confuse' },
+  taunt:      { icon: 'taunted',  css: 'pull', name: 'hl.st.taunt' },
+  dot:        { icon: 'dotHarm',  css: 'bane', name: 'hl.st.dot' },
+  'heal-dot': { icon: 'dotMend',  css: 'mend', name: 'hl.st.hot' },
+  buff:       { icon: 'boonUp',   css: 'boon', name: 'hl.st.buff' },
+  debuff:     { icon: 'wiltDown', css: 'wilt', name: 'hl.st.debuff' },
 };
 
 // 같은 종류가 여럿이면 하나로 묶고 남은 시간이 긴 쪽을 남긴다. 저주 셋이 걸린
@@ -450,7 +450,7 @@ function kill(state, unit) {
   state.stats.deaths += unit.side === 'ally' ? 1 : 0;
   // 죽은 유닛에게 걸린 장판·도트는 남겨 두면 부활 없는 이 게임에서 영원히 헛돈다.
   state.dots = state.dots.filter((dot) => dot.targetUid !== unit.uid);
-  emit(state, { type: 'death', uid: unit.uid, side: unit.side, text: `${unit.name} 쓰러짐` });
+  emit(state, { type: 'death', uid: unit.uid, side: unit.side, code: 'hl.log.down', vars: { name: unit.name } });
 }
 
 // **반경으로 퍼지는 회복.** 시전자 편에게는 회복이지만, 반경 안에 회복이 해가
@@ -661,7 +661,7 @@ function stun(state, caster, target, duration) {
   target.stunUntil = until;
   if (target.cast) cancelCast(state, target);
   emit(state, { type: 'stun', uid: target.uid, until,
-    text: `${caster.name} → ${target.name}: 기절` });
+    code: 'hl.log.stun', vars: { from: caster.name, to: target.name } });
   return duration;
 }
 
@@ -679,7 +679,7 @@ function confuse(state, caster, target, duration) {
   target.confusedUntil = until;
   target.targetUid = null;
   emit(state, { type: 'confuse', uid: target.uid, until,
-    text: `${caster.name} → ${target.name}: 혼란` });
+    code: 'hl.log.confuse', vars: { from: caster.name, to: target.name } });
   return duration;
 }
 
@@ -694,7 +694,7 @@ function giveMana(state, caster, target, amount) {
   const gained = Math.round(target.mp - before);
   if (gained > 0) {
     emit(state, { type: 'mana', uid: target.uid, amount: gained,
-      text: `${caster.name} → ${target.name}: 마나 ${D.num(gained)}` });
+      code: 'hl.log.mana', vars: { from: caster.name, to: target.name, n: D.num(gained) } });
   }
   return gained;
 }
@@ -915,25 +915,25 @@ function playerSkill(state, skillId) {
 }
 
 function castSkill(state, skillId, target) {
-  if (state.status !== 'fighting') return { ok: false, reason: '전투가 끝났다' };
+  if (state.status !== 'fighting') return { ok: false, reason: 'hl.why.over' };
   const slot = skillSlot(state, skillId);
   const def = playerSkill(state, skillId);
-  if (!def || !slot) return { ok: false, reason: '등록되지 않은 스킬' };
+  if (!def || !slot) return { ok: false, reason: 'hl.why.notEquipped' };
 
   const caster = hero(state);
-  if (caster.dead) return { ok: false, reason: '쓰러졌다' };
-  if (stunned(state, caster)) return { ok: false, reason: '기절' };
+  if (caster.dead) return { ok: false, reason: 'hl.why.down' };
+  if (stunned(state, caster)) return { ok: false, reason: 'hl.st.stun' };
   // 시전 중인 것이 쿨타임보다 먼저다. 외우는 중에 다른 것을 누르면 화면에
   // 뜨는 이유가 "쿨타임"이면 무엇이 막고 있는지 알 수 없다.
-  if (caster.cast) return { ok: false, reason: '시전 중' };
-  if (state.t < slot.readyAt) return { ok: false, reason: '쿨타임' };
-  if (caster.mp < def.mp) return { ok: false, reason: '마나 부족' };
+  if (caster.cast) return { ok: false, reason: 'hl.why.casting' };
+  if (state.t < slot.readyAt) return { ok: false, reason: 'hl.why.cooldown' };
+  if (caster.mp < def.mp) return { ok: false, reason: 'hl.why.noMana' };
 
   const spot = resolveTarget(state, def, target);
-  if (!spot) return { ok: false, reason: '대상이 올바르지 않다' };
+  if (!spot) return { ok: false, reason: 'hl.why.badTarget' };
   // 주인공의 스킬도 사거리가 있다. 닿지 않으면 쓸 수 없고, 대신 주인공이
   // 저절로 앞줄 쪽으로 붙으므로 잠시 뒤에는 닿는다.
-  if (dist(caster, spot) > def.range) return { ok: false, reason: '사거리 밖' };
+  if (dist(caster, spot) > def.range) return { ok: false, reason: 'hl.why.outOfRange' };
 
   slot.readyAt = state.t + def.cd;
   caster.mp -= def.mp;
@@ -951,16 +951,16 @@ function castSkill(state, skillId, target) {
 function drink(state, unit, potionId) {
   const potion = D.POTIONS[potionId];
   const carried = unit === hero(state) ? state.potions : unit.potions;
-  if (!potion || !carried || carried[potionId] <= 0) return { ok: false, reason: '물약이 없다' };
+  if (!potion || !carried || carried[potionId] <= 0) return { ok: false, reason: 'hl.why.noPotion' };
 
   const readyAt = unit === hero(state) ? state.potionReadyAt : unit.potionReadyAt;
-  if (state.t < readyAt) return { ok: false, reason: '쿨타임' };
-  if (unit.dead) return { ok: false, reason: '쓰러졌다' };
+  if (state.t < readyAt) return { ok: false, reason: 'hl.why.cooldown' };
+  if (unit.dead) return { ok: false, reason: 'hl.why.down' };
   // 언데드에게는 회복이 통하지 않는다(위 `applyHeal`). 물약은 체력을 직접 더하는
   // 자리라 그 규칙을 따로 한 번 더 적는다. **마나 물약은 막지 않는다** — 통하지
   // 않는 것은 생명의 힘이지 마력이 아니다. **물약을 쓰기 전에 막는다**: 뒤에
   // 두면 회복이 0인 채로 물약만 사라진다.
-  if (potion.restore === 'hp' && unit.healHarm) return { ok: false, reason: '회복이 통하지 않는다' };
+  if (potion.restore === 'hp' && unit.healHarm) return { ok: false, reason: 'hl.why.noHeal' };
 
   carried[potionId]--;
   if (unit === hero(state)) state.potionReadyAt = state.t + potion.cd;
@@ -980,7 +980,7 @@ function drink(state, unit, potionId) {
 }
 
 function usePotion(state, potionId) {
-  if (state.status !== 'fighting') return { ok: false, reason: '전투가 끝났다' };
+  if (state.status !== 'fighting') return { ok: false, reason: 'hl.why.over' };
   return drink(state, hero(state), potionId || 'mana');
 }
 
@@ -992,7 +992,7 @@ function checkEnd(state) {
   // 힐러가 빠진 파티가 버티는지를 보는 것도 이 게임의 한 장면이다.
   if (!alive(state, 'ally').length) {
     state.status = 'lost';
-    emit(state, { type: 'end', result: 'lost', text: '파티 전멸' });
+    emit(state, { type: 'end', result: 'lost', text: 'hl.why.wipe' });
     return;
   }
   if (alive(state, 'enemy').length) return;
@@ -1005,7 +1005,7 @@ function checkEnd(state) {
       // 뒤로 흘러가고, 화면 밖으로 나가면 사라진다(`zoneX`). 이동 중에 새로 까는
       // 것도 같은 규칙을 타므로 여기에 예외가 없다. 도트는 몸에 붙은 것이라
       // 따라가는 것이 맞으므로 건드리지 않는다.
-      emit(state, { type: 'march', text: '다음 무리를 찾아 나선다' });
+      emit(state, { type: 'march', text: 'hl.log.nextPack' });
     } else if (state.t >= state.nextWaveAt) {
       state.nextWaveAt = 0;
       state.marching = false;
@@ -1014,7 +1014,7 @@ function checkEnd(state) {
     return;
   }
   state.status = 'won';
-  emit(state, { type: 'end', result: 'won', text: '퀘스트 완료' });
+  emit(state, { type: 'end', result: 'won', text: 'hl.log.questDone' });
 }
 
 // 무리와 무리 사이. 싸울 상대가 없으므로 판단을 돌리지 않고, 아군은 처음 섰던

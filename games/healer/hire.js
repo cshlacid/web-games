@@ -52,9 +52,9 @@ function wageOf(member, quest, ctx) {
   const scales = [
     { why: `${feel.name}`, mul: feel.wage },
     { why: Rep.trustStage(trust).name, mul: trustScale(trust) },
-    { why: `평판 ${stage.name}`, mul: stage.wage },
+    { why: { code: 'hl.hire.rep', vars: { stage: stage.id } }, mul: stage.wage },
     { why: trait.name, mul: trait.wage },
-    { why: (Loot.METHODS[opts.method] || {}).name || '분배 방식', mul: method },
+    { why: { code: 'hl.hire.split', vars: { method: opts.method } }, mul: method },
   ];
   const gold = Math.max(1, Math.round(scales.reduce((n, s) => n * s.mul, base)));
 
@@ -74,14 +74,14 @@ function willJoin(member, quest) {
   // 목숨을 걸 만한 일은 믿는 사람과만 한다. 단계로 보는 것은, 경계 수치를
   // 여기에 다시 적으면 표를 고칠 때 한쪽만 바뀌기 때문이다.
   if (feel.id === 'deadly' && (stage.id === 'hate' || stage.id === 'broken')) {
-    return { ok: false, reason: '이런 일을 당신과 할 수는 없습니다.', stage, feel };
+    return { ok: false, reason: { code: 'hl.hire.refuseTrust' }, stage, feel };
   }
   // **시시한 일은 거절한다.** 길드의 모험가는 주인공 레벨에 맞춰 나오는 것이
   // 아니라 제 경력이 있고(`roster.guildLevel`), 한참 아래 의뢰는 시간 낭비다 —
   // 값을 더 부르는 것(`TRUST_FEEL`의 `wage`)만으로는 "안 가는 자리"가 없었다.
   // **믿는 사이면 따라나선다**: 관계가 그 손해를 대신 갚는 자리다.
   if (feel.id === 'trivial' && !(stage.id === 'high' || stage.id === 'bond')) {
-    return { ok: false, reason: '이런 일에 저까지 부르실 필요는 없습니다.', stage, feel };
+    return { ok: false, reason: { code: 'hl.hire.refuseTrivial' }, stage, feel };
   }
   return { ok: true, reason: stage.line, stage, feel };
 }

@@ -474,7 +474,7 @@ function cast(state, skillId, target) {
   // 이유를 그대로 돌려준다.
   hero.stunUntil = state.t + 2;
   check('주인공도 굳으면 못 쓴다',
-    L.castSkill(state, 'touch', { uid: hero.uid }).reason, '기절');
+    L.castSkill(state, 'touch', { uid: hero.uid }).reason, 'hl.st.stun');
 }
 
 // --- 아군의 마나를 채운다 (음유시인) ------------------------------------
@@ -701,7 +701,7 @@ function cast(state, skillId, target) {
   check('아직 회복되지 않았다', tank.hp, 400);
   check('마나는 시작할 때 낸다', hero.mp, before - D.PLAYER_SKILLS.touch.mp);
   check('시전 중에는 다른 스킬을 못 쓴다',
-    L.castSkill(state, 'ripple', { uid: tank.uid }).reason, '시전 중');
+    L.castSkill(state, 'ripple', { uid: tank.uid }).reason, 'hl.why.casting');
 
   run(state, D.PLAYER_SKILLS.touch.cast + 0.1);
   check('시전 시간이 지나면 터진다', state.stats.healed > 0, true);
@@ -1538,7 +1538,7 @@ function cast(state, skillId, target) {
   check('주인공이 쓰러져도 계속한다', dead.status, 'fighting');
   check('동료는 남아 있었다', AI.alive(dead, 'ally').length > 0, true);
   check('스킬은 더 못 쓴다',
-    L.castSkill(dead, 'touch', { uid: AI.alive(dead, 'ally')[0].uid }).reason, '쓰러졌다');
+    L.castSkill(dead, 'touch', { uid: AI.alive(dead, 'ally')[0].uid }).reason, 'hl.why.down');
 
   // 남은 동료가 다 정리하면 주인공이 없어도 이긴다.
   AI.alive(dead, 'enemy').forEach((u) => L.applyDamage(dead, null, u, 99999));
@@ -2224,7 +2224,7 @@ function cast(state, skillId, target) {
   zed.potions = { health: 3, mana: 3 };
   zed.potionReadyAt = 0;
   check('체력 물약을 마시지 못한다',
-    L.drink(state, zed, 'health').reason, '회복이 통하지 않는다');
+    L.drink(state, zed, 'health').reason, 'hl.why.noHeal');
   check('물약이 그대로 남는다', zed.potions.health, 3);
   // **마나는 통한다** — 통하지 않는 것은 생명의 힘이지 마력이 아니다.
   zed.mp = 0;

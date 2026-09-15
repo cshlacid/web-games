@@ -177,8 +177,13 @@ function makeQuest(rng, level, index) {
     region: region.id,
     scene: region.scene,
     level,
-    name: `${pick(rng, region.prefix)} ${region.name} ${pick(rng, region.task)}`,
-    desc: `적정 레벨 ${level}. ${waves.length}개의 무리를 상대한다.`,
+    // 이름은 문장이 아니라 조각의 번호로 담는다 — 붙이는 순서와 빈칸이 언어마다 다르다.
+    name: { code: 'hl.questName', vars: {
+      prefix: `hl.prefix.${region.id}.${Math.floor(rng() * region.prefix.length)}`,
+      region: `healer.region.${region.id}.name`,
+      task: `hl.task.${region.id}.${Math.floor(rng() * region.task.length)}`,
+    } },
+    desc: { code: 'hl.quest.note', vars: { level, waves: waves.length } },
     waves,
     guildReward: {
       // **게시판에 적힌 골드는 파티 전체 몫이다.** 나눠 갖게 되면서 한 사람 몫이
