@@ -19,9 +19,17 @@ const LIMITS = {
   DS: 6,         // 샘플 간격 (m)
 };
 
-// 100m당이 아니라 1m당 억 단위. 건물 밑이 도로 밑의 네 배를 조금 넘는다 —
-// 이 배수가 "곧게 뚫을까 돌아갈까"의 값이라 숫자를 바꿀 때 제일 먼저 보는 곳이다.
-const UNIT_COST = { road: 0.008, empty: 0.013, building: 0.035 };
+// 100m당이 아니라 1m당 억 단위. **이 다섯 값의 비가 곧 이 게임이다** — 곧게 뚫을까
+// 돌아갈까, 강을 건널까 돌아 나갈까가 전부 여기서 갈린다. 숫자를 바꿀 때 제일 먼저
+// 보는 곳이다.
+const UNIT_COST = {
+  road: 0.008,      // 도로 밑. 가장 싸다
+  empty: 0.013,     // 빈 땅
+  building: 0.035,  // 건물 밑. 도로의 네 배를 조금 넘는다
+  hill: 0.05,       // 산 밑. 암반이라 더 든다
+  water: 0.095,     // 물 밑. 하저터널은 이 게임에서 가장 비싼 선택이다
+};
+const GROUND = Object.keys(UNIT_COST);
 
 // 거의 일직선인 모서리는 호를 끼우지 않는다. 끼워도 눈에 안 보이는데 t가 0에
 // 가까워 수치가 불안정해진다.
@@ -164,7 +172,8 @@ function profile(path, limits = LIMITS) {
 // 건물 한 채짜리 가짜 도시를 넘긴다.
 function cost(path, classify, unit = UNIT_COST) {
   const { pts, s } = path;
-  const lengths = { road: 0, empty: 0, building: 0 };
+  const lengths = {};
+  for (const kind of GROUND) lengths[kind] = 0;
   const runs = [];
   let run = null;
 
@@ -174,14 +183,15 @@ function cost(path, classify, unit = UNIT_COST) {
     const kind = classify(mx, my);
     lengths[kind] += s[i + 1] - s[i];
 
-    // 건물 밑으로 지나는 토막을 이어 붙여 둔다. 화면이 그 부분만 붉게 덧그린다.
-    if (kind === 'building') {
-      if (run && run.to === i) run.to = i + 1;
-      else { run = { from: i, to: i + 1 }; runs.push(run); }
-    }
+    // 비싼 땅을 지나는 토막을 종류째 이어 붙여 둔다. 화면이 그 부분만 덧그린다.
+    if (kind === 'building' || kind === 'hill' || kind === 'water') {
+      if (run && run.to === i && run.kind === kind) run.to = i + 1;
+      else { run = { from: i, to: i + 1, kind }; runs.push(run); }
+    } else run = null;
   }
 
-  const total = lengths.road * unit.road + lengths.empty * unit.empty + lengths.building * unit.building;
+  let total = 0;
+  for (const kind of GROUND) total += lengths[kind] * unit[kind];
   return { lengths, runs, cost: total };
 }
 

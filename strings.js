@@ -25,7 +25,7 @@
       'desc.rushhour': '막힌 길에서 빨간 차 빼내기',
       'desc.healer': '파티 힐러 맡기',
       'desc.defense': '길목에 사람을 세워 적을 막기',
-      'desc.metro': '도시 아래로 노선 깔기'
+      'desc.metro': '노선을 깔아 도시 키우기'
     },
     en: {
       'hub.tagline': 'Mini games you can play right in the browser',
@@ -51,7 +51,7 @@
       'desc.rushhour': 'Get the red car out',
       'desc.healer': 'Play the party healer',
       'desc.defense': 'Post units on the path to stop them',
-      'desc.metro': 'Lay lines under the city'
+      'desc.metro': 'Grow a city by laying metro lines'
     },
     ja: {
       'hub.tagline': 'ブラウザですぐ遊べるミニゲーム集',
@@ -77,7 +77,7 @@
       'desc.rushhour': '赤い車を外に出す',
       'desc.healer': 'パーティのヒーラーを務める',
       'desc.defense': '通り道に人を置いて敵を止める',
-      'desc.metro': '街の下に線路を引く'
+      'desc.metro': '路線を引いて街を育てる'
     },
     'zh-CN': {
       'hub.tagline': '打开浏览器就能玩的小游戏',
@@ -103,7 +103,7 @@
       'desc.rushhour': '把红车开出去',
       'desc.healer': '担任队伍的治疗',
       'desc.defense': '在路口布防挡住敌人',
-      'desc.metro': '在城市地下铺线'
+      'desc.metro': '铺地铁线路养大城市'
     },
     'zh-TW': {
       'hub.tagline': '打開瀏覽器就能玩的小遊戲',
@@ -129,7 +129,7 @@
       'desc.rushhour': '把紅車開出去',
       'desc.healer': '擔任隊伍的治療',
       'desc.defense': '在路口布防擋住敵人',
-      'desc.metro': '在城市地下鋪線'
+      'desc.metro': '鋪地鐵線路養大城市'
     },
     es: {
       'hub.tagline': 'Minijuegos para jugar en el navegador',
@@ -155,7 +155,7 @@
       'desc.rushhour': 'Saca el coche rojo',
       'desc.healer': 'Sé el sanador del grupo',
       'desc.defense': 'Coloca unidades en el paso',
-      'desc.metro': 'Tiende líneas bajo la ciudad'
+      'desc.metro': 'Haz crecer la ciudad con el metro'
     }
   });
 })();
