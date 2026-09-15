@@ -4,6 +4,10 @@
     ko: {
       'meta.desc': '도시 아래로 노선을 그어 두 역을 잇는다. 건물 밑은 비싸고, 급하게 굽으면 느려진다.',
       'metro.mapLabel': '도시',
+      'metro.difficulty': '난이도',
+      'metro.easy': '쉬움',
+      'metro.normal': '보통',
+      'metro.hard': '어려움',
       'metro.spent': '누적 건설비',
       'metro.newCity': '새 도시',
       'metro.cost': '건설비',
@@ -29,11 +33,17 @@
       'metro.rule4': '<b>건물 밑</b>으로 지나는 구간은 붉게 보이고 건설비가 네 배를 넘습니다. 도로 밑이 가장 쌉니다.',
       'metro.rule5': '급하게 굽으면 그 구간의 <b>제한속도</b>가 걸려 느려집니다. 너무 급하면 아예 지을 수 없습니다.',
       'metro.rule6': '열차는 역에서 <b>서 있다가 출발해 다음 역에서 섭니다.</b> 그래서 역이 가까우면 최고 속도에 닿지 못합니다.',
-      'metro.rule7': '<b>확정</b>을 누르기 전에는 아무것도 지어지지 않습니다. 마음껏 끌어 보세요.'
+      'metro.rule7': '<b>확정</b>을 누르기 전에는 아무것도 지어지지 않습니다. 마음껏 끌어 보세요.',
+      'metro.ruleMap': '지도는 화면보다 넓습니다. <b>빈 곳을 끌면</b> 지도가 움직입니다. 고른 역이 화면 밖으로 나가면 가장자리에 점으로 남습니다.',
+      'metro.ruleDistrict': '<b>구시가지</b>는 골목이 좁고 굽은 데다 건물이 빽빽해, 길을 따라가면 느리고 곧게 뚫으면 비쌉니다. <b>계획도시</b>는 그 반대입니다. 난이도는 둘의 배합을 바꿉니다.'
     },
     en: {
       'meta.desc': 'Draw a line under the city to link two stations. Tunnelling under buildings costs more, and tight curves slow trains down.',
       'metro.mapLabel': 'City',
+      'metro.difficulty': 'Difficulty',
+      'metro.easy': 'Easy',
+      'metro.normal': 'Normal',
+      'metro.hard': 'Hard',
       'metro.spent': 'Spent',
       'metro.newCity': 'New city',
       'metro.cost': 'Cost',
@@ -59,11 +69,17 @@
       'metro.rule4': 'Stretches running <b>under buildings</b> show in red and cost over four times as much. Under a street is cheapest.',
       'metro.rule5': 'A tight bend puts a <b>speed limit</b> on that stretch. Too tight and it cannot be built at all.',
       'metro.rule6': 'Trains <b>start from a standstill and stop at the next station</b>, so close stations never reach top speed.',
-      'metro.rule7': 'Nothing is built until you press <b>Build</b>. Drag as much as you like.'
+      'metro.rule7': 'Nothing is built until you press <b>Build</b>. Drag as much as you like.',
+      'metro.ruleMap': 'The map is wider than the screen. <b>Drag an empty spot</b> to move it. A station you picked leaves a dot at the edge once it scrolls off.',
+      'metro.ruleDistrict': 'In the <b>old town</b> the lanes are narrow and winding and the buildings are packed, so following the streets is slow and cutting straight is expensive. A <b>planned district</b> is the opposite. Difficulty changes the mix.'
     },
     ja: {
       'meta.desc': '街の下に線路を引いて二つの駅をつなぐ。建物の下は高くつき、急な曲線は速度を落とす。',
       'metro.mapLabel': '街',
+      'metro.difficulty': '難易度',
+      'metro.easy': 'やさしい',
+      'metro.normal': 'ふつう',
+      'metro.hard': 'むずかしい',
       'metro.spent': '総建設費',
       'metro.newCity': '新しい街',
       'metro.cost': '建設費',
@@ -89,11 +105,17 @@
       'metro.rule4': '<b>建物の下</b>を通る区間は赤く見え、建設費が四倍を超えます。道路の下がいちばん安いです。',
       'metro.rule5': '急に曲がるとその区間に<b>制限速度</b>がかかって遅くなります。急すぎると建設そのものができません。',
       'metro.rule6': '列車は駅で<b>止まった状態から発車し、次の駅で止まります。</b>だから駅が近いと最高速度に届きません。',
-      'metro.rule7': '<b>確定</b>を押すまでは何も建ちません。思いきり動かしてみてください。'
+      'metro.rule7': '<b>確定</b>を押すまでは何も建ちません。思いきり動かしてみてください。',
+      'metro.ruleMap': '地図は画面より広いです。<b>何もない所をドラッグ</b>すると地図が動きます。選んだ駅が画面の外に出ると、端に点が残ります。',
+      'metro.ruleDistrict': '<b>旧市街</b>は路地が狭く曲がっていて建物も密なので、道に沿えば遅く、まっすぐ抜けば高くつきます。<b>計画都市</b>はその逆です。難易度はその配分を変えます。'
     },
     'zh-CN': {
       'meta.desc': '在城市地下铺线，连接两座车站。从建筑下方穿过造价更高，急弯会让列车变慢。',
       'metro.mapLabel': '城市',
+      'metro.difficulty': '难度',
+      'metro.easy': '简单',
+      'metro.normal': '普通',
+      'metro.hard': '困难',
       'metro.spent': '累计造价',
       'metro.newCity': '新城市',
       'metro.cost': '造价',
@@ -119,11 +141,17 @@
       'metro.rule4': '从<b>建筑下方</b>穿过的区段显示为红色，造价是道路下的四倍多。道路下最便宜。',
       'metro.rule5': '弯得太急，该区段会有<b>限速</b>而变慢。过急则根本无法施工。',
       'metro.rule6': '列车在车站<b>从静止起步，到下一站停车</b>，所以车站太近就到不了最高速度。',
-      'metro.rule7': '按下<b>确定</b>之前什么都不会建成，尽管拖动试试。'
+      'metro.rule7': '按下<b>确定</b>之前什么都不会建成，尽管拖动试试。',
+      'metro.ruleMap': '地图比屏幕更大。<b>拖动空白处</b>即可移动地图。已选的车站移出画面后，会在边缘留下一个点。',
+      'metro.ruleDistrict': '<b>老城区</b>的巷子又窄又弯，建筑也密，顺着路走慢、直接穿过贵。<b>新城区</b>正相反。难度改变两者的比例。'
     },
     'zh-TW': {
       'meta.desc': '在城市地下鋪線，連接兩座車站。從建築下方穿過造價更高，急彎會讓列車變慢。',
       'metro.mapLabel': '城市',
+      'metro.difficulty': '難度',
+      'metro.easy': '簡單',
+      'metro.normal': '普通',
+      'metro.hard': '困難',
       'metro.spent': '累計造價',
       'metro.newCity': '新城市',
       'metro.cost': '造價',
@@ -149,11 +177,17 @@
       'metro.rule4': '從<b>建築下方</b>穿過的區段顯示為紅色，造價是道路下的四倍多。道路下最便宜。',
       'metro.rule5': '彎得太急，該區段會有<b>限速</b>而變慢。過急則根本無法施工。',
       'metro.rule6': '列車在車站<b>從靜止起步，到下一站停車</b>，所以車站太近就到不了最高速度。',
-      'metro.rule7': '按下<b>確定</b>之前什麼都不會建成，儘管拖動看看。'
+      'metro.rule7': '按下<b>確定</b>之前什麼都不會建成，儘管拖動看看。',
+      'metro.ruleMap': '地圖比螢幕更大。<b>拖動空白處</b>即可移動地圖。已選的車站移出畫面後，會在邊緣留下一個點。',
+      'metro.ruleDistrict': '<b>老城區</b>的巷子又窄又彎，建築也密，順著路走慢、直接穿過貴。<b>新城區</b>正相反。難度改變兩者的比例。'
     },
     es: {
       'meta.desc': 'Traza una línea bajo la ciudad para unir dos estaciones. Excavar bajo los edificios cuesta más y las curvas cerradas frenan los trenes.',
       'metro.mapLabel': 'Ciudad',
+      'metro.difficulty': 'Dificultad',
+      'metro.easy': 'Fácil',
+      'metro.normal': 'Normal',
+      'metro.hard': 'Difícil',
       'metro.spent': 'Gasto total',
       'metro.newCity': 'Nueva ciudad',
       'metro.cost': 'Coste',
@@ -179,7 +213,9 @@
       'metro.rule4': 'Los tramos que pasan <b>bajo edificios</b> se ven en rojo y cuestan más del cuádruple. Bajo la calle es lo más barato.',
       'metro.rule5': 'Una curva cerrada impone un <b>límite de velocidad</b> en ese tramo. Si es excesiva, no se puede construir.',
       'metro.rule6': 'Los trenes <b>arrancan parados y paran en la estación siguiente</b>, así que con estaciones juntas nunca alcanzan la velocidad máxima.',
-      'metro.rule7': 'No se construye nada hasta pulsar <b>Construir</b>. Arrastra cuanto quieras.'
+      'metro.rule7': 'No se construye nada hasta pulsar <b>Construir</b>. Arrastra cuanto quieras.',
+      'metro.ruleMap': 'El mapa es más ancho que la pantalla. <b>Arrastra una zona vacía</b> para moverlo. La estación elegida deja un punto en el borde al salir de la vista.',
+      'metro.ruleDistrict': 'En el <b>casco antiguo</b> las calles son estrechas y sinuosas y los edificios están apiñados: seguir las calles es lento y atravesar en recto sale caro. Un <b>barrio planificado</b> es lo contrario. La dificultad cambia la mezcla.'
     }
   });
 })();

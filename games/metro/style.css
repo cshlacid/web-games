@@ -11,6 +11,7 @@
      갈리게 했다. 노선과 경고색만 채도를 가진다. */
   --ground: #dfe5ee;
   --road: #ffffff;
+  --alley: #eff2f7;
   --road-edge: #ccd5e2;
   --home: #c5cfdd;
   --shop: #b4c0d2;
@@ -37,6 +38,7 @@
 
     --ground: #171c24;
     --road: #3f4a59;
+    --alley: #2f3845;
     --road-edge: #2c3441;
     --home: #303947;
     --shop: #3b4653;
@@ -112,6 +114,26 @@ h1 {
 .back:hover { opacity: 1; }
 
 .picker-row { display: flex; align-items: center; gap: 10px; }
+.picker { display: flex; gap: 4px; }
+
+.pick {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.pick[aria-pressed="true"] {
+  background: var(--btn-bg);
+  border-color: var(--btn-bg);
+  color: var(--btn-fg);
+}
+
 .spent { font-size: 12px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
 .spent b { color: var(--fg); }
 .picker-row .toggle { margin-inline-start: auto; }
@@ -129,7 +151,8 @@ h1 {
 .map {
   display: block;
   width: 100%;
-  /* viewBox와 같은 비율로 못 박아 여백(레터박스)이 생기지 않게 한다. 여백이 생기면
+  /* 한 화면에 보이는 창(citygen.js의 VIEW)과 같은 비율로 못 박아 여백(레터박스)이
+     생기지 않게 한다. 도시 전체가 아니라 창의 비율이다. 여백이 생기면
      손가락 좌표를 지도 좌표로 옮기는 계산이 한 겹 더 필요해진다. */
   aspect-ratio: 2400 / 2700;
   /* 끌어서 조작하는 판이라 none. 그래서 이 안에는 click으로 도는 조작을 두지 않는다 —

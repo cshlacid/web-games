@@ -37,6 +37,7 @@
       </div>
     </div>
     <div class="picker-row">
+      <div class="picker" id="levels" role="group" aria-label="난이도" data-i18n-attr="aria-label=metro.difficulty"></div>
       <span class="spent"><span data-i18n="metro.spent">누적 건설비</span> <b id="spent">0</b></span>
       <button class="toggle" id="new-city" type="button" data-i18n="metro.newCity">새 도시</button>
     </div>
@@ -84,12 +85,14 @@
     <p class="sheet-title" data-i18n="ui.rules">규칙</p>
     <p class="sheet-note" data-i18n="metro.draftNote">경로 편집만 먼저 만든 시안입니다. 수요와 수입은 아직 없습니다.</p>
     <ul class="help-list">
+      <li data-i18n-html="metro.ruleMap">지도는 화면보다 넓습니다. <b>빈 곳을 끌면</b> 지도가 움직입니다. 고른 역이 화면 밖으로 나가면 가장자리에 점으로 남습니다.</li>
       <li data-i18n-html="metro.rule1"><b>역 두 개</b>를 차례로 누르면 둘을 잇는 직선이 생깁니다.</li>
       <li data-i18n-html="metro.rule2">그 선을 <b>잡아 끌면</b> 그 자리에 중간점이 생기며 경로가 휩니다. 중간점은 <b>세 개</b>까지입니다.</li>
       <li data-i18n-html="metro.rule3">중간점을 <b>두 번 두드리면</b> 지워집니다. 끌 때 도로 가까이 가면 도로에 <b>달라붙습니다</b>.</li>
       <li data-i18n-html="metro.rule4"><b>건물 밑</b>으로 지나는 구간은 붉게 보이고 건설비가 네 배를 넘습니다. 도로 밑이 가장 쌉니다.</li>
       <li data-i18n-html="metro.rule5">급하게 굽으면 그 구간의 <b>제한속도</b>가 걸려 느려집니다. 너무 급하면 아예 지을 수 없습니다.</li>
       <li data-i18n-html="metro.rule6">열차는 역에서 <b>서 있다가 출발해 다음 역에서 섭니다.</b> 그래서 역이 가까우면 최고 속도에 닿지 못합니다.</li>
+      <li data-i18n-html="metro.ruleDistrict"><b>구시가지</b>는 골목이 좁고 굽은 데다 건물이 빽빽해, 길을 따라가면 느리고 곧게 뚫으면 비쌉니다. <b>계획도시</b>는 그 반대입니다. 난이도는 둘의 배합을 바꿉니다.</li>
       <li data-i18n-html="metro.rule7"><b>확정</b>을 누르기 전에는 아무것도 지어지지 않습니다. 마음껏 끌어 보세요.</li>
     </ul>
     <div class="sheet-actions">
