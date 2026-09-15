@@ -22,6 +22,7 @@
       'game.rushhour': '차 빼기',
       'game.healer': '힐러',
       'game.defense': '길목 지키기',
+      'game.metro': '지하철 노선',
 
       'ui.back': '← 목록',
       'ui.bgm': 'BGM',
@@ -82,6 +83,7 @@
       'game.rushhour': 'Rush Hour',
       'game.healer': 'Healer',
       'game.defense': 'Hold the Line',
+      'game.metro': 'Metro Lines',
 
       'ui.back': '← All games',
       'ui.bgm': 'Music',
@@ -142,6 +144,7 @@
       'game.rushhour': 'ラッシュアワー',
       'game.healer': 'ヒーラー',
       'game.defense': '進路防衛',
+      'game.metro': '地下鉄路線',
 
       'ui.back': '← 一覧',
       'ui.bgm': 'BGM',
@@ -202,6 +205,7 @@
       'game.rushhour': '停车难题',
       'game.healer': '治疗师',
       'game.defense': '守路口',
+      'game.metro': '地铁线路',
 
       'ui.back': '← 列表',
       'ui.bgm': '音乐',
@@ -262,6 +266,7 @@
       'game.rushhour': '停車難題',
       'game.healer': '治療師',
       'game.defense': '守路口',
+      'game.metro': '地鐵路線',
 
       'ui.back': '← 列表',
       'ui.bgm': '音樂',
@@ -322,6 +327,7 @@
       'game.rushhour': 'Atasco',
       'game.healer': 'Sanador',
       'game.defense': 'Defensa',
+      'game.metro': 'Líneas de Metro',
 
       'ui.back': '← Lista',
       'ui.bgm': 'Música',
