@@ -1,0 +1,222 @@
+:root {
+  --bg: #f4f6f9;
+  --fg: #2c3542;
+  --muted: #7b8698;
+  --line: #cdd5e0;
+  --btn-bg: #55637a;
+  --btn-fg: #f2f5f9;
+  --sheet-bg: #ffffff;
+
+  /* 지도. 땅 → 길 → 건물 순으로 밝기를 낮춰, 색을 보지 않고 명암만으로도 층이
+     갈리게 했다. 노선과 경고색만 채도를 가진다. */
+  --ground: #dfe5ee;
+  --road: #ffffff;
+  --road-edge: #ccd5e2;
+  --home: #c5cfdd;
+  --shop: #b4c0d2;
+  --office: #a2b0c6;
+  --metro: #3f6fd8;
+  --metro-soft: #8fa9e4;
+  --under: #d9534f;
+  --slow: #c9862b;
+  --station-fill: #ffffff;
+  --station-ring: #3c465a;
+
+  --pad-x: clamp(10px, 4vmin, 28px);
+  --app-max: 440px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #171b21;
+    --fg: #dfe5ee;
+    --muted: #8892a3;
+    --line: #333c49;
+    --btn-bg: #4a5568;
+    --sheet-bg: #212832;
+
+    --ground: #171c24;
+    --road: #3f4a59;
+    --road-edge: #2c3441;
+    --home: #303947;
+    --shop: #3b4653;
+    --office: #4a5666;
+    --metro: #6f9bf0;
+    --metro-soft: #3a4c70;
+    --under: #e4736f;
+    --slow: #d8a13a;
+    --station-fill: #12161c;
+    --station-ring: #c3cbd8;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+
+/* display를 지정한 클래스는 `[hidden]`의 display:none을 이긴다. 판을 확정한 뒤에도
+   지난 구간의 숫자가 그대로 떠 있던 것이 이 때문이었다. */
+[hidden] { display: none !important; }
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  display: flex;
+  justify-content: center;
+  padding: clamp(10px, 3vmin, 24px) var(--pad-x);
+}
+
+.app {
+  width: min(100%, var(--app-max));
+  display: flex;
+  flex-direction: column;
+  gap: clamp(8px, 2vmin, 14px);
+}
+
+/* 헤더 배치는 모든 게임이 같다 — 왼쪽 위에 목록과 도움말, 가운데 이름, 오른쪽에 소리. */
+.title-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 10px;
+}
+
+.title-row h1 { text-align: center; }
+.title-row .head-nav { justify-self: start; }
+.head-nav { display: flex; align-items: center; gap: 14px; }
+.title-row .head-actions { justify-self: end; }
+
+h1 {
+  margin: 0;
+  font-size: clamp(22px, 5.6vmin, 32px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.head-actions { display: flex; align-items: baseline; gap: 14px; }
+
+.toggle {
+  border: 0; background: none; padding: 0;
+  color: inherit; font-family: inherit; font-size: 14px; font-weight: 600;
+  cursor: pointer; opacity: 0.6;
+}
+.toggle:hover { opacity: 1; }
+.toggle.sound { font-size: 12px; }
+.toggle.sound[aria-pressed="false"] { opacity: 0.38; text-decoration: line-through; }
+
+.back {
+  color: inherit; opacity: 0.6; text-decoration: none;
+  font-size: 14px; font-weight: 600;
+}
+.back:hover { opacity: 1; }
+
+.picker-row { display: flex; align-items: center; gap: 10px; }
+.spent { font-size: 12px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
+.spent b { color: var(--fg); }
+.picker-row .toggle { margin-inline-start: auto; }
+
+/* 지도는 화면 한 장에 다 들어온다. 확대·팬이 없는 것은 게으름이 아니라 결정이다 —
+   shared/base.js가 손가락 둘 이상의 touchmove를 문서 전체에서 취소하므로, 자체
+   핀치 줌을 짜도 이벤트가 오지 않는다. 자세한 사정은 CLAUDE.md에 있다. */
+.map-wrap {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--ground);
+}
+
+.map {
+  display: block;
+  width: 100%;
+  /* viewBox와 같은 비율로 못 박아 여백(레터박스)이 생기지 않게 한다. 여백이 생기면
+     손가락 좌표를 지도 좌표로 옮기는 계산이 한 겹 더 필요해진다. */
+  aspect-ratio: 2400 / 2700;
+  /* 끌어서 조작하는 판이라 none. 그래서 이 안에는 click으로 도는 조작을 두지 않는다 —
+     확정·취소 단추가 판 밖에 있는 이유가 이것이다. */
+  touch-action: none;
+}
+
+.status {
+  margin: 0;
+  min-height: 1.3em;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  text-align: center;
+}
+.status.warn { color: var(--under); }
+
+.readout {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.stats { margin: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.stats div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.stats dt { font-size: 11px; color: var(--muted); font-weight: 600; }
+.stats dd {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* 땅의 갈래를 길이 비율 그대로 한 줄에 눕힌다. 숫자 셋을 읽는 것보다 빠르다. */
+.mix { display: flex; height: 7px; border-radius: 999px; overflow: hidden; background: var(--line); }
+.mix span { display: block; min-width: 0; }
+.mix-road { background: var(--metro-soft); }
+.mix-empty { background: var(--muted); }
+.mix-building { background: var(--under); }
+
+.mix-legend {
+  margin: 0;
+  display: flex;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  flex-wrap: wrap;
+}
+.mix-legend span { display: inline-flex; align-items: center; gap: 4px; }
+.mix-legend b { color: var(--fg); font-weight: 700; }
+.dot { width: 7px; height: 7px; border-radius: 2px; display: inline-block; }
+.dot.road { background: var(--metro-soft); }
+.dot.empty { background: var(--muted); }
+.dot.building { background: var(--under); }
+
+.actions { display: flex; gap: 8px; }
+
+.btn {
+  flex: 1;
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  border: 0;
+  border-radius: 8px;
+  padding: 11px 16px;
+  font-size: 15px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+}
+.btn.ghost { background: none; color: var(--fg); border: 1px solid var(--line); flex: 0 1 auto; }
+.btn:disabled { opacity: 0.4; cursor: default; }
+
+.sheet-title { margin: 0; font-size: 19px; font-weight: 800; }
+.sheet-note { margin: 0; font-size: 14px; color: var(--muted); }
+.sheet-actions { display: flex; gap: 8px; }
+
+.help-list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 1.55;
+}

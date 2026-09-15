@@ -24,7 +24,8 @@
       'desc.nonogram': '숫자대로 칠해 그림 찾기',
       'desc.rushhour': '막힌 길에서 빨간 차 빼내기',
       'desc.healer': '파티 힐러 맡기',
-      'desc.defense': '길목에 사람을 세워 적을 막기'
+      'desc.defense': '길목에 사람을 세워 적을 막기',
+      'desc.metro': '도시 아래로 노선 깔기'
     },
     en: {
       'hub.tagline': 'Mini games you can play right in the browser',
@@ -49,7 +50,8 @@
       'desc.nonogram': 'Paint by the numbers',
       'desc.rushhour': 'Get the red car out',
       'desc.healer': 'Play the party healer',
-      'desc.defense': 'Post units on the path to stop them'
+      'desc.defense': 'Post units on the path to stop them',
+      'desc.metro': 'Lay lines under the city'
     },
     ja: {
       'hub.tagline': 'ブラウザですぐ遊べるミニゲーム集',
@@ -74,7 +76,8 @@
       'desc.nonogram': '数字どおりに塗って絵を出す',
       'desc.rushhour': '赤い車を外に出す',
       'desc.healer': 'パーティのヒーラーを務める',
-      'desc.defense': '通り道に人を置いて敵を止める'
+      'desc.defense': '通り道に人を置いて敵を止める',
+      'desc.metro': '街の下に線路を引く'
     },
     'zh-CN': {
       'hub.tagline': '打开浏览器就能玩的小游戏',
@@ -99,7 +102,8 @@
       'desc.nonogram': '按数字涂出图案',
       'desc.rushhour': '把红车开出去',
       'desc.healer': '担任队伍的治疗',
-      'desc.defense': '在路口布防挡住敌人'
+      'desc.defense': '在路口布防挡住敌人',
+      'desc.metro': '在城市地下铺线'
     },
     'zh-TW': {
       'hub.tagline': '打開瀏覽器就能玩的小遊戲',
@@ -124,7 +128,8 @@
       'desc.nonogram': '按數字塗出圖案',
       'desc.rushhour': '把紅車開出去',
       'desc.healer': '擔任隊伍的治療',
-      'desc.defense': '在路口布防擋住敵人'
+      'desc.defense': '在路口布防擋住敵人',
+      'desc.metro': '在城市地下鋪線'
     },
     es: {
       'hub.tagline': 'Minijuegos para jugar en el navegador',
@@ -149,7 +154,8 @@
       'desc.nonogram': 'Pinta según los números',
       'desc.rushhour': 'Saca el coche rojo',
       'desc.healer': 'Sé el sanador del grupo',
-      'desc.defense': 'Coloca unidades en el paso'
+      'desc.defense': 'Coloca unidades en el paso',
+      'desc.metro': 'Tiende líneas bajo la ciudad'
     }
   });
 })();
