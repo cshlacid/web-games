@@ -1,0 +1,95 @@
+// 이 게임에만 나오는 문구. 도구 이름과 공통 문구는 shared/strings.js에 있다.
+(function () {
+  SharedI18n.add({
+    ko: {
+      'meta.desc': '1번 칸에서 시작해 숫자를 순서대로 밟으며 모든 칸을 한 번씩 지나는 선을 긋는 퍼즐',
+      'zip.note': '{size}×{size}, 숫자 {count}개.',
+      'zip.hintTrim': '어긋난 {count}칸을 지우고 다음 칸을 놓았습니다.',
+      'zip.hintPlaced': '다음 칸을 놓았습니다.',
+      'zip.rule1': '<b>1</b>이 적힌 칸에서 출발해 <b>2, 3, …을 순서대로</b> 지나는 선 하나를 긋습니다. 숫자를 건너뛸 수 없습니다.',
+      'zip.rule2': '선은 <b>모든 칸을 정확히 한 번씩</b> 지나야 합니다. 한 칸이라도 비면 완성이 아닙니다.',
+      'zip.rule3': '선은 <b>위아래·양옆으로만</b> 움직이고, 자기 자신과 겹칠 수 없습니다.',
+      'zip.rule4': '칸과 칸 사이의 <b>굵은 선은 벽</b>입니다. 벽은 지나갈 수 없으니 돌아가야 합니다.',
+      'zip.rule5': '<b>이 게임의 모든 판은 답이 하나뿐입니다.</b> 답이 여럿인 판은 나오지 않습니다.',
+      'zip.rule6': '판 크기가 곧 난이도입니다. 칸이 늘면 벽도 함께 늘어납니다.',
+      'zip.rule7': '칸을 <b>누른 채 끌어</b> 선을 긋습니다. 지나온 칸을 되짚어 끌면 그만큼 지워집니다. 한 칸씩 톡톡 눌러 이어 가도 됩니다.',
+      'zip.rule8': '키보드: <b>방향키</b>로 잇고, <b>Backspace</b>로 한 칸 되돌리고, <b>Esc</b>로 전부 지웁니다.',
+      'zip.rule9': '<b>힌트</b>는 어긋난 곳까지 지우고 다음 한 칸을 놓아 줍니다. 힌트를 쓴 판은 최고 기록으로 남기지 않습니다.'
+    },
+    en: {
+      'meta.desc': 'Start at 1, step through the numbers in order, and draw one line that visits every cell once',
+      'zip.note': '{size}×{size}, {count} numbers.',
+      'zip.hintTrim': 'Erased {count} wrong cells and placed the next one.',
+      'zip.hintPlaced': 'Placed the next cell.',
+      'zip.rule1': 'Start on the cell marked <b>1</b> and draw a single line through <b>2, 3, … in order</b>. No skipping a number.',
+      'zip.rule2': 'The line must pass through <b>every cell exactly once</b>. One empty cell and it is not finished.',
+      'zip.rule3': 'The line moves <b>only up, down, left and right</b>, and never crosses itself.',
+      'zip.rule4': 'A <b>thick line between cells is a wall</b>. You cannot cross it, so go around.',
+      'zip.rule5': '<b>Every board here has exactly one solution.</b> Boards with several answers never appear.',
+      'zip.rule6': 'Board size is the difficulty. More cells means more walls too.',
+      'zip.rule7': '<b>Press and drag</b> across cells to draw. Drag back over the line to erase that much. Tapping cell by cell works too.',
+      'zip.rule8': 'Keyboard: <b>arrow keys</b> to extend, <b>Backspace</b> to step back, <b>Esc</b> to clear.',
+      'zip.rule9': 'A <b>Hint</b> erases back to the mistake and places the next cell. Boards solved with hints are not recorded.'
+    },
+    ja: {
+      'meta.desc': '1のマスから始めて数字を順に踏み、すべてのマスを一度ずつ通る線を引くパズル',
+      'zip.note': '{size}×{size}、数字 {count} 個。',
+      'zip.hintTrim': 'ずれた{count}マスを消して次のマスを置きました。',
+      'zip.hintPlaced': '次のマスを置きました。',
+      'zip.rule1': '<b>1</b>のマスから出発し、<b>2, 3, … を順に</b>通る線を一本引きます。数字を飛ばせません。',
+      'zip.rule2': '線は<b>すべてのマスをちょうど一度ずつ</b>通ります。一マスでも空くと完成ではありません。',
+      'zip.rule3': '線は<b>上下左右にだけ</b>進み、自分自身と重なれません。',
+      'zip.rule4': 'マスとマスの間の<b>太い線は壁</b>です。通れないので回り道します。',
+      'zip.rule5': '<b>この盤はすべて答えがひとつだけです。</b>答えが複数ある盤は出ません。',
+      'zip.rule6': '盤の大きさがそのまま難易度です。マスが増えると壁も増えます。',
+      'zip.rule7': 'マスを<b>押したまま引いて</b>線を描きます。通ったマスをたどり返すとその分消えます。一マスずつ叩いてつないでも構いません。',
+      'zip.rule8': 'キーボード：<b>矢印キー</b>でつなぎ、<b>Backspace</b>で一マス戻し、<b>Esc</b>で全部消します。',
+      'zip.rule9': '<b>ヒント</b>はずれた所まで消して次の一マスを置きます。ヒントを使った盤はベスト記録に残しません。'
+    },
+    'zh-CN': {
+      'meta.desc': '从 1 出发按顺序踩过数字，画一条经过每个格子一次的线',
+      'zip.note': '{size}×{size}，数字 {count} 个。',
+      'zip.hintTrim': '擦掉 {count} 个走错的格子，放好了下一格。',
+      'zip.hintPlaced': '放好了下一格。',
+      'zip.rule1': '从写着 <b>1</b> 的格子出发，按<b>2、3、… 的顺序</b>画一条线，不能跳过数字。',
+      'zip.rule2': '线必须<b>经过每个格子恰好一次</b>。少走一格就不算完成。',
+      'zip.rule3': '线只能<b>上下左右</b>走，且不能与自己重叠。',
+      'zip.rule4': '格子之间的<b>粗线是墙</b>，不能穿过，只能绕行。',
+      'zip.rule5': '<b>这里的每一盘都只有一个答案。</b>不会出现多解的盘面。',
+      'zip.rule6': '盘面越大越难。格子多了，墙也会跟着多。',
+      'zip.rule7': '<b>按住拖动</b>来画线。沿原路拖回去就会擦掉那一段。一格一格点也可以。',
+      'zip.rule8': '键盘：<b>方向键</b>接线，<b>Backspace</b> 退一格，<b>Esc</b> 全部清空。',
+      'zip.rule9': '<b>提示</b>会擦到出错的地方，再放好下一格。用过提示的盘面不计入最好成绩。'
+    },
+    'zh-TW': {
+      'meta.desc': '從 1 出發按順序踩過數字，畫一條經過每個格子一次的線',
+      'zip.note': '{size}×{size}，數字 {count} 個。',
+      'zip.hintTrim': '擦掉 {count} 個走錯的格子，放好了下一格。',
+      'zip.hintPlaced': '放好了下一格。',
+      'zip.rule1': '從寫著 <b>1</b> 的格子出發，按<b>2、3、… 的順序</b>畫一條線，不能跳過數字。',
+      'zip.rule2': '線必須<b>經過每個格子恰好一次</b>。少走一格就不算完成。',
+      'zip.rule3': '線只能<b>上下左右</b>走，且不能與自己重疊。',
+      'zip.rule4': '格子之間的<b>粗線是牆</b>，不能穿過，只能繞行。',
+      'zip.rule5': '<b>這裡的每一盤都只有一個答案。</b>不會出現多解的盤面。',
+      'zip.rule6': '盤面越大越難。格子多了，牆也會跟著多。',
+      'zip.rule7': '<b>按住拖曳</b>來畫線。沿原路拖回去就會擦掉那一段。一格一格點也可以。',
+      'zip.rule8': '鍵盤：<b>方向鍵</b>接線，<b>Backspace</b> 退一格，<b>Esc</b> 全部清空。',
+      'zip.rule9': '<b>提示</b>會擦到出錯的地方，再放好下一格。用過提示的盤面不計入最佳成績。'
+    },
+    es: {
+      'meta.desc': 'Empieza en el 1, pisa los números en orden y traza una línea que pase una vez por cada casilla',
+      'zip.note': '{size}×{size}, {count} números.',
+      'zip.hintTrim': 'Se borraron {count} casillas erróneas y se colocó la siguiente.',
+      'zip.hintPlaced': 'Se colocó la siguiente casilla.',
+      'zip.rule1': 'Empieza en la casilla con el <b>1</b> y traza una sola línea pasando por <b>2, 3, … en orden</b>. No se salta ningún número.',
+      'zip.rule2': 'La línea debe pasar por <b>todas las casillas exactamente una vez</b>. Si queda una vacía, no está resuelto.',
+      'zip.rule3': 'La línea solo se mueve <b>en horizontal y vertical</b>, y nunca se cruza consigo misma.',
+      'zip.rule4': 'La <b>línea gruesa entre casillas es un muro</b>. No se puede cruzar: hay que rodearlo.',
+      'zip.rule5': '<b>Todos los tableros tienen una única solución.</b> Nunca aparecen tableros con varias respuestas.',
+      'zip.rule6': 'El tamaño es la dificultad. Con más casillas también hay más muros.',
+      'zip.rule7': '<b>Mantén pulsado y arrastra</b> para trazar. Arrastra hacia atrás sobre la línea para borrar ese tramo. También puedes tocar casilla a casilla.',
+      'zip.rule8': 'Teclado: <b>flechas</b> para avanzar, <b>Retroceso</b> para retroceder una casilla, <b>Esc</b> para borrar todo.',
+      'zip.rule9': 'Una <b>Pista</b> borra hasta el error y coloca la siguiente casilla. Los tableros resueltos con pistas no cuentan para el récord.'
+    }
+  });
+})();

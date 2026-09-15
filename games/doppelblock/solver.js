@@ -88,8 +88,10 @@ function viableArrangements(state, line) {
   return out;
 }
 
-// 설명에 어느 줄인지가 빠지면 사용자가 화면에서 근거를 되짚을 수 없다.
-const lineName = (line) => `${line.kind === 'row' ? '가로' : '세로'} ${line.index + 1}줄(합 ${line.clue})`;
+// 근거는 문장이 아니라 자료로 돌려준다. 여섯 언어로 갈리는 문장을 여기서 만들면
+// 로직이 한 언어에 묶이고, node 테스트가 브라우저 전역(사전)을 부르게 된다.
+// 어느 줄인지가 빠지면 화면에서 근거를 되짚을 수 없으므로 line은 항상 싣는다.
+const lineOf = (line) => ({ kind: line.kind, index: line.index, clue: line.clue });
 
 // --- 기법들. 무언가 바뀌면 그 사실을 설명과 함께 돌려준다. ---
 
@@ -115,7 +117,7 @@ function eliminate(state) {
       }
       if (changed) {
         const digit = Math.log2(mask);
-        return { line, cell, detail: `${lineName(line)}에 이미 ${digit}이 있으니 같은 줄의 다른 칸에는 ${digit}이 올 수 없습니다.` };
+        return { line, cell, why: { code: 'eliminate', line: lineOf(line), digit } };
       }
     }
   }
@@ -156,7 +158,7 @@ function blockPairs(state) {
     }
     if (feasible.length === 0) {
       state.broken = true;
-      return { line, detail: '이 줄에는 검은 칸을 놓을 자리가 남아 있지 않습니다.' };
+      return { line, why: { code: 'noBlockRoom' } };
     }
 
     const possible = new Set();
@@ -172,10 +174,10 @@ function blockPairs(state) {
 
     if (changed) {
       const gaps = [...new Set(feasible.map(([i, j]) => j - i - 1))].sort((x, y) => x - y);
-      const detail = feasible.length === 1
-        ? `${lineName(line)}에서 단서를 만족시킬 수 있는 검은 칸 자리는 한 쌍뿐입니다.`
-        : `${lineName(line)}에서 단서를 만들려면 검은 칸 사이가 ${gaps.join('칸 또는 ')}칸이어야 합니다.`;
-      return { line, detail };
+      const why = feasible.length === 1
+        ? { code: 'onePair', line: lineOf(line) }
+        : { code: 'gaps', line: lineOf(line), gaps };
+      return { line, why };
     }
   }
   return null;
@@ -194,7 +196,7 @@ function maxClue(state) {
       changed = restrict(state, line.cells[p], ~BLOCK_BIT) || changed;
     }
     if (changed) {
-      return { line, detail: `${lineName(line)}의 단서는 그 줄의 숫자를 모두 더한 값이라, 검은 칸은 양 끝일 수밖에 없습니다.` };
+      return { line, why: { code: 'maxClue', line: lineOf(line) } };
     }
   }
   return null;
@@ -211,7 +213,7 @@ function blocksPlaced(state) {
       changed = restrict(state, cell, ~BLOCK_BIT) || changed;
     }
     if (changed) {
-      return { line, detail: `${lineName(line)}의 검은 칸 두 개가 이미 정해졌으니 나머지 칸은 모두 숫자입니다.` };
+      return { line, why: { code: 'blocksPlaced', line: lineOf(line) } };
     }
   }
   return null;
@@ -226,7 +228,7 @@ function hiddenSingle(state) {
       if (spots.length !== 1) continue;
       if (state.cands[spots[0]] === bit) continue;
       if (restrict(state, spots[0], bit)) {
-        return { line, cell: spots[0], detail: `${lineName(line)}에서 ${d}이 들어갈 수 있는 칸이 여기뿐입니다.` };
+        return { line, cell: spots[0], why: { code: 'hiddenSingle', line: lineOf(line), digit: d } };
       }
     }
   }
@@ -273,16 +275,16 @@ function combinations(state) {
     };
     pick(1, inside.length, 0, []);
 
-    if (found === 0) { state.broken = true; return { line, detail: '이 줄은 단서를 만족시킬 수 없습니다.' }; }
+    if (found === 0) { state.broken = true; return { line, why: { code: 'noCombo' } }; }
 
     let changed = false;
     for (const cell of inside) changed = restrict(state, cell, insideUnion) || changed;
     for (const cell of outside) changed = restrict(state, cell, outsideUnion | BLOCK_BIT) || changed;
     if (changed) {
-      const detail = found === 1
-        ? `${lineName(line)}은 검은 칸 사이 ${inside.length}칸의 합이 ${line.clue}이 되어야 하는데, 그런 조합은 하나뿐입니다.`
-        : `${lineName(line)}은 검은 칸 사이 ${inside.length}칸의 합이 ${line.clue}이 되어야 하고, 그런 조합 ${found}가지 어디에도 없는 숫자는 사이에 올 수 없습니다.`;
-      return { line, detail };
+      const why = found === 1
+        ? { code: 'comboOne', line: lineOf(line), inside: inside.length }
+        : { code: 'comboMany', line: lineOf(line), inside: inside.length, found };
+      return { line, why };
     }
   }
   return null;
@@ -295,7 +297,7 @@ function combinations(state) {
 function lineArrangements(state) {
   for (const line of state.lines) {
     const viable = viableArrangements(state, line);
-    if (viable.length === 0) { state.broken = true; return { line, detail: '이 줄에 가능한 배치가 남아 있지 않습니다.' }; }
+    if (viable.length === 0) { state.broken = true; return { line, why: { code: 'noArrangement' } }; }
 
     const union = new Array(state.n).fill(0);
     for (const arrangement of viable) {
@@ -307,10 +309,7 @@ function lineArrangements(state) {
       // 배치 수만 말하면 "5가지"가 무엇의 5가지인지 알 수 없다. 사람이 손으로
       // 따지는 단위는 숫자 순서까지가 아니라 검은 칸 두 자리이므로 함께 센다.
       const spots = new Set(viable.map((a) => a.reduce((acc, v, p) => (v === R.BLOCK ? `${acc},${p}` : acc), ''))).size;
-      return {
-        line,
-        detail: `${lineName(line)}에서 단서를 만족시키는 배치는 ${viable.length}가지(검은 칸 자리로는 ${spots}가지) 남았습니다. 그 배치 어디에도 나오지 않는 값은 놓을 수 없습니다.`,
-      };
+      return { line, why: { code: 'arrangements', line: lineOf(line), count: viable.length, spots } };
     }
   }
   return null;
@@ -392,7 +391,7 @@ function crossLines(state) {
           if (capacity < demand) {
             state.broken = true;
             return { line: state.lines[(from === 'row' ? 0 : n) + chosen[0]],
-                     detail: '이 줄들에 그 값을 놓을 자리가 모자랍니다.' };
+                     why: { code: 'crossShort' } };
           }
           if (capacity !== demand) return null;
 
@@ -409,16 +408,16 @@ function crossLines(state) {
             }
             if (!changed) continue;
 
-            const fromLabel = from === 'row' ? '가로' : '세로';
-            const toLabel = from === 'row' ? '세로' : '가로';
-            const lines = chosen.map((a) => a + 1).join('·');
-            const spots = [...union].sort((x, y) => x - y).map((c) => c + 1).join('·');
-            const name = valueName(value);
             return {
               line: state.lines[(from === 'row' ? n : 0) + b],
-              detail: `${fromLabel} ${lines}줄의 ${withSubject(name)} 갈 수 있는 자리는 ${toLabel} ${spots}줄 안에만 있습니다.`
-                + ` 그 줄들이 내놓아야 할 ${demand}개가 ${toLabel} ${spots}줄에 남은 자리 수와 정확히 같으니,`
-                + ` 그 자리는 전부 ${fromLabel} ${lines}줄 차지입니다.`,
+              why: {
+                code: 'cross',
+                from,
+                lines: chosen.map((a) => a + 1),
+                spots: [...union].sort((x, y) => x - y).map((c) => c + 1),
+                value,
+                demand,
+              },
             };
           }
           return null;
@@ -435,15 +434,16 @@ function crossLines(state) {
 // 앞쪽이 사람 눈에 쉬운 기법이다. 채점은 "끝까지 푸는 데 필요했던 가장 어려운
 // 기법"으로 하므로, 매번 앞에서부터 다시 시도해야 각 단계에서 실제로 필요했던
 // 최소한의 추론이 기록된다.
+// 화면에 쓰는 기법 이름은 여기 두지 않는다 — name을 사전 열쇠로 쓴다.
 const TECHNIQUES = [
-  { name: 'eliminate', label: '같은 줄 소거', run: eliminate },
-  { name: 'maxClue', label: '최대 단서', run: maxClue },
-  { name: 'blockPairs', label: '검은 칸 자리 따지기', run: blockPairs },
-  { name: 'blocksPlaced', label: '검은 칸 확정', run: blocksPlaced },
-  { name: 'hiddenSingle', label: '숨은 단수', run: hiddenSingle },
-  { name: 'combinations', label: '조합 따지기', run: combinations },
-  { name: 'lineArrangements', label: '배치 좁히기', run: lineArrangements },
-  { name: 'crossLines', label: '가로세로 맞물림', run: crossLines },
+  { name: 'eliminate', run: eliminate },
+  { name: 'maxClue', run: maxClue },
+  { name: 'blockPairs', run: blockPairs },
+  { name: 'blocksPlaced', run: blocksPlaced },
+  { name: 'hiddenSingle', run: hiddenSingle },
+  { name: 'combinations', run: combinations },
+  { name: 'lineArrangements', run: lineArrangements },
+  { name: 'crossLines', run: crossLines },
 ];
 
 const TECHNIQUE_NAMES = TECHNIQUES.map((t) => t.name);
@@ -505,21 +505,10 @@ function hardestTechnique(n, rowClues, colClues, allowed = TECHNIQUE_NAMES) {
   return hardest;
 }
 
-const valueName = (value) => (value === R.BLOCK ? '검은 칸' : String(value));
-
-// 주격 조사는 앞말 받침에 따라 갈린다. 숫자는 소리 내어 읽은 형태로 따진다 —
-// 화면에는 아라비아 숫자로 보이지만 읽히는 것은 우리말이다. 지금 쓰는 숫자는
-// 1~4뿐이지만, 판이 커지면 조용히 틀린 조사가 붙으므로 미리 채워 둔다.
-const HAS_FINAL = {
-  '검은 칸': true,
-  1: true, 2: false, 3: true, 4: false, 5: false,
-  6: true, 7: true, 8: true, 9: false,
-};
-const withSubject = (name) => `${name}${HAS_FINAL[name] ? '이' : '가'}`;
-
 /**
  * 이번 단계에서 어느 칸의 무엇이 빠졌는지. 기법의 근거만 읽어서는 화면의 어디를
- * 봐야 하는지 알 수 없어서, 결론을 줄 안의 자리 번호로 되짚어 준다.
+ * 봐야 하는지 알 수 없어서, 결론을 줄 안의 자리 번호로 되짚어 준다. 문장으로
+ * 엮는 것은 화면 쪽 일이다 — 값을 늘어놓는 방식이 언어마다 다르다.
  */
 function removalSummary(line, cells, before, after, digits) {
   const groups = new Map();
@@ -530,14 +519,11 @@ function removalSummary(line, cells, before, after, digits) {
     groups.get(removed).push(line.cells.indexOf(cell) + 1);
   }
 
-  const parts = [];
+  const out = [];
   for (const [removed, spots] of groups) {
-    const names = valuesOf(removed, digits).map(valueName);
-    const head = names.slice(0, -1);
-    const tail = withSubject(names[names.length - 1]);
-    parts.push(`${spots.join('·')}번 칸에서 ${[...head, tail].join('·')} 빠집니다`);
+    out.push({ spots, values: valuesOf(removed, digits) });
   }
-  return parts.length ? ` 그래서 ${parts.join(', ')}.` : '';
+  return out;
 }
 
 /**
@@ -584,8 +570,7 @@ function nextHint(n, rowClues, colClues, placed, marks = null, allowed = TECHNIQ
         cell: settled,
         value,
         technique: technique.name,
-        label: technique.label,
-        detail: `${outcome.detail} 그래서 이 칸에 남는 것은 ${valueName(value)}뿐입니다.`,
+        why: outcome.why,
       };
     }
 
@@ -599,8 +584,8 @@ function nextHint(n, rowClues, colClues, placed, marks = null, allowed = TECHNIQ
       line: { kind: outcome.line.kind, index: outcome.line.index },
       cells: fresh.map((i) => ({ cell: i, mask: state.cands[i] })),
       technique: technique.name,
-      label: technique.label,
-      detail: outcome.detail + removalSummary(outcome.line, fresh, before, state.cands, state.digits),
+      why: outcome.why,
+      removals: removalSummary(outcome.line, fresh, before, state.cands, state.digits),
     };
   }
   return null;
@@ -631,7 +616,7 @@ const Solver = {
   BLOCK_BIT, bitOf, popcount, valuesOf,
   TECHNIQUES, TECHNIQUE_NAMES,
   createState, cloneState, gridOf, isSolved, viableArrangements,
-  solveLogically, hardestTechnique, grade, nextHint, clueCombinations, valueName,
+  solveLogically, hardestTechnique, grade, nextHint, clueCombinations,
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = Solver;

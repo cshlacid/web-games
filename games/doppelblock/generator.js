@@ -55,10 +55,11 @@ const SIZES_BY_LEVEL = {
   hard: [5, 6, 7, 8],
 };
 
+// 화면에 쓰는 이름은 열쇠로만 둔다 — 여섯 언어로 갈리므로 로직 자료에 넣지 않는다.
 const LEVELS = {
-  easy: { label: '쉬움', note: '배치 좁히기 없이 풀립니다' },
-  medium: { label: '보통', note: '배치 좁히기가 필요합니다' },
-  hard: { label: '어려움', note: '맞물림까지 따지거나, 8×8을 상대합니다' },
+  easy: { labelKey: 'ui.easy' },
+  medium: { labelKey: 'ui.medium' },
+  hard: { labelKey: 'ui.hard' },
 };
 
 const LEVEL_NAMES = ['easy', 'medium', 'hard'];
@@ -100,7 +101,7 @@ function fromBaked(n, level, rng) {
     return {
       n,
       level,
-      label: LEVELS[level].label,
+      labelKey: LEVELS[level].labelKey,
       rowClues: [...rowClues],
       colClues: [...colClues],
       solution: result.grid,
@@ -122,7 +123,7 @@ function generate(level = 'medium', options = {}) {
   const sizes = SIZES_BY_LEVEL[level];
   let n = options.n;
   if (n === undefined) n = sizes[Math.floor(rng() * sizes.length)];
-  else if (!sizes.includes(n)) throw new Error(`${n}×${n}에는 ${LEVELS[level].label} 난이도가 없습니다`);
+  else if (!sizes.includes(n)) throw new Error(`${n}×${n}에는 ${level} 난이도가 없습니다`);
 
   // 목록에 있는 크기는 목록에서만 꺼낸다. 그 자리에서 뽑기에는 너무 드물어서
   // 구워 둔 것이라, 목록이 비었다고 실시간 생성으로 넘어가면 몇 분이 걸린다.
@@ -147,7 +148,7 @@ function generate(level = 'medium', options = {}) {
     const puzzle = {
       n,
       level,
-      label: LEVELS[level].label,
+      labelKey: LEVELS[level].labelKey,
       rowClues,
       colClues,
       solution,

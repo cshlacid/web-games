@@ -86,7 +86,7 @@ const LEVELS = [1, 4, 9, 16, 25, 30];
   const price = Items.price(item);
   check('돈이 있으면 산다', Shop.buyGear(price, item).ok, true);
   check('한 골드 모자라면 못 산다', Shop.buyGear(price - 1, item).ok, false);
-  check('이유를 알려 준다', Shop.buyGear(0, item).reason, '골드가 모자란다');
+  check('이유를 알려 준다', Shop.buyGear(0, item).reason, 'hl.why.noGold');
 
   check('물약도 값이 있다', Shop.buyPotion(D.potionPrice('mana', 1), 'mana', 1).ok, true);
   check('모르는 물약은 못 산다', Shop.buyPotion(1e9, '엘릭서', 1).ok, false);

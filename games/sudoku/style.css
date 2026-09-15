@@ -47,7 +47,6 @@ body {
   display: flex;
   justify-content: center;
   padding: clamp(10px, 3vmin, 24px) clamp(10px, 4vmin, 28px);
-  overscroll-behavior: none;
 }
 
 .app {

@@ -1,0 +1,330 @@
+:root {
+  --bg: #f7f5f1;
+  --fg: #33302b;
+  --muted: #8a8377;
+  --line: #ded7cc;
+  --board-bg: #e5dfd4;
+  --cell-bg: #ffffff;
+  /* 처음부터 놓여 있어 바뀌지 않는 칸. 색을 너무 진하게 두면 규칙을 어긴 칸의
+     붉은 테두리와 다투므로 바탕만 살짝 눕힌다. */
+  --fixed-bg: #efeadf;
+  --edge: #4a4640;
+  --grid: #ded7cc;
+  --ink: #33302b;
+  /* 해와 달. 밝기를 비슷하게 맞춰 어느 쪽도 먼저 튀지 않게 한다 — 둘을 반씩
+     놓는 게임이라 한쪽이 눈에 먼저 들어오면 판이 기울어 보인다. */
+  --sun: #cf8b2c;
+  --moon: #5566a8;
+  --bad: #cf5233;
+  --lit: #2f8f74;
+  --btn-bg: #5c564c;
+  --btn-fg: #f7f5f1;
+  --sheet-bg: #ffffff;
+  --pad-x: clamp(10px, 4vmin, 28px);
+  --app-max: 440px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1a1815;
+    --fg: #e6e1d8;
+    --muted: #918a7e;
+    --line: #3b3631;
+    --board-bg: #2e2a25;
+    --cell-bg: #23201c;
+    --fixed-bg: #332e28;
+    --edge: #cfc8bc;
+    --grid: rgba(255, 255, 255, 0.12);
+    --ink: #e6e1d8;
+    --sun: #e0a445;
+    --moon: #8b9ae0;
+    --bad: #e26a4c;
+    --lit: #46b394;
+    --btn-bg: #4c463d;
+    --sheet-bg: #23201c;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  display: flex;
+  justify-content: center;
+  padding: clamp(10px, 3vmin, 24px) var(--pad-x);
+  overscroll-behavior: none;
+}
+
+.app {
+  width: min(100%, var(--app-max));
+  display: flex;
+  flex-direction: column;
+  gap: clamp(8px, 2vmin, 14px);
+}
+
+/* 게임을 옮겨 다닐 때 목록으로 돌아가는 길을 매번 다시 찾지 않도록 헤더 배치는
+   모든 게임이 같다. 양옆을 1fr로 묶으면 좌우 폭이 달라도 이름이 가운데에 온다. */
+.title-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 10px;
+}
+
+.title-row h1 { text-align: center; }
+.title-row .head-nav { justify-self: start; }
+.head-nav { display: flex; align-items: center; gap: 14px; }
+.title-row .head-actions { justify-self: end; }
+
+h1 {
+  margin: 0;
+  font-size: clamp(24px, 6vmin, 34px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.head-actions { display: flex; align-items: baseline; gap: 14px; }
+
+.toggle {
+  border: 0; background: none; padding: 0;
+  color: inherit; font-family: inherit; font-size: 14px; font-weight: 600;
+  cursor: pointer; opacity: 0.6;
+}
+.toggle:hover { opacity: 1; }
+.toggle.sound { font-size: 12px; }
+/* 취소선은 소리 토글에만 준다. 도움말의 꺼짐은 "안 열림"이라 뜻이 다르다. */
+.toggle.sound[aria-pressed="false"] { opacity: 0.38; text-decoration: line-through; }
+
+.back {
+  color: inherit; opacity: 0.6; text-decoration: none;
+  font-size: 14px; font-weight: 600;
+}
+.back:hover { opacity: 1; }
+
+.picker-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.picker { display: flex; gap: 4px; }
+
+.pick {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.pick[aria-pressed="true"] {
+  background: var(--btn-bg);
+  border-color: var(--btn-bg);
+  color: var(--btn-fg);
+}
+
+/* 자동 체크는 크기 고르기와 성격이 달라 같은 줄에 있어도 한 칸 떼어 둔다. */
+.check { margin-inline-start: 4px; }
+
+.best {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.timer {
+  margin-inline-start: auto;
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+/* 판이 아직 없는 첫 순간에도 자리를 차지해야 하므로 상자에 최소 높이를 준다. */
+.board-wrap { position: relative; min-height: 220px; }
+
+.board {
+  position: relative;
+  user-select: none;
+  /* 화면 폭에 맞춰 줄이는 항이 없으면 8×8이 좁은 폰에서 옆으로 잘린다.
+     --cols는 buildBoard가 넣는다. */
+  /* **칸 너비를 정수 픽셀로 끊는다.** 소수점으로 두면 브라우저가 열마다 다르게
+     반올림해 어떤 칸이 1픽셀 넓어지고, 그만큼 칸 안의 그림도 열마다 다른 자리에
+     놓인다. 끊는 것은 아래 @supports가 맡는다. */
+  --cell-raw: min(clamp(32px, 13vmin, 58px),
+    calc((min(100vw - 2 * var(--pad-x), var(--app-max))) / var(--cols)));
+  --cell: var(--cell-raw);
+  display: grid;
+  width: max-content;
+  margin-inline: auto;
+  background: var(--board-bg);
+  /* 모서리를 둥글게 두지 않는다. 칸은 네모라서 둥근 판과 곡률이 어긋나고, 그
+     틈으로 칸 색이 한 픽셀 비어져 나온다. */
+  border-radius: 0;
+  /* 선과 표를 칸 위에 SVG로 겹쳐 긋기 때문에 칸 사이에 틈을 두지 않는다. 틈을
+     두면 SVG 좌표와 칸 좌표가 칸마다 조금씩 어긋나 표가 금에서 벗어난다. */
+  gap: 0;
+  --board-pad: 2px;
+  padding: var(--board-pad);
+  /* 같은 칸을 이어 두드려 해·달·빈칸을 돌리는 게임이라 빠른 두 번 두드리기가
+     보통 조작이다. `none`으로 두면 `shared/base.js`가 그 안의 touchend를 모두
+     취소해 확대가 걸리지 않는다. 대신 click이 나지 않으므로 조작은 포인터
+     이벤트로 짠다. */
+  touch-action: none;
+}
+
+/* `round()`를 아는 브라우저에서만 끊는다. **커스텀 속성은 값이 이상해도 파싱에서
+   버려지지 않아**, 모르는 브라우저에 그냥 두면 `--cell`이 통째로 무효가 되어 판이
+   무너진다. 보통 속성처럼 앞 선언으로 물러나 주지 않는다. */
+@supports (width: round(down, 3px, 2px)) {
+  .board { --cell: round(down, var(--cell-raw), 1px); }
+}
+
+.cell {
+  position: relative;
+  width: var(--cell);
+  height: var(--cell);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--cell-bg);
+  color: var(--ink);
+}
+
+.cell.fixed { background: var(--fixed-bg); }
+
+/* 그림은 칸마다 둘 다 넣어 두고 여기서 감춘다 — 이유는 main.js에 적어 두었다. */
+.cell .ico { display: none; width: 66%; height: 66%; }
+.cell.sun .ico-sun { display: block; color: var(--sun); }
+.cell.moon .ico-moon { display: block; color: var(--moon); }
+
+/* 셋 다 box-shadow 한 자리를 두고 다투므로 순서가 곧 우선순위다. 규칙을 어긴
+   칸이 가장 먼저 보여야 하니 뒤에 둔다. 칸 구분선과 표는 칸 위에 얹힌 SVG가
+   긋고 있어, 고리를 그 위로 올리지 않으면 선에 덮여 잘려 보인다. */
+.cell.cursor, .cell.lit, .cell.bad { z-index: 2; }
+.cell.cursor { box-shadow: inset 0 0 0 2px var(--edge); }
+.cell.lit { box-shadow: inset 0 0 0 2px var(--lit); }
+.cell.bad { box-shadow: inset 0 0 0 3px var(--bad); }
+.cell.bad .ico { color: var(--bad); }
+
+.board.done .cell { background: var(--cell-bg); }
+
+.edges {
+  position: absolute;
+  inset: var(--board-pad);
+  /* **크기를 인셋에 맡기지 않고 직접 준다.** `<svg>`는 대체 요소라 너비가 auto면
+     사파리가 오른쪽·아래 인셋을 버리고 제 본래 크기(패딩 상자)를 쓴다. 그러면
+     칸 영역보다 패딩 두 몫만큼 큰 상자에 그려져 칸과 선의 간격이 갈린다. */
+  width: calc(100% - 2 * var(--board-pad));
+  height: calc(100% - 2 * var(--board-pad));
+  pointer-events: none;
+  z-index: 1;
+}
+
+.edges path, .edges rect {
+  fill: none;
+  stroke-linecap: square;
+  stroke-linejoin: miter;
+}
+
+/* **픽셀 격자에 맞춰 그린다.** 칸 크기에서 나온 굵기는 소수점이라 양쪽 끝이
+   반투명하게 번지고, 그만큼 선이 흐리고 자리도 어긋나 보인다. 가로세로로만 긋는
+   선이라 맞춰 끊어도 잃는 것이 없다. **표는 여기에 넣지 않는다** — ×의 빗금까지
+   격자에 맞추면 계단이 진다. */
+.edges .grid, .edges .frame { shape-rendering: crispEdges; }
+
+.edges .grid { stroke: var(--grid); stroke-width: 0.04; }
+.edges .frame { stroke: var(--edge); stroke-width: 0.08; }
+
+/* 표가 앉을 자리. 금이 표를 뚫고 지나가면 =의 두 줄과 섞여 세 줄로 보인다. */
+.edges .bed { fill: var(--cell-bg); stroke: none; }
+.edges .link {
+  stroke: var(--edge);
+  stroke-width: 0.055;
+  stroke-linecap: round;
+}
+
+.veil {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--bg) 75%, transparent);
+  font-weight: 700;
+  color: var(--muted);
+}
+.veil[hidden] { display: none; }
+
+.toast {
+  margin: 0;
+  min-height: 20px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.tools { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
+
+.tool {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 7px 0;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  cursor: pointer;
+}
+/* 도구 아이콘은 글자가 아니라 도형이다(`shared/icons.js`). */
+.tool-icon { display: inline-flex; line-height: 0; }
+.tool-icon svg { width: 19px; height: 19px; }
+.tool-label { font-size: 11px; font-weight: 600; opacity: 0.8; }
+.tool:disabled { opacity: 0.35; cursor: default; }
+
+.sheet {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--sheet-bg);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sheet[hidden] { display: none; }
+
+.sheet-title { margin: 0; font-size: 19px; font-weight: 800; }
+.sheet-note { margin: 0; font-size: 14px; color: var(--muted); }
+.sheet-actions { display: flex; gap: 8px; }
+
+.btn {
+  flex: 1;
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  border: 0;
+  border-radius: 8px;
+  padding: 11px 16px;
+  font-size: 15px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.help-list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 1.55;
+}

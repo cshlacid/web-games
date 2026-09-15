@@ -158,7 +158,10 @@ const EMERGENCY = 0.35;  // 효율을 따질 상황이 아닌 체력 비율
 // "여유가 있다"를 따로 재지 않는 것은, 효율·위급 조건에 걸리지 않는 것이 곧
 // 여유가 있다는 뜻이기 때문이다 — 조건 하나로 순서와 여유를 같이 본다.
 function healTarget(unit, state, heal) {
-  const friends = alive(state, unit.side).filter((u) => missing(u) > 0);
+  // **회복이 통하지 않는 편은 후보에서 뺀다**(언데드, `logic.applyHeal`). 빼지
+  // 않으면 그쪽은 체력이 영영 안 차므로 늘 "가장 많이 깎인 아군"으로 남아,
+  // 힐러가 남은 전투 내내 헛힐만 던진다.
+  const friends = alive(state, unit.side).filter((u) => missing(u) > 0 && !u.healHarm);
   if (!friends.length) return null;
 
   const ordered = friends.slice().sort((a, b) => {
@@ -327,7 +330,8 @@ function chooseSkill(unit, state, target) {
       const hurt = healTarget(unit, state, def.heal);
       if (!hurt || dist(unit, hurt) > reach) continue;
       const covered = alive(state, unit.side)
-        .filter((mate) => dist(mate, hurt) <= def.radius && missing(mate) >= def.heal * EFFICIENT);
+        .filter((mate) => dist(mate, hurt) <= def.radius
+          && missing(mate) >= def.heal * EFFICIENT && !mate.healHarm);
       if (covered.length >= 2) return { id: def.id, targetUid: hurt.uid };
       continue;
     }

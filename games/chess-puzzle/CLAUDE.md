@@ -11,6 +11,16 @@ node games/chess-puzzle/data.test.js   # 덩이 적재 테스트
 node games/chess-puzzle/bake.js pick   # 문제 900개 굽기
 ```
 
+## 문제 자료에는 문장을 담지 않는다
+
+**구워 둔 문제는 주제·제목·힌트·설명을 모두 열쇠로만 들고 있다**(`themes: ['fork']`,
+`title: 'sacrifice'`, `piece: 'q'`, `why: 'gain'`, `gain: 3`). 문장은 `strings.js`에
+여섯 언어로 있고 화면이 엮는다. 한국어 문장을 자료에 구워 넣으면 900개짜리 자료가
+한 언어에 묶이고, 언어를 늘릴 때마다 원본 CSV(304MB)를 다시 받아 구워야 한다.
+
+`bake.js`도 같은 열쇠를 내보낸다. 이미 구운 자료를 바꾼 것은 원본 CSV 없이 옮기려고
+한 번 돌린 변환이었고, 다시 구우면 같은 모양이 나온다.
+
 ## 자료를 어디서 가져오나
 
 **문제는 만들지 않고 고른다.** Lichess Puzzle Database(CC0)를 훑어 조건에 맞는

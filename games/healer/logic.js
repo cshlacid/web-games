@@ -40,7 +40,9 @@ const MARCH_RECOVER_MP = 0.20;
 // 이것이 없을 때에는 전투가 3분인데 마나가 1분 만에 말라, 남은 시간에는 힐도
 // 도발도 나가지 않고 파티가 서서히 깎이기만 했다. 아군과 적이 같은 규칙을
 // 쓰므로 여기서도 편을 가르지 않는다.
-const MANA_REGEN_PER_INT = 0.02;
+// **수치는 `data.js`에 있다**(`D.MANA_REGEN_PER_INT`). 전투력 계산이 같은 값을
+// 봐야 해서 옮겼다 — 두 곳에 적으면 한쪽만 고치는 일이 난다.
+const MANA_REGEN_PER_INT = D.MANA_REGEN_PER_INT;
 const EVENT_CAP = 400;        // 화면이 안 가져가도 무한히 쌓이지 않게
 
 function createRng(seed) {
@@ -127,6 +129,11 @@ function makeUnit(def, side, uid, x, y, level, override, bonus, potions, name, h
     stunUntil: 0,
     // 혼란이 풀리는 시각. 그때까지는 제 편을 적으로 본다(`ai.foesOf`).
     confusedUntil: 0,
+    // 갈래별로 얼마나 더 아픈가(`D.weakOf`). 종족이 정하므로 유닛을 만들 때
+    // 한 번만 보고, 매 타격마다 표를 다시 뒤지지 않는다.
+    weak: D.weakOf(def),
+    // 회복을 맞으면 얼마나 아픈가(`D.healHarmOf`). 위와 같은 이유로 여기서 한 번만 본다.
+    healHarm: D.healHarmOf(def),
     exp: Math.round((def.exp || 0) * (1 + 0.25 * (level - 1))),
     // 계열의 목록 중 레벨이 되는 것을 앞에서부터 넷. 편성 화면이 보여 준 것과
     // 전투에서 실제로 쓰는 것이 같아야 하므로 같은 함수를 쓴다.
@@ -213,7 +220,7 @@ function spawnWave(state, index) {
     state.units.push(unit);
   });
   emit(state, { type: 'wave', index, total: state.quest.waves.length,
-    text: `${index + 1}번째 무리 (${state.quest.waves.length} 중)` });
+    code: 'hl.log.wave', vars: { index: index + 1, total: state.quest.waves.length } });
 }
 
 // party는 편성 화면이 고른 동료다: [{ defId, level }]. 주인공의 수치는 성장
@@ -342,13 +349,13 @@ function updateAuras(state) {
 // **장판은 여기 없다.** 서 있는 자리에 따라 붙었다 떨어졌다 하는 것이라 초상화에
 // 띄우면 걸어가는 동안 깜빡이고, 어차피 전장 바닥에 그려져 있다.
 const STATUS_KINDS = {
-  stun:       { icon: 'stunned',  css: 'stun', name: '기절' },
-  confuse:    { icon: 'confused', css: 'daze', name: '혼란' },
-  taunt:      { icon: 'taunted',  css: 'pull', name: '도발' },
-  dot:        { icon: 'dotHarm',  css: 'bane', name: '지속 피해' },
-  'heal-dot': { icon: 'dotMend',  css: 'mend', name: '지속 회복' },
-  buff:       { icon: 'boonUp',   css: 'boon', name: '강화' },
-  debuff:     { icon: 'wiltDown', css: 'wilt', name: '약화' },
+  stun:       { icon: 'stunned',  css: 'stun', name: 'hl.st.stun' },
+  confuse:    { icon: 'confused', css: 'daze', name: 'hl.st.confuse' },
+  taunt:      { icon: 'taunted',  css: 'pull', name: 'hl.st.taunt' },
+  dot:        { icon: 'dotHarm',  css: 'bane', name: 'hl.st.dot' },
+  'heal-dot': { icon: 'dotMend',  css: 'mend', name: 'hl.st.hot' },
+  buff:       { icon: 'boonUp',   css: 'boon', name: 'hl.st.buff' },
+  debuff:     { icon: 'wiltDown', css: 'wilt', name: 'hl.st.debuff' },
 };
 
 // 같은 종류가 여럿이면 하나로 묶고 남은 시간이 긴 쪽을 남긴다. 저주 셋이 걸린
@@ -383,7 +390,10 @@ function statusesOf(state, unit) {
   return Object.keys(STATUS_KINDS).filter((kind) => found.has(kind)).map((kind) => found.get(kind));
 }
 
-function applyDamage(state, source, target, raw, dodgeable) {
+// `school`은 피해의 갈래다(지금은 신성 하나). 적지 않으면 아무 배수도 타지
+// 않으므로 대부분의 호출은 그대로다 — **곱하는 자리를 여기 하나로 둔 것**은
+// 강화·약화와 같은 이유다: 기본 공격·스킬·도트·장판이 같은 규칙을 타야 한다.
+function applyDamage(state, source, target, raw, dodgeable, school) {
   if (target.dead) return 0;
 
   if (dodgeable && target.dodge > 0 && state.rng() < target.dodge) {
@@ -396,7 +406,8 @@ function applyDamage(state, source, target, raw, dodgeable) {
   // 스킬마다 곱하지 않고 이 한 곳에 둔 것은, 기본 공격과 도트와 장판까지 같은
   // 규칙을 타야 하기 때문이다.
   const boost = auraMul(state, source, 'atk') * auraMul(state, target, 'armor');
-  const amount = Math.max(1, Math.round(raw * boost * crit * target.armor));
+  const weak = D.schoolMul(target.weak, school);
+  const amount = Math.max(1, Math.round(raw * boost * crit * target.armor * weak));
   target.hp = Math.max(0, target.hp - amount);
   state.stats.damage += source && source.side === 'ally' ? amount : 0;
   if (source) source.tally.dealt += amount;
@@ -408,6 +419,12 @@ function applyDamage(state, source, target, raw, dodgeable) {
 
 function applyHeal(state, source, target, raw) {
   if (target.dead) return 0;
+  // **언데드에게는 회복이 통하지 않는다**(`D.HEAL_HARM`). 생명의 힘을 받는 몸이
+  // 아니라는 것이 이 종족의 정의이고, 그래서 반경으로 퍼지는 회복은 이들에게
+  // 피해가 된다(`healSpread`). **막는 자리를 여기 하나로 둔다** — 회복이
+  // 지나가는 길이 지목·범위·장판·지속 넷이라, 자리마다 적으면 하나를 잊는다.
+  // 물약은 이 함수를 안 거치므로 `drink`에서 따로 막는다.
+  if (target.healHarm) return 0;
   // 회복도 터진다. 다만 받는 쪽이 아군이라 회피가 끼어들지 않는다.
   const crit = rollCrit(state, source, null);
   const healed = Math.round(raw * auraMul(state, source, 'heal') * crit);
@@ -433,7 +450,26 @@ function kill(state, unit) {
   state.stats.deaths += unit.side === 'ally' ? 1 : 0;
   // 죽은 유닛에게 걸린 장판·도트는 남겨 두면 부활 없는 이 게임에서 영원히 헛돈다.
   state.dots = state.dots.filter((dot) => dot.targetUid !== unit.uid);
-  emit(state, { type: 'death', uid: unit.uid, side: unit.side, text: `${unit.name} 쓰러짐` });
+  emit(state, { type: 'death', uid: unit.uid, side: unit.side, code: 'hl.log.down', vars: { name: unit.name } });
+}
+
+// **반경으로 퍼지는 회복.** 시전자 편에게는 회복이지만, 반경 안에 회복이 해가
+// 되는 적이 서 있으면 그쪽에는 신성 피해가 된다(`D.HEAL_HARM`). 넷으로 흩어져
+// 있던 "반경 안의 아군을 훑는다"를 여기로 모은 것은, 적을 함께 훑는 자리가
+// 한 곳이어야 새 회복 스킬이 저절로 같은 규칙을 타기 때문이다.
+//
+// **회복량은 아군이 실제로 받은 값이 아니라 걸린 값이다.** 아군이 만피라
+// 회복이 0이 되어도 언데드는 그만큼 맞는다 — 한쪽의 남은 체력이 다른 쪽의
+// 피해를 정하면 화면에서 읽히지 않는다.
+function healSpread(state, source, side, point, radius, amount) {
+  // **편을 나누는 것은 회복뿐이다.** 반경 안의 언데드는 어느 편이든 맞는다 —
+  // 회복이 해가 되는 것은 그 몸의 성질이지 적이라서가 아니고, 편으로 갈라 두면
+  // 언젠가 언데드를 아군으로 들일 때 그쪽만 규칙 밖에 남는다.
+  for (const unit of state.units) {
+    if (unit.dead || dist(unit, point) > radius) continue;
+    if (unit.healHarm) applyDamage(state, source, unit, amount * unit.healHarm, false, 'holy');
+    else if (unit.side === side) applyHeal(state, source, unit, amount);
+  }
 }
 
 // 같은 스킬을 다시 걸면 쌓지 않고 새로 고친다. 쌓기로 하면 도트 하나로
@@ -446,6 +482,7 @@ function addDot(state, source, target, def, kind, amount) {
   dot.kind = kind;
   dot.amount = amount == null ? def.tick : amount;
   dot.interval = def.interval;
+  dot.school = def.school;
   dot.endsAt = state.t + def.duration;
   dot.nextAt = state.t + def.interval;
   if (!existing) state.dots.push(dot);
@@ -462,7 +499,7 @@ function addZone(state, source, def, x, y, kind, amount) {
     x, y, radius: def.radius, amount: amount == null ? def.tick : amount,
     interval: def.interval,
     endsAt: state.t + def.duration, nextAt: state.t + def.interval,
-    bornAt: state.t, scrollAt: state.scroll, skillId: def.id,
+    bornAt: state.t, scrollAt: state.scroll, skillId: def.id, school: def.school,
   });
 }
 
@@ -473,7 +510,7 @@ function updateDots(state) {
     while (dot.nextAt <= state.t && dot.nextAt <= dot.endsAt + 1e-6) {
       const source = dot.sourceUid ? byUid(state, dot.sourceUid) : null;
       if (dot.kind === 'heal') applyHeal(state, source, target, dot.amount);
-      else applyDamage(state, source, target, dot.amount);
+      else applyDamage(state, source, target, dot.amount, false, dot.school);
       dot.nextAt += dot.interval;
     }
   }
@@ -494,10 +531,11 @@ function updateZones(state) {
     const spot = { x: zoneX(state, zone), y: zone.y };
     while (zone.nextAt <= state.t && zone.nextAt <= zone.endsAt + 1e-6) {
       const source = zone.sourceUid ? byUid(state, zone.sourceUid) : null;
-      for (const unit of alive(state, zone.side)) {
-        if (dist(unit, spot) > zone.radius) continue;
-        if (zone.kind === 'heal') applyHeal(state, source, unit, zone.amount);
-        else applyDamage(state, source, unit, zone.amount);
+      if (zone.kind === 'heal') healSpread(state, source, zone.side, spot, zone.radius, zone.amount);
+      else {
+        for (const unit of alive(state, zone.side)) {
+          if (dist(unit, spot) <= zone.radius) applyDamage(state, source, unit, zone.amount, false, zone.school);
+        }
       }
       zone.nextAt += zone.interval;
     }
@@ -548,9 +586,7 @@ function runUnitSkill(state, unit, choice) {
   if (def.kind === 'heal') { applyHeal(state, unit, target, def.heal); return; }
   if (def.kind === 'heal-dot') { addDot(state, unit, target, def, 'heal'); return; }
   if (def.kind === 'heal-area') {
-    for (const mate of alive(state, unit.side)) {
-      if (dist(mate, target) <= def.radius) applyHeal(state, unit, mate, def.heal);
-    }
+    healSpread(state, unit, unit.side, target, def.radius, def.heal);
     return;
   }
   // 자기 마나를 되찾는다. 마나를 다 쓴 시전자가 남은 전투 내내 기본 공격만
@@ -608,10 +644,10 @@ function runUnitSkill(state, unit, choice) {
     addZone(state, unit, def, target.x, target.y, 'damage', over(def.tick));
     return;
   }
-  if (def.kind === 'damage') { applyDamage(state, unit, target, unit.atk * def.mul, true); return; }
+  if (def.kind === 'damage') { applyDamage(state, unit, target, unit.atk * def.mul, true, def.school); return; }
   if (def.kind === 'damage-area') {
     for (const foe of alive(state, AI.opposite(unit.side))) {
-      if (dist(foe, target) <= def.radius) applyDamage(state, unit, foe, unit.atk * def.mul);
+      if (dist(foe, target) <= def.radius) applyDamage(state, unit, foe, unit.atk * def.mul, false, def.school);
     }
   }
 }
@@ -625,7 +661,7 @@ function stun(state, caster, target, duration) {
   target.stunUntil = until;
   if (target.cast) cancelCast(state, target);
   emit(state, { type: 'stun', uid: target.uid, until,
-    text: `${caster.name} → ${target.name}: 기절` });
+    code: 'hl.log.stun', vars: { from: caster.name, to: target.name } });
   return duration;
 }
 
@@ -643,7 +679,7 @@ function confuse(state, caster, target, duration) {
   target.confusedUntil = until;
   target.targetUid = null;
   emit(state, { type: 'confuse', uid: target.uid, until,
-    text: `${caster.name} → ${target.name}: 혼란` });
+    code: 'hl.log.confuse', vars: { from: caster.name, to: target.name } });
   return duration;
 }
 
@@ -658,7 +694,7 @@ function giveMana(state, caster, target, amount) {
   const gained = Math.round(target.mp - before);
   if (gained > 0) {
     emit(state, { type: 'mana', uid: target.uid, amount: gained,
-      text: `${caster.name} → ${target.name}: 마나 ${D.num(gained)}` });
+      code: 'hl.log.mana', vars: { from: caster.name, to: target.name, n: D.num(gained) } });
   }
   return gained;
 }
@@ -827,7 +863,7 @@ function resolvePlayerSkill(state, def, spot) {
   // 기절은 때리면서 굳힌다. 피해를 먼저 넣는 것은, 기절이 외우던 것을 끊으므로
   // 순서를 뒤집으면 같은 틱에 죽은 적에게 기절이 걸린 것으로 남기 때문이다.
   if (def.kind === 'stun') {
-    if (def.damage) applyDamage(state, caster, unit, harm(def.damage));
+    if (def.damage) applyDamage(state, caster, unit, harm(def.damage), false, def.school);
     stun(state, caster, unit, def.duration);
     return;
   }
@@ -850,9 +886,9 @@ function resolvePlayerSkill(state, def, spot) {
   if (def.mana) caster.mp = Math.min(caster.maxMp, caster.mp + def.mana);
   else if (def.damage && def.targeting === 'area-enemy') {
     for (const foe of alive(state, 'enemy')) {
-      if (dist(foe, point) <= def.radius) applyDamage(state, caster, foe, harm(def.damage));
+      if (dist(foe, point) <= def.radius) applyDamage(state, caster, foe, harm(def.damage), false, def.school);
     }
-  } else if (def.damage) applyDamage(state, caster, unit, harm(def.damage));
+  } else if (def.damage) applyDamage(state, caster, unit, harm(def.damage), false, def.school);
   else if (def.targeting === 'ally' && def.heal) {
     // **정화는 회복하면서 약화를 걷어낸다.** 거는 것과 반대되는 일이라 오라를
     // 만드는 자리가 아니라 지우는 자리를 따로 두지 않고, 걸린 목록에서 강화가
@@ -863,9 +899,7 @@ function resolvePlayerSkill(state, def, spot) {
   else if (def.targeting === 'ally') addDot(state, caster, unit, def, 'heal', heal(def.tick));
   else if (def.targeting === 'enemy') addDot(state, caster, unit, def, 'damage', harm(def.tick));
   else if (def.targeting === 'area-ally' && def.heal) {
-    for (const ally of alive(state, 'ally')) {
-      if (dist(ally, point) <= def.radius) applyHeal(state, caster, ally, heal(def.heal));
-    }
+    healSpread(state, caster, 'ally', point, def.radius, heal(def.heal));
   } else if (def.targeting === 'area-ally') {
     addZone(state, caster, def, point.x, point.y, 'heal', heal(def.tick));
   } else if (def.targeting === 'area-enemy') {
@@ -881,25 +915,25 @@ function playerSkill(state, skillId) {
 }
 
 function castSkill(state, skillId, target) {
-  if (state.status !== 'fighting') return { ok: false, reason: '전투가 끝났다' };
+  if (state.status !== 'fighting') return { ok: false, reason: 'hl.why.over' };
   const slot = skillSlot(state, skillId);
   const def = playerSkill(state, skillId);
-  if (!def || !slot) return { ok: false, reason: '등록되지 않은 스킬' };
+  if (!def || !slot) return { ok: false, reason: 'hl.why.notEquipped' };
 
   const caster = hero(state);
-  if (caster.dead) return { ok: false, reason: '쓰러졌다' };
-  if (stunned(state, caster)) return { ok: false, reason: '기절' };
+  if (caster.dead) return { ok: false, reason: 'hl.why.down' };
+  if (stunned(state, caster)) return { ok: false, reason: 'hl.st.stun' };
   // 시전 중인 것이 쿨타임보다 먼저다. 외우는 중에 다른 것을 누르면 화면에
   // 뜨는 이유가 "쿨타임"이면 무엇이 막고 있는지 알 수 없다.
-  if (caster.cast) return { ok: false, reason: '시전 중' };
-  if (state.t < slot.readyAt) return { ok: false, reason: '쿨타임' };
-  if (caster.mp < def.mp) return { ok: false, reason: '마나 부족' };
+  if (caster.cast) return { ok: false, reason: 'hl.why.casting' };
+  if (state.t < slot.readyAt) return { ok: false, reason: 'hl.why.cooldown' };
+  if (caster.mp < def.mp) return { ok: false, reason: 'hl.why.noMana' };
 
   const spot = resolveTarget(state, def, target);
-  if (!spot) return { ok: false, reason: '대상이 올바르지 않다' };
+  if (!spot) return { ok: false, reason: 'hl.why.badTarget' };
   // 주인공의 스킬도 사거리가 있다. 닿지 않으면 쓸 수 없고, 대신 주인공이
   // 저절로 앞줄 쪽으로 붙으므로 잠시 뒤에는 닿는다.
-  if (dist(caster, spot) > def.range) return { ok: false, reason: '사거리 밖' };
+  if (dist(caster, spot) > def.range) return { ok: false, reason: 'hl.why.outOfRange' };
 
   slot.readyAt = state.t + def.cd;
   caster.mp -= def.mp;
@@ -917,11 +951,16 @@ function castSkill(state, skillId, target) {
 function drink(state, unit, potionId) {
   const potion = D.POTIONS[potionId];
   const carried = unit === hero(state) ? state.potions : unit.potions;
-  if (!potion || !carried || carried[potionId] <= 0) return { ok: false, reason: '물약이 없다' };
+  if (!potion || !carried || carried[potionId] <= 0) return { ok: false, reason: 'hl.why.noPotion' };
 
   const readyAt = unit === hero(state) ? state.potionReadyAt : unit.potionReadyAt;
-  if (state.t < readyAt) return { ok: false, reason: '쿨타임' };
-  if (unit.dead) return { ok: false, reason: '쓰러졌다' };
+  if (state.t < readyAt) return { ok: false, reason: 'hl.why.cooldown' };
+  if (unit.dead) return { ok: false, reason: 'hl.why.down' };
+  // 언데드에게는 회복이 통하지 않는다(위 `applyHeal`). 물약은 체력을 직접 더하는
+  // 자리라 그 규칙을 따로 한 번 더 적는다. **마나 물약은 막지 않는다** — 통하지
+  // 않는 것은 생명의 힘이지 마력이 아니다. **물약을 쓰기 전에 막는다**: 뒤에
+  // 두면 회복이 0인 채로 물약만 사라진다.
+  if (potion.restore === 'hp' && unit.healHarm) return { ok: false, reason: 'hl.why.noHeal' };
 
   carried[potionId]--;
   if (unit === hero(state)) state.potionReadyAt = state.t + potion.cd;
@@ -941,7 +980,7 @@ function drink(state, unit, potionId) {
 }
 
 function usePotion(state, potionId) {
-  if (state.status !== 'fighting') return { ok: false, reason: '전투가 끝났다' };
+  if (state.status !== 'fighting') return { ok: false, reason: 'hl.why.over' };
   return drink(state, hero(state), potionId || 'mana');
 }
 
@@ -953,7 +992,7 @@ function checkEnd(state) {
   // 힐러가 빠진 파티가 버티는지를 보는 것도 이 게임의 한 장면이다.
   if (!alive(state, 'ally').length) {
     state.status = 'lost';
-    emit(state, { type: 'end', result: 'lost', text: '파티 전멸' });
+    emit(state, { type: 'end', result: 'lost', text: 'hl.why.wipe' });
     return;
   }
   if (alive(state, 'enemy').length) return;
@@ -966,7 +1005,7 @@ function checkEnd(state) {
       // 뒤로 흘러가고, 화면 밖으로 나가면 사라진다(`zoneX`). 이동 중에 새로 까는
       // 것도 같은 규칙을 타므로 여기에 예외가 없다. 도트는 몸에 붙은 것이라
       // 따라가는 것이 맞으므로 건드리지 않는다.
-      emit(state, { type: 'march', text: '다음 무리를 찾아 나선다' });
+      emit(state, { type: 'march', text: 'hl.log.nextPack' });
     } else if (state.t >= state.nextWaveAt) {
       state.nextWaveAt = 0;
       state.marching = false;
@@ -975,7 +1014,7 @@ function checkEnd(state) {
     return;
   }
   state.status = 'won';
-  emit(state, { type: 'end', result: 'won', text: '퀘스트 완료' });
+  emit(state, { type: 'end', result: 'won', text: 'hl.log.questDone' });
 }
 
 // 무리와 무리 사이. 싸울 상대가 없으므로 판단을 돌리지 않고, 아군은 처음 섰던
@@ -988,7 +1027,8 @@ function march(state, dt) {
     // 사이는 사람이 힐을 넣는 자리라 회복이 차오르는 것이 보여야 한다. 외우는
     // 중이어도 몸은 쉬므로 아래 continue보다 앞에 둔다.
     const share = dt / WAVE_GAP;
-    unit.hp = Math.min(unit.maxHp, unit.hp + unit.maxHp * MARCH_RECOVER * share);
+    // 언데드는 쉬어도 몸이 낫지 않는다(위 `applyHeal`). 마나는 그대로 찬다.
+    if (!unit.healHarm) unit.hp = Math.min(unit.maxHp, unit.hp + unit.maxHp * MARCH_RECOVER * share);
     unit.mp = Math.min(unit.maxMp, unit.mp + unit.maxMp * MARCH_RECOVER_MP * share);
     // **외우는 중이면 걸음을 멈춘다.** 대열을 다시 짜자고 끌고 가면 그 순간
     // 시전이 취소되는데, 무리 사이는 사람이 힐을 넣는 자리라 누른 스킬이

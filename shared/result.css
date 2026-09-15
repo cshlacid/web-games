@@ -1,0 +1,62 @@
+/* 한 판이 끝났을 때의 안내. **판 위 한가운데에 덮는다.**
+
+   화면 맨 아래에 두었을 때는 시선이 판에 머무는 동안 끝난 줄 모르고 계속 두드리는
+   일이 있었다. 폰에서는 도구줄 아래라 스크롤해야 보이는 게임도 있었다.
+
+   판을 지우지 않고 흐리게 남긴다 — 다 푼 판을 보는 것이 이 순간의 즐거움이라
+   가려 버리면 안 된다.
+
+   여섯 게임이 같은 껍데기를 쓰게 되어 뽑아냈다. 게임은 판을 감싼 상자에
+   `position: relative`만 주고, 안내 내용만 `.result > .result-card`에 담는다.
+   글자와 단추 모양은 게임의 `.sheet-title`·`.sheet-note`·`.btn`이 그대로 맡는다.
+
+   **`hidden`을 여기서 다시 눌러 준다.** UA 스타일시트의 `display: none`은 아래의
+   `display: flex`에 밀린다.
+
+   결과 시트를 여닫는 것은 게임의 몫이다(`el.result.hidden = false`). */
+
+.result {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  border-radius: 14px;
+  /* 게임이 --scrim을 정해 두면 그 색을 쓰고, 없으면 밝기만 맞춘 기본값으로 간다. */
+  background: var(--scrim, rgba(247, 248, 251, 0.74));
+  backdrop-filter: blur(2px);
+  animation: result-in 0.22s ease-out;
+  z-index: 2;
+}
+
+.result[hidden] { display: none; }
+
+@media (prefers-color-scheme: dark) {
+  .result { background: var(--scrim, rgba(14, 17, 22, 0.76)); }
+}
+
+.result-card {
+  max-width: 100%;
+  background: var(--sheet-bg);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 18px 22px 16px;
+  text-align: center;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.result-card .sheet-actions { justify-content: center; }
+
+@keyframes result-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* 판 위에서 뜨는 것이라 움직임이 눈에 띈다. 줄이기를 요청한 기기에서는 끈다. */
+@media (prefers-reduced-motion: reduce) {
+  .result { animation: none; }
+}

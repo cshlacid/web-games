@@ -1,0 +1,302 @@
+:root {
+  --bg: #f5f3ee;
+  --fg: #2c3138;
+  --muted: #7e858d;
+  --line: #d6d2c8;
+  --board-bg: #e7e2d8;
+  --cell: #efe7d4;
+  --grid: #d9d2be;
+  --wall: #8d8472;
+  --entry: #c4544a;
+  --exit: #4f9d5d;
+  --trail: #b9ad92;
+  --gold: #c08a1e;
+  --life: #c4544a;
+  --btn-bg: #3f4750;
+  --btn-fg: #f7f8f9;
+  --sheet-bg: #ffffff;
+
+  --pad-x: clamp(10px, 4vmin, 28px);
+  --app-max: 440px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #16181a;
+    --fg: #dfe3e7;
+    --muted: #848b93;
+    --line: #2d3136;
+    --board-bg: #1b1e21;
+    --cell: #292e33;
+    --grid: #33383d;
+    --wall: #4a5058;
+    --entry: #d8503c;
+    --exit: #5cae6a;
+    --trail: #4d545c;
+    --gold: #e0b03c;
+    --life: #d8503c;
+    --btn-bg: #353d45;
+    --sheet-bg: #1f2327;
+  }
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  display: flex;
+  justify-content: center;
+  padding: clamp(10px, 3vmin, 24px) var(--pad-x);
+}
+
+.app {
+  width: min(100%, var(--app-max));
+  display: flex;
+  flex-direction: column;
+  gap: clamp(8px, 2vmin, 14px);
+}
+
+/* 헤더 배치는 모든 게임이 같다. */
+.title-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 10px;
+}
+.title-row h1 { text-align: center; }
+.title-row .head-nav { justify-self: start; }
+.title-row .head-actions { justify-self: end; }
+.head-nav { display: flex; align-items: center; gap: 14px; }
+.head-actions { display: flex; align-items: baseline; gap: 14px; }
+
+h1 {
+  margin: 0;
+  font-size: clamp(20px, 5.2vmin, 30px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.toggle {
+  border: 0; background: none; padding: 0;
+  color: inherit; font-family: inherit; font-size: 14px; font-weight: 600;
+  cursor: pointer; opacity: 0.6;
+}
+.toggle:hover { opacity: 1; }
+.toggle.sound { font-size: 12px; }
+.toggle.sound[aria-pressed="false"] { opacity: 0.38; text-decoration: line-through; }
+
+.back { color: inherit; opacity: 0.6; text-decoration: none; font-size: 14px; font-weight: 600; }
+.back:hover { opacity: 1; }
+
+.status {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 12px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.chip { color: var(--muted); }
+.chip.gold { color: var(--gold); margin-left: auto; }
+.chip.lives { color: var(--life); }
+.chip.wave { color: var(--fg); }
+.chip.time { font-variant-numeric: tabular-nums; }
+/* 속공 목표가 걸린 판에서는 남은 시간이 곧 목표다. 넘기면 색으로 알린다. */
+.chip.time.over { color: var(--life); }
+
+/* 영웅 자리. 한 판에 한 번뿐인 것이라 팔레트에서도 달라 보여야 한다. */
+.slot.hero { border-color: var(--gold); box-shadow: inset 0 0 0 1px var(--gold); }
+.slot.hero.used { opacity: 0.35; }
+
+.board-wrap { position: relative; display: flex; justify-content: center; }
+
+/* 판은 캔버스 하나에 그린다. 적이 마흔 마리까지 매 프레임 움직이고 그 위로 사격선이
+   번쩍이는데, 그것을 DOM으로 두면 노드가 프레임마다 갈려 폰이 먼저 죽는다. */
+.board {
+  border-radius: 12px;
+  background: var(--board-bg);
+  /* 눌러서 미리 보고 떼서 세우므로 스크롤·확대에 넘기지 않는다. 이 자리에는
+     click으로 도는 조작을 두지 않는다 — shared/base.js가 touchend를 취소한다. */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.toast {
+  margin: 0;
+  min-height: 1.2em;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.pad { display: flex; flex-direction: column; gap: 10px; }
+
+.palette { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+
+.slot {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 6px 2px 5px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  cursor: pointer;
+}
+.slot .pic { display: block; background-repeat: no-repeat; }
+.slot .cost { font-size: 11px; font-weight: 700; color: var(--gold); font-variant-numeric: tabular-nums; }
+.slot[aria-pressed="true"] { border-color: var(--btn-bg); box-shadow: inset 0 0 0 1px var(--btn-bg); }
+.slot[disabled] { opacity: 0.35; cursor: default; }
+.slot.poor .cost { color: var(--muted); }
+
+/* `hidden`은 UA의 display:none이라 display를 준 자리에서는 다시 눌러 줘야 한다. */
+.unit-bar[hidden] { display: none; }
+
+.unit-bar {
+  display: flex; flex-direction: column; gap: 7px;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.unit-top { display: flex; align-items: center; gap: 8px; }
+.unit-name { font-size: 13px; font-weight: 700; margin-right: auto; }
+
+/* 지금 수치를 그대로 적는다. 올리기 단추에는 "지금 → 올린 뒤"가 같이 붙어,
+   값을 치르기 전에 무엇이 얼마나 오르는지 보고 고를 수 있다. */
+.unit-stats {
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.unit-stats b { color: var(--fg); font-weight: 700; }
+
+/* 판이 끝난 뒤의 기여도. 누가 일했는지는 숫자로만 갈린다.
+   **칸을 못 박은 격자로 짠다** — 한 줄 flex로 두었더니 오른쪽 글이 길어질 때
+   막대가 0까지 눌려 사라졌다. 막대는 짧아도 순서를 한눈에 보이는 몫을 한다. */
+.report { display: flex; flex-direction: column; gap: 5px; margin: 2px 0 4px; }
+.report:empty { display: none; }
+.report .line {
+  display: grid;
+  grid-template-columns: 4.7em 32px 1fr;
+  align-items: center;
+  gap: 7px;
+  text-align: left;
+  font-size: 11px;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+}
+.report .who { font-weight: 700; }
+.report .bar { height: 5px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.report .bar i { display: block; height: 100%; border-radius: 3px; }
+.report .did { color: var(--muted); }
+
+/* 결과 문구는 줄바꿈을 살린다 — 목표와 보상이 한 줄로 붙으면 읽기 어렵다. */
+#result-note { white-space: pre-line; }
+
+.tools { display: flex; gap: 6px; }
+.tool {
+  flex: 1;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 8px 4px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  cursor: pointer;
+}
+.tool:disabled { opacity: 0.35; cursor: default; }
+.tool-icon { display: block; width: 20px; height: 20px; }
+.tool-icon svg { width: 100%; height: 100%; }
+.tool-label { font-size: 11px; font-weight: 600; }
+
+.btn {
+  border: 0;
+  border-radius: 999px;
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 9px 18px;
+  cursor: pointer;
+}
+.btn.small { font-size: 12px; padding: 6px 12px; }
+.btn.wide { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 7px 10px; }
+.btn.wide span { font-size: 10.5px; font-weight: 600; opacity: 0.75; font-variant-numeric: tabular-nums; }
+.btn.ghost { background: none; color: var(--muted); box-shadow: inset 0 0 0 1px var(--line); }
+.btn:disabled { opacity: 0.4; cursor: default; }
+
+.help-list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; line-height: 1.55; }
+
+.goal-row { display: flex; align-items: flex-start; gap: 10px; font-size: 12px; }
+.goal { flex: 1; text-align: left; color: var(--muted); font-weight: 600; line-height: 1.45; }
+.goal b { color: var(--fg); }
+.goal.done { color: var(--exit); }
+
+.items { display: flex; gap: 6px; flex-wrap: wrap; }
+.items:empty { display: none; }
+.item {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 12px;
+  cursor: pointer;
+}
+.item[aria-pressed="true"] { background: var(--btn-bg); border-color: var(--btn-bg); color: var(--btn-fg); }
+.item:disabled { opacity: 0.35; cursor: default; }
+
+/* 보상 카드. 목표를 채웠을 때만 나온다. */
+.cards[hidden] { display: none; }
+.cards { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 2px; }
+.card {
+  display: flex; flex-direction: column; gap: 2px;
+  text-align: left;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  cursor: pointer;
+}
+.card b { font-size: 13px; }
+.card span { font-size: 11px; color: var(--muted); }
+
+.camp-label { margin: 14px 0 6px; font-size: 12px; font-weight: 700; }
+.camp-note { font-weight: 500; color: var(--muted); }
+.gems { float: right; font-size: 13px; font-weight: 700; color: var(--gold); }
+.arrow { display: flex; align-items: center; justify-content: center; padding: 6px 10px; }
+.arrow .tool-icon { width: 16px; height: 16px; }
+.arrow.back-way .tool-icon { transform: rotate(180deg); }
+
+.stage-pick { display: flex; align-items: center; gap: 8px; }
+.stage-now { font-size: 16px; font-weight: 800; min-width: 2ch; text-align: center; font-variant-numeric: tabular-nums; }
+.stage-pick .camp-note { font-size: 11px; }
+
+.camp-list { display: flex; flex-direction: column; gap: 5px; }
+.row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 13px;
+  text-align: left;
+  width: 100%;
+  cursor: pointer;
+}
+.row .pic { display: block; flex: none; background-repeat: no-repeat; }
+.row .who { font-weight: 700; }
+.row .sub { color: var(--muted); font-size: 11px; margin-left: auto; }
+.row[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--btn-bg); }
+.row:disabled { opacity: 0.4; cursor: default; }
+.row .price { color: var(--gold); font-weight: 700; font-size: 12px; }

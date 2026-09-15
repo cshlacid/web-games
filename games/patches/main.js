@@ -6,6 +6,7 @@ const R = window.PatchesRules;
 const G = window.PatchesGenerator;
 const Icons = window.PatchesIcons;
 const Sound = window.PatchesSound;
+const t = SharedI18n.t;
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
 const SIZE_KEY = 'web-games.patches.size';
@@ -78,7 +79,7 @@ function formatTime(seconds) {
 
 function showBest() {
   const best = loadBest()[game.size];
-  el.best.textContent = best ? `최고 ${formatTime(best)}` : '';
+  el.best.textContent = best ? t('record.best', { time: formatTime(best) }) : '';
 }
 
 function toast(text) { el.toast.textContent = text; }
@@ -319,8 +320,8 @@ function hint() {
   Sound.play('hint');
   paint();
   toast(removed
-    ? `어긋난 조각 ${removed}개를 걷어 내고 다음 조각을 놓았습니다.`
-    : '지금 알아낼 수 있는 조각을 놓았습니다.');
+    ? t('patches.hintCleared', { count: removed })
+    : t('patches.hintPlaced'));
   finishIfDone();
 }
 
@@ -335,20 +336,21 @@ function finishIfDone() {
 
   const best = loadBest();
   const previous = best[game.size];
-  let note = `${game.size}×${game.size}, 조각 ${game.puzzle.solution.length}개.`;
+  // 조각에 앞 공백을 넣어 두면 언어마다 빈칸 규칙이 달라 어긋난다 — 모아서 붙인다.
+  const note = [t('patches.note', { size: game.size, count: game.puzzle.solution.length })];
   if (game.hinted) {
-    note += ` 힌트를 ${game.hinted}번 썼으니 기록은 남기지 않습니다.`;
+    note.push(t('record.hinted', { count: game.hinted }));
   } else if (!previous || game.elapsed < previous) {
     best[game.size] = game.elapsed;
     saveBest(best);
-    note += previous ? ` 최고 기록을 ${formatTime(previous)}에서 줄였습니다.` : ' 첫 기록입니다.';
+    note.push(previous ? t('record.improved', { time: formatTime(previous) }) : t('record.first'));
     showBest();
   } else {
-    note += ` 최고 기록은 ${formatTime(previous)}입니다.`;
+    note.push(t('record.bestIs', { time: formatTime(previous) }));
   }
 
-  el.resultTitle.textContent = `완성! ${formatTime(game.elapsed)}`;
-  el.resultNote.textContent = note;
+  el.resultTitle.textContent = t('record.done', { time: formatTime(game.elapsed) });
+  el.resultNote.textContent = note.join(' ');
   el.result.hidden = false;
 }
 
@@ -363,7 +365,7 @@ function newGame() {
     const puzzle = G.generate(game.size) || G.generate(game.size);
     if (!puzzle) {
       el.veil.hidden = true;
-      toast('판을 만들지 못했습니다. 새 판을 눌러 다시 시도해 주세요.');
+      toast(t('record.genFail'));
       return;
     }
     game.puzzle = puzzle;

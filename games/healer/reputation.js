@@ -146,18 +146,18 @@ function trustDelta(member, quest, outcome) {
   const parts = [];
 
   if (outcome.won) {
-    parts.push({ why: `${feel.name} 의뢰 완료`, delta: feel.trust });
+    parts.push({ why: { code: 'hl.rep.cleared', vars: { feel: feel.id } }, delta: feel.trust });
   } else {
     // 애초에 무리한 일이었다면 덜 깎인다. 벅찬 줄 알고 따라나선 것이라 실패도
     // 절반은 제 판단이다.
     const relief = (feel.id === 'hard' || feel.id === 'deadly') ? D.TRUST_FAIL.hardRelief : 0;
-    parts.push({ why: '의뢰 실패', delta: D.TRUST_FAIL.base + relief });
+    parts.push({ why: { code: 'hl.rep.failed' }, delta: D.TRUST_FAIL.base + relief });
   }
 
   // 진 판의 전투불능은 실패 몫에 이미 들어 있다. 둘을 다 세면 전멸한 판마다
   // -64가 되어, 두 판이면 어떤 동료와도 관계가 끊어진다.
   if (outcome.downed && outcome.won) {
-    parts.push({ why: '전투불능', delta: D.TRUST.down + feel.downRelief });
+    parts.push({ why: { code: 'hl.rep.downed' }, delta: D.TRUST.down + feel.downRelief });
   }
 
   // 받은 보수가 부른 값과 다를 때. 부른 값이 0이면 견줄 것이 없다.
@@ -173,7 +173,7 @@ function trustDelta(member, quest, outcome) {
     const delta = paid > asked
       ? Math.min(D.TRUST_PAY.cap, Math.round((ratio - 1) * D.TRUST_PAY.per))
       : Math.max(D.TRUST_PAY.shortCap, Math.round((ratio - 1) * D.TRUST_PAY.shortPer));
-    if (delta) parts.push({ why: paid > asked ? '보수를 더 받았다' : '보수가 모자랐다', delta });
+    if (delta) parts.push({ why: { code: paid > asked ? 'hl.rep.paidMore' : 'hl.rep.paidLess' }, delta });
   }
 
   return { feel, parts, delta: parts.reduce((sum, part) => sum + part.delta, 0) };

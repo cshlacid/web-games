@@ -133,76 +133,41 @@ function primaryOf(row) {
 
 // 화면에 그대로 나가는 이름이라, 판을 보고 확인할 수 있는 것만 옮긴다. 여기
 // 없는 주제는 버린다 — 뜻이 애매한 이름을 지어 붙이면 판과 어긋난 설명이 된다.
-const THEME_KO = {
-  smotheredMate: '질식 메이트',
-  backRankMate: '백 랭크 메이트',
-  doubleCheck: '더블 체크',
-  discoveredCheck: '발견 체크',
-  discoveredAttack: '발견 공격',
-  skewer: '스큐어',
-  pin: '핀',
-  fork: '포크',
-  deflection: '수비 이탈',
-  attraction: '유인',
-  clearance: '길 비우기',
-  interference: '차단',
-  intermezzo: '중간 수',
-  capturingDefender: '수비 말 잡기',
-  xRayAttack: '엑스레이 공격',
-  trappedPiece: '갇힌 말',
-  zugzwang: '추크츠방',
-  enPassant: '앙파상',
-  castling: '캐슬링',
-  underPromotion: '낮은 승격',
-  promotion: '승격',
-  advancedPawn: '전진한 폰',
-  sacrifice: '희생',
-  mateIn1: '한 수 메이트',
-  mateIn2: '두 수 메이트',
-  mateIn3: '세 수 메이트',
-  mateIn4: '긴 메이트',
-  mateIn5: '긴 메이트',
-  mate: '메이트',
-  quietMove: '조용한 수',
-  defensiveMove: '수비수',
-  hangingPiece: '지켜지지 않은 말',
-  attackingF2F7: '약한 칸 공격',
-  exposedKing: '드러난 킹',
-  kingsideAttack: '킹사이드 공격',
-  queensideAttack: '퀸사이드 공격',
-  pawnEndgame: '폰 종반',
-  rookEndgame: '룩 종반',
-  bishopEndgame: '비숍 종반',
-  knightEndgame: '나이트 종반',
-  queenEndgame: '퀸 종반',
-  opening: '오프닝',
-  middlegame: '중반',
-  endgame: '종반',
-};
 
 // 좁은 것을 앞에 둔다. 세 개까지만 보여 주므로 순서가 곧 무엇이 잘리는지다.
 // 판 단계(오프닝·중반·종반)는 전술이 아니라 배경이라 맨 뒤에 둔다.
+// 이름을 붙일 수 있는 주제. 실제 이름은 games/chess-puzzle/strings.js에 있다.
+const NAMED = new Set([
+  'smotheredMate', 'backRankMate', 'doubleCheck', 'discoveredCheck', 'discoveredAttack',
+  'skewer', 'pin', 'fork', 'deflection', 'attraction', 'clearance', 'interference',
+  'intermezzo', 'capturingDefender', 'xRayAttack', 'trappedPiece', 'zugzwang', 'enPassant',
+  'castling', 'underPromotion', 'promotion', 'advancedPawn', 'sacrifice',
+  'mateIn1', 'mateIn2', 'mateIn3', 'mateIn4', 'mateIn5', 'mate',
+  'quietMove', 'defensiveMove', 'hangingPiece', 'attackingF2F7', 'exposedKing',
+  'kingsideAttack', 'queensideAttack', 'pawnEndgame', 'rookEndgame', 'bishopEndgame',
+  'knightEndgame', 'queenEndgame', 'opening', 'middlegame', 'endgame',
+]);
+
 const THEME_ORDER = [...PRIMARY, 'mateIn4', 'mateIn5', 'castling',
   'bishopEndgame', 'knightEndgame', 'queenEndgame', 'opening', 'middlegame', 'endgame'];
 
+// 담는 것은 이름이 아니라 주제 id다 — 화면이 고른 언어로 옮긴다. NAMED에 없는
+// 주제는 옮길 말이 없다는 뜻이라 그대로 거른다.
 function themesOf(row) {
   const set = new Set(row.themes);
   const out = [];
   for (const theme of THEME_ORDER) {
-    if (!set.has(theme) || !THEME_KO[theme]) continue;
-    const name = THEME_KO[theme];
-    if (!out.includes(name)) out.push(name);   // mateIn4와 mateIn5가 같은 이름을 쓴다
+    if (!set.has(theme) || !NAMED.has(theme)) continue;
+    // mateIn4와 mateIn5는 화면에서 같은 이름이 되므로 뒤엣것을 버린다.
+    const id = theme === 'mateIn5' ? 'mateIn4' : theme;
+    if (!out.includes(id)) out.push(id);
     if (out.length === 3) break;
   }
-  return out.length ? out : ['전술'];
+  return out.length ? out : ['tactic'];
 }
 
 const VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 100 };
 
-// 말 이름과 조사. 받침이 없는 이름은 나이트뿐이다.
-const PIECE = { p: '폰', n: '나이트', b: '비숍', r: '룩', q: '퀸', k: '킹' };
-const subject = (kind) => PIECE[kind] + (kind === 'n' ? '가' : '이');
-const object = (kind) => PIECE[kind] + (kind === 'n' ? '를' : '을');
 
 /**
  * 정답 수가 판에서 무엇을 하는지 읽는다. 제목과 힌트는 여기서 읽은 사실과
@@ -279,76 +244,54 @@ function outcomeOf(puzzle) {
  * 지어낸 말이 아니라 자료에 있는 사실이다. themesOf가 덮기 전에 부른다.
  */
 function whyOf(row, facts) {
-  if (facts.mate) return '체크메이트입니다.';
+  if (facts.mate) return { why: 'mateNow' };
   const { mate, gain } = outcomeOf(row);
-  if (mate) return '수순을 다 두면 체크메이트입니다.';
-  if (gain >= 8) return `수순을 다 두면 말을 크게 벌어 둡니다(폰 ${gain}개 값).`;
-  if (gain >= 1) return `수순을 다 두면 폰 ${gain}개 값만큼 앞섭니다.`;
+  if (mate) return { why: 'mateLine' };
+  if (gain >= 8) return { why: 'bigGain', gain };
+  if (gain >= 1) return { why: 'gain', gain };
 
   const verdict = new Set(row.themes);
   if (gain <= -1) {
-    return verdict.has('crushing')
-      ? '말을 내주고도 판이 결정적으로 기웁니다.'
-      : '말을 내주고도 자리가 좋아집니다.';
+    return { why: verdict.has('crushing') ? 'gaveCrushing' : 'gaveBetter' };
   }
-  if (verdict.has('crushing')) return '잡은 것은 없어도 자리가 결정적으로 좋아집니다.';
-  if (verdict.has('advantage')) return '잡은 것은 없어도 뚜렷하게 유리해집니다.';
-  if (verdict.has('equality')) return '불리하던 판을 다시 팽팽하게 돌려놓습니다.';
-  return '잡은 것은 없어도 자리가 좋아집니다.';
+  if (verdict.has('crushing')) return { why: 'crushing' };
+  if (verdict.has('advantage')) return { why: 'advantage' };
+  if (verdict.has('equality')) return { why: 'equality' };
+  return { why: 'better' };
 }
 
-// 대표 주제로 붙일 수 있는 제목·힌트. lichess가 붙인 주제도 판에서 읽어낸
-// 사실이므로, 판을 직접 본 것과 같은 자격으로 쓴다.
-const BY_THEME = {
-  smotheredMate: ['빠져나갈 곳이 없다', '킹의 도망 칸을 자기 말이 막고 있습니다.'],
-  backRankMate: ['맨 끝 줄', '킹이 폰 뒤에 갇혀 있습니다.'],
-  doubleCheck: ['두 곳에서 동시에', '두 말이 함께 체크를 겁니다. 막을 수 없습니다.'],
-  discoveredCheck: ['비켜서면 체크', '한 말이 비켜서면 뒤의 말이 체크를 겁니다.'],
-  discoveredAttack: ['열린 길', '한 말이 비켜서면 뒤의 말이 노리는 것이 드러납니다.'],
-  skewer: ['앞의 말을 밀어낸다', '값진 말을 먼저 겨누면 뒤의 말이 남습니다.'],
-  pin: ['묶인 말', '움직이면 뒤가 드러나는 말이 있습니다.'],
-  deflection: ['수비를 떼어낸다', '무언가를 지키고 있는 말을 다른 곳으로 부르세요.'],
-  attraction: ['불러들인다', '상대 말을 원하는 칸으로 끌어내 보세요.'],
-  clearance: ['길을 비운다', '내 말이 내 길을 막고 있습니다.'],
-  interference: ['사이를 끊는다', '지키는 말과 지켜지는 말 사이를 막아 보세요.'],
-  intermezzo: ['그전에 한 수', '되잡기 전에 먼저 끼워 넣을 수가 있습니다.'],
-  capturingDefender: ['지키는 말을 잡는다', '무언가를 지키고 있는 말부터 없애 보세요.'],
-  xRayAttack: ['말을 꿰뚫어', '내 말 너머까지 이어지는 줄을 보세요.'],
-  trappedPiece: ['갈 곳이 없다', '도망갈 칸이 없는 말이 있습니다.'],
-  zugzwang: ['둘 수가 없다', '상대는 무엇을 두든 나빠집니다.'],
-  enPassant: ['지나쳐 잡는다', '방금 두 칸 나온 폰을 앙파상으로 잡을 수 있습니다.'],
-  underPromotion: ['퀸이 아니다', '퀸 말고 다른 말로 승격해 보세요.'],
-  advancedPawn: ['끝줄이 가깝다', '깊이 들어간 폰을 보세요.'],
-  quietMove: ['조용한 한 수', '잡지도 체크하지도 않는 수입니다.'],
-  defensiveMove: ['먼저 막는다', '공격보다 지키는 수가 필요한 자리입니다.'],
-  hangingPiece: ['그냥 놓여 있다', '아무도 지키지 않는 말이 있습니다.'],
-};
+// 대표 주제로 붙일 수 있는 제목·힌트가 있는 주제. 문장 자체는 화면 쪽 사전에 있다.
+const HAS_THEME_TEXT = new Set([
+  'smotheredMate', 'backRankMate', 'doubleCheck', 'discoveredCheck', 'discoveredAttack',
+  'skewer', 'pin', 'deflection', 'attraction', 'clearance', 'interference', 'intermezzo',
+  'capturingDefender', 'xRayAttack', 'trappedPiece', 'zugzwang', 'enPassant',
+  'underPromotion', 'advancedPawn', 'quietMove', 'defensiveMove', 'hangingPiece',
+]);
 
+// 제목은 열쇠 하나와, 말 이름이 들어가는 것이면 그 말 한 글자로 담는다.
 function titleOf(puzzle, facts) {
-  if (puzzle.primary === 'mateIn1') return `${subject(facts.kind)} 끝낸다`;
-  if (BY_THEME[puzzle.primary]) return BY_THEME[puzzle.primary][0];
-  if (puzzle.primary.startsWith('mateIn') || puzzle.primary === 'mate') return '메이트로 가는 길';
-  if (facts.sacrifice) return `${object(facts.kind)} 내준다`;
-  if (facts.fork) return `${subject(facts.kind)} 둘을 노린다`;
-  if (facts.promotion) return '끝까지 간 폰';
-  if (facts.tookKind && facts.capture >= 5) return `${subject(facts.tookKind)} 놓여 있다`;
-  if (facts.tookKind) return `${subject(facts.tookKind)} 지켜지지 않았다`;
-  if (!facts.check) return '조용한 한 수';
-  return `${subject(facts.kind)} 몰아붙인다`;
+  if (puzzle.primary === 'mateIn1') return { title: 'mateIn1', piece: facts.kind };
+  if (HAS_THEME_TEXT.has(puzzle.primary)) return { title: puzzle.primary };
+  if (puzzle.primary.startsWith('mateIn') || puzzle.primary === 'mate') return { title: 'mateLine' };
+  if (facts.sacrifice) return { title: 'sacrifice', piece: facts.kind };
+  if (facts.fork) return { title: 'fork', piece: facts.kind };
+  if (facts.promotion) return { title: 'promotionTitle' };
+  if (facts.tookKind && facts.capture >= 5) return { title: 'hanging', piece: facts.tookKind };
+  if (facts.tookKind) return { title: 'undefended', piece: facts.tookKind };
+  if (!facts.check) return { title: 'quietMove' };
+  return { title: 'press', piece: facts.kind };
 }
 
 function hintOf(puzzle, facts) {
-  if (puzzle.primary === 'mateIn1') return '한 번에 끝낼 수 있습니다.';
-  if (BY_THEME[puzzle.primary]) return BY_THEME[puzzle.primary][1];
-  if (puzzle.primary.startsWith('mateIn') || puzzle.primary === 'mate') {
-    return '피할 곳을 좁혀 가면 메이트가 보입니다.';
-  }
-  if (facts.sacrifice) return '손해처럼 보이는 수를 한 번 따져 보세요.';
-  if (facts.fork) return '한 수로 두 개를 동시에 노릴 수 있습니다.';
-  if (facts.promotion) return '폰이 끝 줄에 닿습니다.';
-  if (facts.capture) return '지켜지지 않은 말이 있습니다.';
-  if (facts.check) return '체크를 걸어 상대를 몰아 보세요.';
-  return '잡지도 체크하지도 않는 수입니다.';
+  if (puzzle.primary === 'mateIn1') return 'mateIn1';
+  if (HAS_THEME_TEXT.has(puzzle.primary)) return puzzle.primary;
+  if (puzzle.primary.startsWith('mateIn') || puzzle.primary === 'mate') return 'mateLine';
+  if (facts.sacrifice) return 'sacrifice';
+  if (facts.fork) return 'fork';
+  if (facts.promotion) return 'promotionHint';
+  if (facts.capture) return 'capture';
+  if (facts.check) return 'check';
+  return 'quietMove';
 }
 
 // --- 담기 전 검증 ---
@@ -465,9 +408,9 @@ function writeChunk(level, n, puzzles) {
       moves: [${p.moves.map(quote).join(', ')}],
       rating: ${p.rating},
       themes: [${p.themes.map(quote).join(', ')}],
-      title: ${quote(p.title)},
+      title: ${quote(p.title)},${p.piece ? `\n      piece: ${quote(p.piece)},` : ''}
       hint: ${quote(p.hint)},
-      why: ${quote(p.why)},
+      why: ${quote(p.why)},${p.gain === undefined ? '' : `\n      gain: ${p.gain},`}
     },`).join('\n');
 
   // 화면 쪽 적재기는 script 태그를 꽂고 onload에서 이 표를 읽는다. 등록 함수를
@@ -515,9 +458,9 @@ function build() {
 
     for (const row of picked) {
       const facts = readMove(row);
-      row.why = whyOf(row, facts);     // lichess 원본 주제를 보므로 themes를 덮기 전에
+      Object.assign(row, whyOf(row, facts));   // lichess 원본 주제를 보므로 themes를 덮기 전에
       row.themes = themesOf(row);
-      row.title = titleOf(row, facts);
+      Object.assign(row, titleOf(row, facts));
       row.hint = hintOf(row, facts);
     }
 

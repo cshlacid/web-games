@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title data-i18n="game.tango">Tango</title>
+<meta name="description" content="해와 달을 반씩, 셋 연달아 오지 않게 놓는 퍼즐" data-i18n-attr="content=meta.desc">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23cf8b2c'><circle cx='12' cy='12' r='5.4'/><g stroke='%23cf8b2c' stroke-width='2.4' stroke-linecap='round'><path d='M12 1.8 V4.2'/><path d='M12 19.8 V22.2'/><path d='M1.8 12 H4.2'/><path d='M19.8 12 H22.2'/><path d='M4.8 4.8 L6.6 6.6'/><path d='M17.4 17.4 L19.2 19.2'/><path d='M19.2 4.8 L17.4 6.6'/><path d='M6.6 17.4 L4.8 19.2'/></g></svg>">
+<link rel="manifest" href="../../manifest.json">
+<link rel="apple-touch-icon" href="../../icons/icon-180.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Tango" data-i18n-attr="content=game.tango">
+<meta name="theme-color" content="#f7f5f1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1a1815" media="(prefers-color-scheme: dark)">
+<link rel="stylesheet" href="../../shared/base.css">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="../../shared/result.css">
+<link rel="stylesheet" href="../../shared/sheet.css">
+<script src="../../shared/analytics.js"></script>
+<script src="../../shared/i18n.js"></script>
+<script src="../../shared/strings.js"></script>
+<script src="strings.js"></script>
+</head>
+<body>
+<main class="app">
+  <header class="head">
+    <div class="title-row">
+      <div class="head-nav">
+        <a class="back" href="../../" data-i18n="ui.back">← 목록</a>
+        <button class="toggle" id="help-open" type="button" aria-pressed="false" data-i18n="ui.help">도움말</button>
+      </div>
+      <h1 data-i18n="game.tango">Tango</h1>
+      <div class="head-actions">
+        <button class="toggle sound" id="toggle-bgm" type="button" aria-pressed="true" data-i18n="ui.bgm">BGM</button>
+        <button class="toggle sound" id="toggle-sfx" type="button" aria-pressed="true" data-i18n="ui.sfx">효과음</button>
+      </div>
+    </div>
+    <div class="picker-row">
+      <div class="picker" id="sizes" role="group" aria-label="판 크기" data-i18n-attr="aria-label=ui.boardSize"></div>
+      <button class="pick check" id="auto-check" type="button" aria-pressed="true" data-i18n="tango.autoCheck">자동 체크</button>
+      <span class="best" id="best"></span>
+      <span class="timer" id="timer">0:00</span>
+    </div>
+  </header>
+
+  <div class="board-wrap">
+    <div class="board" id="board"></div>
+    <div class="veil" id="veil" hidden data-i18n="ui.making">만드는 중…</div>
+    <div class="result" id="result" role="status" aria-live="polite" hidden>
+      <div class="result-card">
+        <p class="sheet-title" id="result-title"></p>
+        <p class="sheet-note" id="result-note"></p>
+        <div class="sheet-actions">
+          <button class="btn" id="again" type="button" data-i18n="ui.again">한 판 더</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="toast" id="toast" role="status" aria-live="polite"></p>
+
+  <div class="pad">
+    <div class="tools">
+      <button class="tool" id="undo" type="button">
+        <span class="tool-icon" data-icon="undo"></span><span class="tool-label" data-i18n="ui.undo">되돌리기</span>
+      </button>
+      <button class="tool" id="clear" type="button">
+        <span class="tool-icon" data-icon="backspace"></span><span class="tool-label" data-i18n="ui.erase">지우기</span>
+      </button>
+      <button class="tool" id="hint" type="button">
+        <span class="tool-icon" data-icon="hint"></span><span class="tool-label" data-i18n="ui.hint">힌트</span>
+      </button>
+      <button class="tool" id="new-game" type="button">
+        <span class="tool-icon" data-icon="plus"></span><span class="tool-label" data-i18n="ui.newBoard">새 판</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="sheet" id="help" hidden>
+    <p class="sheet-title" data-i18n="ui.rules">규칙</p>
+    <ul class="help-list">
+      <li data-i18n-html="tango.rule1">모든 칸을 <b>해</b>나 <b>달</b>로 채웁니다.</li>
+      <li data-i18n-html="tango.rule2"><b>줄마다 해와 달이 반씩</b>입니다. 6×6이면 한 줄에 해 셋,
+        달 셋입니다. 행도 열도 마찬가지입니다.</li>
+      <li data-i18n-html="tango.rule3"><b>같은 것이 셋 연달아 올 수 없습니다.</b> 가로로도 세로로도
+        둘까지입니다.</li>
+      <li data-i18n-html="tango.rule4">두 칸 사이의 <b>=</b>는 둘이 <b>같다</b>는 뜻이고, <b>×</b>는
+        둘이 <b>다르다</b>는 뜻입니다.</li>
+      <li data-i18n-html="tango.rule5">처음부터 놓여 있는 칸은 <b>바뀌지 않습니다</b>.</li>
+      <li data-i18n-html="tango.rule6">칸을 누르면 <b>빈칸 → 해 → 달 → 빈칸</b> 순서로 바뀝니다.</li>
+      <li data-i18n-html="tango.rule7"><b>자동 체크</b>를 켜 두면 규칙을 어긴 칸이 곧바로 붉게
+        표시됩니다. 스스로 찾고 싶으면 꺼 두세요.</li>
+      <li data-i18n-html="tango.rule8"><b>이 게임의 모든 판은 답이 하나뿐이고, 찍지 않고 논리만으로
+        풀립니다.</b> 마지막에 두 자리를 놓고 고민하게 되는 판은 나오지 않습니다.</li>
+      <li data-i18n-html="tango.rule9"><b>힌트</b>는 어긋난 칸을 걷어 내고, 지금 알아낼 수 있는 칸
+        하나를 채워 줍니다. 힌트를 쓴 판은 최고 기록으로 남기지 않습니다.</li>
+      <li data-i18n-html="tango.rule10">키보드: <b>방향키</b>로 칸을 옮기고, <b>스페이스</b>로 바꾸고,
+        <b>Backspace</b>로 되돌립니다.</li>
+    </ul>
+    <div class="sheet-actions">
+      <button class="btn" id="help-close" type="button" data-i18n="ui.close">닫기</button>
+    </div>
+  </div>
+</main>
+
+<script>SharedI18n.apply();</script>
+<script src="../../shared/base.js"></script>
+<script src="rules.js"></script>
+<script src="solver.js"></script>
+<script src="generator.js"></script>
+<script src="icons.js"></script>
+<script src="../../shared/icons.js"></script>
+<script src="../../shared/audio.js"></script>
+<script src="audio.js"></script>
+<script src="../../shared/snap.js"></script>
+<script src="../../shared/sheet.js"></script>
+<script src="main.js"></script>
+</body>
+</html>

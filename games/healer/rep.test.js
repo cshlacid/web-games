@@ -218,7 +218,7 @@ const nameWithTrait = (want) => {
       < Rep.trustDelta(fit, quest(5), { won: true }).delta - 30, true);
   check('시시한 판에서 죽으면 그대로 -50이다',
     Rep.trustDelta(fit, quest(1), { won: true, downed: true }).parts
-      .find((part) => part.why === '전투불능').delta, D.TRUST.down);
+      .find((part) => part.why.code === 'hl.rep.downed').delta, D.TRUST.down);
   check('위험한 판에서 죽으면 덜 원망한다',
     Rep.trustDelta(fit, quest(8), { won: true, downed: true }).delta
       > Rep.trustDelta(fit, quest(5), { won: true, downed: true }).delta, true);

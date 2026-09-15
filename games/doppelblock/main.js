@@ -6,6 +6,57 @@
   const S = window.DoppelSolver;
   const G = window.DoppelGenerator;
   const Sound = window.DoppelSound;
+
+  const t = SharedI18n.t;
+
+  // 주격 조사는 앞말 받침에 따라 갈린다. 한국어에서만 필요한 일이라 화면 쪽에 남겼다.
+  // 지금 쓰는 숫자는 1~4뿐이지만, 판이 커지면 조용히 틀린 조사가 붙으므로 미리 채워 둔다.
+  const HAS_FINAL = { 1: true, 2: false, 3: true, 4: false, 5: false, 6: true, 7: true, 8: true, 9: false };
+
+  function valueName(value) {
+    return value === R.BLOCK ? t('doppel.block') : String(value);
+  }
+
+  function withSubject(name, value) {
+    if (SharedI18n.lang !== 'ko') return name;
+    return `${name}${value === R.BLOCK ? '이' : (HAS_FINAL[value] ? '이' : '가')}`;
+  }
+
+  function dirName(kind) {
+    return t(kind === 'row' ? 'doppel.row' : 'doppel.col');
+  }
+
+  function lineName(line) {
+    return t('doppel.line', { dir: dirName(line.kind), index: line.index + 1, clue: line.clue });
+  }
+
+  // solver는 근거를 자료로만 돌려준다. 문장으로 엮는 것은 여기 한 곳이다.
+  function whyText(why) {
+    const vars = { ...why };
+    if (why.line) vars.line = lineName(why.line);
+    if (why.line) vars.clue = why.line.clue;
+    if (why.gaps) vars.gaps = why.gaps.join(t('doppel.gapJoin'));
+    if (why.lines) vars.lines = why.lines.join('·');
+    if (why.spots && Array.isArray(why.spots)) vars.spots = why.spots.join('·');
+    if (why.code === 'cross') {
+      vars.from = dirName(why.from);
+      vars.to = dirName(why.from === 'row' ? 'col' : 'row');
+      vars.value = withSubject(valueName(why.value), why.value);
+    }
+    return t('doppel.why.' + why.code, vars);
+  }
+
+  function removalText(removals) {
+    if (!removals || !removals.length) return '';
+    const parts = removals.map(({ spots, values }) => {
+      const names = values.map(valueName);
+      const last = values[values.length - 1];
+      names[names.length - 1] = withSubject(names[names.length - 1], last);
+      return t('doppel.removal', { spots: spots.join('·'), values: names.join('·') });
+    });
+    return t('doppel.gap') + t('doppel.soThat', { list: parts.join(', ') });
+  }
+
   const SAVE_KEY = 'web-games.doppelblock.game';
 
   const el = {
@@ -215,9 +266,9 @@
 
   function renderCombos() {
     const rows = [
-      { title: `가로 ${rowOf(state.selected) + 1}줄 · 합 ${state.rowClues[rowOf(state.selected)]}`,
+      { title: t('doppel.comboHead', { dir: dirName('row'), index: rowOf(state.selected) + 1, clue: state.rowClues[rowOf(state.selected)] }),
         groups: S.clueCombinations(state.n, state.rowClues[rowOf(state.selected)]) },
-      { title: `세로 ${colOf(state.selected) + 1}줄 · 합 ${state.colClues[colOf(state.selected)]}`,
+      { title: t('doppel.comboHead', { dir: dirName('col'), index: colOf(state.selected) + 1, clue: state.colClues[colOf(state.selected)] }),
         groups: S.clueCombinations(state.n, state.colClues[colOf(state.selected)]) },
     ];
 
@@ -233,7 +284,7 @@
       if (row.groups.length === 0) {
         const none = document.createElement('span');
         none.className = 'combo-none';
-        none.textContent = '가능한 조합이 없습니다';
+        none.textContent = t('doppel.noCombos');
         head.appendChild(none);
       }
       el.combos.appendChild(head);
@@ -243,12 +294,12 @@
         line.className = 'combo-line';
         const between = document.createElement('span');
         between.className = 'combo-head';
-        between.textContent = `사이 ${group.between}칸`;
+        between.textContent = t('doppel.between', { n: group.between });
         line.appendChild(between);
         for (const set of group.sets) {
           const chip = document.createElement('span');
           chip.className = 'combo-set';
-          chip.textContent = set.length ? set.join(' ') : '없음';
+          chip.textContent = set.length ? set.join(' ') : t('doppel.emptySet');
           line.appendChild(chip);
         }
         el.combos.appendChild(line);
@@ -403,8 +454,8 @@
     if (R.validate(state.n, state.values, state.rowClues, state.colClues)) return;
     state.done = true;
     state.running = false;
-    el.resultTitle.textContent = '다 풀었어요';
-    el.resultNote.textContent = `${state.n}×${state.n} ${G.LEVELS[state.level].label} · ${formatTime(state.elapsed)}`;
+    el.resultTitle.textContent = t('doppel.solved');
+    el.resultNote.textContent = t('doppel.resultNote', { size: state.n, level: t(G.LEVELS[state.level].labelKey), time: formatTime(state.elapsed) });
     el.result.hidden = false;
     Sound.play('win');
     save();
@@ -422,12 +473,12 @@
    */
   function fillLineCandidates(kind, index) {
     if (state.done) return;
-    if (lineStatus(kind, index) === 'done') { toast('이미 끝난 줄이에요'); return; }
+    if (lineStatus(kind, index) === 'done') { toast(t('doppel.lineDone')); return; }
 
     const cellsInLine = lineCells(kind, index);
     const blocks = cellsInLine.filter((cell) => state.values[cell] === R.BLOCK).length;
     if (blocks !== 2) {
-      toast(`검은 칸 두 개를 먼저 정해야 후보를 적을 수 있어요 (지금 ${blocks}개)`);
+      toast(t('doppel.needBlocks', { count: blocks }));
       return;
     }
 
@@ -438,12 +489,12 @@
       if (mask) updates.push([cell, mask]);
     }
 
-    if (updates.length === 0) { toast('이 줄에 새로 적을 후보가 없어요'); return; }
+    if (updates.length === 0) { toast(t('doppel.nothingToFill')); return; }
 
     snapshot();
     for (const [cell, mask] of updates) state.marks[cell] = mask;
     Sound.play('autofill');
-    toast(`${kind === 'row' ? '가로' : '세로'} ${index + 1}줄 ${updates.length}칸에 후보를 적었어요`);
+    toast(t('doppel.filled', { dir: dirName(kind), index: index + 1, count: updates.length }));
     afterChange();
   }
 
@@ -526,13 +577,13 @@
         state.hinted.clear();
         render();
         Sound.play('conflict');
-        toast('여기 값이 정답과 달라요. 먼저 고쳐야 이어서 풀 수 있어요', true);
+        toast(t('doppel.wrong'), true);
         return;
       }
     }
 
     const step = S.nextHint(state.n, state.rowClues, state.colClues, state.values, state.marks);
-    if (!step) { toast('더 짚어줄 것을 찾지 못했어요'); return; }
+    if (!step) { toast(t('doppel.noStep')); return; }
 
     snapshot();
     state.hinted.clear();
@@ -544,7 +595,8 @@
       state.selected = step.cell;
       state.hinted.add(step.cell);
       Sound.play('hint');
-      toast(`${S.valueName(step.value)} — ${step.detail}`, true);
+      toast(`${valueName(step.value)} — ${whyText(step.why)}${t('doppel.gap')}`
+        + t('doppel.thenOnly', { value: valueName(step.value) }), true);
       afterChange();
       return;
     }
@@ -560,7 +612,7 @@
     state.selected = step.cells[0].cell;
 
     Sound.play('hint');
-    toast(`${step.label} — ${step.detail}`, true);
+    toast(`${t('doppel.tech.' + step.technique)} — ${whyText(step.why)}${removalText(step.removals)}`, true);
     afterChange();
   }
 
@@ -606,8 +658,8 @@
     el.size.textContent = `${state.n}×${state.n}`;
     syncDoneLines();
     if (state.done) {
-      el.resultTitle.textContent = '다 풀었어요';
-      el.resultNote.textContent = `${state.n}×${state.n} ${G.LEVELS[state.level].label} · ${formatTime(state.elapsed)}`;
+      el.resultTitle.textContent = t('doppel.solved');
+      el.resultNote.textContent = t('doppel.resultNote', { size: state.n, level: t(G.LEVELS[state.level].labelKey), time: formatTime(state.elapsed) });
       el.result.hidden = false;
     }
     return true;
@@ -661,8 +713,8 @@
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'pick';
-      button.textContent = G.LEVELS[level].label;
-      button.title = G.LEVELS[level].note;
+      button.textContent = t(G.LEVELS[level].labelKey);
+      button.title = t('doppel.levelNote.' + level);
       button.setAttribute('aria-pressed', String(level === state.level));
       button.addEventListener('click', () => newGame(level));
       el.levels.appendChild(button);

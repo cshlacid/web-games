@@ -70,7 +70,7 @@ function stock(level, seed) {
 // 알 수 없게 된다.
 
 function canBuy(gold, cost) {
-  return gold >= cost ? { ok: true } : { ok: false, reason: '골드가 모자란다' };
+  return gold >= cost ? { ok: true } : { ok: false, reason: 'hl.why.noGold' };
 }
 
 // 갱신 값도 레벨을 따라간다. 곡선은 동료 목록 새로 고침과 같은 것을 쓴다
