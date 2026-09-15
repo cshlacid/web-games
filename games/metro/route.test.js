@@ -140,7 +140,21 @@ function straightTime(d, v, a, b) {
 
   const allRoad = R.cost(path, () => 'road');
   ok('건물을 피하면 싸다', allRoad.cost < c.cost);
-  ok('피하면 붉게 칠할 토막이 없다', allRoad.runs.length === 0);
+  ok('피하면 덧칠할 토막이 없다', allRoad.runs.length === 0);
+
+  // 물 밑이 가장 비싸고, 그다음이 산, 그다음이 건물이다. 이 차례가 뒤집히면
+  // "강을 건널까 돌아 나갈까"가 성립하지 않는다.
+  const same = (kind) => R.cost(path, () => kind).cost;
+  ok('값의 차례: 도로 < 빈 땅 < 건물 < 산 < 물',
+    same('road') < same('empty') && same('empty') < same('building')
+    && same('building') < same('hill') && same('hill') < same('water'));
+
+  // 종류가 다른 토막은 따로 묶인다. 한 덩어리로 묶으면 화면에서 강 밑과 건물 밑이
+  // 같은 색으로 칠해진다.
+  const mixed = R.cost(path, (x) => (x < 300 ? 'water' : x < 600 ? 'hill' : 'road'));
+  ok('종류가 바뀌면 토막이 갈린다',
+    mixed.runs.length === 2 && mixed.runs[0].kind === 'water' && mixed.runs[1].kind === 'hill',
+    JSON.stringify(mixed.runs));
 }
 
 // --- 그리는 선과 재는 값이 같은 자료에서 나온다 ---

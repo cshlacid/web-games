@@ -13,15 +13,26 @@
   --road: #ffffff;
   --alley: #eff2f7;
   --road-edge: #ccd5e2;
-  --home: #c5cfdd;
-  --shop: #b4c0d2;
-  --office: #a2b0c6;
+  --water: #a8c6e2;
+  --hill: #cbd7c4;
+  --hill-2: #bdcbb5;
+  /* 건물 색은 종류가 아니라 층수가 정한다. 자란 정도가 화면에서 읽혀야 한다. */
+  --lv1: #c2cde0;
+  --lv2: #aab8d0;
+  --lv3: #92a2c0;
+  --lv4: #7789ab;
   --metro: #3f6fd8;
   --metro-soft: #8fa9e4;
+  --reach: #cfdcf3;
   --under: #d9534f;
   --slow: #c9862b;
   --station-fill: #ffffff;
   --station-ring: #3c465a;
+  /* 노선이 비싼 땅을 지나는 토막에 덧칠하는 색. 그 땅의 색을 진하게 한 것이라
+     "여기가 강 밑이구나"가 지도와 이어져 읽힌다. */
+  --cut-building: #d9534f;
+  --cut-hill: #6f8a5f;
+  --cut-water: #1f6fb0;
 
   --pad-x: clamp(10px, 4vmin, 28px);
   --app-max: 440px;
@@ -40,15 +51,23 @@
     --road: #3f4a59;
     --alley: #2f3845;
     --road-edge: #2c3441;
-    --home: #303947;
-    --shop: #3b4653;
-    --office: #4a5666;
+    --water: #1d3247;
+    --hill: #26302a;
+    --hill-2: #2d3931;
+    --lv1: #2d3645;
+    --lv2: #3b4757;
+    --lv3: #4b586a;
+    --lv4: #5d6b7e;
     --metro: #6f9bf0;
     --metro-soft: #3a4c70;
+    --reach: #26344b;
     --under: #e4736f;
     --slow: #d8a13a;
     --station-fill: #12161c;
     --station-ring: #c3cbd8;
+    --cut-building: #e4736f;
+    --cut-hill: #8fb07a;
+    --cut-water: #5aa9e6;
   }
 }
 
@@ -134,8 +153,14 @@ h1 {
   color: var(--btn-fg);
 }
 
-.spent { font-size: 12px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
-.spent b { color: var(--fg); }
+.budget { font-size: 12px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
+.budget b { color: var(--fg); }
+
+/* 도구 고르개는 판 바로 아래에 둔다. 판 안은 touch-action: none이라 click이 나지
+   않으므로 단추를 그 안에 둘 수 없고, 헤더까지 올리면 지금 무슨 모드인지가 눈이
+   가는 곳에서 멀어진다. */
+.modes { justify-content: center; }
+.modes .pick { padding: 6px 16px; font-size: 13px; }
 .picker-row .toggle { margin-inline-start: auto; }
 
 /* 지도는 화면 한 장에 다 들어온다. 확대·팬이 없는 것은 게으름이 아니라 결정이다 —
@@ -195,12 +220,14 @@ h1 {
 .mix span { display: block; min-width: 0; }
 .mix-road { background: var(--metro-soft); }
 .mix-empty { background: var(--muted); }
-.mix-building { background: var(--under); }
+.mix-building { background: var(--cut-building); }
+.mix-hill { background: var(--cut-hill); }
+.mix-water { background: var(--cut-water); }
 
 .mix-legend {
   margin: 0;
   display: flex;
-  gap: 12px;
+  gap: 5px 12px;
   font-size: 11px;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
@@ -211,7 +238,9 @@ h1 {
 .dot { width: 7px; height: 7px; border-radius: 2px; display: inline-block; }
 .dot.road { background: var(--metro-soft); }
 .dot.empty { background: var(--muted); }
-.dot.building { background: var(--under); }
+.dot.building { background: var(--cut-building); }
+.dot.hill { background: var(--cut-hill); }
+.dot.water { background: var(--cut-water); }
 
 .actions { display: flex; gap: 8px; }
 

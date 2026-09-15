@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title data-i18n="game.metro">지하철 노선</title>
-<meta name="description" content="도시 아래로 노선을 그어 두 역을 잇는다. 건물 밑은 비싸고, 급하게 굽으면 느려진다." data-i18n-attr="content=meta.desc">
+<meta name="description" content="역을 놓고 그 사이로 노선을 그어 도시를 키운다. 건물 밑은 비싸고 강 밑은 더 비싸며, 급하게 굽으면 느려진다." data-i18n-attr="content=meta.desc">
 <meta name="color-scheme" content="light dark">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235f6d87' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='M4 19 C4 10 12 14 12 6 C12 3 14 3 20 3'/><circle cx='4' cy='19' r='2.2' fill='%235f6d87'/><circle cx='20' cy='3' r='2.2' fill='%235f6d87'/></svg>">
 <link rel="manifest" href="../../manifest.json">
@@ -38,21 +38,26 @@
     </div>
     <div class="picker-row">
       <div class="picker" id="levels" role="group" aria-label="난이도" data-i18n-attr="aria-label=metro.difficulty"></div>
-      <span class="spent"><span data-i18n="metro.spent">누적 건설비</span> <b id="spent">0</b></span>
+      <span class="budget"><span data-i18n="metro.budget">예산</span> <b id="budget">0</b></span>
       <button class="toggle" id="new-city" type="button" data-i18n="metro.newCity">새 도시</button>
     </div>
   </header>
 
   <div class="map-wrap">
     <svg class="map" id="map" xmlns="http://www.w3.org/2000/svg" aria-label="도시" data-i18n-attr="aria-label=metro.mapLabel">
+      <g id="layer-water"></g>
+      <g id="layer-hills"></g>
       <g id="layer-roads"></g>
       <g id="layer-buildings"></g>
+      <g id="layer-grown"></g>
       <g id="layer-lines"></g>
       <g id="layer-draft"></g>
       <g id="layer-stations"></g>
       <g id="layer-handles"></g>
     </svg>
   </div>
+
+  <div class="picker modes" id="modes" role="group" aria-label="도구" data-i18n-attr="aria-label=metro.tool"></div>
 
   <p class="status" id="status" role="status" aria-live="polite"></p>
 
@@ -67,11 +72,15 @@
       <span class="mix-road" id="mix-road"></span>
       <span class="mix-empty" id="mix-empty"></span>
       <span class="mix-building" id="mix-building"></span>
+      <span class="mix-hill" id="mix-hill"></span>
+      <span class="mix-water" id="mix-water"></span>
     </div>
     <p class="mix-legend">
       <span><i class="dot road"></i><span data-i18n="metro.underRoad">도로 밑</span> <b id="len-road">0</b></span>
       <span><i class="dot empty"></i><span data-i18n="metro.underEmpty">빈 땅</span> <b id="len-empty">0</b></span>
       <span><i class="dot building"></i><span data-i18n="metro.underBuilding">건물 밑</span> <b id="len-building">0</b></span>
+      <span><i class="dot hill"></i><span data-i18n="metro.underHill">산 밑</span> <b id="len-hill">0</b></span>
+      <span><i class="dot water"></i><span data-i18n="metro.underWater">물 밑</span> <b id="len-water">0</b></span>
     </p>
   </div>
 
@@ -83,16 +92,18 @@
 
   <div class="sheet" id="help" hidden>
     <p class="sheet-title" data-i18n="ui.rules">규칙</p>
-    <p class="sheet-note" data-i18n="metro.draftNote">경로 편집만 먼저 만든 시안입니다. 수요와 수입은 아직 없습니다.</p>
+    <p class="sheet-note" data-i18n="metro.draftNote">아직 만드는 중입니다. 승객 수요와 요금 수입은 들어오지 않았습니다.</p>
     <ul class="help-list">
       <li data-i18n-html="metro.ruleMap">지도는 화면보다 넓습니다. <b>빈 곳을 끌면</b> 지도가 움직입니다. 고른 역이 화면 밖으로 나가면 가장자리에 점으로 남습니다.</li>
-      <li data-i18n-html="metro.rule1"><b>역 두 개</b>를 차례로 누르면 둘을 잇는 직선이 생깁니다.</li>
+      <li data-i18n-html="metro.ruleStation"><b>역 놓기</b>에서 빈 자리를 누르면 역이 생깁니다. 물·산·건물 위에는 놓을 수 없습니다. 역을 다시 누르면 철거되고 절반을 돌려받습니다.</li>
+      <li data-i18n-html="metro.rule1"><b>노선 잇기</b>로 바꾸고 역 두 개를 차례로 누르면 둘을 잇는 직선이 생깁니다.</li>
       <li data-i18n-html="metro.rule2">그 선을 <b>잡아 끌면</b> 그 자리에 중간점이 생기며 경로가 휩니다. 중간점은 <b>세 개</b>까지입니다.</li>
       <li data-i18n-html="metro.rule3">중간점을 <b>두 번 두드리면</b> 지워집니다. 끌 때 도로 가까이 가면 도로에 <b>달라붙습니다</b>.</li>
-      <li data-i18n-html="metro.rule4"><b>건물 밑</b>으로 지나는 구간은 붉게 보이고 건설비가 네 배를 넘습니다. 도로 밑이 가장 쌉니다.</li>
+      <li data-i18n-html="metro.rule4">땅마다 값이 다릅니다. <b>도로 밑</b>이 가장 싸고, 빈 땅, 건물 밑, 산 밑 순으로 오르며 <b>물 밑</b>이 가장 비쌉니다.</li>
       <li data-i18n-html="metro.rule5">급하게 굽으면 그 구간의 <b>제한속도</b>가 걸려 느려집니다. 너무 급하면 아예 지을 수 없습니다.</li>
       <li data-i18n-html="metro.rule6">열차는 역에서 <b>서 있다가 출발해 다음 역에서 섭니다.</b> 그래서 역이 가까우면 최고 속도에 닿지 못합니다.</li>
-      <li data-i18n-html="metro.ruleDistrict"><b>구시가지</b>는 골목이 좁고 굽은 데다 건물이 빽빽해, 길을 따라가면 느리고 곧게 뚫으면 비쌉니다. <b>계획도시</b>는 그 반대입니다. 난이도는 둘의 배합을 바꿉니다.</li>
+      <li data-i18n-html="metro.ruleGrow">구간을 확정하면 <b>이어진 역 둘레의 동네가 자랍니다.</b> 빈 터에 건물이 들어서고 있던 건물은 높아지며, 자란 만큼 예산이 들어옵니다. <b>얼마나 높아질지는 건물의 종류가 정합니다.</b></li>
+      <li data-i18n-html="metro.ruleDistrict"><b>구시가지</b>는 골목이 좁고 굽은 데다 막다른 길과 삼거리가 많아 길을 따라가기 어렵습니다. <b>계획도시</b>는 그 반대입니다. 난이도는 둘의 배합을 바꿉니다.</li>
       <li data-i18n-html="metro.rule7"><b>확정</b>을 누르기 전에는 아무것도 지어지지 않습니다. 마음껏 끌어 보세요.</li>
     </ul>
     <div class="sheet-actions">

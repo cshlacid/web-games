@@ -1,9 +1,11 @@
 'use strict';
 
-// 도시 한 장을 씨앗 하나와 난이도 하나에서 만든다.
+// 도시 한 장을 씨앗 하나와 난이도 하나에서 만든다. 지형·도로·건물까지.
 //
 // **타일이 아니라 연속 좌표다.** 격자로 두면 건설 판정은 쉬워지지만 방향이 여덟
 // 개뿐이라 곡률이라는 개념이 성립하지 않는다. 이 게임은 곡률이 중심이라 벡터로 간다.
+//
+// **역은 여기서 만들지 않는다.** 플레이어가 직접 놓는다.
 (function () {
 
 const Geom = (typeof module !== 'undefined' && module.exports)
@@ -14,31 +16,37 @@ const Geom = (typeof module !== 'undefined' && module.exports)
 const VIEW = { w: 2400, h: 2700 };
 const WORLD = { w: 4800, h: 5400 };
 
-const GRID = 90;             // 공간 색인 칸 크기. 골목이 촘촘한 구시가지에서
-                             // 후보가 쏟아지지 않을 만큼 잘게 끊는다
-const MAX_BUILDINGS = 2600;  // 안전망. 보통 천오백 채 안팎에서 저절로 멎는다
+const GRID = 90;             // 공간 색인 칸 크기
+const MAX_BUILDINGS = 3000;  // 안전망. 보통 이천 채 안팎에서 저절로 멎는다
 
 const ROAD_W = { arterial: 36, avenue: 32, planned: 20, suburb: 18, alley: 13 };
+
+// 건물이 자랄 수 있는 끝. **종류가 정하는 상한이다** — 주거는 얼마 못 가고 업무는
+// 높이 간다. 지금은 화면에서 진하기로만 보이지만, 수요가 들어오면 그 자리가
+// 낼 수 있는 통행량의 상한이 된다.
+const CAP = { home: 2, shop: 3, office: 4 };
 
 // 구역의 성격. **이 표가 이 게임의 난이도 지형이다.**
 //
 // 구시가지는 길이 굽고 좁은 데다 건물이 빽빽해서, 도로를 따라가면 느리고 곧게
-// 뚫으면 비싸다 — 양쪽이 다 나쁜 자리다. 계획도시는 그 반대로 둘 다 좋다. 나중에
-// 수요를 건물 밀도에 비례해 깔면 **돈이 되는 곳이 짓기 어려운 곳**이 되어, 지형
-// 자체가 난이도를 만든다.
+// 뚫으면 비싸다 — 양쪽이 다 나쁜 자리다. 계획도시는 그 반대로 둘 다 좋다.
 const DISTRICT = {
-  old:     { gap: 80,  jitter: 30, w: ROAD_W.alley,   size: [18, 34], clear: 6,  fill: 0.52 },
-  planned: { gap: 155, jitter: 0,  w: ROAD_W.planned, size: [50, 88], clear: 12, fill: 0.46, regular: true },
-  suburb:  { gap: 250, jitter: 12, w: ROAD_W.suburb,  size: [36, 64], clear: 10, fill: 0.17 },
+  old:     { gap: 80,  w: ROAD_W.alley,   size: [18, 34], clear: 6,  fill: 0.52, organic: true },
+  planned: { gap: 155, w: ROAD_W.planned, size: [50, 88], clear: 12, fill: 0.46, regular: true },
+  suburb:  { gap: 250, w: ROAD_W.suburb,  size: [36, 64], clear: 10, fill: 0.17, jitter: 12 },
 };
 
-// 난이도는 구역의 넓이 배합과 건물 밀도로 낸다. 규칙을 바꾸지 않고 지형만 바꾸는
+// 난이도는 구역의 넓이 배합과 건물·지형으로 낸다. 규칙을 바꾸지 않고 지형만 바꾸는
 // 것이라, 쉬운 판에서 익힌 감각이 어려운 판에서도 그대로 통한다.
 const LEVELS = [
-  { id: 'easy',   oldR: 620,  town: [2200, 1900], density: 0.74 },
-  { id: 'normal', oldR: 1150, town: [1700, 1450], density: 1.0 },
-  { id: 'hard',   oldR: 1750, town: [1100, 950],  density: 1.3 },
+  { id: 'easy',   oldR: 620,  town: [2200, 1900], density: 0.78, hills: 1, sea: 0.3 },
+  { id: 'normal', oldR: 1150, town: [1700, 1450], density: 1.0,  hills: 2, sea: 0.55 },
+  { id: 'hard',   oldR: 1750, town: [1100, 950],  density: 1.25, hills: 3, sea: 0.85 },
 ];
+
+// 처음에는 도시가 듬성듬성하다. 후보의 이만큼만 서 있고 나머지는 빈 터로 남아,
+// 노선이 닿는 곳부터 하나씩 들어선다.
+const START_FILL = 0.42;
 
 function mulberry32(seed) {
   let a = seed >>> 0;
@@ -85,6 +93,23 @@ function query(ix, x, y, pad = 0) {
   return out;
 }
 
+function indexPolylines(lines, world) {
+  const segments = [];
+  const ix = makeIndex(world, GRID);
+  for (const line of lines) {
+    for (let i = 1; i < line.pts.length; i++) {
+      const a = line.pts[i - 1];
+      const b = line.pts[i];
+      const id = segments.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y, w: line.w }) - 1;
+      const pad = line.w / 2 + 2;
+      insert(ix, id,
+        Math.min(a.x, b.x) - pad, Math.min(a.y, b.y) - pad,
+        Math.max(a.x, b.x) + pad, Math.max(a.y, b.y) + pad);
+    }
+  }
+  return { segments, index: ix };
+}
+
 // --- 도형 ---
 
 function segSegHit(a, b, c, d) {
@@ -120,6 +145,130 @@ function overlaps(a, b, gap) {
     && a.y - gap < b.y + b.h && a.y + a.h + gap > b.y;
 }
 
+// 꺾은선에서 막힌 구간을 잘라 내고 통과하는 토막만 남긴다. 길이 물이나 산을
+// 관통하지 않게 하는 데 쓴다.
+function clipPolyline(pts, blocked, step = 22) {
+  const parts = [];
+  let run = null;
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1];
+    const b = pts[i];
+    const n = Math.max(1, Math.ceil(Geom.dist(a.x, a.y, b.x, b.y) / step));
+    for (let k = 0; k <= n; k++) {
+      if (i > 1 && k === 0) continue;   // 이음매를 두 번 세지 않는다
+      const p = { x: a.x + (b.x - a.x) * (k / n), y: a.y + (b.y - a.y) * (k / n) };
+      if (blocked(p.x, p.y)) { run = null; continue; }
+      if (!run) { run = [p]; parts.push(run); } else run.push(p);
+    }
+  }
+  return parts.filter((part) => part.length > 1);
+}
+
+// --- 지형 ---
+
+function wander(from, to, swing, rng, steps = 9) {
+  const len = Geom.dist(from.x, from.y, to.x, to.y);
+  const nx = -(to.y - from.y) / len;
+  const ny = (to.x - from.x) / len;
+  const pts = [];
+  let drift = 0;
+  for (let i = 0; i <= steps; i++) {
+    const k = i / steps;
+    drift += (rng() - 0.5) * swing;
+    drift *= 0.82;                       // 되돌아오게 눌러 준다. 안 그러면 한쪽으로만 샌다
+    const sway = Math.sin(k * Math.PI) * swing * 0.9 + drift;
+    pts.push({ x: from.x + (to.x - from.x) * k + nx * sway, y: from.y + (to.y - from.y) * k + ny * sway });
+  }
+  return pts;
+}
+
+function makeTerrain(city, spec, rng) {
+  const { w, h } = city.world;
+  city.water = [];
+  city.hills = [];
+  city.sea = null;
+
+  // 바다는 "아주 넓은 강"으로 둔다. 해안선을 따로 다루면 판정이 하나 더 느는데,
+  // 지하철에게는 물이면 다 같은 물이라 얻는 것이 없다.
+  if (rng() < spec.sea) {
+    const side = Math.floor(rng() * 4);
+    const band = 1500;
+    const out = band / 2 - (420 + rng() * 380);   // 지도 안으로 들어오는 깊이
+    const line = side === 0 ? wander({ x: -200, y: out }, { x: w + 200, y: out }, 190, rng)
+      : side === 1 ? wander({ x: -200, y: h - out }, { x: w + 200, y: h - out }, 190, rng)
+      : side === 2 ? wander({ x: out, y: -200 }, { x: out, y: h + 200 }, 190, rng)
+      : wander({ x: w - out, y: -200 }, { x: w - out, y: h + 200 }, 190, rng);
+    city.sea = { pts: line, w: band, kind: 'sea' };
+    city.water.push(city.sea);
+  }
+
+  // 강은 지도를 가로지른다. 바다가 있으면 대개 그쪽으로 흘러 나간다.
+  {
+    const vertical = rng() < 0.5;
+    const from = vertical ? { x: w * (0.2 + rng() * 0.6), y: -150 } : { x: -150, y: h * (0.2 + rng() * 0.6) };
+    const to = vertical ? { x: w * (0.2 + rng() * 0.6), y: h + 150 } : { x: w + 150, y: h * (0.2 + rng() * 0.6) };
+    city.water.push({ pts: wander(from, to, 320, rng, 11), w: 110 + rng() * 110, kind: 'river' });
+  }
+
+  // 산은 원 몇 개를 사슬처럼 이어 만든다. 다각형을 제대로 다루는 대신 원의 합집합으로
+  // 두면 판정이 거리 비교 한 줄이고, 불투명하게 겹쳐 그리면 화면에서도 한 덩어리로 보인다.
+  for (let k = 0; k < spec.hills; k++) {
+    const ang = rng() * Math.PI * 2;
+    const away = city.core.r + 500 + rng() * 900;
+    let at = {
+      x: clamp(city.core.x + Math.cos(ang) * away, 300, w - 300),
+      y: clamp(city.core.y + Math.sin(ang) * away, 300, h - 300),
+    };
+    let dir = rng() * Math.PI * 2;
+    const lumps = 4 + Math.floor(rng() * 4);
+    for (let i = 0; i < lumps; i++) {
+      const r = 190 + rng() * 190;
+      // 물에 잠긴 봉우리는 섬처럼 보여 어색하다. 물을 먼저 깔아 두고 여기서 거른다.
+      if (!isWaterLines(city.water, at.x, at.y)) city.hills.push({ x: at.x, y: at.y, r });
+      dir += (rng() - 0.5) * 1.1;
+      at = { x: at.x + Math.cos(dir) * r * 0.85, y: at.y + Math.sin(dir) * r * 0.85 };
+      if (at.x < 200 || at.x > w - 200 || at.y < 200 || at.y > h - 200) break;
+    }
+  }
+
+  const packed = indexPolylines(city.water, city.world);
+  city.waterSegments = packed.segments;
+  city.waterIndex = packed.index;
+}
+
+// 색인을 만들기 전, 지형을 깔던 중에 쓰는 느린 판정. 물줄기가 둘뿐이라 훑어도 된다.
+function isWaterLines(bodies, x, y) {
+  for (const body of bodies) {
+    for (let i = 1; i < body.pts.length; i++) {
+      const a = body.pts[i - 1];
+      const b = body.pts[i];
+      if (Geom.nearestOnSegment(x, y, a.x, a.y, b.x, b.y).d <= body.w / 2) return true;
+    }
+  }
+  return false;
+}
+
+function isWater(city, x, y) {
+  for (const id of query(city.waterIndex, x, y)) {
+    const s = city.waterSegments[id];
+    if (Geom.nearestOnSegment(x, y, s.x1, s.y1, s.x2, s.y2).d <= s.w / 2) return true;
+  }
+  return false;
+}
+
+// 바다만 따로 본다. **다리는 강에만 놓는다** — 열린 바다를 가로지르는 간선도로는
+// 어디로도 가지 않는 다리라 화면에서 곧장 잘못 그린 것으로 보인다.
+function isSea(city, x, y) {
+  return city.sea ? isWaterLines([city.sea], x, y) : false;
+}
+
+function isHill(city, x, y) {
+  for (const hill of city.hills) {
+    if ((x - hill.x) ** 2 + (y - hill.y) ** 2 <= hill.r * hill.r) return true;
+  }
+  return false;
+}
+
 // --- 구역 ---
 
 // 구시가지의 경계는 원이 아니다. 딱 떨어지는 원으로 두면 화면에서 동그란 얼룩으로
@@ -137,7 +286,7 @@ function districtAt(city, x, y) {
   return 'suburb';
 }
 
-// --- 만들기 ---
+// --- 길 ---
 
 function axisLines(center, span, gap, rng) {
   const lines = [center];
@@ -152,10 +301,8 @@ function axisLines(center, span, gap, rng) {
   return lines.sort((p, q) => p - q);
 }
 
-// 한 줄기의 길. jitter가 0이면 곧은 선분 하나, 크면 굽이치는 꺾은선이 된다.
-// **구시가지가 계획도시와 갈리는 곳이 이 한 값이다.**
-function street(from, to, jitter, rng) {
-  if (jitter === 0) return [from, to];
+function straightish(from, to, jitter, rng) {
+  if (!jitter) return [from, to];
   const len = Geom.dist(from.x, from.y, to.x, to.y);
   const steps = Math.max(2, Math.round(len / 120));
   const nx = -(to.y - from.y) / len;
@@ -163,15 +310,88 @@ function street(from, to, jitter, rng) {
   const pts = [];
   for (let i = 0; i <= steps; i++) {
     const k = i / steps;
-    // 양 끝은 큰길에 닿아야 하므로 흔들지 않는다. 가운데로 갈수록 크게 흔들린다.
+    // 양 끝은 큰길에 닿아야 하므로 흔들지 않는다.
     const sway = Math.sin(k * Math.PI) * (rng() - 0.5) * 2 * jitter;
-    pts.push({
-      x: from.x + (to.x - from.x) * k + nx * sway,
-      y: from.y + (to.y - from.y) * k + ny * sway,
-    });
+    pts.push({ x: from.x + (to.x - from.x) * k + nx * sway, y: from.y + (to.y - from.y) * k + ny * sway });
   }
   return pts;
 }
+
+// 구시가지의 골목은 **자라서** 생긴다.
+//
+// 블록을 가로지르는 줄을 몇 개 긋는 방식으로는 아무리 굽혀도 격자가 남는다. 격자에서는
+// 노선을 그을 때 고민할 것이 없다 — 어느 길을 타도 비슷하기 때문이다. 경계에서 씨를
+// 뿌려 안쪽으로 뻗게 하고 도중에 갈라지거나 멈추게 하면 **삼거리와 Y자와 막다른 길**이
+// 나오고, 그제야 "이 골목은 저기까지밖에 안 간다"가 판단거리가 된다.
+function organicBlock(b, d, rng, emit) {
+  const step = d.gap * 0.78;
+  const cell = step;
+  const bins = new Map();
+  const key = (x, y) => `${Math.floor(x / cell)},${Math.floor(y / cell)}`;
+
+  function remember(p) {
+    const k = key(p.x, p.y);
+    if (!bins.has(k)) bins.set(k, []);
+    bins.get(k).push(p);
+  }
+  function nearby(x, y, r) {
+    const c = Math.floor(x / cell);
+    const q = Math.floor(y / cell);
+    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
+      const arr = bins.get(`${c + i},${q + j}`);
+      if (!arr) continue;
+      for (const p of arr) if (Geom.dist(p.x, p.y, x, y) < r) return p;
+    }
+    return null;
+  }
+
+  const queue = [];
+  const seeds = 5 + Math.floor(rng() * 4);
+  for (let i = 0; i < seeds; i++) {
+    const side = Math.floor(rng() * 4);
+    const t = 0.1 + rng() * 0.8;
+    const at = side === 0 ? { x: b.x + b.w * t, y: b.y }
+      : side === 1 ? { x: b.x + b.w * t, y: b.y + b.h }
+      : side === 2 ? { x: b.x, y: b.y + b.h * t }
+      : { x: b.x + b.w, y: b.y + b.h * t };
+    const dir = side === 0 ? Math.PI / 2 : side === 1 ? -Math.PI / 2 : side === 2 ? 0 : Math.PI;
+    queue.push({ at, dir, life: 5 + Math.floor(rng() * 7) });
+  }
+
+  let guard = 0;
+  while (queue.length && guard++ < 90) {
+    const branch = queue.shift();
+    const pts = [branch.at];
+    let cur = branch.at;
+    let dir = branch.dir;
+    for (let k = 0; k < branch.life; k++) {
+      dir += (rng() - 0.5) * 0.8;
+      const next = { x: cur.x + Math.cos(dir) * step, y: cur.y + Math.sin(dir) * step };
+
+      if (next.x < b.x + 6 || next.x > b.x + b.w - 6 || next.y < b.y + 6 || next.y > b.y + b.h - 6) {
+        // 블록 경계에 닿으면 큰길에 붙이고 끝낸다. 여기가 삼거리가 된다.
+        pts.push({ x: clamp(next.x, b.x, b.x + b.w), y: clamp(next.y, b.y, b.y + b.h) });
+        break;
+      }
+      const join = nearby(next.x, next.y, step * 0.6);
+      if (join) { pts.push(join); break; }   // 있던 골목에 붙는다 — 삼거리
+
+      pts.push(next);
+      remember(next);
+      cur = next;
+      if (rng() < 0.22 && queue.length < 12) {
+        queue.push({
+          at: next,
+          dir: dir + (rng() < 0.5 ? 1 : -1) * (0.65 + rng() * 0.7),
+          life: 3 + Math.floor(rng() * 5),
+        });
+      }
+    }
+    if (pts.length > 1) emit(pts);
+  }
+}
+
+// --- 만들기 ---
 
 function create(seed = 1, level = 1) {
   const spec = LEVELS[clamp(level, 0, LEVELS.length - 1)];
@@ -180,38 +400,48 @@ function create(seed = 1, level = 1) {
   const cy = WORLD.h / 2;
 
   const core = { x: cx + (rng() - 0.5) * 500, y: cy + (rng() - 0.5) * 500, r: spec.oldR, phase: rng() * Math.PI * 2 };
-  const town = {
-    w: spec.town[0], h: spec.town[1],
-    x: 0, y: 0,
-  };
+  const town = { w: spec.town[0], h: spec.town[1], x: 0, y: 0 };
   // 계획도시는 구시가지를 비켜 한쪽에 붙는다 — 현실의 신도시가 그렇다.
   const away = rng() * Math.PI * 2;
   town.x = clamp(core.x + Math.cos(away) * (core.r + town.w * 0.62) - town.w / 2, 120, WORLD.w - town.w - 120);
   town.y = clamp(core.y + Math.sin(away) * (core.r + town.h * 0.62) - town.h / 2, 120, WORLD.h - town.h - 120);
 
-  const city = { seed, level: spec.id, world: WORLD, view: VIEW, core, town, roads: [] };
+  const city = {
+    seed, level: spec.id, world: WORLD, view: VIEW, core, town,
+    roads: [], stations: [], growSeed: (seed * 2246822519) >>> 0,
+  };
+
+  makeTerrain(city, spec, rng);
+  const wet = (x, y) => isWater(city, x, y);
+  const rocky = (x, y) => isHill(city, x, y);
 
   // 1) 간선. 지도 전체를 가로지르는 곧은 격자다. 구역이 어떻든 이 뼈대는 같아서
-  //    도시가 하나로 이어지고, 역이 설 자리도 여기서 나온다.
+  //    도시가 하나로 이어진다.
+  //
+  //    **간선만 강을 건넌다.** 물 위의 토막을 잘라 내지 않고 다리로 둔다 — 도시에
+  //    다리가 하나도 없으면 강 건너가 딴 세상으로 보인다. 지하철에게는 그래도 강
+  //    밑이라 값은 그대로 비싸다. 산은 간선도 피한다.
   const xs = axisLines(cx, WORLD.w, 600, rng);
   const ys = axisLines(cy, WORLD.h, 600, rng);
-  for (const x of xs) city.roads.push({ pts: [{ x, y: 0 }, { x, y: WORLD.h }], w: ROAD_W.arterial, kind: 'arterial' });
-  for (const y of ys) city.roads.push({ pts: [{ x: 0, y }, { x: WORLD.w, y }], w: ROAD_W.arterial, kind: 'arterial' });
-
-  // 2) 대로 둘. 격자만 있으면 노선이 전부 ㄱ자로 꺾여 휜 선로를 그릴 자리가 없다.
+  const arterials = [];
+  for (const x of xs) arterials.push([{ x, y: 0 }, { x, y: WORLD.h }]);
+  for (const y of ys) arterials.push([{ x: 0, y }, { x: WORLD.w, y }]);
   for (let k = 0; k < 2; k++) {
+    // 대로 둘. 격자만 있으면 노선이 전부 ㄱ자로 꺾여 휜 선로를 그릴 자리가 없다.
     const ang = Math.PI / 4 + (rng() * 0.5 - 0.25) + k * Math.PI / 2;
     const len = Math.hypot(WORLD.w, WORLD.h);
-    city.roads.push({
-      pts: [
-        { x: cx - Math.cos(ang) * len, y: cy - Math.sin(ang) * len },
-        { x: cx + Math.cos(ang) * len, y: cy + Math.sin(ang) * len },
-      ],
-      w: ROAD_W.avenue, kind: 'avenue',
-    });
+    arterials.push([
+      { x: cx - Math.cos(ang) * len, y: cy - Math.sin(ang) * len },
+      { x: cx + Math.cos(ang) * len, y: cy + Math.sin(ang) * len },
+    ]);
+  }
+  for (const pts of arterials) {
+    for (const part of clipPolyline(pts, (x, y) => rocky(x, y) || isSea(city, x, y))) {
+      city.roads.push({ pts: part, w: ROAD_W.arterial, kind: 'arterial' });
+    }
   }
 
-  // 3) 국지도로. 간선 블록마다 그 자리의 구역 성격대로 깐다.
+  // 2) 국지도로. 간선 블록마다 그 자리의 구역 성격대로 깐다.
   const blocks = [];
   for (let i = 0; i + 1 < xs.length; i++) {
     for (let j = 0; j + 1 < ys.length; j++) {
@@ -220,6 +450,15 @@ function create(seed = 1, level = 1) {
       blocks.push(b);
       const d = DISTRICT[b.kind];
       b.cuts = { x: [], y: [] };   // 계획도시가 건물을 이 자리에 맞춰 세운다
+
+      const lay = (pts) => {
+        for (const part of clipPolyline(pts, (x, y) => wet(x, y) || rocky(x, y))) {
+          city.roads.push({ pts: part, w: d.w, kind: b.kind });
+        }
+      };
+
+      if (d.organic) { organicBlock(b, d, rng, lay); continue; }
+
       for (const axis of ['x', 'y']) {
         const span = axis === 'x' ? b.w : b.h;
         const count = Math.floor(span / d.gap) - 1;
@@ -230,50 +469,37 @@ function create(seed = 1, level = 1) {
           const from = axis === 'x' ? { x: b.x + t, y: b.y } : { x: b.x, y: b.y + t };
           const to = axis === 'x' ? { x: b.x + t, y: b.y + b.h } : { x: b.x + b.w, y: b.y + t };
           b.cuts[axis].push(t);
-          city.roads.push({ pts: street(from, to, d.jitter, rng), w: d.w, kind: b.kind });
+          lay(straightish(from, to, d.jitter, rng));
         }
       }
     }
   }
 
-  // 도로를 선분으로 펴서 색인한다. 반지름만큼 넓혀 넣어야 "중심선에서 w/2 안쪽"
-  // 질문이 자기 칸만 보고 답해진다.
-  city.segments = [];
-  const roadIndex = makeIndex(WORLD, GRID);
-  for (const road of city.roads) {
-    for (let i = 1; i < road.pts.length; i++) {
-      const a = road.pts[i - 1];
-      const b = road.pts[i];
-      const seg = { x1: a.x, y1: a.y, x2: b.x, y2: b.y, w: road.w };
-      const id = city.segments.push(seg) - 1;
-      const pad = road.w / 2 + 2;
-      insert(roadIndex, id,
-        Math.min(a.x, b.x) - pad, Math.min(a.y, b.y) - pad,
-        Math.max(a.x, b.x) + pad, Math.max(a.y, b.y) + pad);
-    }
-  }
-  city.roadIndex = roadIndex;
+  const packed = indexPolylines(city.roads, WORLD);
+  city.segments = packed.segments;
+  city.roadIndex = packed.index;
 
-  // 4) 건물. **기각 표집으로 뿌리는 것이 기본이다** — 구시가지의 길은 굽어서 블록이
-  //    사각형이 아니고, 칸에 맞춰 놓으면 굽은 길 위에 건물이 올라앉는다.
+  // 3) 건물. **기각 표집으로 뿌리는 것이 기본이다** — 구시가지의 길은 굽고 갈라져서
+  //    블록이 사각형이 아니고, 칸에 맞춰 놓으면 골목 위에 건물이 올라앉는다.
   city.buildings = [];
   const buildIndex = makeIndex(WORLD, GRID);
   const maxD = Math.hypot(cx, cy);
 
-  function place(lot, d, kindOfBlock) {
+  function place(lot, d, blockKind) {
     if (city.buildings.length >= MAX_BUILDINGS) return false;
     if (lot.w < 16 || lot.h < 16) return false;
 
     const mx = lot.x + lot.w / 2;
     const my = lot.y + lot.h / 2;
     const reach = Math.hypot(lot.w, lot.h) / 2;
+    if (wet(mx, my) || rocky(mx, my)) return false;
 
-    for (const id of query(roadIndex, mx, my, reach + 40)) {
+    for (const id of query(city.roadIndex, mx, my, reach + 40)) {
       const seg = city.segments[id];
       const need = seg.w / 2 + d.clear;
-      // 값싼 거름망을 먼저 놓는다. 중심에서 선분까지의 거리가 대각선 반쪽보다도 멀면
-      // 사각형 어느 구석도 닿을 수 없다. 이것 없이 후보마다 선분–사각형 거리를 다
-      // 재면 어려움 한 판을 만드는 데 0.4초가 넘게 든다.
+      // 값싼 거름망을 먼저 놓는다. 중심에서 선분까지의 거리가 사각형 대각선의
+      // 절반보다도 멀면 어느 구석도 닿을 수 없다. 이것 없이 후보마다 선분–사각형
+      // 거리를 다 재면 어려움 한 판을 만드는 데 0.4초가 넘게 든다.
       if (Geom.nearestOnSegment(mx, my, seg.x1, seg.y1, seg.x2, seg.y2).d > reach + need) continue;
       if (segRectDistance(seg, lot) < need) return false;
     }
@@ -281,12 +507,13 @@ function create(seed = 1, level = 1) {
       if (overlaps(lot, city.buildings[id], d.clear * 0.6)) return false;
     }
 
-    // 도심일수록 업무·상업, 외곽일수록 주거. 지금은 쓰지 않지만 시간대 수요
-    // (아침엔 주거 → 업무)를 붙일 때 생성기를 다시 짜지 않으려고 미리 넣어 둔다.
+    // 도심일수록 업무·상업, 외곽일수록 주거. 종류가 자랄 수 있는 끝을 정한다.
     const r = rng();
-    lot.kind = kindOfBlock === 'suburb'
+    lot.kind = blockKind === 'suburb'
       ? (r < 0.12 ? 'shop' : 'home')
       : (r < 0.36 ? 'office' : (r < 0.68 ? 'shop' : 'home'));
+    lot.cap = Math.max(1, CAP[lot.kind] - (blockKind === 'suburb' ? 1 : 0));
+    lot.level = rng() < START_FILL ? 1 : 0;   // 0은 아직 빈 터다
     const id = city.buildings.push(lot) - 1;
     insert(buildIndex, id, lot.x, lot.y, lot.x + lot.w, lot.y + lot.h);
     return true;
@@ -301,7 +528,6 @@ function create(seed = 1, level = 1) {
     const ey = edges(b.cuts.y, b.h);
     for (let i = 0; i + 1 < ex.length; i++) {
       for (let j = 0; j + 1 < ey.length; j++) {
-        // 칸의 가장자리가 블록의 가장자리면 그쪽은 간선도로라 더 물려야 한다.
         const left = (i === 0 ? ROAD_W.arterial : d.w) / 2 + d.clear;
         const right = (i + 2 === ex.length ? ROAD_W.arterial : d.w) / 2 + d.clear;
         const top = (j === 0 ? ROAD_W.arterial : d.w) / 2 + d.clear;
@@ -312,21 +538,19 @@ function create(seed = 1, level = 1) {
         };
         if (cell.w < 20 || cell.h < 20) continue;
 
-        // 칸이 크면 두 줄 두 칸으로 나눈다. 한 칸을 통째로 채우면 건물 하나가
-        // 블록만 해져서 지하철이 피해 갈 자리가 아예 없어진다.
+        // 칸이 크면 두 줄 두 칸으로 나눈다. 통째로 채우면 건물 하나가 블록만 해져서
+        // 지하철이 피해 갈 자리가 없어진다.
         const cols = cell.w > 104 ? 2 : 1;
         const rows = cell.h > 104 ? 2 : 1;
         const inner = 11;
-        for (let c = 0; c < cols; c++) {
-          for (let r = 0; r < rows; r++) {
-            if (rng() < 0.12) continue;   // 빈 터를 조금 남긴다
-            place({
-              x: cell.x + (cell.w / cols) * c + (c ? inner / 2 : 0),
-              y: cell.y + (cell.h / rows) * r + (r ? inner / 2 : 0),
-              w: cell.w / cols - (cols > 1 ? inner / 2 : 0),
-              h: cell.h / rows - (rows > 1 ? inner / 2 : 0),
-            }, d, b.kind);
-          }
+        for (let c = 0; c < cols; c++) for (let r = 0; r < rows; r++) {
+          if (rng() < 0.12) continue;   // 빈 터를 조금 남긴다
+          place({
+            x: cell.x + (cell.w / cols) * c + (c ? inner / 2 : 0),
+            y: cell.y + (cell.h / rows) * r + (r ? inner / 2 : 0),
+            w: cell.w / cols - (cols > 1 ? inner / 2 : 0),
+            h: cell.h / rows - (rows > 1 ? inner / 2 : 0),
+          }, d, b.kind);
         }
       }
     }
@@ -338,17 +562,13 @@ function create(seed = 1, level = 1) {
 
     // 외곽은 도시에서 멀어질수록 더 성기다. 같은 비율로 깔면 지도 끝까지 똑같이
     // 생긴 동네가 이어져 어디쯤 와 있는지 알 수가 없다.
-    const away = Math.hypot(b.x + b.w / 2 - cx, b.y + b.h / 2 - cy) / maxD;
-    const fade = b.kind === 'suburb' ? clamp(1.3 - away * 1.7, 0.16, 1) : 1;
-
-    // 목표 채수는 "블록 넓이 × 채움 비율 ÷ 한 채 넓이"다.
+    const off = Math.hypot(b.x + b.w / 2 - cx, b.y + b.h / 2 - cy) / maxD;
+    const fade = b.kind === 'suburb' ? clamp(1.3 - off * 1.7, 0.16, 1) : 1;
     const lotArea = ((d.size[0] + d.size[1]) / 2) ** 2;
     const target = Math.round(b.w * b.h * d.fill * fade * spec.density / lotArea);
 
     // **시도 횟수에 상한을 둔다.** 기각 표집은 빽빽해질수록 실패가 늘어 목표를 좇다
-    // 보면 시간이 폭발한다(어려움에서 한 판에 0.5초를 넘겼다). 상한에 걸려 목표에
-    // 못 미치는 것은 손해가 아니라 이득이다 — 빽빽한 구역일수록 덜 채워져 건물
-    // 사이에 숨 쉴 자리가 남는다.
+    // 보면 시간이 폭발한다. 상한에 걸려 목표에 못 미치는 것은 손해가 아니라 이득이다.
     let tries = Math.min(target * 6, 420);
     let placed = 0;
     while (placed < target && tries-- > 0) {
@@ -360,34 +580,23 @@ function create(seed = 1, level = 1) {
 
   city.buildIndex = buildIndex;
   city.blocks = blocks;
-
-  // 5) 역 후보는 간선끼리 만나는 자리에서 고른다. 도로 위라는 조건이 저절로
-  //    지켜지고, 건물은 길에서 물려 놓았으니 건물 위에 놓일 일도 없다.
-  const spots = [];
-  for (const x of xs) for (const y of ys) {
-    if (x < 300 || x > WORLD.w - 300 || y < 300 || y > WORLD.h - 300) continue;
-    spots.push({ x, y, k: rng() });
-  }
-  spots.sort((p, q) => p.k - q.k);
-
-  city.stations = [];
-  for (const s of spots) {
-    if (city.stations.length >= 14) break;
-    if (city.stations.every((t) => Geom.dist(s.x, s.y, t.x, t.y) > 850)) {
-      city.stations.push({ id: `s${city.stations.length}`, x: s.x, y: s.y });
-    }
-  }
-
   return city;
 }
 
+// --- 땅 가르기 ---
+
+// 다섯 갈래. 물과 산이 도로·건물보다 먼저인 것은 값이 가장 크기 때문이고, 실제로
+// 겹칠 일은 다리뿐이다 — 다리 밑은 지하철에게 그냥 강이다.
 function classify(city, x, y) {
+  if (isWater(city, x, y)) return 'water';
+  if (isHill(city, x, y)) return 'hill';
   for (const id of query(city.roadIndex, x, y)) {
     const s = city.segments[id];
     if (Geom.nearestOnSegment(x, y, s.x1, s.y1, s.x2, s.y2).d <= s.w / 2) return 'road';
   }
   for (const id of query(city.buildIndex, x, y)) {
-    if (Geom.pointInRect(x, y, city.buildings[id])) return 'building';
+    const b = city.buildings[id];
+    if (b.level > 0 && Geom.pointInRect(x, y, b)) return 'building';
   }
   return 'empty';
 }
@@ -403,9 +612,70 @@ function snapToRoad(city, x, y, radius) {
   return best;
 }
 
+// --- 역 ---
+
+const STATION_GAP = 340;   // 역끼리 이만큼은 떨어져야 한다
+
+// 왜 못 놓는지를 문장이 아니라 열쇠로 돌려준다. 이 파일이 한 언어에 묶이면 node
+// 테스트가 브라우저 전역(사전)을 부르게 된다.
+function canPlaceStation(city, x, y) {
+  if (x < 60 || y < 60 || x > city.world.w - 60 || y > city.world.h - 60) return 'outside';
+  const ground = classify(city, x, y);
+  if (ground === 'water') return 'water';
+  if (ground === 'hill') return 'hill';
+  if (ground === 'building') return 'building';
+  for (const s of city.stations) {
+    if (Geom.dist(x, y, s.x, s.y) < STATION_GAP) return 'close';
+  }
+  return null;
+}
+
+function addStation(city, x, y) {
+  const why = canPlaceStation(city, x, y);
+  if (why) return null;
+  const station = { id: `s${city.stations.length}${Math.round(x)}`, x, y };
+  city.stations.push(station);
+  return station;
+}
+
+// --- 도시가 자란다 ---
+
+// **수요를 처리한 자리가 자란다.** 지금은 수요가 없어서 "노선에 이어진 역의 도보권"을
+// 그 대리로 쓴다. 수요가 들어오면 조건만 갈아 끼우면 되고, 자라는 쪽 구조는 그대로다.
+//
+// 자란다는 것은 빈 터에 건물이 들어서거나(0 → 1) 있던 건물이 높아지는(1 → cap) 것
+// 둘 다다. 상한은 종류가 정한다 — 주거 동네는 아무리 잘해도 도심이 되지 않는다.
+function grow(city, centers, radius, budget) {
+  if (!centers.length) return [];
+  const rng = mulberry32(city.growSeed = (city.growSeed * 1664525 + 1013904223) >>> 0);
+  const near = new Set();
+  for (const c of centers) {
+    for (const id of query(city.buildIndex, c.x, c.y, radius)) {
+      const b = city.buildings[id];
+      if (b.level >= b.cap) continue;
+      if (Geom.dist(b.x + b.w / 2, b.y + b.h / 2, c.x, c.y) <= radius) near.add(id);
+    }
+  }
+  const pool = [...near];
+  const grown = [];
+  // 무작위로 고르되 뽑은 자리를 뒤에서 당겨 메운다. 셔플 한 번보다 싸고, 예산이
+  // 후보보다 적을 때 앞쪽만 자라는 쏠림이 없다.
+  for (let n = pool.length; n > 0 && grown.length < budget; n--) {
+    const pick = Math.floor(rng() * n);
+    const id = pool[pick];
+    pool[pick] = pool[n - 1];
+    city.buildings[id].level++;
+    grown.push(id);
+  }
+  // 어디가 자랐는지 화면이 짚어 줄 수 있게 자리를 돌려준다. 숫자만 알려 주면
+  // 플레이어는 자기가 무엇을 바꿨는지 보지 못한다.
+  return grown;
+}
+
 const CityGen = {
-  VIEW, WORLD, GRID, MAX_BUILDINGS, ROAD_W, DISTRICT, LEVELS,
-  create, classify, snapToRoad, districtAt, segRectDistance, mulberry32,
+  VIEW, WORLD, GRID, MAX_BUILDINGS, ROAD_W, DISTRICT, LEVELS, CAP, STATION_GAP, START_FILL,
+  create, classify, snapToRoad, districtAt, canPlaceStation, addStation, grow,
+  isWater, isSea, isHill, segRectDistance, clipPolyline, mulberry32,
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = CityGen;

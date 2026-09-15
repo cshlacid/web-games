@@ -13,6 +13,15 @@ const VIEW = City.VIEW;
 const MAX_MIDS = 3;
 const LEVEL_KEY = 'web-games.metro.level';
 
+// 돈. 수요가 아직 없어서 수입은 "자란 건물 수 × 얼마"로 대신한다. 2단계에서
+// 진짜 수요 수입으로 갈아 끼울 자리다.
+const START_BUDGET = 420;
+const STATION_COST = 14;
+const REFUND = 0.5;
+const GROW_RADIUS = 520;    // 역 하나가 키우는 범위 (도보권의 대리)
+const GROW_BUDGET = 18;     // 한 구간을 놓을 때 자라는 최대 채수
+const INCOME_PER_GROWTH = 2.5;
+
 // 손가락 판정은 화면 픽셀로 잡고 지도 좌표로 환산해 쓴다. 지도가 화면 폭에 맞춰
 // 늘어나므로 지도 좌표로 적어 두면 큰 화면에서 판정이 좁아진다.
 const GRAB_PX = 22;    // 선을 잡는 거리
@@ -30,13 +39,15 @@ const ART = {
   label: 78,
 };
 
+const GROUND = ['road', 'empty', 'building', 'hill', 'water'];
+
 const el = {};
-for (const id of ['map', 'status', 'readout', 'actions', 'spent', 'newCity', 'levels',
+for (const id of ['map', 'status', 'readout', 'actions', 'budget', 'newCity', 'levels', 'modes',
   'undo', 'cancel', 'confirm', 'help', 'helpOpen', 'helpClose', 'toggleBgm', 'toggleSfx']) {
   el[id] = document.getElementById(id.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`));
 }
 const layer = {};
-for (const name of ['roads', 'buildings', 'lines', 'draft', 'stations', 'handles']) {
+for (const name of ['water', 'hills', 'roads', 'buildings', 'grown', 'lines', 'draft', 'stations', 'handles']) {
   layer[name] = document.getElementById(`layer-${name}`);
 }
 const value = {
@@ -45,16 +56,12 @@ const value = {
   length: document.getElementById('v-length'),
   speed: document.getElementById('v-speed'),
 };
-const mix = {
-  road: document.getElementById('mix-road'),
-  empty: document.getElementById('mix-empty'),
-  building: document.getElementById('mix-building'),
-};
-const lenOut = {
-  road: document.getElementById('len-road'),
-  empty: document.getElementById('len-empty'),
-  building: document.getElementById('len-building'),
-};
+const mix = {};
+const lenOut = {};
+for (const kind of GROUND) {
+  mix[kind] = document.getElementById(`mix-${kind}`);
+  lenOut[kind] = document.getElementById(`len-${kind}`);
+}
 
 let city = null;
 let seed = Math.floor(Math.random() * 9999) + 1;
@@ -65,13 +72,15 @@ try {
 } catch { /* 저장된 값이 없거나 접근 불가: 기본값 */ }
 
 const cam = { x: 0, y: 0 };
+let mode = 'station';
+let budget = START_BUDGET;
 let built = [];
-let spent = 0;
 let first = null;   // 처음 고른 역
 let edit = null;    // { from, to, mids }
 let drag = null;
 let lastTap = { index: -1, at: 0 };
 let history = [];
+let grown = [];   // 방금 자란 자리. 다음 조작 때까지만 짚어 준다
 
 const t = (key) => SharedI18n.t(key);
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
@@ -84,17 +93,20 @@ function makeCity(nextSeed, nextLevel) {
   level = nextLevel;
   try { localStorage.setItem(LEVEL_KEY, String(level)); } catch { /* 무시 */ }
   city = City.create(seed, level);
+  budget = START_BUDGET;
+  grown = [];
   built = [];
-  spent = 0;
   first = null;
   edit = null;
   history = [];
   drag = null;
+  mode = 'station';
   setCam(city.core.x - VIEW.w / 2, city.core.y - VIEW.h / 2);
   drawCity();
-  renderLevels();
+  renderGrown();
+  renderPicks();
   renderAll();
-  setStatus('metro.pickFirst');
+  setStatus('metro.placeHint');
 }
 
 function svg(name, attrs) {
@@ -112,11 +124,31 @@ function polyD(pts) {
 }
 
 // 도시는 씨앗이 바뀔 때만 그린다. 그리고 **조각 하나에 요소 하나씩 두지 않는다** —
-// 건물이 이천 채인데 팬 한 번마다 그 전부를 다시 칠해야 한다. 같은 색·같은 굵기끼리
-// 한 `path`로 묶으면 도시 전체가 예닐곱 개로 줄어든다.
+// 건물이 천 채가 넘는데 팬 한 번마다 그 전부를 다시 칠해야 한다. 같은 색·같은
+// 굵기끼리 한 `path`로 묶으면 도시 전체가 열 몇 개로 줄어든다.
 function drawCity() {
+  clear(layer.water);
+  clear(layer.hills);
   clear(layer.roads);
-  clear(layer.buildings);
+
+  // 물은 굵은 선으로 긋는다. 강이든 바다든 폭만 다른 같은 것이라 코드가 하나다.
+  for (const body of city.water) {
+    layer.water.appendChild(svg('path', {
+      d: polyD(body.pts), fill: 'none', stroke: 'var(--water)', 'stroke-width': body.w,
+      'stroke-linecap': 'round', 'stroke-linejoin': 'round',
+    }));
+  }
+
+  // 산은 불투명한 원을 겹쳐 합집합처럼 보이게 한다. 반투명으로 두면 겹친 자리만
+  // 진해져 원 여러 개인 것이 그대로 드러난다. 안쪽에 작은 원을 한 겹 더 얹어
+  // 능선이 있는 것처럼 보이게 했다.
+  for (const pass of [{ r: 1, color: 'var(--hill)' }, { r: 0.58, color: 'var(--hill-2)' }]) {
+    const group = svg('g', { fill: pass.color });
+    for (const hill of city.hills) {
+      group.appendChild(svg('circle', { cx: hill.x, cy: hill.y, r: hill.r * pass.r }));
+    }
+    layer.hills.appendChild(group);
+  }
 
   const byWidth = new Map();
   for (const road of city.roads) {
@@ -144,12 +176,24 @@ function drawCity() {
     }
   }
 
-  const byKind = { home: [], shop: [], office: [] };
-  for (const b of city.buildings) byKind[b.kind].push(b);
-  for (const kind of ['home', 'shop', 'office']) {
+  drawBuildings();
+}
+
+// 건물은 자랄 때마다 다시 그리므로 따로 뗐다. **색은 종류가 아니라 층수가 정한다** —
+// 종류를 색으로 가르면 자란 정도가 안 보이고, 지금 화면에서 읽어야 하는 것은
+// "이 동네가 얼마나 찼는가"다. 종류는 얼마까지 자랄 수 있는지로만 드러난다.
+function drawBuildings() {
+  clear(layer.buildings);
+  const byLevel = new Map();
+  for (const b of city.buildings) {
+    if (b.level < 1) continue;   // 아직 빈 터다
+    if (!byLevel.has(b.level)) byLevel.set(b.level, []);
+    byLevel.get(b.level).push(b);
+  }
+  for (const [lv, list] of [...byLevel.entries()].sort((a, b) => a[0] - b[0])) {
     layer.buildings.appendChild(svg('path', {
-      d: byKind[kind].map((b) => `M${r1(b.x)} ${r1(b.y)}h${r1(b.w)}v${r1(b.h)}h${r1(-b.w)}z`).join(''),
-      fill: `var(--${kind})`,
+      d: list.map((b) => `M${r1(b.x)} ${r1(b.y)}h${r1(b.w)}v${r1(b.h)}h${r1(-b.w)}z`).join(''),
+      fill: `var(--lv${Math.min(lv, 4)})`,
     }));
   }
 }
@@ -200,7 +244,34 @@ function pushHistory() {
   if (history.length > 40) history.shift();
 }
 
+function connected() {
+  const set = new Set();
+  for (const line of built) { set.add(line.from); set.add(line.to); }
+  return [...set];
+}
+
 // --- 그리기 ---
+
+// 방금 자란 자리를 짚어 준다. 숫자만 알려 주면 플레이어는 자기가 무엇을 바꿨는지
+// 보지 못하고, 성장이 화면 어딘가에서 조용히 일어나는 일이 된다. 다음에 무언가를
+// 건드리면 지운다 — 시간으로 지우면 타이머를 관리해야 하는데 얻는 것이 없다.
+function renderGrown() {
+  clear(layer.grown);
+  if (!grown.length) return;
+  layer.grown.appendChild(svg('path', {
+    d: grown.map((id) => {
+      const b = city.buildings[id];
+      return `M${r1(b.x)} ${r1(b.y)}h${r1(b.w)}v${r1(b.h)}h${r1(-b.w)}z`;
+    }).join(''),
+    fill: 'none', stroke: 'var(--metro)', 'stroke-width': 9, opacity: 0.9,
+  }));
+}
+
+function clearGrown() {
+  if (!grown.length) return;
+  grown = [];
+  renderGrown();
+}
 
 function renderAll() {
   renderLines();
@@ -274,11 +345,16 @@ function renderDraft() {
     'stroke-width': ART.draft, 'stroke-linecap': 'round', 'stroke-linejoin': 'round',
   }));
 
-  // 건물 밑은 본선 위에 덮는다. 돈이 새는 자리라 가장 먼저 보여야 한다.
-  if (edit.cost.runs.length) {
+  // 비싼 땅은 본선 위에 그 땅의 색으로 덮는다. 돈이 새는 자리라 가장 먼저 보여야 한다.
+  const byKind = new Map();
+  for (const run of edit.cost.runs) {
+    if (!byKind.has(run.kind)) byKind.set(run.kind, []);
+    byKind.get(run.kind).push(run);
+  }
+  for (const [kind, list] of byKind) {
     layer.draft.appendChild(svg('path', {
-      d: edit.cost.runs.map((run) => Route.svgPath(edit.path.pts, run.from, run.to)).join(''),
-      fill: 'none', stroke: 'var(--under)', 'stroke-width': ART.draft, 'stroke-linecap': 'butt',
+      d: list.map((run) => Route.svgPath(edit.path.pts, run.from, run.to)).join(''),
+      fill: 'none', stroke: `var(--cut-${kind})`, 'stroke-width': ART.draft, 'stroke-linecap': 'butt',
     }));
   }
 
@@ -297,19 +373,31 @@ function renderDraft() {
 function renderStations() {
   clear(layer.stations);
   const active = new Set([first, edit && edit.from, edit && edit.to].filter(Boolean));
+  const live = new Set(connected());
+
+  // 역 놓기 모드에서만 자라는 범위를 보여 준다. 늘 켜 두면 원끼리 겹쳐 지도가
+  // 안 보이고, 정작 필요한 순간은 다음 역을 어디 놓을지 고를 때뿐이다.
+  if (mode === 'station') {
+    const group = svg('g', { fill: 'var(--reach)', opacity: 0.5 });
+    for (const s of city.stations) {
+      if (!inView(s, -GROW_RADIUS)) continue;
+      group.appendChild(svg('circle', { cx: s.x, cy: s.y, r: GROW_RADIUS }));
+    }
+    layer.stations.appendChild(group);
+  }
 
   for (const s of city.stations) {
     if (!inView(s, -ART.station * 2)) continue;   // 화면 밖은 그리지 않는다
     layer.stations.appendChild(svg('circle', {
-      cx: s.x, cy: s.y, r: ART.station, fill: 'var(--station-fill)',
+      cx: s.x, cy: s.y, r: ART.station,
+      fill: live.has(s) ? 'var(--metro)' : 'var(--station-fill)',
       stroke: active.has(s) ? 'var(--metro)' : 'var(--station-ring)',
       'stroke-width': active.has(s) ? ART.stationRing * 1.5 : ART.stationRing,
     }));
   }
 
   // **고른 역이 화면 밖으로 나가면 가장자리에 표시를 남긴다.** 지도가 화면보다
-  // 넓어지면서, 한 역을 고르고 팬으로 옮긴 순간 무엇을 고른 채인지 알 길이
-  // 없어졌다. 가장자리로 밀어 붙인 점 하나가 그 자리를 가리킨다.
+  // 넓어지면서, 한 역을 고르고 팬으로 옮긴 순간 무엇을 고른 채인지 알 길이 없어졌다.
   const pad = ART.station * 1.4;
   for (const s of active) {
     if (inView(s, pad)) continue;
@@ -338,20 +426,40 @@ function renderHandles() {
   }
 }
 
-function renderLevels() {
-  clear(el.levels);
-  City.LEVELS.forEach((spec, i) => {
+function picker(node, items, chosen, onPick) {
+  clear(node);
+  items.forEach((item, i) => {
     const button = document.createElement('button');
     button.className = 'pick';
     button.type = 'button';
-    button.textContent = t(`metro.${spec.id}`);
-    button.setAttribute('aria-pressed', String(i === level));
-    button.addEventListener('click', () => {
-      if (i === level) return;
-      Sound.play('select');
-      makeCity(seed + 1, i);
-    });
-    el.levels.appendChild(button);
+    button.textContent = t(item.key);
+    button.setAttribute('aria-pressed', String(item.id === chosen));
+    button.addEventListener('click', () => onPick(item.id, i));
+    node.appendChild(button);
+  });
+}
+
+function renderPicks() {
+  picker(el.levels, City.LEVELS.map((s, i) => ({ id: i, key: `metro.${s.id}` })), level, (id) => {
+    if (id === level) return;
+    Sound.play('select');
+    makeCity(seed + 1, id);
+  });
+  picker(el.modes, [
+    { id: 'station', key: 'metro.modeStation' },
+    { id: 'line', key: 'metro.modeLine' },
+  ], mode, (id) => {
+    if (id === mode) return;
+    mode = id;
+    first = null;
+    edit = null;
+    history = [];
+    Sound.play('select');
+    renderPicks();
+    renderAll();
+    setStatus(mode === 'station' ? 'metro.placeHint'
+      : city.stations.length < 2 ? 'metro.needStations' : 'metro.pickFirst',
+      mode === 'line' && city.stations.length < 2);
   });
 }
 
@@ -371,18 +479,17 @@ function clock(sec) {
 }
 
 function renderPanel() {
-  el.spent.textContent = money(spent);
+  el.budget.textContent = money(budget);
   const live = edit && edit.path.ok;
   el.readout.hidden = !edit;
   el.actions.hidden = !edit;
-  el.confirm.disabled = !live;
+  el.confirm.disabled = !live || edit.cost.cost > budget;
   el.undo.disabled = !edit || history.length === 0;
   if (!edit) return;
 
   if (!live) {
     for (const k in value) value[k].textContent = '–';
-    for (const k in mix) mix[k].style.flexGrow = '0';
-    for (const k in lenOut) lenOut[k].textContent = '–';
+    for (const kind of GROUND) { mix[kind].style.flexGrow = '0'; lenOut[kind].textContent = '–'; }
     return;
   }
 
@@ -391,17 +498,18 @@ function renderPanel() {
   value.length.textContent = metres(edit.path.length);
   // 이 노선의 발목을 잡는 속도. 최고 속도는 곧은 구간이 늘 최고속에 닿아 언제나
   // 같은 값이 나오고, 평균 속도는 길이가 늘면 같이 올라 곡선의 손해가 묻힌다.
-  // 가장 엄한 제한 하나만 플레이어가 끄는 대로 정직하게 움직인다.
   value.speed.textContent = `${Math.round(Math.min(...edit.path.nodeLim) * 3.6)}km/h`;
 
-  for (const kind of ['road', 'empty', 'building']) {
+  for (const kind of GROUND) {
     mix[kind].style.flexGrow = String(edit.cost.lengths[kind]);
     lenOut[kind].textContent = metres(edit.cost.lengths[kind]);
   }
 }
 
-function setStatus(key, warn = false) {
-  el.status.textContent = key ? t(key) : '';
+function setStatus(key, warn = false, fill = null) {
+  let text = key ? t(key) : '';
+  if (fill != null) text = text.replace('{n}', fill);
+  el.status.textContent = text;
   el.status.classList.toggle('warn', warn);
 }
 
@@ -433,6 +541,7 @@ function grabHandle(w) {
 // 것이고, 나머지는 전부 팬이다. 이 경계가 없으면 지도를 옮기려다 노선이 휘고,
 // 노선을 휘려다 지도가 밀린다.
 function onDown(event) {
+  clearGrown();
   const w = toWorld(event);
 
   if (edit) {
@@ -457,8 +566,7 @@ function onDown(event) {
     }
 
     // 선을 잡는다. 판정은 다듬어진 곡선이 아니라 찍은 점들의 꺾은선으로 한다 —
-    // 새 점을 **몇 번째 자리에 끼울지**가 그 꺾은선에서만 나온다. 둘의 차이는
-    // 모서리에서만 생기고 그나마 잡는 거리 안쪽이다.
+    // 새 점을 **몇 번째 자리에 끼울지**가 그 꺾은선에서만 나온다.
     const ctrl = [edit.from, ...edit.mids, edit.to];
     const near = Geom.nearestOnPolyline(w.x, w.y, ctrl);
     if (near.d < GRAB_PX * w.scale) {
@@ -481,13 +589,13 @@ function onDown(event) {
     }
   }
 
-  // 그 밖은 전부 팬이다. 손을 뗐을 때 거의 움직이지 않았고 역 위에서 시작했으면
-  // 두드린 것으로 본다 — 끌기와 두드림을 누르는 순간에 가르려 하면, 역을 짚고
-  // 지도를 미는 동작이 통째로 막힌다.
+  // 그 밖은 전부 팬이다. 손을 뗐을 때 거의 움직이지 않았으면 두드린 것으로 본다 —
+  // 끌기와 두드림을 누르는 순간에 가르려 하면, 무언가를 짚고 지도를 미는 동작이
+  // 통째로 막힌다.
   const station = edit ? null
     : city.stations.find((s) => Geom.dist(w.x, w.y, s.x, s.y) < HIT_PX * 1.3 * w.scale);
   drag = {
-    kind: 'pan', station, moved: 0,
+    kind: 'pan', station, moved: 0, at: { x: w.x, y: w.y },
     camX: cam.x, camY: cam.y, sx: event.clientX, sy: event.clientY,
   };
   el.map.setPointerCapture(event.pointerId);
@@ -506,10 +614,7 @@ function onMove(event) {
     return;
   }
 
-  const point = {
-    x: clamp(w.x, 0, city.world.w),
-    y: clamp(w.y, 0, city.world.h),
-  };
+  const point = { x: clamp(w.x, 0, city.world.w), y: clamp(w.y, 0, city.world.h) };
   const snap = City.snapToRoad(city, point.x, point.y, SNAP_PX * w.scale);
   if (snap) { point.x = snap.x; point.y = snap.y; point.snapped = true; }
 
@@ -530,10 +635,50 @@ function onUp(event) {
   if (el.map.hasPointerCapture(event.pointerId)) el.map.releasePointerCapture(event.pointerId);
   const done = drag;
   drag = null;
+  if (done.kind !== 'pan' || done.moved > TAP_PX) return;
 
-  if (done.kind !== 'pan' || done.moved > TAP_PX || !done.station) return;
+  if (mode === 'station') tapStation(done);
+  else tapLine(done.station);
+}
 
-  const station = done.station;
+function tapStation(done) {
+  if (done.station) {
+    // 노선이 붙은 역은 못 없앤다. 없애면 그 구간을 어떻게 할지까지 정해야 하는데,
+    // 지금 단계에서 답할 필요가 없는 질문이다.
+    if (built.some((line) => line.from === done.station || line.to === done.station)) {
+      setStatus('metro.inUse', true);
+      Sound.play('deny');
+      return;
+    }
+    city.stations.splice(city.stations.indexOf(done.station), 1);
+    budget += STATION_COST * REFUND;
+    Sound.play('erase');
+    renderAll();
+    setStatus('metro.removed');
+    return;
+  }
+
+  if (budget < STATION_COST) {
+    setStatus('metro.noMoney', true);
+    Sound.play('deny');
+    return;
+  }
+  const why = City.canPlaceStation(city, done.at.x, done.at.y);
+  if (why) {
+    setStatus(`metro.bad.${why}`, true);
+    Sound.play('deny');
+    return;
+  }
+  City.addStation(city, done.at.x, done.at.y);
+  budget -= STATION_COST;
+  Sound.play('place');
+  renderAll();
+  setStatus('metro.stationBuilt');
+}
+
+function tapLine(station) {
+  if (city.stations.length < 2) { setStatus('metro.needStations', true); return; }
+  if (!station) return;
   if (!first) {
     first = station;
     Sound.play('select');
@@ -558,15 +703,24 @@ el.map.addEventListener('pointercancel', onUp);
 // 밖에 둔 이유가 이것이다.
 
 el.confirm.addEventListener('click', () => {
-  if (!edit || !edit.path.ok) return;
-  built.push({ d: Route.svgPath(edit.path.pts), cost: edit.cost.cost, time: edit.prof.time });
-  spent += edit.cost.cost;
+  if (!edit || !edit.path.ok || edit.cost.cost > budget) return;
+  built.push({
+    d: Route.svgPath(edit.path.pts), cost: edit.cost.cost, time: edit.prof.time,
+    from: edit.from, to: edit.to,
+  });
+  budget -= edit.cost.cost;
   edit = null;
   first = null;
   history = [];
+
+  // 한 구간을 놓을 때마다 도시가 한 걸음 자란다. 지금은 확정이 곧 한 턴이다.
+  grown = City.grow(city, connected(), GROW_RADIUS, GROW_BUDGET);
+  budget += grown.length * INCOME_PER_GROWTH;
+  drawBuildings();
+  renderGrown();
   Sound.play('build');
   renderAll();
-  setStatus('metro.built');
+  setStatus(grown.length ? 'metro.grew' : 'metro.built', false, grown.length);
 });
 
 el.cancel.addEventListener('click', () => {
