@@ -4,7 +4,9 @@
 
 const R = window.IdiomsRules;
 const G = window.IdiomsGenerator;
-const W = window.IdiomsWords;
+// 성어는 언어마다 다르다. 뿌리가 한문 고전이라 겹치는 것이 많지만 칸에 들어가는
+// 글자가 그 나라의 것이라 판을 나눠 쓸 수 없다(`words.js`).
+const W = window.IdiomsWords.pick(SharedI18n.lang);
 const Sound = window.IdiomsSound;
 const t = SharedI18n.t;
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -352,7 +354,8 @@ function newGame() {
   // 가림막이 먼저 그려지도록 한 프레임 뒤로 미룬다 — 바로 만들면 화면이 멈춘 채로
   // 아무 표시가 없다.
   requestAnimationFrame(() => setTimeout(() => {
-    const puzzle = G.generate(game.size) || G.generate(game.size);
+    const words = W.WORDS;
+    const puzzle = G.generate(game.size, { words }) || G.generate(game.size, { words });
     if (!puzzle) {
       el.veil.hidden = true;
       toast(t('record.genFail'));

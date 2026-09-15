@@ -4,7 +4,8 @@
 const R = require('./rules.js');
 const S = require('./solver.js');
 const G = require('./generator.js');
-const W = require('./words.js');
+const Words = require('./words.js');
+const W = Words.pick('ko');
 
 let passed = 0;
 let failed = 0;
@@ -69,6 +70,22 @@ check('다른 씨앗은 다른 판',
 check('지원하지 않는 크기는 거절한다', (() => {
   try { G.generate(7); return false; } catch { return true; }
 })(), true);
+
+// --- 언어마다 그 나라 성어로 판이 나오는가 ---
+const byLang = {};
+for (const lang of Words.LANGS) {
+  const set = Words.pick(lang);
+  let bad = 0;
+  for (const size of G.SIZES) {
+    const puzzle = G.generate(size, { seed: 31, words: set.WORDS });
+    if (!puzzle) { bad++; continue; }
+    if (!R.wellFormed(puzzle, set.WORDS)) bad++;
+    if (S.count(puzzle, set.WORDS, { limit: 2 }).count !== 1) bad++;
+  }
+  byLang[lang] = bad;
+}
+check('네 언어 모두에서 유일해 판이 나온다', byLang,
+  Object.fromEntries(Words.LANGS.map((lang) => [lang, 0])));
 
 // --- 판마다 다른 성어가 나오는가 ---
 // 사전이 커도 생성기가 앞쪽 몇 개만 집으면 판이 늘 비슷해 보인다.

@@ -2,7 +2,8 @@
 
 // 실행: node games/idioms/rules.test.js
 const R = require('./rules.js');
-const W = require('./words.js');
+const Words = require('./words.js');
+const W = Words.pick('ko');
 
 let passed = 0;
 let failed = 0;
@@ -109,10 +110,24 @@ check('길이 끊기면 제 모양이 아니다',
   R.wellFormed({ ...PUZZLE, solution: [{ word: '일석이조', path: [0, 1, 2, 7] }] }, W.WORDS), false);
 
 // --- 사전 ---
+// 네 언어를 모두 본다. 한 언어만 보면 나중에 더한 사전에서 세 글자짜리가 섞여도
+// 테스트가 통과한다 — 이 게임은 한 성어가 네 칸이라는 데 기대어 판을 만든다.
 
-check('모두 네 글자', W.WORDS.filter((word) => word.length !== R.LENGTH), []);
-check('중복이 없다', W.WORDS.length, new Set(W.WORDS).size);
-check('뜻이 다 달려 있다', W.WORDS.filter((word) => !W.MEANING[word]), []);
+const problems = { short: 0, dup: 0, noMean: 0 };
+for (const lang of Words.LANGS) {
+  const set = Words.pick(lang);
+  problems.short += set.WORDS.filter((word) => [...word].length !== R.LENGTH).length;
+  problems.dup += set.WORDS.length - new Set(set.WORDS).size;
+  problems.noMean += set.WORDS.filter((word) => !set.MEANING[word]).length;
+}
+check('모든 언어에서 성어가 네 글자', problems.short, 0);
+check('모든 언어에서 중복이 없다', problems.dup, 0);
+check('모든 언어에서 뜻이 달려 있다', problems.noMean, 0);
+check('네 글자 성어가 없는 언어는 한국어로 간다', Words.pick('en').WORDS[0], Words.pick('ko').WORDS[0]);
+// 언어끼리 성어가 겹치지 않아야 한다는 규칙은 없지만, 글자가 달라 실제로 겹치지
+// 않는다 — 판을 나눠 쓸 수 없는 이유가 이것이다.
+check('한국어와 일본어 사전이 겹치지 않는다',
+  Words.pick('ko').WORDS.some((word) => Words.pick('ja').WORDS.includes(word)), false);
 
 console.log(`\n${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);

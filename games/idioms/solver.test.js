@@ -4,7 +4,8 @@
 const R = require('./rules.js');
 const S = require('./solver.js');
 const G = require('./generator.js');
-const W = require('./words.js');
+const Words = require('./words.js');
+const W = Words.pick('ko');
 
 let passed = 0;
 let failed = 0;

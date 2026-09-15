@@ -46,8 +46,9 @@ function shuffle(list, rng) {
   return list;
 }
 
-// 성어 count개를 격자에 겹치지 않게 눕힌다.
-function place(size, count, rng, paths) {
+// 성어 count개를 격자에 겹치지 않게 눕힌다. 쓸 사전은 부르는 쪽이 준다 — 이
+// 파일은 어느 언어의 성어인지 알 필요가 없다.
+function place(size, count, rng, paths, words) {
   const n = size * size;
   const cells = new Array(n).fill('');
   const used = new Set();
@@ -56,7 +57,7 @@ function place(size, count, rng, paths) {
   // 나아가면 끝에 가서 홀로 남아 되짚기만 길어진다. 남는 칸이 있는 판에서는
   // 첫 칸이 벽이 될 수도 있으므로 이 조임을 걸지 않는다.
   const tight = n === count * R.LENGTH;
-  const words = shuffle(W.WORDS.slice(), rng);
+  const pool = shuffle(words.slice(), rng);
   const order = shuffle(paths.slice(), rng);
   let steps = 0;
 
@@ -70,7 +71,7 @@ function place(size, count, rng, paths) {
     for (const path of order) {
       if (anchor !== -1 && !path.includes(anchor)) continue;
       if (path.some((cell) => cells[cell])) continue;
-      for (const word of words) {
+      for (const word of pool) {
         if (used.has(word)) continue;
         path.forEach((cell, i) => { cells[cell] = word[i]; });
         used.add(word);
@@ -90,13 +91,16 @@ function place(size, count, rng, paths) {
 function generate(size, options = {}) {
   if (!SIZES.includes(size)) throw new Error(`지원하지 않는 크기: ${size}`);
   const rng = options.rng || (options.seed !== undefined ? mulberry32(options.seed) : Math.random);
+  // 사전은 화면이 고른 언어의 것이다. 안 주면 한국어로 간다 — 테스트와 node에서
+  // 부를 때 언어를 매번 적지 않아도 되게 한다.
+  const words = options.words || W.pick('ko').WORDS;
   const paths = S.allPaths(size, new Set());
 
   for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
-    const laid = place(size, COUNT[size], rng, paths);
+    const laid = place(size, COUNT[size], rng, paths, words);
     if (!laid) continue;
     const puzzle = { size, cells: laid.cells, solution: laid.solution };
-    const seen = S.count(puzzle, W.WORDS, { limit: 2 });
+    const seen = S.count(puzzle, words, { limit: 2 });
     if (seen.over || seen.count !== 1) continue;
     return puzzle;
   }
