@@ -12,7 +12,58 @@ const Loot = window.HealerLoot;
 const P = window.HealerProgress;
 const Q = window.HealerQuests;
 const Items = window.HealerItems;
+
+const t = SharedI18n.t;
+
+// 로직은 사유와 기록을 { code, vars }로 돌려준다. 문장으로 엮는 것은 여기 한 곳이다.
+// data.js는 스킬 효과를 조각으로만 돌려준다. 문장으로 엮는 것은 여기다.
+function effectText(def) {
+  const e = D.skillEffect(def);
+  if (!e) return '';
+  if (e.code === 'hl.eff.aura') {
+    return t('hl.eff.aura', {
+      where: e.radius ? t('hl.eff.where', { radius: e.radius }) : '',
+      stat: t('healer.aura.' + e.stat) || e.stat,
+      mul: e.mul, duration: e.duration,
+      bleed: e.tick ? t('hl.eff.bleed', { tick: e.tick }) : '',
+    });
+  }
+  if (e.code === 'hl.eff.confuse') {
+    return t('hl.eff.confuse', {
+      where: e.radius ? t('hl.eff.confuseWhere', { radius: e.radius }) : '',
+      duration: e.duration,
+    });
+  }
+  if (e.code === 'hl.eff.damage') {
+    return e.radius ? t('hl.eff.damageArea', e) : t('hl.eff.damage', e);
+  }
+  if (e.code === 'hl.eff.heal') {
+    const vars = { ...e, cleanse: e.cleanse ? t('hl.eff.cleanse') : '' };
+    return e.radius ? t('hl.eff.healArea', vars) : t('hl.eff.heal', vars);
+  }
+  if (e.code === 'hl.eff.tick') {
+    return t('hl.eff.tick', {
+      where: e.radius ? t('hl.eff.tickWhere', { radius: e.radius }) : '',
+      tick: e.tick, duration: e.duration, total: e.total,
+      kind: t(e.harm ? 'hl.wordDamage' : 'hl.wordHeal'),
+    });
+  }
+  return t(e.code, e);
+}
+
+const msg = (v) => {
+  if (!v || typeof v !== 'object' || !v.code) return v;
+  // 조각이 또 열쇠인 자리가 있다(퀘스트 이름) — 값이 'hl.' 꼴이면 한 번 더 푼다.
+  const vars = {};
+  for (const [key, value] of Object.entries(v.vars || {})) {
+    vars[key] = typeof value === 'string' && /^(hl|healer)\./.test(value) ? t(value) : value;
+  }
+  return t(v.code, vars);
+};
+
 const Roster = window.HealerRoster;
+const Rep = window.HealerRep;
+const Hire = window.HealerHire;
 const Shop = window.HealerShop;
 const Sprites = window.HealerSprites;
 const Icons = window.HealerIcons;
@@ -20,6 +71,10 @@ const Scenes = window.HealerScenes;
 const sound = window.HealerSound;
 
 const $ = (id) => document.getElementById(id);
+// **화면에 나오는 숫자는 전부 여기를 거친다**(천 단위 쉼표). 규칙은 `data.js`에
+// 있다 — 아이템 옵션 글자(`STATS`의 `fmt`)와 전투가 내보내는 글자도 같은 것을
+// 쓰므로, 화면마다 다른 모양의 숫자가 생기지 않는다.
+const num = D.num;
 const el = (tag, cls) => {
   const node = document.createElement(tag);
   if (cls) node.className = cls;
@@ -41,13 +96,26 @@ const icon = (name, cls) => {
 const app = {
   screen: 'home',
   tab: 'quest',
+  // 캐릭터 화면 안의 갈래. 저장본에 남기지 않는다 — 어디를 보고 있었는지는
+  // 다음에 켰을 때 이어 갈 것이 아니다.
+  charPage: 'stats',
   progress: P.load(),
   quests: [],
   quest: null,
   candidates: [],
   party: [],
   skills: [],
-  lootMethod: 'even',
+  lootMethod: Loot.DEFAULT,
+  // 이번 편성의 계약. 후보 전원에 대해 한 번에 내고(이름 → 계약), 데려간
+  // 동료의 것만 전투 뒤 정산에 쓴다. 전투가 시작할 때 굳는다 — 결과 화면에서
+  // 다시 계산하면 부른 값과 준 값이 갈린다.
+  wages: new Map(),
+  // 부른 값에 얹어 주기로 한 몫(이름 → 골드). 기획서 14장의 만족도가 여기서 온다.
+  tips: {},
+  // 마지막으로 재련한 결과 한 줄. 저장본에 남기지 않는다 — 다음에 켰을 때 이어
+  // 볼 것이 아니고, 화면이 다시 그려지는 동안만 필요하다.
+  reforged: '',
+  contracts: [],
   battle: null,
   aiming: null,
   paused: false,
@@ -65,10 +133,10 @@ function persist() {
 // --- 화면 전환 ---------------------------------------------------------
 
 const SCREENS = {
-  home: { node: 'screen-home', name: '모험가 길드', note: '', back: null, tabs: true },
-  party: { node: 'screen-party', name: '편성', note: '파티와 스킬을 정한다', back: 'home' },
-  battle: { node: 'screen-battle', name: '전투', note: '', back: null },
-  result: { node: 'screen-result', name: '결과', note: '', back: null },
+  home: { node: 'screen-home', name: t('hl.step.guild'), note: '', back: null, tabs: true },
+  party: { node: 'screen-party', name: t('hl.step.party'), note: t('hl.step.partyNote'), back: 'home' },
+  battle: { node: 'screen-battle', name: t('hl.step.battle'), note: '', back: null },
+  result: { node: 'screen-result', name: t('hl.step.result'), note: '', back: null },
 };
 
 function show(name, note) {
@@ -91,6 +159,32 @@ $('step-back').addEventListener('click', () => {
   openHome();
 });
 
+// 캐릭터 화면의 갈래 고르기. **점수가 남아 있으면 그 갈래에 표시를 단다** —
+// 갈래로 나누면서 생긴 값이 "다른 화면에 있는 것을 못 본다"라, 레벨이 올랐는데
+// 점수를 안 쓰고 지나가는 일이 그대로 늘어난다.
+function openCharPage(page) {
+  if (page) app.charPage = page;
+  const left = {
+    stats: P.freePoints(app.progress),
+    skill: P.freeSkillPoints(app.progress),
+    gear: 0,
+  };
+  for (const button of $('char-tabs').children) {
+    const name = button.dataset.page;
+    button.setAttribute('aria-pressed', String(name === app.charPage));
+    button.classList.toggle('has-point', left[name] > 0);
+    $(`char-page-${name}`).hidden = name !== app.charPage;
+  }
+}
+
+for (const button of $('char-tabs').children) {
+  button.addEventListener('click', () => {
+    sound.play('click');
+    openCharPage(button.dataset.page);
+    window.scrollTo(0, 0);
+  });
+}
+
 function openHome(tab) {
   if (tab) app.tab = tab;
   $('tab-quest').hidden = app.tab !== 'quest';
@@ -104,9 +198,9 @@ function openHome(tab) {
   else renderCharacter();
 
   const notes = {
-    quest: '의뢰 게시판',
-    character: `캐릭터 Lv ${app.progress.charLevel}`,
-    shop: `${app.progress.gold} 골드`,
+    quest: t('hl.board'),
+    character: t('hl.charLv', { n: app.progress.charLevel }),
+    shop: t('hl.gold', { n: num(app.progress.gold) }),
   };
   show('home', notes[app.tab]);
 }
@@ -127,7 +221,36 @@ for (const slot of document.querySelectorAll('[data-icon]')) {
 // --- 퀘스트 게시판 -----------------------------------------------------
 
 function refreshQuests() {
-  app.quests = Q.generate(app.progress.charLevel, app.progress.questSeed);
+  // **게시판의 상한을 평판이 정한다.** 무명인 힐러에게 길드가 영웅급 의뢰를
+  // 내주지 않는다는 것이 기획서의 뜻이고, 이 게임에서 "상위 콘텐츠"라고 부를 수
+  // 있는 것은 의뢰의 난이도뿐이다.
+  app.quests = Q.generate(app.progress.charLevel, app.progress.questSeed,
+    Rep.questGap(Rep.repValue(app.progress)));
+}
+
+// 평판 한 줄. **막대까지 그리는 것은** 숫자만 두면 지금이 어디쯤인지가 단계
+// 표를 외운 사람에게만 보이기 때문이다. 다음 단계에서 무엇이 열리는지도 함께
+// 적는다 — 평판을 올릴 이유가 화면에 없으면 그냥 지나가는 숫자가 된다.
+function renderRep(box, rep) {
+  box.textContent = '';
+  const at = Rep.repProgress(rep);
+
+  const head = el('div', 'rep-head');
+  head.append(icon('crest'));
+  head.append(text('b', null, at.stage.name));
+  head.append(text('span', 'why', `${rep}`));
+  box.append(head);
+
+  const bar = el('div', 'rep-bar');
+  const fill = el('span');
+  // 마지막 단계에는 다음이 없다. 나눌 것이 없으므로 가득 채운다.
+  fill.style.width = `${at.need ? Math.round((at.have / at.need) * 100) : 100}%`;
+  bar.append(fill);
+  box.append(bar);
+
+  box.append(text('p', 'rep-note', at.next
+    ? t('hl.repNext', { name: at.next.name, n: at.need - at.have, gap: at.stage.questGap })
+    : t('hl.repMax', { gap: at.stage.questGap })));
 }
 
 function enemyCounts(quest) {
@@ -142,14 +265,15 @@ function enemyCounts(quest) {
 // 머리로 빼야 한다.
 function difficultyOf(quest) {
   const gap = quest.level - app.progress.charLevel;
-  if (gap <= -2) return { cls: 'easy', label: '쉬움' };
-  if (gap <= 1) return { cls: 'fair', label: '알맞음' };
-  if (gap <= 3) return { cls: 'hard', label: '벅참' };
-  return { cls: 'deadly', label: '위험' };
+  if (gap <= -2) return { cls: 'easy', label: t('hl.feel.easy') };
+  if (gap <= 1) return { cls: 'fair', label: t('hl.feel.fit') };
+  if (gap <= 3) return { cls: 'hard', label: t('hl.feel.hard') };
+  return { cls: 'deadly', label: t('hl.feel.deadly') };
 }
 
 function renderQuests() {
   if (!app.quests.length) refreshQuests();
+  renderRep($('rep'), Rep.repValue(app.progress));
   const list = $('quests');
   list.textContent = '';
 
@@ -159,19 +283,22 @@ function renderQuests() {
     button.type = 'button';
 
     const title = el('div', 'quest-title');
-    title.append(text('b', null, quest.name));
+    title.append(text('b', null, msg(quest.name)));
     title.append(text('span', `level ${mood.cls}`, `Lv ${quest.level} · ${mood.label}`));
     button.append(title);
 
-    button.append(text('p', 'quest-desc', quest.desc));
+    button.append(text('p', 'quest-desc', msg(quest.desc)));
 
     const meta = el('div', 'quest-meta');
-    meta.append(text('span', 'tag place', Scenes.SCENES[quest.scene].name));
+    meta.append(text('span', 'tag place', t('hl.scene.' + quest.scene)));
     for (const label of enemyCounts(quest)) meta.append(text('span', 'tag', label));
-    meta.append(text('span', 'tag gold', `${quest.guildReward.gold} 골드 · ${quest.guildReward.exp} exp`));
+    // **적힌 골드는 파티가 나눌 몫이다.** 그냥 숫자만 두면 그만큼이 지갑에
+    // 들어오는 것으로 읽힌다.
+    meta.append(text('span', 'tag gold',
+      t('hl.questReward', { gold: num(quest.guildReward.gold), exp: num(quest.guildReward.exp) })));
     // 전리품 목록은 미리 알 수 없다 — 쓰러뜨린 적에게서 굴려진다. 게시판이
     // 말할 수 있는 것은 어떤 적이 나오는가까지다.
-    meta.append(text('span', `tag rank-${quest.rank}`, `${D.RANKS[quest.rank].name} 출현`));
+    meta.append(text('span', `tag rank-${quest.rank}`, t('hl.rankAppears', { rank: D.RANKS[quest.rank].name })));
     button.append(meta);
 
     button.addEventListener('click', () => {
@@ -204,7 +331,7 @@ function levelRow(label, level, exp, toNext) {
   fill.style.width = `${toNext ? Math.min(100, (exp / toNext) * 100) : 100}%`;
   bar.append(fill);
   row.append(bar);
-  row.append(text('small', null, toNext ? `${exp} / ${toNext}` : '최대'));
+  row.append(text('small', null, toNext ? `${num(exp)} / ${num(toNext)}` : t('hl.max')));
   return row;
 }
 
@@ -214,16 +341,16 @@ function levelRow(label, level, exp, toNext) {
 // **회복력과 마법 공격력은 둘 다 지능에서 나오고 계수가 다르다**(회복 쪽이
 // 가파르다). 한 줄로 적으면 그 차이가 보이지 않는다.
 const STAT_LABELS = {
-  hp: '최대 체력',
-  mp: '최대 마나',
+  hp: t('hl.statHp'),
+  mp: t('hl.statMp'),
   // 주인공도 마나가 떨어지면 기본 공격을 한다. 쓰지 않는 수치가 아니므로 적는다.
-  atk: '물리 공격력 (힘)',
-  spell: '마법 공격력 (지능)',
-  heal: '회복력 (지능)',
-  crit: '치명타 확률',
-  critDamage: '치명타 피해',
-  dodge: '회피',
-  armor: '받는 피해',
+  atk: t('hl.statPhys'),
+  spell: t('hl.statMagic'),
+  heal: t('hl.statHeal'),
+  crit: t('hl.statCrit'),
+  critDamage: t('hl.statCritDmg'),
+  dodge: t('hl.statDodge'),
+  armor: t('hl.statArmor'),
 };
 
 function statText(key, value) {
@@ -231,7 +358,7 @@ function statText(key, value) {
     return `×${value.toFixed(2)}`;
   }
   if (key === 'dodge' || key === 'crit') return `${(value * 100).toFixed(1)}%`;
-  return String(Math.round(value));
+  return num(Math.round(value));
 }
 
 // 능력치 한 줄. 남은 점수가 있으면 오른쪽에 넣는 단추가 붙는다.
@@ -242,7 +369,7 @@ function renderAttrs() {
   // 벗으면 얼마가 빠지는지도 알 수 없다.
   const gear = P.gearAttrs(progress);
   const left = P.freePoints(progress);
-  $('attr-points').textContent = left ? `남은 점수 ${left}` : '남은 점수 없음';
+  $('attr-points').textContent = left ? `남은 점수 ${left}` : t('hl.noPoints');
 
   const list = $('char-attrs');
   list.textContent = '';
@@ -254,19 +381,19 @@ function renderAttrs() {
     // 자동으로 오른 몫과 내가 넣은 몫을 나눠 보여 준다. 합쳐서 보여 주면
     // 점수를 어디에 넣었는지 알 수 없다.
     const put = progress.spent[attr.id] || 0;
-    if (put) name.append(text('span', 'job', `투자 +${put}`));
+    if (put) name.append(text('span', 'job', t('hl.invested', { n: num(put) })));
     const worn = Math.round(gear[attr.id] || 0);
-    if (worn) name.append(text('span', 'job gear', `장비 +${worn}`));
+    if (worn) name.append(text('span', 'job gear', t('hl.fromGear', { n: num(worn) })));
     body.append(name);
     body.append(text('div', 'pick-sub', attr.effect));
     row.append(body);
-    row.append(text('b', 'attr-value', String(own[attr.id] + worn)));
+    row.append(text('b', 'attr-value', num(own[attr.id] + worn)));
 
     const add = el('button', 'attr-add');
     add.type = 'button';
     add.textContent = '＋';
     add.disabled = left <= 0;
-    add.setAttribute('aria-label', `${attr.name} 올리기`);
+    add.setAttribute('aria-label', t('hl.raiseAttr', { name: attr.name }));
     add.addEventListener('click', () => {
       const spent = P.spendPoint(progress, attr.id);
       sound.play(spent.ok ? 'click' : 'deny');
@@ -289,11 +416,11 @@ function renderCharacter() {
   jobSlot.textContent = '';
   jobSlot.append(jobTag('healer', job.spec, D.HERO.race));
 
-  $('char-gold').textContent = `${progress.gold} 골드`;
+  $('char-gold').textContent = t('hl.gold', { n: num(progress.gold) });
 
   const levels = $('char-levels');
   levels.textContent = '';
-  levels.append(levelRow('캐릭터', progress.charLevel, progress.charExp,
+  levels.append(levelRow(t('hl.charTab'), progress.charLevel, progress.charExp,
     max ? 0 : D.LEVEL.charExpTo(progress.charLevel)));
   // 직업 레벨은 계열마다 따로 쌓이고 상한도 계열이 정한다. 이름을 '힐러'로
   // 두면 계열을 바꿔도 같은 줄로 보인다.
@@ -304,6 +431,13 @@ function renderCharacter() {
 
   const statList = $('char-stats');
   statList.textContent = '';
+  // **전투력이 맨 위다.** 아래 아홉 줄을 머리로 접은 값이라, 아래에 두면 다 읽고
+  // 나서야 나온다. 역할 안에서 읽는 값이므로 역할 이름을 옆에 적는다 — 그것이
+  // 없으면 동료의 숫자와 그냥 견주게 된다.
+  const powerRow = el('li', 'power-row');
+  powerRow.append(text('span', null, t('hl.power', { role: D.JOBS[D.HERO.job].name })));
+  powerRow.append(text('b', 'stat-value', num(P.power(progress))));
+  statList.append(powerRow);
   for (const [key, label] of Object.entries(STAT_LABELS)) {
     const row = el('li');
     row.append(text('span', null, label));
@@ -324,7 +458,7 @@ function renderCharacter() {
       button.append(itemName(item, 'item-name'));
       button.append(text('span', 'why', Items.summary(item)));
     } else {
-      button.append(text('span', 'item-name empty', '비어 있음'));
+      button.append(text('span', 'item-name empty', t('hl.empty')));
     }
     button.addEventListener('click', () => {
       sound.play('click');
@@ -362,14 +496,14 @@ function renderCharacter() {
     // 레벨을 이름 옆에 적는다. 효과 줄에만 두면 어느 스킬에 점수를 넣었는지
     // 목록을 훑어서는 알 수 없다. **아직 안 배운 것은 레벨이 아니라 그렇게 적는다.**
     if (known) name.append(text('span', 'job', `Lv ${level} / ${D.SKILL.max}`));
-    else if (isOpen) name.append(text('span', 'job', '안 배움'));
+    else if (isOpen) name.append(text('span', 'job', t('hl.notLearned')));
     body.append(name);
     body.append(text('div', 'pick-sub',
-      isOpen ? base.desc : `${job.name} Lv ${base.unlock}에 배울 수 있다`));
+      isOpen ? base.desc : t('hl.unlockAt', { job: job.name, n: base.unlock })));
     if (isOpen) {
       // 지금 레벨에서 실제로 얼마를 하는지. 정의에 적힌 문장만으로는 점수를
       // 넣은 것이 화면에 보이지 않는다.
-      body.append(text('div', 'pick-sub', `${D.skillEffect(def)} · 마나 ${def.mp || 0}`));
+      body.append(text('div', 'pick-sub', t('hl.effectMana', { effect: effectText(def), mp: def.mp || 0 })));
       // 시전 시간과 사거리는 등록 화면에서 고르는 근거다. 캐스팅 스킬은 외우는
       // 동안 아무것도 못 하고 움직이면 취소되므로, 회복량만 보고 고르면 안 된다.
       body.append(text('div', 'pick-sub dim', castLine(base)));
@@ -381,9 +515,9 @@ function renderCharacter() {
       // 누르는 것이 무슨 일인지 알 수 없어, 아직 안 배운 스킬에는 이름을 적는다.
       const add = el('button', known ? 'attr-add' : 'attr-add learn');
       add.type = 'button';
-      add.textContent = known ? '＋' : '배우기';
+      add.textContent = known ? '＋' : t('hl.learn');
       add.disabled = points <= 0 || level >= D.SKILL.max;
-      add.setAttribute('aria-label', known ? `${base.name} 레벨 올리기` : `${base.name} 배우기`);
+      add.setAttribute('aria-label', known ? t('hl.raiseSkill', { name: base.name }) : t('hl.learnSkill', { name: base.name }));
       add.addEventListener('click', () => {
         const spent = known ? P.raiseSkill(progress, base.id) : P.learnSkill(progress, base.id);
         sound.play(spent.ok ? 'click' : 'deny');
@@ -411,13 +545,17 @@ function renderCharacter() {
     name.append(text('span', 'job', D.heroJob(base.job).name));
     name.append(text('span', 'job', `Lv ${P.skillLevel(progress, base.id)}`));
     body.append(name);
-    body.append(text('div', 'pick-sub', D.skillEffect(P.skillDef(progress, base.id))));
+    body.append(text('div', 'pick-sub', effectText(P.skillDef(progress, base.id))));
     row.append(body);
     kept.append(row);
   }
 
-  $('skill-points').textContent = points ? `남은 점수 ${points}` : '남은 점수 없음';
+  $('skill-points').textContent = points ? `남은 점수 ${points}` : t('hl.noPoints');
   $('skill-open').textContent = `${P.learnedSkills(progress).length} / ${D.heroSkillsOf(progress.job).length}`;
+
+  // 갈래와 그 위의 점수 표시는 화면을 다시 그릴 때마다 함께 맞춘다. 점수를 쓰는
+  // 단추가 전부 renderCharacter를 다시 부르므로 여기 한 곳이면 된다.
+  openCharPage();
 }
 
 
@@ -448,7 +586,7 @@ function renderJobs() {
     button.append(head);
     button.append(text('div', 'pick-sub', job.desc));
     button.append(text('div', 'pick-sub dim',
-      now ? '지금 맡고 있다' : can.ok ? '전직할 수 있다' : can.reason));
+      now ? t('hl.nowJob') : can.ok ? t('hl.canChange') : msg(can.reason)));
 
     button.addEventListener('click', () => {
       const moved = P.changeJob(progress, job.id);
@@ -466,8 +604,8 @@ function renderJobs() {
 // 스킬 하나의 시전 시간과 사거리. 아군·적 스킬과 주인공 스킬이 같은 형태로
 // 적혀 있어 한 함수로 쓴다.
 function castLine(def) {
-  const cast = def.cast ? `시전 ${def.cast}초` : '즉시 시전';
-  return def.range ? `${cast} · 사거리 ${def.range}` : cast;
+  const cast = def.cast ? `시전 ${def.cast}초` : t('hl.instant');
+  return def.range ? t('hl.castRange', { cast, range: def.range }) : cast;
 }
 
 // 지금 낀 것과 견준 차이. 이걸 보여 주지 않으면 갈아 끼울지 말지를 매번 머리로
@@ -476,14 +614,23 @@ function castLine(def) {
 // 피해가 늘어난 것처럼 읽혔다. 부호를 그대로 적는 편이 모든 스탯에서 헷갈리지
 // 않는다 — 받는 피해가 −3%인 것은 그 자체로 좋다는 뜻이다.
 function diffSummary(compare) {
-  if (!compare.current) return '빈 슬롯';
+  if (!compare.current) return t('hl.emptySlot');
   const parts = Object.entries(compare.diff).map(([key, value]) => {
     const size = key === 'hp' || key === 'mp'
-      ? Math.round(Math.abs(value))
-      : `${Math.round(Math.abs(value) * 100)}%`;
+      ? num(Math.round(Math.abs(value)))
+      : `${num(Math.round(Math.abs(value) * 100))}%`;
     return `${D.STATS[key].name} ${value > 0 ? '+' : '−'}${size}`;
   });
-  return parts.length ? `지금 낀 것과 ${parts.join(' · ')}` : '지금 낀 것과 차이 없음';
+  return parts.length ? `지금 낀 것과 ${parts.join(' · ')}` : t('hl.noDiff');
+}
+
+// **전투력 증감이 옵션 줄의 결론이다.** "최대 체력 +33 · 회피 +2%"가 나은 것인지
+// 매번 머리로 계산해야 했는데, 그 계산이 곧 전투력이다. 옵션 줄을 없애지 않는
+// 것은 왜 그렇게 되는지가 거기 있기 때문이다.
+function powerSummary(compare) {
+  const d = compare.powerDiff;
+  if (!d) return null;
+  return t('hl.powerDelta', { sign: d > 0 ? '+' : '−', n: num(Math.abs(d)) });
 }
 
 // 인벤토리·상점·결과 화면이 같은 줄 모양을 쓴다. action은 오른쪽에 붙는 글자와
@@ -504,6 +651,8 @@ function itemButton(item, action) {
   body.append(text('div', 'pick-sub', Items.summary(item)));
   // 지금 낀 것과의 차이. 이걸 보여 주지 않으면 갈아 끼울지를 매번 머리로
   // 계산해야 하고, 결국 아무도 계산하지 않는다.
+  const power = powerSummary(compare);
+  if (power) body.append(text('div', `pick-sub power-diff ${compare.powerDiff > 0 ? 'up' : 'down'}`, power));
   body.append(text('div', 'pick-sub diff', diffSummary(compare)));
   button.append(body);
 
@@ -532,14 +681,14 @@ function renderInventory() {
   $('inv-count').textContent = String(app.progress.inventory.length);
 
   if (!app.progress.inventory.length) {
-    list.append(text('li', 'empty-note', '아직 없다. 의뢰를 받아 오면 쌓인다.'));
+    list.append(text('li', 'empty-note', t('hl.bagEmpty')));
     return;
   }
 
   for (const item of app.progress.inventory) {
     const row = el('li');
     row.append(itemButton(item, {
-      label: '장착',
+      label: t('hl.equip'),
       run: () => {
         sound.play('click');
         P.equip(app.progress, item.uid);
@@ -567,8 +716,8 @@ function shopStock() {
 function renderShop() {
   const progress = app.progress;
   const stock = shopStock();
-  $('shop-gold').textContent = `${progress.gold} 골드`;
-  $('shop-refresh').textContent = `진열대 바꾸기 · ${stock.refreshCost} 골드`;
+  $('shop-gold').textContent = t('hl.gold', { n: num(progress.gold) });
+  $('shop-refresh').textContent = t('hl.refreshStock', { n: num(stock.refreshCost) });
   $('shop-refresh').disabled = progress.gold < stock.refreshCost;
 
   const potions = $('shop-potions');
@@ -588,10 +737,12 @@ function renderShop() {
     name.append(text('span', 'job', `${held} / ${D.POTION_MAX}`));
     body.append(name);
     body.append(text('div', 'pick-sub',
-      `최대 ${D.STATS[potion.restore === 'hp' ? 'hp' : 'mp'].name}의 ${Math.round(potion.ratio * 100)}% 회복`
-      + ` · 쿨 ${potion.cd}초`));
+      t('hl.potionRestore', {
+        stat: D.STATS[potion.restore === 'hp' ? 'hp' : 'mp'].name,
+        pct: Math.round(potion.ratio * 100),
+      }) + t('hl.potionCd', { n: potion.cd })));
     button.append(body);
-    button.append(text('span', 'pick-cost', full ? '가득' : `${entry.price} 골드`));
+    button.append(text('span', 'pick-cost', full ? t('hl.full') : t('hl.priceGold', { n: num(entry.price) })));
     button.addEventListener('click', () => {
       const bought = P.buyPotion(progress, entry.id);
       sound.play(bought.ok ? 'click' : 'deny');
@@ -605,13 +756,13 @@ function renderShop() {
   const gear = $('shop-gear');
   gear.textContent = '';
   if (!stock.gear.length) {
-    gear.append(text('li', 'empty-note', '진열대를 비웠다. 의뢰를 깨면 새로 채워진다.'));
+    gear.append(text('li', 'empty-note', t('hl.stockEmpty')));
   }
   for (const item of stock.gear) {
     const price = Items.price(item);
     const row = el('li');
     const button = itemButton(item, {
-      label: `${price} 골드`,
+      label: t('hl.priceGold', { n: num(price) }),
       run: () => {
         const bought = P.buyGear(progress, item);
         sound.play(bought.ok ? 'click' : 'deny');
@@ -628,16 +779,52 @@ function renderShop() {
     gear.append(row);
   }
 
+  // **재련은 가진 물건 전부에 걸린다** — 장착 중인 것까지. 지금 끼고 있는 것을
+  // 손보는 것이 이 자리를 쓰는 첫 번째 이유라, 팔기처럼 인벤토리만 세우면
+  // 정작 굴리고 싶은 물건이 목록에 없다.
+  const owned = P.equippedItems(progress).concat(progress.inventory)
+    .filter((item) => Items.isGear(item));
+  const reforgeList = $('shop-reforge');
+  reforgeList.textContent = '';
+  // 무엇이 바뀌었는지 적는다. 목록만 다시 그리면 굴린 것이 어느 물건이었는지
+  // 눈으로 좇아야 한다. **전투 화면의 로그(`note`)는 여기서 보이지 않는다.**
+  const rolledNote = $('reforge-note');
+  rolledNote.textContent = app.reforged || '';
+  rolledNote.hidden = !app.reforged;
+  $('reforge-count').textContent = String(owned.length);
+  if (!owned.length) {
+    reforgeList.append(text('li', 'empty-note', t('hl.noReforge')));
+  }
+  for (const item of owned) {
+    const cost = Items.reforgePrice(item);
+    const row = el('li');
+    const button = itemButton(item, {
+      label: t('hl.reforgeFor', { n: num(cost) }),
+      run: () => {
+        const before = Items.summary(item);
+        const rolled = P.reforge(progress, item.uid);
+        sound.play(rolled.ok ? 'click' : 'deny');
+        if (!rolled.ok) return;
+        app.reforged = `${Items.name(item)} · ${before} → ${Items.summary(item)}`;
+        persist();
+        renderShop();
+      },
+    });
+    button.disabled = progress.gold < cost;
+    row.append(button);
+    reforgeList.append(row);
+  }
+
   const sellList = $('shop-sell');
   sellList.textContent = '';
   $('sell-count').textContent = String(progress.inventory.length);
   if (!progress.inventory.length) {
-    sellList.append(text('li', 'empty-note', '팔 물건이 없다.'));
+    sellList.append(text('li', 'empty-note', t('hl.noSell')));
   }
   for (const item of progress.inventory) {
     const row = el('li');
     row.append(itemButton(item, {
-      label: `${Items.sellPrice(item)} 골드에 팔기`,
+      label: t('hl.sellFor', { n: num(Items.sellPrice(item)) }),
       run: () => {
         sound.play('click');
         P.sell(progress, item.uid);
@@ -702,12 +889,7 @@ function setFrame(wrap, col, row) {
 // crop은 칸의 어디를 보여 줄지다. 전투 초상화는 머리만('head'), 편성 화면은
 // 서 있기 그림에 맞춰 좁힌 전신('list')이다.
 function avatar(kind, crop) {
-  if (Sprites.sheet(kind)) {
-    return sheetBody(kind, 'avatar', crop || 'list');
-  }
-  const wrap = el('span', 'avatar');
-  wrap.innerHTML = Sprites.svg(kind);
-  return wrap;
+  return sheetBody(kind, 'avatar', crop || 'list');
 }
 
 // 역할과 계열을 함께 적는다. 역할만 적으면 궁수와 마법사가 같은 줄로 보이고,
@@ -723,7 +905,7 @@ function itemName(item, cls) {
 
 function jobTag(job, spec, race) {
   const parts = [D.JOBS[job].name];
-  if (spec) parts.push(D.SPECS[spec]);
+  if (spec) parts.push(t('healer.spec.' + spec));
   // 종족은 능력치와 물약 사용 여부를 함께 정하므로 편성할 때 보여야 한다.
   if (race) parts.push(D.RACES[race].name);
   // 계열마다 색이 다르다. 역할 색만으로는 궁수와 마법사가 같은 줄로 보인다.
@@ -739,7 +921,7 @@ function jobTag(job, spec, race) {
 // 철벽의 스킬을 쓴다.
 function specTag(member) {
   const spec = Roster.specOf(member);
-  return text('span', `job ${Roster.jobOf(member)} spec-${spec}`, D.SPECS[spec]);
+  return text('span', `job ${Roster.jobOf(member)} spec-${spec}`, t('healer.spec.' + spec));
 }
 
 function renderBrief() {
@@ -747,22 +929,93 @@ function renderBrief() {
   const brief = $('quest-brief');
   brief.textContent = '';
   const head = el('div', 'panel-head');
-  head.append(text('h2', null, quest.name));
+  head.append(text('h2', null, msg(quest.name)));
   head.append(text('span', `count level ${difficultyOf(quest).cls}`, `Lv ${quest.level}`));
   brief.append(head);
   brief.append(text('p', 'panel-note',
-    `${Scenes.SCENES[quest.scene].name} · ${quest.waves.length}개 무리 · `
-    + `완료 시 ${quest.guildReward.gold} 골드와 ${quest.guildReward.exp} exp`));
+    t('hl.questLine', { scene: t('hl.scene.' + quest.scene), n: quest.waves.length })
+    + t('hl.questPayout', { exp: num(quest.guildReward.exp), gold: num(quest.guildReward.gold) })));
   const meta = el('div', 'quest-meta');
   for (const label of enemyCounts(quest)) meta.append(text('span', 'tag', label));
   brief.append(meta);
 }
 
+// --- 보수와 계약 ----------------------------------------------------------
+
+// 후보 전원의 계약을 한 번에 낸다. **하나씩 부르지 않는 것은** 분배 방식을
+// 바꿨을 때 일부만 갱신되는 일을 막기 위해서다 — 방식이 보수를 흔든다.
+function refreshWages() {
+  const ctx = { rep: Rep.repValue(app.progress), method: app.lootMethod };
+  app.wages = new Map(Hire.contractsFor(app.candidates, app.quest, ctx)
+    .map((contract) => [contract.name, contract]));
+  // 응하지 않는 동료는 파티에서 빠진다. 방식을 바꾸다 거부로 넘어가는 일은
+  // 없지만, 명부가 자라며 신뢰도가 바뀐 뒤 같은 화면을 다시 열 수 있다.
+  app.party = app.party.filter((member) => (app.wages.get(member.name) || {}).ok);
+}
+
+const wageOf = (member) => app.wages.get(member.name) || null;
+
+// 데려간 동료의 계약만. 정산과 합계가 같은 목록을 봐야 화면의 숫자와 지갑이 맞다.
+const partyContracts = () => app.party.map((member) => wageOf(member)).filter(Boolean);
+
+const tipFor = (name) => Math.max(0, Math.round(app.tips[name] || 0));
+
+// 얹어 주는 단위. 부른 값의 비율로 두는 것은, 고정 금액이면 초반에는 큰돈이고
+// 후반에는 있으나 마나가 되기 때문이다.
+const TIP_STEP = 0.1;
+
+function renderDeal() {
+  const list = $('deal');
+  list.textContent = '';
+  const contracts = partyContracts();
+  const tips = {};
+  for (const contract of contracts) tips[contract.name] = tipFor(contract.name);
+  const deal = Hire.settle(app.quest, contracts, true, tips);
+
+  for (const row of deal.paid) {
+    const line = el('li');
+    line.append(text('span', 'rname', row.name));
+    const value = text('b', 'stat-value', num(row.gold));
+    // 얹어 준 몫은 따로 적는다. 합쳐 두면 부른 값이 얼마였는지 사라진다.
+    if (row.tip) value.append(text('small', 'why', ` +${num(row.tip)}`));
+    line.append(value);
+    list.append(line);
+  }
+  if (!contracts.length) {
+    const none = el('li');
+    none.append(text('span', 'rname', t('hl.alone')));
+    none.append(text('b', 'stat-value', '0'));
+    list.append(none);
+  }
+
+  // **주인공 몫은 음수가 될 수 있다**(기획서 확정). 그때는 제 돈을 보태는 것이라
+  // 지갑에서 빠지고, 가진 돈으로도 못 메우면 전투를 시작할 수 없다.
+  const afford = Hire.canAfford(app.progress.gold, app.quest, contracts, tips);
+  const head = $('deal-hero');
+  head.textContent = t('hl.myCut', { n: num(deal.hero) });
+  head.className = `count${deal.hero < 0 ? ' short' : ''}`;
+
+  const note = $('deal-panel').querySelector('.panel-note');
+  // 조사를 붙이지 않고 값만 늘어놓는다 — 숫자 뒤의 을/를은 끝자리마다 갈려,
+  // 붙이려면 숫자를 읽는 규칙이 화면 코드에 하나 더 생긴다.
+  note.textContent = afford.ok
+    ? (deal.hero < 0
+      ? t('hl.short', { purse: num(deal.purse), n: num(-deal.hero) })
+      : t('hl.purseSpent', { purse: num(deal.purse), spent: num(deal.spent) }))
+    : t('hl.cannotAfford', { n: num(afford.short) });
+  return afford;
+}
+
 function memberSummary(member) {
   const def = Roster.defOf(member);
   const gear = Roster.gearOf(member);
-  const parts = [def.note];
-  if (gear.length) parts.push(`장비 ${gear.length}`);
+  // **카드의 금빛 숫자가 무엇인지는 여기서 밝힌다.** 카드에는 이름을 적을 자리가
+  // 없어 숫자만 서 있다.
+  const parts = [t('hl.powerOf', { n: num(Roster.powerOf(member)) }), def.note];
+  if (gear.length) parts.push(t('hl.gearCount', { n: gear.length }));
+  // **떠날 만큼 쉰 동료는 그 사실을 적는다.** 결과 화면이 떠난 뒤에 알려 주는
+  // 것만으로는 늦다 — 미리 보이지 않으면 규칙이 아니라 사고로 읽힌다.
+  if (Roster.leaveChance(member) > 0) parts.push(t('hl.idle', { n: member.idle }));
   return parts.join(' · ');
 }
 
@@ -784,21 +1037,39 @@ function renderRoster() {
   heroRow.append(avatar('hero'));
   const heroBody = el('div', 'pick-body');
   const heroName = el('div', 'pick-name');
-  heroName.append(document.createTextNode(`주인공 Lv ${app.progress.charLevel}`));
+  heroName.append(document.createTextNode(t('hl.heroLv', { n: app.progress.charLevel })));
   heroName.append(jobTag('healer', D.heroJob(app.progress.job).spec, D.HERO.race));
   heroBody.append(heroName);
   const stats = P.stats(app.progress);
   heroBody.append(text('div', 'pick-sub',
-    `체력 ${stats.hp} · 마나 ${stats.mp} · 회복력 ×${stats.heal.toFixed(2)}`));
+    t('hl.heroStats', { hp: num(stats.hp), mp: num(stats.mp), heal: stats.heal.toFixed(2) })));
   heroRow.append(heroBody);
   const heroItem = el('li', 'wide');
   heroItem.append(heroRow);
   list.append(heroItem);
 
-  for (const member of app.candidates) {
+  // **친구는 따로 묶어 위에 세운다.** 뽑기와 상관없이 늘 서는 자리라, 같은 격자에
+  // 섞어 두면 이번에 운 좋게 걸린 것인지 늘 있는 것인지 구별되지 않는다.
+  const friends = app.candidates.filter(Rep.isFriend);
+  const drawn = app.candidates.filter((member) => !Rep.isFriend(member));
+  let group = null;
+
+  for (const member of friends.concat(drawn)) {
     const def = Roster.defOf(member);
     const picked = app.party.includes(member);
     const full = app.party.length >= D.PARTY_MAX - 1;
+
+    // 묶음이 바뀌는 자리에 이름표를 한 줄 끼운다. 친구가 없으면 이름표도 없다 —
+    // 빈 묶음 제목만 남으면 무엇이 없는 것인지 화면이 설명해야 한다.
+    const here = friends.includes(member) ? 'friend' : 'drawn';
+    if (friends.length && here !== group) {
+      const label = el('li', 'wide group');
+      label.append(text('span', 'group-name', here === 'friend' ? t('hl.friends') : t('hl.applicants')));
+      label.append(text('span', 'group-note', here === 'friend'
+        ? t('hl.alwaysCome') : t('hl.redrawn')));
+      list.append(label);
+      group = here;
+    }
 
     const row = el('div', 'pick card');
     const open = el('button', 'pick-open');
@@ -810,12 +1081,47 @@ function renderRoster() {
     const face = el('span', 'pick-face');
     face.append(avatar(Roster.spriteOf(member)));
     face.append(text('span', 'lv', `Lv ${member.level}`));
+    // **전투력은 레벨 아래에 둔다.** 신뢰도·보수 줄에 끼우면 320px에서 그 줄이
+    // 세 칸으로 늘어 접히는데, 이 칸은 폭이 고정이라 이름·계열과 자리를 다투지
+    // 않는다. 무엇을 재는 값인지는 상세와 도움말에 있다.
+    face.append(text('span', 'power', num(Roster.powerOf(member))));
     open.append(face);
 
     const body = el('div', 'pick-body');
     body.append(text('div', 'pick-name', member.name));
     // 카드에는 종족을 적지 않는다. 셋을 다 적으면 좁은 칸에서 줄이 늘어난다.
-    body.append(specTag(member));
+    const tags = el('div', 'pick-tags');
+    tags.append(specTag(member));
+    body.append(tags);
+    // **보수와 신뢰도는 카드에 있어야 한다.** 상세를 열어야만 보이면 열 명의
+    // 값을 견주는 데 열 번을 열어야 한다. 왜 그 값인지는 상세에서 본다.
+    const contract = wageOf(member);
+    // **제 레벨에 맞는 일이라고 보는 동료에게만 표를 단다.** 난이도를 어떻게
+    // 보는지는 그때까지 상세에만 있어서, 열 명을 견주려면 열 번을 열어야 했다.
+    // 다섯 갈래를 다 적지 않는 것은 후보의 대부분이 벅차다·위험하다라, 전부
+    // 적으면 줄마다 글자가 하나 더 붙을 뿐 고르는 데는 도움이 되지 않기
+    // 때문이다(재 보니 알맞다 16% · 벅차다 41% · 위험하다 32%).
+    // **아랫줄이 아니라 계열 옆에 두는 것은** 신뢰도와 보수가 모든 카드에 있어
+    // 세로로 줄이 맞는데, 거기에 끼우면 그 줄이 밀려 카드 폭을 넘기 때문이다.
+    if (contract && contract.feel.id === 'fit') {
+      tags.append(text('span', 'feel-tag', contract.feel.name));
+    }
+    if (contract) {
+      const deal = el('div', 'pick-deal');
+      const stage = Rep.trustStage(contract.trust);
+      deal.append(text('span', `trust-tag t-${stage.id}`, `${contract.trust > 0 ? '+' : ''}${contract.trust}`));
+      if (contract.ok) {
+        // **동전과 금액은 한 덩어리로 묶는다.** 따로 두었더니 좁은 화면에서 줄이
+        // 접힐 때 동전만 윗줄에, 숫자만 아랫줄에 남았다.
+        const paid = el('span', 'wage-box');
+        paid.append(icon('coin'));
+        paid.append(text('span', 'wage', num(contract.gold)));
+        deal.append(paid);
+      } else {
+        deal.append(text('span', 'wage no', t('hl.refuse')));
+      }
+      body.append(deal);
+    }
     open.append(body);
     open.addEventListener('click', () => openMember(member));
     row.append(open);
@@ -823,8 +1129,8 @@ function renderRoster() {
     const take = el('button', 'pick-take');
     take.type = 'button';
     take.setAttribute('aria-pressed', String(picked));
-    take.setAttribute('aria-label', `${member.name} ${picked ? '빼기' : '데려가기'}`);
-    take.disabled = !picked && full;
+    take.setAttribute('aria-label', t('hl.takeDrop', { name: member.name, what: t(picked ? 'hl.drop' : 'hl.take') }));
+    take.disabled = !picked && (full || !(contract && contract.ok));
     take.append(icon('check'));
     take.addEventListener('click', () => toggleMember(member));
     row.append(take);
@@ -834,11 +1140,44 @@ function renderRoster() {
     list.append(item);
   }
   $('party-count').textContent = `${app.party.length + 1} / ${D.PARTY_MAX}`;
+  // 값을 단추에 적는다. 눌러 보고 나서야 골드가 모자란 것을 알면 고장 난 것으로
+  // 보인다 — 진열대 바꾸기와 같은 규칙이다.
+  const redraw = Roster.redrawCost(app.progress.charLevel);
+  $('roster-refresh').textContent = t('hl.redrawCost', { n: num(redraw) });
+  $('roster-refresh').disabled = app.progress.gold < redraw;
 }
+
+// **새로 고치면 길드에 새 얼굴이 들어와 있을 수 있다.** 다시 뽑기만 하면 명부
+// 아홉을 섞는 것뿐이라, 몇 번 누르면 볼 것이 없어진다. 들어오는 규칙은 의뢰를
+// 깼을 때와 같은 것을 쓴다(`maybeJoin`) — 규칙이 둘이 되면 한쪽만 고치게 된다.
+$('roster-refresh').addEventListener('click', () => {
+  // **값을 낸다.** 공짜였을 때에는 마음에 드는 목록이 나올 때까지 누르는 것이
+  // 아무 대가 없는 일이라, 뽑기가 사실상 없는 것과 같았다.
+  const paid = P.spend(app.progress, Roster.redrawCost(app.progress.charLevel));
+  sound.play(paid.ok ? 'click' : 'deny');
+  if (!paid.ok) return;
+  app.rosterSeed = (Math.random() * 1e9) | 0;
+  const joined = Roster.maybeJoin(app.progress.roster,
+    (Math.random() * 1e9) | 0, Roster.REDRAW_JOIN_CHANCE);
+  // 골드가 나갔으므로 새 얼굴이 없어도 저장한다.
+  persist();
+  drawCandidates();
+  // 새로 뽑은 뒤에는 계약도 다시 낸다 — 목록과 보수가 같은 후보를 봐야 한다.
+  refreshWages();
+  renderRoster();
+  updateStart();
+  const said = $('roster-note');
+  said.textContent = joined ? t('hl.joined', { name: joined.name }) : '';
+  said.hidden = !joined;
+});
 
 function toggleMember(member) {
   const picked = app.party.includes(member);
+  const contract = wageOf(member);
   if (!picked && app.party.length >= D.PARTY_MAX - 1) { sound.play('deny'); return; }
+  // 응하지 않는 동료는 얼마를 준다 해도 따라나서지 않는다. 이유를 알리지 않으면
+  // 단추가 고장 난 것으로 보인다.
+  if (!picked && contract && !contract.ok) { sound.play('deny'); note(contract.line); return; }
   sound.play('click');
   if (picked) app.party = app.party.filter((entry) => entry !== member);
   else app.party.push(member);
@@ -876,7 +1215,7 @@ function openMember(member) {
     const kind = D.skillKind(skill);
     // 아이콘이 "어떤 스킬인가"를, 색이 "무엇을 하는가"를 알린다. 이름만
     // 늘어놓았을 때에는 넷을 훑는 데 넷을 다 읽어야 했다.
-    const chip = chipButton(`chip skill ${kind.css}`, skill.icon, `${skill.name} ${skill.mp}`,
+    const chip = chipButton(`chip skill ${kind.css}`, skill.icon, `${skill.name} ${num(skill.mp)}`,
       // 종류 이름이 스킬 이름과 같으면(도발) 두 번 적지 않는다.
       () => showChip(chip, skill.name === kind.name ? skill.name : `${skill.name} · ${kind.name}`,
         skillLines(skill), skill.desc));
@@ -887,7 +1226,7 @@ function openMember(member) {
       const potion = D.POTIONS[id];
       const chip = chipButton('chip dim', potion.icon, String(count),
         () => showChip(chip, `${potion.name} ×${count}`, potionLines(potion),
-          '동료는 직업에 따라 알아서 챙겨 오고, 위급할 때 알아서 마신다.'));
+          t('hl.potionAuto')));
       chips.append(chip);
     }
   }
@@ -895,18 +1234,22 @@ function openMember(member) {
     const gear = D.GEAR[item.defId];
     const chip = chipButton(`chip gear tier-${Items.tier(item).css}`, gear.icon, Items.name(item),
       () => showChip(chip, `${Items.name(item)} · ${D.SLOTS[gear.slot].name}`, gearLines(item),
-        '분배로 받은 장비는 그 동료가 계속 쓴다.'));
+        t('hl.gearStays')));
     chips.append(chip);
   }
-  if (!chips.children.length) chips.append(text('span', 'pick-sub', '들고 오는 것이 없다'));
+  if (!chips.children.length) chips.append(text('span', 'pick-sub', t('hl.bringsNothing')));
   hideChip();
 
+  renderTrust(member);
   renderSpecSwap(member);
+  renderFavor(member);
 
   const picked = app.party.includes(member);
+  const contract = wageOf(member);
   const take = $('member-take');
-  take.textContent = picked ? '파티에서 뺀다' : '데려간다';
-  take.disabled = !picked && app.party.length >= D.PARTY_MAX - 1;
+  take.textContent = picked ? t('hl.removeFromParty') : t('hl.take');
+  take.disabled = !picked
+    && (app.party.length >= D.PARTY_MAX - 1 || !(contract && contract.ok));
   sheet.hidden = false;
 }
 
@@ -923,8 +1266,8 @@ function renderSpecSwap(member) {
   const now = Roster.baseSpecOf(member);
   const ready = member.level >= D.SPEC_CHANGE_LEVEL;
   box.append(text('div', 'pick-sub dim', ready
-    ? '계열을 바꾼다. 역할은 그대로고, 지금 들고 다니는 넷은 배운 것으로 남는다.'
-    : `계열은 레벨 ${D.SPEC_CHANGE_LEVEL}부터 바꿀 수 있다.`));
+    ? t('hl.changeSpec')
+    : t('hl.specFrom', { n: D.SPEC_CHANGE_LEVEL })));
 
   const row = el('div', 'spec-row');
   for (const spec of choices) {
@@ -932,11 +1275,11 @@ function renderSpecSwap(member) {
     button.type = 'button';
     button.setAttribute('aria-pressed', String(spec === now));
     button.disabled = spec === now || !ready;
-    button.append(document.createTextNode(D.SPECS[spec]));
+    button.append(document.createTextNode(t('healer.spec.' + spec)));
     button.addEventListener('click', () => {
       const moved = Roster.changeSpec(member, spec);
       sound.play(moved.ok ? 'click' : 'deny');
-      if (!moved.ok) { note(moved.reason); return; }
+      if (!moved.ok) { note(msg(moved.reason)); return; }
       persist();
       renderRoster();
       openMember(member);
@@ -950,8 +1293,123 @@ function renderSpecSwap(member) {
   const borrowed = (member.learned || []).filter((id) => !list.includes(id));
   if (borrowed.length) {
     box.append(text('div', 'pick-sub dim',
-      `다른 계열에서 배운 것: ${borrowed.map((id) => D.UNIT_SKILLS[id].name).join(', ')}`));
+      t('hl.borrowed', { list: borrowed.map((id) => D.UNIT_SKILLS[id].name).join(', ') })));
   }
+}
+
+// 신뢰도와 이번 의뢰의 보수. **카드에는 숫자만 있고 이유는 여기에만 있다** —
+// 열 명의 카드에 이유를 다 적으면 카드가 다시 네 줄이 된다.
+function renderTrust(member) {
+  const box = $('member-trust');
+  box.textContent = '';
+  const contract = wageOf(member);
+  const trust = Rep.trustOf(member);
+  const stage = Rep.trustStage(trust);
+  const trait = Rep.traitOf(member);
+
+  const head = el('div', 'trust-head');
+  head.append(icon('trust'));
+  head.append(text('b', null, stage.name));
+  head.append(text('span', `trust-tag t-${stage.id}`, `${trust > 0 ? '+' : ''}${trust}`));
+  box.append(head);
+  // 단계마다의 한 마디. 숫자만으로는 -40과 -60이 어떻게 다른지 읽히지 않는다.
+  box.append(text('p', 'trust-line', stage.line));
+  box.append(text('p', 'pick-sub dim', `${trait.name} · ${trait.note}`));
+
+  if (!contract) return;
+  if (!contract.ok) {
+    box.append(text('p', 'trust-line no', t('hl.wontJoin')));
+    return;
+  }
+
+  // **값을 이룬 배수를 그대로 보여 준다.** 왜 이 동료가 비싼지 알 수 없으면
+  // 신뢰도를 관리할 이유가 화면에 없다. 1에서 멀리 있는 것부터 적는다.
+  const why = contract.scales
+    .filter((scale) => Math.abs(scale.mul - 1) > 0.001)
+    .sort((a, b) => Math.abs(b.mul - 1) - Math.abs(a.mul - 1))
+    .map((scale) => `${scale.why} ${scale.mul > 1 ? '+' : '−'}${Math.round(Math.abs(scale.mul - 1) * 100)}%`);
+
+  const wage = el('div', 'trust-wage');
+  wage.append(icon('coin'));
+  wage.append(text('b', null, t('hl.contractGold', { n: num(contract.gold) })));
+  wage.append(text('span', 'why', t('hl.contractBase', { n: num(contract.base) })));
+  box.append(wage);
+  box.append(text('p', 'pick-sub dim', why.length ? why.join(' · ') : t('hl.asBase')));
+  // 이 동료가 이번 의뢰를 어떻게 보는가. 게시판의 난이도는 주인공 기준이라
+  // 여기 값과 갈린다 — 그래서 적정 레벨을 함께 적는다.
+  box.append(text('p', 'pick-sub dim',
+    t('hl.feelNote', { feel: contract.feel.name, level: Rep.tasteOf(member) })));
+}
+
+// 얹어 주기와 선물. **둘 다 신뢰도를 사는 수단이라 한자리에 둔다** — 갈라 두면
+// 관계를 고치는 방법이 화면 두 곳에 흩어진다.
+function renderFavor(member) {
+  const box = $('member-favor');
+  box.textContent = '';
+  const contract = wageOf(member);
+  box.hidden = !contract || !contract.ok;
+  if (box.hidden) return;
+
+  const tip = tipFor(member.name);
+  const row = el('div', 'favor-row');
+  row.append(text('span', 'pick-sub', t('hl.tipUp', { n: num(tip) })));
+  const step = Math.max(1, Math.round(contract.gold * TIP_STEP));
+  row.append(chipButton('chip', 'coin', `+${step}`, () => {
+    app.tips[member.name] = tip + step;
+    renderFavor(member);
+    renderRoster();
+    updateStart();
+  }));
+  if (tip > 0) {
+    row.append(chipButton('chip dim', 'restart', t('hl.undo'), () => {
+      delete app.tips[member.name];
+      renderFavor(member);
+      renderRoster();
+      updateStart();
+    }));
+  }
+  box.append(row);
+  box.append(text('p', 'pick-sub dim',
+    t('hl.tipNote')));
+
+  // 선물. **인벤토리의 물건을 그대로 준다** — 선물용 물건을 따로 두면 상점에
+  // 줄이 하나 더 늘고, 쓸모없는 장비를 처분할 자리도 사라진다.
+  const job = Roster.jobOf(member);
+  const gifts = app.progress.inventory.slice();
+  const list = el('div', 'favor-row');
+  list.append(text('span', 'pick-sub', t('hl.gift')));
+  if (!gifts.length) {
+    list.append(text('span', 'pick-sub dim', t('hl.noGift')));
+  }
+  for (const item of gifts.slice(0, 8)) {
+    const value = Rep.giftValue(member, item, job);
+    const chip = chipButton(`chip gear tier-${Items.tier(item).css}`, D.GEAR[item.defId].icon,
+      `${Items.name(item)} +${num(value.trust)}`, () => giveGift(member, item));
+    // 쓸 수 있는 물건이면 더 기뻐한다. 표시가 없으면 왜 값이 다른지 알 수 없다.
+    if (value.liked) chip.classList.add('liked');
+    list.append(chip);
+  }
+  box.append(list);
+  if (gifts.length > 8) {
+    box.append(text('p', 'pick-sub dim', t('hl.giftLimit', { n: gifts.length })));
+  }
+}
+
+// 선물을 준다. **바로 신뢰도가 오르고 보수가 다시 매겨진다** — 값이 그대로면
+// 선물이 이번 편성에 아무것도 하지 않는 것으로 보인다.
+function giveGift(member, item) {
+  const index = P.findItem(app.progress, item.uid);
+  if (index < 0) { sound.play('deny'); return; }
+  const value = Rep.giftValue(member, item, Roster.jobOf(member));
+  app.progress.inventory.splice(index, 1);
+  const moved = Rep.addTrust(member, value.trust);
+  sound.play('click');
+  persist();
+  refreshWages();
+  renderRoster();
+  updateStart();
+  openMember(member);
+  note(t('hl.trustMoved', { name: member.name, sign: moved.delta > 0 ? '+' : '', delta: moved.delta, after: moved.after }));
 }
 
 function chipButton(cls, iconName, label, run) {
@@ -992,30 +1450,32 @@ function hideChip() {
 // 적을 수 없고, 도트에 한 번의 값을 적으면 실제로 들어가는 양이 가려진다.
 function skillLines(def) {
   const lines = [];
-  if (def.heal) lines.push(`한 번에 ${def.heal} 회복`);
-  if (def.mul) lines.push(`공격력의 ×${def.mul}`);
+  if (def.heal) lines.push(t('hl.healOnce', { n: num(def.heal) }));
+  if (def.mul) lines.push(t('hl.mulAtk', { n: def.mul }));
   if (def.tick) {
     const total = Math.round(def.tick * (def.duration / (def.interval || 1)));
-    const what = def.kind === 'heal-dot' ? '회복' : '피해';
-    lines.push(`${def.interval || 1}초마다 ${def.tick} ${what} · ${def.duration}초 (합계 ${total})`);
+    const what = def.kind === 'heal-dot' ? t('hl.wordHeal') : t('hl.wordDamage');
+    lines.push(t('hl.tickLine', { interval: def.interval || 1, tick: num(def.tick), what, duration: def.duration, total: num(total) }));
   }
-  if (def.mana) lines.push(def.kind === 'mana' ? `자기 마나 ${def.mana} 회복` : `아군 마나 ${def.mana} 회복`);
-  if (def.kind === 'stun') lines.push(`${def.duration}초 동안 굳힌다 · 외우던 스킬도 끊긴다`);
-  if (def.kind === 'taunt' || def.kind === 'taunt-area') lines.push(`${def.duration}초 동안 어그로를 붙든다`);
-  if (def.radius) lines.push(`반경 ${def.radius} 안을 함께 친다`);
-  lines.push(`마나 ${def.mp} · 쿨타임 ${def.cd}초 · ${castLine(def)}`);
+  if (def.mana) lines.push(t(def.kind === 'mana' ? 'hl.selfMana' : 'hl.allyMana', { n: num(def.mana) }));
+  if (def.kind === 'stun') lines.push(t('hl.stunLine', { n: def.duration }));
+  if (def.kind === 'taunt' || def.kind === 'taunt-area') lines.push(t('hl.tauntLine', { n: def.duration }));
+  if (def.radius) lines.push(t('hl.radiusLine', { n: def.radius }));
+  lines.push(t('hl.manaCd', { mp: num(def.mp), cd: def.cd, cast: castLine(def) }));
   return lines;
 }
 
 function potionLines(potion) {
-  return [`최대 ${potion.restore === 'hp' ? '체력' : '마나'}의 ${Math.round(potion.ratio * 100)}%를 채운다`,
-    `쿨타임 ${potion.cd}초`];
+  return [t('hl.potionFill', {
+    stat: D.STATS[potion.restore === 'hp' ? 'hp' : 'mp'].name,
+    pct: Math.round(potion.ratio * 100),
+  }), t('hl.potionCdLine', { n: potion.cd })];
 }
 
 // 등급은 이름에 이미 붙어 있고 색으로도 읽히므로 다시 적지 않는다.
 function gearLines(item) {
   const options = Items.summary(item);
-  return [options || '붙은 옵션이 없다'];
+  return [options || t('hl.noAffix')];
 }
 
 function closeMember() {
@@ -1052,11 +1512,11 @@ function renderSkillPicks() {
       name.append(text('span', 'job dim', D.heroJob(base.job).name));
     }
     body.append(name);
-    body.append(text('div', 'pick-sub', D.skillEffect(def)));
+    body.append(text('div', 'pick-sub', effectText(def)));
     body.append(text('div', 'pick-sub dim', def.desc));
     button.append(body);
 
-    const cost = text('span', 'pick-cost', `${def.mp ? `마나 ${def.mp}` : '마나 없음'}\n쿨 ${def.cd}초`);
+    const cost = text('span', 'pick-cost', `${def.mp ? t('hl.manaCost', { n: num(def.mp) }) : t('hl.noManaCost')}\n${t('hl.cdShort', { n: def.cd })}`);
     cost.style.whiteSpace = 'pre-line';
     button.append(cost);
 
@@ -1078,7 +1538,7 @@ function renderSkillPicks() {
   if (!list.children.length) {
     const empty = el('li');
     empty.append(text('div', 'pick-sub',
-      '배운 스킬이 없다. 캐릭터 화면에서 스킬 점수로 배운다.'));
+      t('hl.noSkills')));
     list.append(empty);
   }
   $('skill-count').textContent = `${app.skills.length} / ${D.SKILL_MAX}`;
@@ -1102,7 +1562,12 @@ function renderMethods() {
       // 스킬 등록과 같다 — 고르는 순간 저장한다.
       app.progress.lootMethod = method.id;
       persist();
+      // **방식이 보수를 흔든다**(기획서 15.1). 값을 다시 내지 않으면 편성 화면의
+      // 숫자가 실제 계약과 갈린다.
+      refreshWages();
       renderMethods();
+      renderRoster();
+      updateStart();
     });
     box.append(button);
   }
@@ -1116,28 +1581,46 @@ function rememberSkills() {
 }
 
 function updateStart() {
-  $('start').disabled = app.skills.length === 0;
+  // 보수를 감당할 수 있는지도 여기서 본다. 계약을 확정하는 단추가 이것 하나라,
+  // 다른 곳에서 막으면 눌러 놓고 전투 화면에서 튕기는 일이 난다.
+  const afford = renderDeal();
+  $('start').disabled = app.skills.length === 0 || !afford.ok;
+}
+
+// 편성 목록을 다시 뽑는다. **친구와 이미 고른 동료는 자리를 지킨다** — 새로
+// 고칠 때마다 고른 것이 흩어지면 넷을 고르는 일을 처음부터 다시 하게 되고,
+// 친구는 애초에 뽑기와 상관없이 서는 자리다.
+function drawCandidates() {
+  const keep = app.progress.roster.filter(Rep.isFriend);
+  for (const member of app.party) if (!keep.includes(member)) keep.push(member);
+  app.candidates = Q.companionsFor(app.quest, app.progress.roster, app.rosterSeed, keep);
 }
 
 function openParty(quest) {
   app.quest = quest;
-  app.candidates = Q.companionsFor(quest, app.progress.roster, app.progress.questSeed + quest.level);
+  app.rosterSeed = app.progress.questSeed + quest.level;
   app.party = [];
+  drawCandidates();
+  // 얹어 주기는 이번 편성에만 남는다. 다음 의뢰까지 끌고 가면 값이 다른 판의
+  // 것이 되어, 부른 값과 얹은 값의 비가 뜻을 잃는다.
+  app.tips = {};
   // 지난번에 등록해 둔 것이 저장본에 남아 있다. 처음이면 열린 것을 앞에서부터
   // 채워 준다 — 빈 채로 두면 "전투 시작"이 꺼져 있는 이유를 알 수 없다.
-  app.lootMethod = Loot.METHODS[app.progress.lootMethod] ? app.progress.lootMethod : 'even';
+  app.lootMethod = Loot.METHODS[app.progress.lootMethod] ? app.progress.lootMethod : Loot.DEFAULT;
   const remembered = app.skills.length ? app.skills : app.progress.skills;
   app.skills = P.validSkills(app.progress, remembered.length
     ? remembered
     : P.learnedSkills(app.progress).map((def) => def.id));
   rememberSkills();
 
+  // 보수가 먼저다 — 목록도 요약도 계약을 보고 그린다.
+  refreshWages();
   renderBrief();
   renderRoster();
   renderSkillPicks();
   renderMethods();
   updateStart();
-  show('party', quest.name);
+  show('party', msg(quest.name));
 }
 
 $('start').addEventListener('click', () => {
@@ -1166,11 +1649,7 @@ function makeUnitNode(unit) {
   // 도트 그림이 제 색을 가지므로 파랑·빨강으로 물들여 편을 가를 수 없다.
   // 발밑에 색 있는 발판을 깔아 그 일을 대신한다 — 그림자 노릇도 같이 한다.
   node.append(el('div', 'mark'));
-  if (Sprites.sheet(unit.sprite)) {
-    node.append(sheetBody(unit.sprite, 'sprite'));
-  } else {
-    node.insertAdjacentHTML('beforeend', Sprites.svg(unit.sprite));
-  }
+  node.append(sheetBody(unit.sprite, 'sprite'));
   node.style.width = `${(UNIT_WIDTH * Sprites.size(unit.sprite).w) / 18}%`;
 
   const bar = el('div', 'hpbar');
@@ -1202,6 +1681,10 @@ function syncSheet(node, unit, state) {
   const info = Sprites.sheet(wrap.dataset.kind);
   const d = wrap.dataset;
 
+  // **쓰러진 유닛은 그림도 멈춘다.** 넘어뜨려 놓고 대기 자세를 계속 돌리면
+  // 누운 채로 숨을 쉬고, 죽기 직전에 휘두르던 공격이 그대로 이어진다.
+  if (unit.dead) { setFrame(wrap, 0, info.clips.idle.row); return; }
+
   const next = unit.nextAttackAt || 0;
   if (Number(d.next || 0) < next) { d.next = next; d.swing = state.t; }
 
@@ -1223,15 +1706,15 @@ function syncSheet(node, unit, state) {
   const swung = state.t - Number(d.swing === undefined ? -99 : d.swing);
   let name = 'idle';
   // 외우는 동안은 준비 자세로 선다. 시전 막대만으로는 무엇을 하는지 안 보인다.
-  if (!unit.dead && unit.cast) name = 'attack';
-  else if (!unit.dead && swung < atk.frames / atk.fps) name = 'attack';
+  if (unit.cast) name = 'attack';
+  else if (swung < atk.frames / atk.fps) name = 'attack';
   // **무리 사이에는 좌표가 움직이지 않는데도 걷는 중이다.** 대열은 이미 제자리라
   // x가 그대로고, 흘러가는 것은 배경이다. 좌표만 보면 다른 동료가 흔들리며 가는
   // 옆에서 주인공만 선 채로 미끄러진다.
-  else if (!unit.dead && state.marching && unit.side === 'ally') name = 'walkRight';
-  // **대열을 벌리는 힘(separate)은 걷는 것이 아니다.** 문턱이 없으면 가만히 선
-  // 유닛이 걷는 자세로 떤다.
-  else if (!unit.dead && walking) name = Number(d.dir) > 0 ? 'walkRight' : 'walkLeft';
+  else if (state.marching && unit.side === 'ally') name = 'walkRight';
+  // **비켜서는 걸음이 달리기로 읽히지 않게 문턱을 둔다.** 문턱이 없으면 가만히
+  // 선 유닛이 걷는 자세로 떤다.
+  else if (walking) name = Number(d.dir) > 0 ? 'walkRight' : 'walkLeft';
 
   const clip = info.clips[name];
   let frame = 0;
@@ -1250,6 +1733,9 @@ function syncUnits(state) {
     const node = unitNodes.get(unit.uid) || makeUnitNode(unit);
     node.style.left = `${pctX(unit.x)}%`;
     node.style.top = `${pctY(unit.y)}%`;
+    // 발이 아래인 쪽이 앞이다. 격자 한 칸 단위로 끊는 것은 매 프레임 값이
+    // 바뀌면 앞뒤가 소수점 흔들림으로 뒤집혀 깜빡이기 때문이다.
+    node.style.zIndex = String(Math.round(unit.y));
     node.classList.toggle('dead', unit.dead);
     node.classList.toggle('low', unit.hp / unit.maxHp <= 0.3);
     node.querySelector('.hpbar span').style.width = `${(unit.hp / unit.maxHp) * 100}%`;
@@ -1257,6 +1743,7 @@ function syncUnits(state) {
     // 굳은 동안에는 아무것도 하지 않는다. 화면이 그것을 보여 주지 않으면 그 몇
     // 초가 "왜 가만히 있지"로만 보인다 — 기절이 있다는 것 자체를 알 수 없다.
     node.classList.toggle('stunned', !unit.dead && L.stunned(state, unit));
+    node.classList.toggle('confused', !unit.dead && L.confused(state, unit));
     syncSheet(node, unit, state);
 
     const cast = unit.cast;
@@ -1347,9 +1834,9 @@ function makePortrait(unit) {
   mp.hidden = unit.maxMp <= 0;
   button.append(mp);
 
-  // 걸려 있는 강화·약화. 아이콘까지 늘어놓으면 다섯 칸짜리 줄이 그것으로
-  // 덮이므로 점으로만 둔다 — 색이 좋은 쪽인지 나쁜 쪽인지를 알린다.
-  button.append(el('div', 'auras'));
+  // 걸려 있는 것 — 지속 피해·지속 회복·기절·도발·혼란·강화·약화. 적과 아군을
+  // 가리지 않고 같은 자리에 붙는다.
+  button.append(el('div', 'status'));
 
   // 피해와 회복이 뜨는 자리. 전장에서 유닛이 뭉쳐 있으면 누가 맞았는지 숫자가
   // 겹쳐 읽히지 않아서, 초상화 위에도 같은 숫자를 띄운다.
@@ -1384,20 +1871,26 @@ function syncPortraitList(state, id) {
     button.classList.toggle('dead', unit.dead);
     button.classList.toggle('casting', Boolean(unit.cast));
     button.classList.toggle('valid', Boolean(app.aiming) && isValidUnitTarget(state, unit));
-    syncAuras(button, unit);
+    syncStatus(button, state, unit);
   }
 }
 
 // 걸린 것과 그려진 것이 다를 때만 다시 그린다. 매 틱 통째로 갈아 끼우면
-// 초상화 다섯 개가 초당 30번 새로 만들어진다.
-function syncAuras(button, unit) {
-  const box = button.querySelector('.auras');
-  const now = (unit.auras || []).map((aura) => (aura.buff ? 'boon' : 'wilt')).join(' ');
+// 초상화 다섯 개가 초당 30번 새로 만들어진다 — 아이콘은 점보다 만드는 값이 커서
+// 이 비교가 더 중요해졌다.
+function syncStatus(button, state, unit) {
+  const box = button.querySelector('.status');
+  const list = L.statusesOf(state, unit);
+  const now = list.map((st) => st.kind).join(' ');
   if (box.dataset.on === now) return;
   box.dataset.on = now;
   box.textContent = '';
-  for (const aura of unit.auras || []) {
-    box.append(el('span', `aura-dot ${aura.buff ? 'boon' : 'wilt'}`));
+  for (const st of list) {
+    const node = icon(st.icon, st.css);
+    // 아이콘만으로는 무엇인지 물어볼 곳이 없다. 마우스가 있는 환경에서만
+    // 보이지만, 없다고 잃는 것도 없다.
+    node.title = st.name;
+    box.append(node);
   }
 }
 
@@ -1433,7 +1926,7 @@ function renderSkillbar() {
     button.setAttribute('aria-pressed', 'false');
     button.append(icon(def.icon, 'glyph'));
     button.append(text('span', 'sname', def.name));
-    button.append(text('span', 'cost', def.mp ? String(def.mp) : '－'));
+    button.append(text('span', 'cost', def.mp ? num(def.mp) : '－'));
     const cool = el('div', 'cool');
     cool.style.transform = 'scaleY(0)';
     button.append(cool);
@@ -1486,10 +1979,10 @@ function syncSkillbar(state) {
 
   const share = hero.hp / hero.maxHp;
   $('hero-hp-fill').style.width = `${Math.max(0, share) * 100}%`;
-  $('hero-hp-text').textContent = `체력 ${Math.max(0, Math.round(hero.hp))} / ${hero.maxHp}`;
+  $('hero-hp-text').textContent = t('hl.hpLine', { now: num(Math.max(0, Math.round(hero.hp))), max: num(hero.maxHp) });
   $('hero-hp-fill').parentNode.classList.toggle('low', share <= DANGER.on);
   $('hero-mp-fill').style.width = `${(hero.mp / hero.maxMp) * 100}%`;
-  $('hero-mp-text').textContent = `마나 ${Math.round(hero.mp)} / ${hero.maxMp}`;
+  $('hero-mp-text').textContent = t('hl.mpLine', { now: num(Math.round(hero.mp)), max: num(hero.maxMp) });
 
   syncDanger(hero, share);
 }
@@ -1513,10 +2006,10 @@ function syncDanger(hero, share) {
 // --- 조준과 조작 -------------------------------------------------------
 
 const AIM_HINT = {
-  ally: '회복할 대상을 고른다 — 초상화나 전투 화면의 아군',
-  enemy: '적을 고른다 — 적 초상화나 전투 화면의 적',
-  'area-ally': '기준점을 고른다 — 동료 초상화 또는 전투 화면의 위치',
-  'area-enemy': '기준점을 고른다 — 적 초상화 또는 전투 화면의 위치',
+  ally: t('hl.pickAlly'),
+  enemy: t('hl.pickEnemy'),
+  'area-ally': t('hl.pickSpotAlly'),
+  'area-enemy': t('hl.pickSpotEnemy'),
 };
 
 // 사거리 밖은 고를 수 있는 대상이 아니다. 눌러 보고 나서야 "사거리 밖"이라고
@@ -1554,8 +2047,8 @@ function onSkill(skillId) {
   // 못 쓰는 이유를 적어 준다. 소리만 내고 말면 스킬을 눌러도 조준이 시작되지
   // 않는 것으로만 보이고, 이어서 초상화를 눌러도 아무 일이 없는 것이 된다.
   const slot = L.skillSlot(state, skillId);
-  if (state.t < slot.readyAt) { sound.play('deny'); note('쿨타임'); return; }
-  if (L.hero(state).mp < def.mp) { sound.play('deny'); note('마나 부족'); return; }
+  if (state.t < slot.readyAt) { sound.play('deny'); note(t('hl.why.cooldown')); return; }
+  if (L.hero(state).mp < def.mp) { sound.play('deny'); note(t('hl.why.noMana')); return; }
   sound.play('click');
   setAiming(skillId);
 }
@@ -1565,14 +2058,14 @@ function onPotion(potionId) {
   if (!state) return;
   const result = L.usePotion(state, potionId);
   sound.play(result.ok ? (potionId === 'health' ? 'heal' : 'mana') : 'deny');
-  if (!result.ok) note(result.reason);
+  if (!result.ok) note(msg(result.reason));
 }
 
 // 초상화는 아군을 살리는 자리이자 적을 치는 자리다. 스킬을 고르지 않은 채
 // 누르면 아무 일도 일어나지 않는데, 그것이 초상화를 누를 수 없는 것으로 읽힌다.
 function onPortrait(uid) {
   if (!app.battle) return;
-  if (!app.aiming) { sound.play('click'); note('스킬을 먼저 고른다'); return; }
+  if (!app.aiming) { sound.play('click'); note(t('hl.pickSkillFirst')); return; }
   cast(app.aiming, { uid });
 }
 
@@ -1581,7 +2074,7 @@ function cast(skillId, target) {
   const result = L.castSkill(app.battle, skillId, target);
   if (!result.ok) {
     sound.play('deny');
-    note(result.reason);
+    note(msg(result.reason));
     return;
   }
   setAiming(null);
@@ -1614,7 +2107,7 @@ field.addEventListener('pointerdown', (event) => {
   const pick = AI.nearest({ x, y }, AI.alive(state, side));
   if (!pick || AI.dist(pick, { x, y }) > SNAP) {
     sound.play('deny');
-    note('대상을 정확히 누른다');
+    note(t('hl.pickExactly'));
     return;
   }
   cast(app.aiming, { uid: pick.uid });
@@ -1672,7 +2165,7 @@ function handleEvents(state, events) {
   for (const event of events) {
     if (event.type === 'dodge') {
       const unit = AI.byUid(state, event.uid);
-      if (unit) floatText(unit, '빗나감', 'miss');
+      if (unit) floatText(unit, t('hl.miss'), 'miss');
       continue;
     }
     if (event.type === 'damage' || event.type === 'heal') {
@@ -1682,7 +2175,7 @@ function handleEvents(state, events) {
         // 치명타는 느낌표와 큰 글자로 가른다. 색만 다르게 하면 피해·회복과
         // 헷갈리고, 숫자만 크게 하면 그냥 많이 맞은 것으로 보인다.
         const kind = `${heal ? 'heal' : 'harm'}${event.crit ? ' crit' : ''}`;
-        const label = `${heal ? '+' : '−'}${event.amount}${event.crit ? '!' : ''}`;
+        const label = `${heal ? '+' : '−'}${num(event.amount)}${event.crit ? '!' : ''}`;
         floatText(unit, label, kind);
         popPortrait(unit.uid, label, kind);
       }
@@ -1697,7 +2190,7 @@ function handleEvents(state, events) {
         if (event.radius) pulse(event.x, event.y, event.radius, event.skillId === 'pyre' ? 'harm' : '');
       } else {
         // 동료가 쓴 스킬은 글자로만 알린다. 소리까지 겹치면 내 조작음이 묻힌다.
-        note(event.text);
+        note(msg(event));
       }
       continue;
     }
@@ -1705,8 +2198,16 @@ function handleEvents(state, events) {
     // 알린다 — 굳는 것이 몇 초뿐이라 놓치면 무엇이 일어났는지 알 수 없다.
     if (event.type === 'stun') {
       const target = AI.byUid(state, event.uid);
-      if (target) floatText(target, '기절', 'miss');
-      note(event.text);
+      if (target) floatText(target, t('hl.st.stun'), 'miss');
+      note(msg(event));
+      continue;
+    }
+    // 혼란. 걸린 적이 제 편을 치기 시작하는데, 그 순간을 알리지 않으면 화면에서는
+    // 적이 갑자기 이상하게 구는 것으로 보인다.
+    if (event.type === 'confuse') {
+      const target = AI.byUid(state, event.uid);
+      if (target) floatText(target, t('hl.st.confuse'), 'daze');
+      note(msg(event));
       continue;
     }
     // 강화·약화가 걸린 순간. 지속 상태는 초상화의 점이 알리지만, 걸린 순간이
@@ -1717,7 +2218,7 @@ function handleEvents(state, events) {
       continue;
     }
     if (event.type === 'death') {
-      note(event.text);
+      note(msg(event));
       if (event.side === 'ally') sound.play('down');
       continue;
     }
@@ -1728,11 +2229,11 @@ function handleEvents(state, events) {
         const unit = AI.byUid(state, uid);
         if (unit && unit.dead) { node.remove(); unitNodes.delete(uid); }
       }
-      note(event.text);
+      note(msg(event));
       continue;
     }
     if (event.type === 'wave') {
-      note(event.text);
+      note(msg(event));
       sound.play('wave');
       $('wave').textContent = `${event.index + 1} / ${event.total}`;
       renderPortraits(state);
@@ -1787,6 +2288,9 @@ function startBattle() {
     seed: (Math.random() * 1e9) | 0,
   });
   app.lootSeed = (Math.random() * 1e9) | 0;
+  // **계약은 여기서 굳는다.** 결과 화면에서 다시 계산하면 그사이 신뢰도가
+  // 움직여 부른 값과 준 값이 갈린다 — 그 차이가 곧 다음 신뢰도라 조용히 어긋난다.
+  app.contracts = partyContracts();
 
   setAiming(null);
   app.danger = false;
@@ -1796,7 +2300,7 @@ function startBattle() {
   renderSkillbar();
   $('wave').textContent = `1 / ${app.quest.waves.length}`;
   note('');
-  show('battle', `${app.quest.name} · Lv ${app.quest.level}`);
+  show('battle', `${msg(app.quest.name)} · Lv ${app.quest.level}`);
 
   L.drainEvents(app.battle);
   lastFrame = 0;
@@ -1839,42 +2343,61 @@ function openResult(state) {
   // 함수라 다시 부르면 다른 것이 나온다.
   const drops = L.dropsOf(state);
 
-  $('verdict').textContent = won ? '퀘스트 완료' : '퀘스트 실패';
+  $('verdict').textContent = won ? t('hl.questDone') : t('hl.questFailed');
   $('verdict').className = `verdict ${won ? 'won' : 'lost'}`;
 
   const survived = members.filter((m) => !AI.byUid(state, m.id).dead).length;
-  $('verdict-note').textContent = `${Math.round(state.t)}초 · 회복 ${Math.round(state.stats.healed)}`
-    + ` (흘린 힐 ${Math.round(state.stats.overheal)}) · 스킬 ${state.stats.casts}회`
-    + ` · 생존 ${survived}/${members.length}`;
+  $('verdict-note').textContent = t('hl.resultTime', { t: Math.round(state.t), healed: num(Math.round(state.stats.healed)) })
+    + t('hl.resultOverheal', { n: num(Math.round(state.stats.overheal)), casts: state.stats.casts })
+    + t('hl.resultSurvived', { n: survived, total: members.length });
 
   // 경험치를 먼저 넣는다. 레벨이 오른 뒤라야 아래에서 계산하는 스탯이 맞다.
   const before = { char: app.progress.charLevel, job: P.jobLevel(app.progress) };
   const job = D.heroJob(app.progress.job);
   const gained = P.addExp(app.progress, reward.charExp, reward.jobExp);
-  app.progress.gold += reward.gold;
+
+  // **보수를 내고 남는 것이 주인공 몫이다.** 계약은 전투가 시작할 때 굳었고
+  // (`app.contracts`), 여기서는 그대로 지불만 한다. 실패하면 길드가 내지
+  // 않으므로 아무도 받지 못한다 — 대신 신뢰도로 갚는다.
+  const deal = Hire.settle(quest, app.contracts, won, app.tips);
+  app.progress.gold += deal.hero;
 
   // 전투에서 마신 물약은 돌아오지 않는다. 상점에서 사는 것이 뜻을 가지려면
   // 쓴 만큼 줄어야 한다.
   app.progress.potions = Object.assign({}, state.potions);
 
   // 명부 전체가 자란다. 데려간 쪽은 전부, 남은 쪽은 다른 파티에서 일한 몫만.
-  const roster = Roster.awardExp(app.progress.roster, app.party.map((m) => m.name),
+  const joinedNames = app.party.map((m) => m.name);
+  const roster = Roster.awardExp(app.progress.roster, joinedNames,
     reward.charExp, (Math.random() * 1e9) | 0);
+
+  // **데려간 동료는 약속한 보수를, 남은 동료는 다른 파티에서 번 몫을 받는다.**
+  // 받은 돈으로 동료가 제 장비를 갖춘다 — 쓸 데가 없으면 저장본에 숫자만 쌓이고,
+  // 보수를 흥정한 것이 화면의 글자로만 남는다.
+  const paid = {};
+  for (const row of deal.paid) paid[row.name] = row.gold;
+  const purses = Roster.awardGold(app.progress.roster, joinedNames,
+    won ? Hire.baseWage(quest) : 0, (Math.random() * 1e9) | 0, paid);
+  const bought = new Map();
+  for (const member of app.progress.roster) {
+    const deal = Roster.goShopping(member, (Math.random() * 1e9) | 0);
+    if (deal) bought.set(member.name, deal);
+  }
 
   const expList = $('exp-gained');
   expList.textContent = '';
-  expList.append(levelRow(`캐릭터 +${reward.charExp}`, app.progress.charLevel, app.progress.charExp,
+  expList.append(levelRow(t('hl.charExp', { n: reward.charExp }), app.progress.charLevel, app.progress.charExp,
     app.progress.charLevel >= D.LEVEL.maxLevel ? 0 : D.LEVEL.charExpTo(app.progress.charLevel)));
   const jobLv = P.jobLevel(app.progress);
   const jobMax = D.jobMaxLevel(app.progress.job);
   expList.append(levelRow(`${job.name} +${reward.jobExp}`, jobLv, P.jobExpOf(app.progress),
     jobLv >= jobMax ? 0 : D.LEVEL.jobExpTo(jobLv)));
 
-  const lines = [`처치 ${reward.kills} · 모험가 길드 ${reward.guild} · 회복 ${reward.healExp}`];
-  if (gained.charLevels) lines.push(`캐릭터 레벨 ${before.char} → ${app.progress.charLevel}`);
-  if (gained.jobLevels) lines.push(`${job.name} 레벨 ${before.job} → ${jobLv}`);
+  const lines = [t('hl.expBreak', { kills: reward.kills, guild: reward.guild, heal: reward.healExp })];
+  if (gained.charLevels) lines.push(t('hl.charLevelUp', { from: before.char, to: app.progress.charLevel }));
+  if (gained.jobLevels) lines.push(t('hl.jobLevelUp', { job: job.name, from: before.job, to: jobLv }));
   if (gained.unlocked.length) {
-    lines.push(`배울 수 있는 스킬: ${gained.unlocked.map((def) => def.name).join(', ')}`);
+    lines.push(t('hl.newSkills', { list: gained.unlocked.map((def) => def.name).join(', ') }));
   }
   $('exp-note').textContent = lines.join(' · ');
 
@@ -1889,9 +2412,13 @@ function openResult(state) {
   if (won) {
     const guild = $('guild-loot');
     guild.textContent = '';
+    // 적힌 금액에서 보수가 빠진 것이 내 몫이라, 셋을 함께 적지 않으면 지갑에
+    // 들어온 숫자와 화면의 숫자가 다르다.
     const gold = el('li');
     gold.append(icon('coin'));
-    gold.append(text('span', null, `${quest.guildReward.gold} 골드`));
+    gold.append(text('span', null, t('hl.purseLine', { n: num(deal.purse) })));
+    gold.append(text('span', 'why', deal.spent ? `보수 ${deal.spent}` : t('hl.noPay')));
+    gold.append(text('span', 'to', t('hl.myCut', { n: num(deal.hero) })));
     guild.append(gold);
 
     const method = Loot.METHODS[app.lootMethod];
@@ -1904,7 +2431,7 @@ function openResult(state) {
     if (!result.awards.length) {
       const none = el('li');
       none.append(text('span', null, '·'));
-      none.append(text('span', 'why', '이번에는 아무것도 나오지 않았다'));
+      none.append(text('span', 'why', t('hl.nothingDropped')));
       awards.append(none);
     }
     for (const award of result.awards) {
@@ -1913,7 +2440,7 @@ function openResult(state) {
       const row = el('li');
       row.append(icon(def.icon));
       row.append(itemName(award.item));
-      row.append(text('span', 'why', award.reason));
+      row.append(text('span', 'why', msg(award.reason)));
       row.append(text('span', 'to', owner.name));
       if (award.rolls) {
         row.append(text('span', 'rolls', award.rolls.map((r) => `${r.name} ${r.roll}`).join(' · ')));
@@ -1942,20 +2469,71 @@ function openResult(state) {
     }
   }
 
+  // --- 평판과 신뢰도 ---------------------------------------------------
+  //
+  // **순서가 있다.** 신뢰도를 먼저 굴리고 평판을 나중에 올린다 — 평판이 오르면
+  // 게시판을 다시 만드는데(`refreshQuests`), 그전에 동료 쪽 정산이 끝나 있어야
+  // 이번 판의 계약과 결과가 같은 자리에서 맺어진다.
+  const downedNames = new Set(members.filter((m) => AI.byUid(state, m.id).dead)
+    .map((m) => m.name));
+  // **난이도 판단도 계약에서 꺼낸다.** 여기서 다시 재면 방금 준 경험치로 올라간
+  // 레벨이 기준이 되어, 알맞다고 보고 따라나선 동료가 끝나서는 쉬웠다며 신뢰도를
+  // 깎는다 — 부른 값을 계약 때 값으로 지불하는 것과 같은 규칙이다.
+  const asked = {};
+  const feels = {};
+  for (const contract of app.contracts) {
+    asked[contract.name] = contract.gold;
+    feels[contract.name] = contract.feel;
+  }
+
+  const trustMoves = [];
+  for (const member of app.party) {
+    const change = Rep.trustDelta(member, quest, {
+      won,
+      feel: feels[member.name],
+      downed: downedNames.has(member.name),
+      asked: asked[member.name] || 0,
+      paid: (deal.paid.find((row) => row.name === member.name) || {}).gold || 0,
+    });
+    trustMoves.push(Object.assign(Rep.addTrust(member, change.delta), { parts: change.parts }));
+  }
+
+  // 주인공이 쓰러진 것은 세지 않는다. 평판이 재는 것은 의뢰를 어떻게 마쳤는가고,
+  // 주인공이 쓰러져도 전투는 이어지므로 결과에 이미 반영돼 있다.
+  const downedAllies = [...downedNames].filter((name) => name !== D.HERO.name).length;
+  const repMove = Rep.addRep(app.progress,
+    Rep.repDelta(quest, app.progress.charLevel, won, downedAllies).delta);
+  renderRepResult(repMove, won ? downedAllies : 0);
+
+  // 데려가지 않은 동료는 앙금이 가라앉는다. **결과 화면에는 적지 않는다** —
+  // 이 화면은 방금 끝난 전투를 읽는 자리고, 나가지도 않은 이름을 다 적으면
+  // 정작 데려간 넷이 묻힌다(명부 보고와 같은 이유다).
+  const joinedSet = new Set(joinedNames);
+  for (const member of app.progress.roster) {
+    if (!joinedSet.has(member.name)) Rep.rest(member);
+  }
+
+  // **일이 없으면 마을을 떠난다.** 이긴 판이든 진 판이든 한 판은 한 판이라
+  // 여기서 센다 — 이기는 동안에만 세면 지는 판이 명부를 얼어붙게 한다.
+  // 떠난 사람은 결과 화면에 적는다: 편성 화면을 열고서야 알면, 없어진 것이
+  // 규칙 때문인지 내가 잘못 본 것인지 알 수 없다.
+  const left = Roster.tickIdle(app.progress.roster, joinedNames,
+    (Math.random() * 1e9) | 0, Rep.isFriend);
+
   // 깬 의뢰는 게시판에서 사라지고 새 의뢰가 걸린다. 상점 진열대도 함께 바뀐다.
   let joined = null;
   if (won) {
     app.progress.cleared++;
     app.progress.questSeed = (Math.random() * 1e9) | 0;
     app.progress.shopSeed = (Math.random() * 1e9) | 0;
-    joined = Roster.maybeJoin(app.progress.roster, app.progress.charLevel, (Math.random() * 1e9) | 0);
+    joined = Roster.maybeJoin(app.progress.roster, (Math.random() * 1e9) | 0);
     refreshQuests();
   }
 
   renderBattleReport(L.battleReport(state));
-  renderRosterReport(roster, joined);
+  renderRosterReport(roster, joined, purses, bought, trustMoves, left);
   persist();
-  show('result', quest.name);
+  show('result', msg(quest.name));
 }
 
 // 캐릭터별로 준 피해·받은 피해·힐량. 흘린 힐은 힐을 넣은 캐릭터에게만 붙인다 —
@@ -1965,26 +2543,41 @@ function renderBattleReport(rows) {
   list.textContent = '';
 
   const head = el('li', 'head-row');
-  head.append(text('span', 'rname', '캐릭터'));
-  for (const label of ['준 피해', '받은 피해', '힐량']) head.append(text('span', null, label));
+  head.append(text('span', 'rname', t('hl.charTab')));
+  for (const label of [t('hl.dealt'), t('hl.taken'), t('hl.healed')]) head.append(text('span', null, label));
   list.append(head);
 
   for (const row of rows) {
     const line = el('li');
     const name = el('span', 'rname');
     name.append(document.createTextNode(row.name));
-    if (row.dead) name.append(text('span', 'why', ' 쓰러짐'));
+    if (row.dead) name.append(text('span', 'why', t('hl.fellSuffix')));
     line.append(name);
-    line.append(text('b', 'stat-value', String(row.dealt)));
-    line.append(text('b', 'stat-value', String(row.taken)));
-    const heal = text('b', 'stat-value', String(row.healed));
+    line.append(text('b', 'stat-value', num(row.dealt)));
+    line.append(text('b', 'stat-value', num(row.taken)));
+    const heal = text('b', 'stat-value', num(row.healed));
     if (row.overheal) heal.append(text('small', 'why', ` +${row.overheal}`));
     line.append(heal);
     list.append(line);
   }
 }
 
-function renderRosterReport(report, joined) {
+// 평판이 얼마나 움직였는가. **실패해도 보여 준다** — 실패한 판에서 평판이
+// 깎이는 것이 이 시스템의 절반이라, 이겼을 때만 뜨면 내려간 것을 아무도 못 본다.
+function renderRepResult(move, downed) {
+  const delta = $('rep-delta');
+  delta.textContent = `${move.delta > 0 ? '+' : ''}${move.delta}`;
+  delta.className = `count ${move.delta >= 0 ? 'up' : 'short'}`;
+
+  renderRep($('rep-after'), move.after);
+
+  const lines = [];
+  if (move.moved) lines.push(t('hl.repUp', { stage: move.stage.name }));
+  if (downed) lines.push(t('hl.downedNote', { n: downed }));
+  $('rep-note').textContent = lines.join(' · ');
+}
+
+function renderRosterReport(report, joined, purses, bought, trustMoves, left) {
   const list = $('roster-report');
   list.textContent = '';
 
@@ -1999,15 +2592,52 @@ function renderRosterReport(report, joined) {
     const name = el('span');
     name.append(document.createTextNode(entry.name));
     row.append(name);
-    const value = `+${entry.exp} exp${entry.levels ? ` · Lv ${member.level}` : ''}`;
+    const purse = (purses || []).find((p) => p.name === entry.name);
+    const value = `+${num(entry.exp)} exp${purse ? ` · ${t('hl.purseLine', { n: num(purse.gold) })}` : ''}`
+      + `${entry.levels ? ` · Lv ${member.level}` : ''}`;
     row.append(text('b', `stat-value${entry.levels ? ' up' : ''}`, value));
     list.append(row);
+
+    // **신뢰도는 이유와 함께 적는다.** 숫자만 뜨면 왜 깎였는지 알 수 없어,
+    // 다음 판에 무엇을 다르게 해야 하는지가 화면에 없다.
+    const move = (trustMoves || []).find((m) => m.name === entry.name);
+    if (move) {
+      const line = el('li', 'sub-row');
+      line.append(text('span', 'why',
+        t('hl.trustParts', { list: move.parts.map((part) => msg(part.why)).join(' · ') })));
+      const shown = text('b', `stat-value ${move.delta >= 0 ? 'up' : 'short'}`,
+        `${move.delta > 0 ? '+' : ''}${move.delta} → ${move.after}`);
+      // 단계가 넘어간 것은 따로 알린다 — 관계가 끊어지면 다음 의뢰에서 아예
+      // 응하지 않으므로, 조용히 넘어가면 편성 화면에서 처음 알게 된다.
+      if (move.moved) shown.append(text('small', 'why', ` ${move.stage.name}`));
+      line.append(shown);
+      list.append(line);
+    }
+
+    // 제 몫으로 장비를 갖췄으면 그 자리에서 알린다. 편성 화면을 열어 봐야
+    // 알 수 있으면 동료가 돈을 쓴 것이 화면에 없는 일이 된다.
+    const deal = bought && bought.get(entry.name);
+    if (deal) {
+      const line = el('li', 'sub-row');
+      line.append(text('span', 'why', t('hl.bought', { name: Items.def(deal.item).name })));
+      line.append(text('b', 'stat-value', t('hl.spentGold', { n: num(deal.price) })));
+      list.append(line);
+    }
   }
 
   if (joined) {
     const row = el('li');
-    row.append(text('span', null, `${joined.name} 합류`));
+    row.append(text('span', null, t('hl.joined', { name: joined.name })));
     row.append(text('b', 'stat-value up', `Lv ${joined.level}`));
+    list.append(row);
+  }
+
+  // **떠난 사람은 데려갔든 아니든 적는다.** 편성 화면을 열고서야 알면, 없어진
+  // 것이 규칙 때문인지 내가 잘못 본 것인지 알 수 없다.
+  for (const member of left || []) {
+    const row = el('li');
+    row.append(text('span', null, t('hl.left', { name: member.name })));
+    row.append(text('b', 'stat-value', t('hl.rested', { n: member.idle })));
     list.append(row);
   }
 }
@@ -2016,17 +2646,17 @@ function renderGained(items, sold, equipped) {
   const list = $('gained');
   list.textContent = '';
 
-  if (sold) list.append(text('li', 'empty-note', `재료를 팔아 ${sold} 골드를 받았다.`));
+  if (sold) list.append(text('li', 'empty-note', t('hl.soldMaterials', { n: num(sold) })));
   if (!items.length) {
-    if (equipped) list.append(text('li', 'empty-note', '장착했다. 나머지는 인벤토리에 있다.'));
-    else if (!sold) list.append(text('li', 'empty-note', '이번에는 내 몫이 없었다.'));
+    if (equipped) list.append(text('li', 'empty-note', t('hl.equipped')));
+    else if (!sold) list.append(text('li', 'empty-note', t('hl.noShare')));
     return;
   }
 
   for (const item of items) {
     const row = el('li');
     row.append(itemButton(item, {
-      label: '장착',
+      label: t('hl.equip'),
       run: () => {
         sound.play('click');
         P.equip(app.progress, item.uid);

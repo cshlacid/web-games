@@ -19,10 +19,10 @@ const Loot = node ? require('./loot.js') : root.HealerLoot;
 
 const STORAGE_KEY = 'web-games.healer.progress';
 // 판이 바뀌면 저장본을 통째로 버린다. 어중간하게 읽으면 더 이상한 상태가 된다.
-// 4에서 바뀐 것: 주인공의 계열과 계열별 직업 레벨·스킬 점수, 스킬을 점수로
-// 배우는 것. 3에서 바뀐 것: 스킬 레벨. 2에서 바뀐 것: 아이템에 uid와 무작위
-// 옵션, 동료 명부, 물약 보유량.
-const VERSION = 4;
+// 5에서 바뀐 것: 평판과 동료별 신뢰도. 4에서 바뀐 것: 주인공의 계열과 계열별
+// 직업 레벨·스킬 점수, 스킬을 점수로 배우는 것. 3에서 바뀐 것: 스킬 레벨.
+// 2에서 바뀐 것: 아이템에 uid와 무작위 옵션, 동료 명부, 물약 보유량.
+const VERSION = 5;
 
 function create() {
   return {
@@ -36,6 +36,9 @@ function create() {
     // 여기 없다 — 그쪽은 레벨에서 바로 계산된다.
     spent: { str: 0, agi: 0, int: 0, vit: 0 },
     gold: 0,
+    // 세상이 주인공을 어떻게 보는가. 동료별 신뢰도(`roster`의 `trust`)와 달리
+    // 하나뿐이고, 게시판에 걸리는 의뢰의 상한을 이것이 정한다.
+    rep: D.REPUTATION.start,
     // 장착은 인벤토리 항목을 가리키는 것이 아니라 따로 들고 있는다. 인벤토리
     // 인덱스를 가리키면 아이템 하나가 빠질 때마다 장착이 엉뚱한 것으로 바뀐다.
     equipped: { weapon: null, armor: null, trinket: null },
@@ -55,7 +58,7 @@ function create() {
     skills: [],
     // 보상 분배 방식도 같은 이유로 남는다. 파티가 미리 합의한다는 이 시스템의
     // 뜻이 "매번 고르는 칸"이 되면 사라진다.
-    lootMethod: 'even',
+    lootMethod: Loot.DEFAULT,
     roster: Roster.create(),
     questSeed: (Math.random() * 1e9) | 0,
     shopSeed: (Math.random() * 1e9) | 0,
@@ -122,8 +125,8 @@ function addExp(progress, charExp, jobExp) {
 // 더할 때마다 분기가 는다.
 function canChangeJob(progress, jobId) {
   const job = D.HERO_JOBS[jobId];
-  if (!job) return { ok: false, reason: '없는 계열' };
-  if (progress.job === jobId) return { ok: false, reason: '이미 맡고 있다' };
+  if (!job) return { ok: false, reason: 'hl.why.noJob' };
+  if (progress.job === jobId) return { ok: false, reason: 'hl.why.sameJob' };
   const need = job.need || {};
   if (need.charLevel && progress.charLevel < need.charLevel) {
     return { ok: false, reason: `캐릭터 레벨 ${need.charLevel} 필요` };
@@ -177,8 +180,8 @@ function spentPoints(progress) {
 const freePoints = (progress) => Math.max(0, earnedPoints(progress) - spentPoints(progress));
 
 function spendPoint(progress, attr) {
-  if (!D.ATTRS[attr]) return { ok: false, reason: '없는 능력치' };
-  if (freePoints(progress) <= 0) return { ok: false, reason: '남은 점수가 없다' };
+  if (!D.ATTRS[attr]) return { ok: false, reason: 'hl.why.noAttr' };
+  if (freePoints(progress) <= 0) return { ok: false, reason: 'hl.why.noPoints' };
   progress.spent[attr] = (progress.spent[attr] || 0) + 1;
   return { ok: true, left: freePoints(progress) };
 }
@@ -195,6 +198,22 @@ function stats(progress) {
     D.withGear(D.derive(D.HERO, own), bonus, D.HERO.armor));
 }
 
+// 주인공의 전투력. **등록해 둔 다섯이 아니라 배운 것 전부로 재지 않는다** —
+// 전투에 들고 가는 것이 다섯이고, 화면의 숫자는 지금 나가면 얼마나 하는가다.
+// `stats`가 장비까지 얹은 값이라 옵션이 그대로 걸린다.
+function power(progress, over) {
+  const worn = over || stats(progress);
+  const level = progress.charLevel;
+  // **등록이 비어 있으면 배운 것을 앞에서부터 채워 본다.** 화면이 편성에서 하는
+  // 것과 같은 규칙이다(`main.js`) — 여기서 빈 손으로 재면 힐러의 전투력에 회복이
+  // 하나도 안 잡혀, 회복력 옵션이 붙은 장비가 "전투력 +0"으로 뜬다.
+  const listed = validSkills(progress, progress.skills || []);
+  const ids = listed.length ? listed
+    : validSkills(progress, learnedSkills(progress).map((def) => def.id));
+  const skills = ids.map((id) => D.skillAt(D.PLAYER_SKILLS[id], skillLevel(progress, id)));
+  return D.combatPower(D.HERO, worn, skills, level, worn.attrs);
+}
+
 // 장비가 얹어 준 능력치만. 캐릭터 창이 "나눠 준 것"과 "장비가 준 것"을 갈라
 // 보여 주는 데 쓴다 — 합쳐 놓으면 점수를 어디에 넣었는지 알 수 없다.
 function gearAttrs(progress) {
@@ -206,6 +225,14 @@ function gearAttrs(progress) {
 
 function equippedItems(progress) {
   return Object.values(progress.equipped).filter(Boolean);
+}
+
+// 지금 낀 것 대신 넘긴 목록을 낀 셈 치고 잰다. 장비 비교가 이것을 쓴다.
+function statsWith(progress, items) {
+  const bonus = Items.sum(items);
+  const own = D.attrsWithGear(attrs(progress), bonus);
+  return Object.assign({ attrs: own },
+    D.withGear(D.derive(D.HERO, own), bonus, D.HERO.armor));
 }
 
 // --- 인벤토리와 장착 ----------------------------------------------------
@@ -232,7 +259,7 @@ function equip(progress, itemUid) {
   const index = findItem(progress, itemUid);
   const item = progress.inventory[index];
   const def = item && D.GEAR[item.defId];
-  if (!def) return { ok: false, reason: '장착할 수 없는 물건' };
+  if (!def) return { ok: false, reason: 'hl.why.cannotEquip' };
 
   const previous = progress.equipped[def.slot];
   progress.equipped[def.slot] = item;
@@ -244,7 +271,7 @@ function equip(progress, itemUid) {
 // --- 상점 ---------------------------------------------------------------
 
 function spend(progress, cost) {
-  if (progress.gold < cost) return { ok: false, reason: '골드가 모자란다' };
+  if (progress.gold < cost) return { ok: false, reason: 'hl.why.noGold' };
   progress.gold -= cost;
   return { ok: true, cost };
 }
@@ -258,7 +285,7 @@ function buyGear(progress, item) {
 
 function buyPotion(progress, potionId) {
   const potion = D.POTIONS[potionId];
-  if (!potion) return { ok: false, reason: '모르는 물약' };
+  if (!potion) return { ok: false, reason: 'hl.why.noSuchPotion' };
   if ((progress.potions[potionId] || 0) >= D.POTION_MAX) {
     return { ok: false, reason: `${D.POTION_MAX}개까지만 들고 간다` };
   }
@@ -268,12 +295,35 @@ function buyPotion(progress, potionId) {
   return { ok: true, cost: paid.cost };
 }
 
+// 재련. 값을 내고 그 물건의 무작위 옵션만 다시 굴린다(`Items.reforge`).
+//
+// **장착 중인 것도 재련한다.** 팔기와 달리 물건이 사라지지 않고, 오히려 지금 끼고
+// 있는 것을 손보는 것이 이 기능을 쓰는 첫 번째 이유다. 그래서 인벤토리와 장착 칸을
+// 함께 뒤진다 — uid는 그대로 두므로 슬롯이 가리키던 물건이 그대로 남는다.
+//
+// **더 나빠질 수도 있고, 되돌릴 수 없다.** 좋은 쪽만 남게 두면 값이 곧 "시간을
+// 들이면 최고 옵션"이 되어, 무엇을 언제 굴릴지 고르는 자리가 사라진다.
+function reforge(progress, itemUid) {
+  const index = findItem(progress, itemUid);
+  const slot = Object.keys(progress.equipped)
+    .find((key) => progress.equipped[key] && progress.equipped[key].uid === itemUid);
+  const item = index >= 0 ? progress.inventory[index] : (slot ? progress.equipped[slot] : null);
+  if (!item) return { ok: false, reason: 'hl.why.noSuchItem' };
+  if (!Items.isGear(item)) return { ok: false, reason: 'hl.why.cannotReforge' };
+
+  const paid = spend(progress, Items.reforgePrice(item));
+  if (!paid.ok) return paid;
+  const before = item.affixes;
+  item.affixes = Items.reforge(item);
+  return { ok: true, cost: paid.cost, before, after: item.affixes };
+}
+
 // 장착 중인 것은 팔 수 없다. 팔리면 다음 전투에 빈손으로 나가는데, 그것을
 // 되돌릴 방법이 없다.
 function sell(progress, itemUid) {
   const index = findItem(progress, itemUid);
   const item = progress.inventory[index];
-  if (!item) return { ok: false, reason: '없는 물건' };
+  if (!item) return { ok: false, reason: 'hl.why.noSuchItem' };
   const gold = Items.sellPrice(item);
   progress.inventory.splice(index, 1);
   progress.gold += gold;
@@ -282,7 +332,7 @@ function sell(progress, itemUid) {
 
 function unequip(progress, slot) {
   const item = progress.equipped[slot];
-  if (!item) return { ok: false, reason: '비어 있다' };
+  if (!item) return { ok: false, reason: 'hl.why.empty' };
   progress.equipped[slot] = null;
   progress.inventory.push(item);
   return { ok: true };
@@ -294,11 +344,20 @@ function compare(progress, item) {
   const def = D.GEAR[item.defId];
   if (!def) return null;
   const current = progress.equipped[def.slot];
+  // **전투력으로도 견준다.** 옵션 줄만 적어 두면 "최대 체력 +33 · 회피 +2%"가
+  // 나은 것인지 매번 머리로 계산해야 하는데, 그 계산이 곧 이 수치다. 슬롯의
+  // 물건만 갈아 끼운 채 다시 재는 것은 능력치 옵션이 `derive` 앞단에 얹혀
+  // 결과 수치를 통째로 흔들기 때문이다 — 옵션 차이를 더해서는 나오지 않는다.
+  const now = power(progress);
+  const worn = Object.assign({}, progress.equipped, { [def.slot]: item });
+  const after = power(progress, statsWith(progress, Object.values(worn).filter(Boolean)));
   return {
     slot: def.slot,
     current,
     diff: Items.diff(item, current),
     upgrade: Items.isUpgrade(item, current),
+    power: after,
+    powerDiff: after - now,
   };
 }
 
@@ -369,14 +428,14 @@ const freeSkillPoints = (progress, jobId) =>
 // 단추 이름을 갈라야 하기 때문이다 — "배우기"와 "＋"는 다른 일로 보여야 한다.
 function spendSkill(progress, id, learning) {
   const def = D.PLAYER_SKILLS[id];
-  if (!def) return { ok: false, reason: '없는 스킬' };
-  if (def.job !== progress.job) return { ok: false, reason: '다른 계열의 스킬' };
-  if (def.unlock > jobLevel(progress)) return { ok: false, reason: '아직 열리지 않았다' };
+  if (!def) return { ok: false, reason: 'hl.why.noSkill' };
+  if (def.job !== progress.job) return { ok: false, reason: 'hl.why.otherJobSkill' };
+  if (def.unlock > jobLevel(progress)) return { ok: false, reason: 'hl.why.locked' };
   const level = skillLevel(progress, id);
-  if (learning && level > 0) return { ok: false, reason: '이미 배웠다' };
-  if (!learning && level <= 0) return { ok: false, reason: '아직 안 배웠다' };
-  if (level >= D.SKILL.max) return { ok: false, reason: '더 올릴 수 없다' };
-  if (freeSkillPoints(progress) <= 0) return { ok: false, reason: '남은 점수가 없다' };
+  if (learning && level > 0) return { ok: false, reason: 'hl.why.known' };
+  if (!learning && level <= 0) return { ok: false, reason: 'hl.why.unknown' };
+  if (level >= D.SKILL.max) return { ok: false, reason: 'hl.why.maxed' };
+  if (freeSkillPoints(progress) <= 0) return { ok: false, reason: 'hl.why.noPoints' };
   if (!progress.learned) progress.learned = {};
   progress.learned[id] = level + 1;
   return { ok: true, level: progress.learned[id], left: freeSkillPoints(progress) };
@@ -477,9 +536,10 @@ function load() {
   // 아직 안 열린 스킬이 섞여 있을 수 있다.
   progress.skills = validSkills(progress, Array.isArray(saved.skills) ? saved.skills : []);
 
-  progress.lootMethod = Loot.METHODS[saved.lootMethod] ? saved.lootMethod : 'even';
+  progress.lootMethod = Loot.METHODS[saved.lootMethod] ? saved.lootMethod : Loot.DEFAULT;
 
   progress.roster = Roster.adopt(saved.roster);
+  progress.rep = Math.max(0, Math.min(D.REPUTATION.max, saved.rep | 0));
   progress.charLevel = Math.max(1, Math.min(D.LEVEL.maxLevel, progress.charLevel | 0));
   progress.gold = Math.max(0, progress.gold | 0);
   return progress;
@@ -494,8 +554,8 @@ const api = {
   STORAGE_KEY, VERSION, create, load, save, reset,
   addExp, gainLevels, stats, attrs, gearAttrs, equippedItems,
   earnedPoints, spentPoints, freePoints, spendPoint,
-  addItem, findItem, equip, unequip, compare,
-  spend, buyGear, buyPotion, sell,
+  addItem, findItem, equip, unequip, compare, power,
+  spend, buyGear, buyPotion, sell, reforge,
   jobEntry, jobLevel, jobExpOf, canChangeJob, changeJob,
   unlockedSkills, learnedSkills, jobSkills, validSkills,
   skillLevel, skillDef, skillLevels, learnSkill, raiseSkill,

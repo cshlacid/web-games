@@ -10,11 +10,33 @@
 const node = typeof module !== 'undefined' && module.exports;
 const D = node ? require('./data.js') : root.HealerData;
 const Items = node ? require('./items.js') : root.HealerItems;
+const Shop = node ? require('./shop.js') : root.HealerShop;
 
 // 처음 명부에 있는 동료 수. 여섯이던 것을 늘렸다 — 편성 목록이 격자가 되면서
 // 한 화면에 더 담을 수 있게 됐고, 여섯일 때에는 고를 것이 사실상 정해져 있었다.
 const START_SIZE = 9;
-const MAX_SIZE = 14;    // 이 이상은 새로 들어오지 않는다 — 편성 화면이 목록 훑기가 된다
+// **명부의 상한.** 열넷이던 때에는 한 번에 보여 주는 수(열)와 거의 같아, 새로
+// 고쳐도 같은 얼굴이 돌아왔다 — 뽑는 것이 아니라 순서만 섞는 셈이었다. 스물넷이면
+// 열 자리를 채우는 방법이 훨씬 많다. **화면이 길어지지는 않는다**: 편성 목록은
+// 여전히 열까지만 세우고, 명부 전체를 훑는 화면은 없다. 마을에 오가는 사람이
+// 많아 보이게 쉰까지 열어 두었고, 안 데려간 동료는 떠나므로(`tickIdle`) 실제로
+// 상한에 눌러앉는 일은 드물다.
+const MAX_SIZE = 50;
+
+// 길드에 새로 등록하는 모험가의 레벨. **주인공 레벨을 보지 않는다** — 길드는
+// 주인공을 중심으로 돌지 않고, 갓 등록한 초심자가 가장 많은 곳이다. 한 단계
+// 올라갈 때마다 확률이 이 배수만큼 남으므로 낮은 레벨이 흔하고 높은 레벨은 드물다.
+//
+// 예전에는 주인공 레벨 ±1로 맞췄다. 그러면 명부가 늘 주인공과 같은 높이라
+// **"어느 모험가를 데려갈까"가 아니라 "몇 번째 복제품을 데려갈까"**가 됐고,
+// 시시한 의뢰를 거절할 사람도 없었다.
+const GUILD_LEVEL_STEP = 0.78;
+
+function guildLevel(rng) {
+  let level = 1;
+  while (level < D.LEVEL.maxLevel && rng() < GUILD_LEVEL_STEP) level++;
+  return level;
+}
 
 function createRng(seed) {
   let a = (seed >>> 0) || 1;
@@ -52,6 +74,15 @@ function makeMember(rng, taken, level, defId) {
     defId: def.id,
     level: Math.max(1, level),
     exp: 0,
+    // 제 몫으로 받은 골드. 동료는 인벤토리가 없으므로 이 돈은 장비를 갖추는
+    // 데에만 쓰인다(`goShopping`).
+    gold: 0,
+    // 주인공에 대한 신뢰도. **초면은 0이다**(기획서 22장 확정). 명부에 남아
+    // 자라는 것이 경험치·장비만이 아니라는 뜻이고, 계산 규칙은 reputation.js에
+    // 있다 — 여기에는 자리만 둔다.
+    trust: D.TRUST.start,
+    // 연속으로 안 데려간 판 수. 이것이 쌓이면 마을을 떠난다(`tickIdle`).
+    idle: 0,
     gear: { weapon: null, armor: null, trinket: null },
   };
 }
@@ -82,8 +113,10 @@ const defOf = (member) => D.COMPANIONS[member.defId];
 // 동료가 다른 사람이 된다.
 const baseSpecOf = (member) => member.spec || D.COMPANIONS[member.defId].spec;
 const specOf = (member) => D.specAt(baseSpecOf(member), member.level);
-// 그림은 계열을 따라간다 — 궁수가 마법사가 되면 손에 든 것이 바뀐다.
-const spriteOf = (member) => D.spriteFor(specOf(member));
+// **계열을 바꾼 동료만 그림이 따라간다** — 궁수가 마법사가 되면 손에 든 것이
+// 바뀐다. 안 바꿨으면 정의의 그림이다: 계열 이름과 그림 이름이 늘 같지는 않다.
+const spriteOf = (member) =>
+  (member.spec ? D.spriteFor(specOf(member)) : D.COMPANIONS[member.defId].sprite);
 
 // 레벨에 맞춰 실제로 들고 나가는 스킬. 편성 화면이 보여 주는 것과 전투가
 // 쓰는 것이 같아야 하므로 규칙을 한 곳에 둔다 — data.js의 skillsFor 하나다.
@@ -102,8 +135,8 @@ function skillsOf(member) {
 const specChoices = (member) => D.SPEC_CHOICES[jobOf(member)] || [];
 
 function canChangeSpec(member, spec) {
-  if (!specChoices(member).includes(spec)) return { ok: false, reason: '고를 수 없는 계열' };
-  if (spec === baseSpecOf(member)) return { ok: false, reason: '이미 그 계열이다' };
+  if (!specChoices(member).includes(spec)) return { ok: false, reason: 'hl.why.badSpec' };
+  if (spec === baseSpecOf(member)) return { ok: false, reason: 'hl.why.sameSpec' };
   if (member.level < D.SPEC_CHANGE_LEVEL) {
     return { ok: false, reason: `레벨 ${D.SPEC_CHANGE_LEVEL} 필요` };
   }
@@ -161,21 +194,83 @@ function awardExp(members, joinedNames, exp, seed) {
   return report;
 }
 
+// 의뢰 골드의 제 몫. 남은 동료는 다른 파티에서 번 몫만 받는다 — **나누는 규칙은
+// 경험치와 같다**(`idleExpRate`). 규칙을 둘로 두면 한쪽만 고치게 된다.
+//
+// **데려간 동료의 몫은 `paid`가 정한다** — 그쪽은 나누는 것이 아니라 모집할 때
+// 약속한 보수고(hire.js), 동료마다 부른 값이 다르다. 안 넘기면 예전처럼
+// `share`를 그대로 준다.
+function awardGold(members, joinedNames, share, seed, paid) {
+  const rng = createRng(seed == null ? (Math.random() * 1e9) | 0 : seed);
+  const joined = new Set(joinedNames);
+  const [lo, hi] = D.LEVEL.idleExpRate;
+  const report = [];
+
+  for (const member of members) {
+    const here = joined.has(member.name);
+    const wage = paid ? Math.max(0, Math.round(paid[member.name] || 0)) : share;
+    const got = here ? wage : Math.round(share * (lo + rng() * (hi - lo)));
+    member.gold = (member.gold || 0) + got;
+    report.push({ name: member.name, joined: here, gold: got });
+  }
+  return report;
+}
+
+// 동료가 제 돈으로 장비를 갖춘다. **상점 진열대를 같이 보지 않는다** — 동료의
+// 장보기는 화면이 없어 사람이 개입할 수 없으므로, 같은 진열대를 두고 다투면
+// 주인공이 사려던 물건이 말없이 사라진다. 등급 규칙(`Shop.tierFor`)만 빌려 쓴다.
+//
+// **지금 낀 것보다 나은 것만 산다**(`offerGear`와 같은 잣대). 아니면 돈을 모은다 —
+// 몇 판 참으면 더 좋은 등급을 살 수 있는데 매번 다 써 버리면 영영 못 산다.
+function goShopping(member, seed) {
+  const rng = createRng(seed == null ? (Math.random() * 1e9) | 0 : seed);
+  const job = jobOf(member);
+  const pool = Object.values(D.GEAR).filter((def) => !def.job || def.job === job);
+  if (!pool.length) return null;
+
+  // 몇 개만 본다. 전부 훑어 가장 좋은 것을 고르게 하면 동료가 주인공보다 장을
+  // 잘 보게 되고, 무작위 옵션이 뜻을 잃는다.
+  for (let i = 0; i < 3; i++) {
+    const def = pick(rng, pool);
+    const item = Items.make(def.id, Shop.tierFor(member.level, rng), (rng() * 1e9) | 0);
+    const price = Items.price(item);
+    if ((member.gold || 0) < price) continue;
+    const taken = offerGear(member, item);
+    if (!taken.taken) continue;
+    member.gold -= price;
+    return { item, slot: taken.slot, price, previous: taken.previous };
+  }
+  return null;
+}
+
 // --- 장비 ---------------------------------------------------------------
 
 // 동료는 인벤토리가 없다. 분배로 받은 장비가 지금 낀 것보다 나으면 갈아 끼우고,
 // 아니면 알아서 처분한다 — 동료의 창고까지 관리하게 하면 화면이 하나 더 는다.
 function offerGear(member, item) {
-  if (!Items.isGear(item)) return { taken: false, reason: '장비가 아니다' };
+  if (!Items.isGear(item)) return { taken: false, reason: 'hl.why.notGear' };
   const slot = D.GEAR[item.defId].slot;
   const current = member.gear[slot];
   const better = !current || Items.score(item, jobOf(member)) > Items.score(current, jobOf(member));
-  if (!better) return { taken: false, reason: '쓰던 것이 낫다' };
+  if (!better) return { taken: false, reason: 'hl.why.worseGear' };
   member.gear[slot] = item;
   return { taken: true, slot, previous: current };
 }
 
 const gearOf = (member) => Object.values(member.gear).filter(Boolean);
+
+// 그 동료의 전투력. **장비까지 얹은 수치로 잰다** — 능력치 옵션은 `attrsWithGear`
+// 앞단에서, 나머지 옵션은 `withGear`에서 녹으므로 옵션 하나를 바꾸면 여기가 움직인다.
+function powerOf(member) {
+  const def = D.COMPANIONS[member.defId];
+  if (!def) return 0;
+  const bonus = Items.sum(gearOf(member));
+  const attrs = D.attrsWithGear(D.attrsAt(def, member.level, null), bonus);
+  const stats = D.withGear(D.derive(def, attrs), bonus, def.armor);
+  const hands = D.skillsFor(specOf(member), member.level, D.skillSeed(member.name),
+    null, member.learned);
+  return D.combatPower(def, stats, hands.map((id) => D.UNIT_SKILLS[id]), member.level, attrs);
+}
 
 // 전투에 넘길 수치. 레벨 배수는 전투 쪽(logic.js)이 곱하므로 여기서는 장비 몫만 낸다.
 function bonusOf(member) {
@@ -205,20 +300,78 @@ function toParty(member) {
   };
 }
 
+// --- 마을을 떠난다 --------------------------------------------------------
+//
+// **안 데려간 판이 이어지면 확률적으로 명부에서 사라진다.** 모험가는 주인공을
+// 기다리며 마을에 머무는 사람들이 아니라, 일이 없으면 다른 마을로 가는 사람들이다.
+// 이것이 없으면 명부가 쌓이기만 해서, 상한을 올린 것이 그대로 "훑을 목록이 길어짐"이
+// 된다 — 새 얼굴이 들어올 자리를 만드는 것이 이 규칙의 실제 값이다.
+//
+// **몇 판은 봐 준다**(`IDLE_GRACE`). 한 판 걸렀다고 사라지면 편성을 바꿔 볼 수가
+// 없다. 그 뒤로는 한 판 지날 때마다 확률이 `IDLE_STEP`씩 오르고 `IDLE_CAP`에서
+// 멈춘다 — 100%로 두면 "몇 판 뒤 반드시"가 되어 확률로 둔 뜻이 없다.
+//
+// **값은 마을 인구가 어디에서 멈추는지로 정했다.** 처음 잡은 값(유예 4 · 걸음
+// 0.12 · 상한 0.5)은 너무 매워서, 예순 판을 굴리니 인구가 열 언저리에 눌러앉았다 —
+// 한 번에 보여 주는 수와 같아지면 새로 고쳐도 같은 얼굴이 돌아온다. 지금 값은
+// 한 판에 새로 고침을 한 번 누르면 열여섯, 세 번 누르면 스물여덟에서 멈춘다.
+const IDLE_GRACE = 8;
+const IDLE_STEP = 0.03;
+const IDLE_CAP = 0.25;
+// 이 아래로는 내보내지 않는다. 명부가 파티를 짤 수 없을 만큼 줄면 게임이 멈춘다.
+const KEEP_MIN = 6;
+
+const leaveChance = (member) =>
+  Math.min(IDLE_CAP, Math.max(0, ((member.idle || 0) - IDLE_GRACE) * IDLE_STEP));
+
+// 판이 하나 지났다. 데려간 쪽은 0으로 돌아가고, 나머지는 하나씩 쌓인다.
+//
+// **친구는 떠나지 않는다**(신뢰도 마지막 단계). 공들여 쌓은 관계가 안 데려간
+// 판 몇 번으로 사라지면, 친구를 만든 것이 손해가 된다.
+function tickIdle(members, joinedNames, seed, isFriend) {
+  const rng = createRng(seed == null ? (Math.random() * 1e9) | 0 : seed);
+  const joined = new Set(joinedNames);
+  const left = [];
+
+  for (const member of members) {
+    if (joined.has(member.name)) { member.idle = 0; continue; }
+    member.idle = (member.idle || 0) + 1;
+    if (isFriend && isFriend(member)) continue;
+    if (members.length - left.length <= KEEP_MIN) continue;
+    if (rng() < leaveChance(member)) left.push(member);
+  }
+
+  for (const member of left) members.splice(members.indexOf(member), 1);
+  return left;
+}
+
 // --- 새 동료 ------------------------------------------------------------
 
-// 의뢰를 깰 때마다 낮은 확률로 명부에 새 얼굴이 들어온다. 레벨은 주인공 근처로
-// 맞춘다 — 1레벨이 들어오면 명부에만 있고 아무도 안 데려간다.
+// 의뢰를 깰 때마다, 그리고 편성 화면에서 목록을 새로 고칠 때마다 명부에 새 얼굴이
+// 들어온다. **레벨은 길드의 분포를 따른다**(`guildLevel`) — 주인공 레벨은 인자로
+// 받지도 않는다.
+//
+// **확률을 밖에서 받는다.** 새로 고침은 몇 번이고 연달아 누를 수 있어 의뢰를 깨는
+// 쪽보다 조금 낮게 둔다. 그래도 명부 상한이 스물넷이라, 눌러서 새 얼굴을 만나는
+// 것이 이 단추의 값이다.
 const JOIN_CHANCE = 0.45;
+const REDRAW_JOIN_CHANCE = 0.35;
 
-function maybeJoin(members, playerLevel, seed) {
+// **새로 고치는 데 값을 낸다.** 공짜였을 때에는 마음에 드는 목록이 나올 때까지
+// 누르는 것이 아무 대가 없는 일이라, 뽑기가 사실상 없는 것과 같았다. 곡선은
+// 진열대 갱신과 같은 것을 쓰고(`D.refreshPrice`) 기준값만 낮다 — 한 판에 여러 번
+// 누를 수 있는 자리라, 같은 값이면 새로 고침 두 번이 의뢰 한 판을 먹는다.
+const REDRAW_COST = 70;
+
+const redrawCost = (charLevel) => D.refreshPrice(REDRAW_COST, charLevel);
+
+function maybeJoin(members, seed, chance) {
   if (members.length >= MAX_SIZE) return null;
   const rng = createRng(seed == null ? (Math.random() * 1e9) | 0 : seed);
-  if (rng() > JOIN_CHANCE) return null;
+  if (rng() > (chance == null ? JOIN_CHANCE : chance)) return null;
 
   const taken = new Set(members.map((m) => m.name));
-  const level = Math.max(1, playerLevel + ((rng() * 3) | 0) - 1);
-  const member = makeMember(rng, taken, level);
+  const member = makeMember(rng, taken, guildLevel(rng));
   members.push(member);
   return member;
 }
@@ -246,6 +399,11 @@ function adopt(saved) {
       defId: entry.defId,
       level: Math.max(1, Math.min(D.LEVEL.maxLevel, entry.level | 0 || 1)),
       exp: Math.max(0, entry.exp | 0),
+      gold: Math.max(0, entry.gold | 0),
+      idle: Math.max(0, entry.idle | 0),
+      // 신뢰도는 범위 밖으로 나갈 수 없다. 저장본을 손대서 +999가 되면 보수가
+      // 1골드로 굳어 모집이 뜻을 잃는다.
+      trust: Math.max(D.TRUST.min, Math.min(D.TRUST.max, entry.trust | 0)),
       gear,
       // 배운 것 중 아는 스킬만 남긴다. 자료가 바뀌어 없어진 것이 섞여 있으면
       // 전투가 시작할 때 빈 스킬을 들고 들어간다.
@@ -263,10 +421,13 @@ function adopt(saved) {
 }
 
 const api = {
-  START_SIZE, MAX_SIZE, JOIN_CHANCE,
+  START_SIZE, MAX_SIZE,
   create, adopt, makeMember, jobOf, specOf, baseSpecOf, spriteOf, defOf, skillsOf,
   specChoices, canChangeSpec, changeSpec, remember,
-  gainExp, awardExp, offerGear, gearOf, bonusOf, potionsOf, toParty, maybeJoin,
+  gainExp, awardExp, awardGold, goShopping, offerGear, gearOf, bonusOf, potionsOf, toParty, maybeJoin,
+  powerOf,
+  JOIN_CHANCE, REDRAW_JOIN_CHANCE, REDRAW_COST, redrawCost, GUILD_LEVEL_STEP, guildLevel,
+  IDLE_GRACE, IDLE_STEP, IDLE_CAP, KEEP_MIN, leaveChance, tickIdle,
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = api;

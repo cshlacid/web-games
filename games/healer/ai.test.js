@@ -129,7 +129,12 @@ function gather(state) {
   // 도발이 쿨타임이면 다시 나가지 않는다.
   const again = enemyOf(state, 'tank');
   again.targetUid = named(state, '사제 노아').uid;
-  check('도발은 쿨타임 동안 다시 안 나간다', AI.chooseSkill(tank, state, again), null);
+  // 아무 스킬도 안 나가는지가 아니라 **도발이** 안 나가는지를 본다. 때리는
+  // 스킬은 사거리만 맞으면 나가도 되고, 사거리는 대열이 어떻게 서느냐에 따라
+  // 달라진다.
+  const later = AI.chooseSkill(tank, state, again);
+  check('도발은 쿨타임 동안 다시 안 나간다',
+    Boolean(later && D.UNIT_SKILLS[later.id].kind.startsWith('taunt')), false);
 }
 {
   // 여럿이 풀렸으면 힐러 → 원거리 → 근접 순으로 구한다.
@@ -252,10 +257,12 @@ function gather(state) {
     .filter(([, list]) => list.some((id) => D.UNIT_SKILLS[id].kind === 'stun'))
     .map(([spec]) => spec).sort();
   // 상위 계열은 아래 계열의 목록을 물려받으므로 근접 셋의 상위 셋까지 나온다.
-  // 늘어난 것이 그 여섯뿐인지를 본다 — 원거리 상위가 기절을 얻으면 여기서 걸린다.
+  // 우두머리도 근접이라 방패 밀치기를 물려받는다 — 적에게도 같은 수단을 준다는
+  // 규칙 쪽이다. 늘어난 것이 그 일곱뿐인지를 본다 — 원거리 계열이 기절을 얻으면
+  // 여기서 걸린다.
   const melee = ['rogue', 'tank', 'warrior'];
   check('기절은 근접 계열만 갖는다', stunSpecs,
-    melee.concat(melee.map((spec) => D.SPEC_UP[spec].spec)).sort());
+    melee.concat(melee.map((spec) => D.SPEC_UP[spec].spec), ['chieftain']).sort());
 }
 
 // --- 음유시인: 아군의 마나를 채운다 -------------------------------------
@@ -460,8 +467,11 @@ function gather(state) {
   check('탱커가 없으면 근접 딜러에게', toMelee && toMelee.x > ranged.x, true);
   check('붙을 자리가 근접 딜러다', AI.anchorOf(ranged, state).uid, melee.uid);
 
-  // 둘 다 없으면 그제야 물러선다.
+  // 둘 다 없으면 그제야 물러선다. **버티는 선도 지금 자리로 옮긴다** — 배치할
+  // 때 잡힌 선이 앞에 남아 있으면 `holdLine`이 "여기는 네 선보다 뒤"라며 앞으로
+  // 되돌린다(그것이 이 규칙이 하는 일이다).
   melee.dead = true;
+  ranged.lineX = ranged.x;
   const away = AI.chooseMove(ranged, state, foe);
   check('붙을 곳이 없으면 물러선다', away && away.x < ranged.x, true);
   check('그래도 때리는 것은 멈추지 않는다', AI.decide(ranged, state).attack !== null, true);
@@ -602,6 +612,63 @@ function gather(state) {
   healer.x = tank.x - AI.STICK;
   check('제자리면 그대로 선다', AI.chooseMove(healer, state, foe), null);
   check('그리고 때린다', AI.decide(healer, state).attack, foe.uid);
+}
+
+// --- 혼란 ---------------------------------------------------------------
+{
+  // 광역 혼란은 광역 도발·광역 약화와 같은 잣대다 — 새로 걸릴 적이 둘 이상일
+  // 때만 쓴다. 쿨타임이 길어 하나에게 쓰면 그 판에서 다시 못 부른다.
+  const state = battle({ party: [{ defId: 'bran', level: 1 }, { defId: 'lyle', level: 1 },
+    { defId: 'mira', level: 1 }, { defId: 'finn', level: 5 }] });
+  gather(state);
+  const bard = AI.alive(state, 'ally').find((u) => u.spec === 'bard');
+  bard.skills = [{ id: 'dissonance', readyAt: 0 }];
+  check('셋이 모여 있으면 불협화음', AI.chooseSkill(bard, state, null).id, 'dissonance');
+
+  const rest = enemies(state).slice(1);
+  rest.forEach((u) => { u.dead = true; });
+  check('하나뿐이면 아낀다', AI.chooseSkill(bard, state, null), null);
+
+  // 이미 혼란인 적은 세지 않는다. 겹쳐 걸면 긴 쿨타임만 버린다 — 기절과 같다.
+  rest.forEach((u) => { u.dead = false; });
+  rest.forEach((u) => { u.confusedUntil = state.t + 3; });
+  check('이미 걸린 적은 세지 않는다', AI.chooseSkill(bard, state, null), null);
+}
+
+// --- 동료가 길을 막으면 돌아서 붙는다 -----------------------------------
+//
+// 비켜서기는 세로로만 옮기는데, 같은 편끼리 벌리는 거리(10)가 근접 사거리(7~9)보다
+// 넓어 한 적을 둘이 치려 하면 뒤에 선 쪽이 사거리 밖으로 밀려난다. 그 자리는
+// 스스로 풀리지 않아, 재 보니 근접이 대상을 두고도 사거리 밖에 머문 시간이
+// 전투의 9.5%였고 한 유닛은 50초를 그렇게 서 있었다.
+{
+  const state = battle({ party: [{ defId: 'bran', level: 4 }, { defId: 'lyle', level: 4 }] });
+  const foe = enemyOf(state, 'tank');
+  const [first, second] = AI.alive(state, 'ally')
+    .filter((u) => AI.roleOf(u) === 'melee' || AI.roleOf(u) === 'tank')
+    .sort((a, b) => (a.uid < b.uid ? -1 : 1));
+  check('근접 둘이 있다', Boolean(first && second), true);
+
+  // 손위가 적의 정면을 차지하고, 손아래는 그 뒤에서 다가온다.
+  foe.x = 60; foe.y = 28;
+  first.x = foe.x - second.range * 0.85; first.y = foe.y;
+  second.x = first.x - 6; second.y = foe.y;
+  for (const u of AI.alive(state, 'enemy')) { if (u.uid !== foe.uid) u.dead = true; }
+  for (const u of AI.alive(state, 'ally')) {
+    if (u.uid !== first.uid && u.uid !== second.uid) u.dead = true;
+  }
+
+  const spot = AI.chooseMove(second, state, foe);
+  check('갈 자리가 있다', Boolean(spot), true);
+  const reach = Math.hypot(spot.x - foe.x, spot.y - foe.y);
+  check('사거리 안까지 간다', reach <= second.range, true);
+  // 비켜서기와 같은 잣대로 골랐으므로, 그 자리는 다시 밀려나지 않는다.
+  const after = AI.freeSpot(second, state, spot);
+  check('비켜서기가 다시 밀어내지 않는다',
+    Math.round(after.y * 10) === Math.round(spot.y * 10), true);
+  // 손위의 자리를 빼앗지도 않는다.
+  check('손위와는 벌어져 선다',
+    Math.max(Math.abs(spot.x - first.x), Math.abs(spot.y - first.y)) >= AI.SPACING, true);
 }
 
 console.log(`${passed}개 통과, ${failed}개 실패`);

@@ -58,7 +58,11 @@ function bestBy(unit, list, order) {
 }
 
 const mates = (unit, state) => alive(state, unit.side).filter((u) => u.uid !== unit.uid);
-const foesOf = (unit, state) => alive(state, opposite(unit.side));
+// 혼란은 편을 뒤집는다. **편을 가르는 자리가 여기 하나뿐이라 여기만 고치면
+// 된다** — 노리는 것도, 붙으러 가는 것도, 스킬을 거는 것도 전부 이 함수를 본다.
+const confused = (state, unit) => state.t < (unit.confusedUntil || 0);
+const foesOf = (unit, state) =>
+  (confused(state, unit) ? mates(unit, state) : alive(state, opposite(unit.side)));
 
 // 이 편의 탱커. 여럿이면 앞에 선 쪽을 기준으로 본다 — 후열이 붙는 자리이자
 // 어그로를 보는 자리라 최전선이어야 나머지 규칙이 뜻대로 굴러간다.
@@ -128,8 +132,10 @@ function dealerTarget(unit, state) {
 
 function chooseTarget(unit, state) {
   // 도발은 다른 모든 판단을 이긴다. 아군이든 적이든 같다.
+  // **혼란만은 도발을 이긴다.** 탱커의 도발이 전투의 7할을 덮고 있어(재 보니 72%),
+  // 도발이 이기게 두면 혼란이 걸려도 대부분 아무 일도 일어나지 않는다.
   const forced = unit.tauntUid && state.t < unit.tauntUntil ? byUid(state, unit.tauntUid) : null;
-  if (forced && !forced.dead) return forced;
+  if (forced && !forced.dead && !confused(state, unit)) return forced;
 
   const role = roleOf(unit);
   if (role === 'tank') return tankTarget(unit, state);
@@ -152,7 +158,10 @@ const EMERGENCY = 0.35;  // 효율을 따질 상황이 아닌 체력 비율
 // "여유가 있다"를 따로 재지 않는 것은, 효율·위급 조건에 걸리지 않는 것이 곧
 // 여유가 있다는 뜻이기 때문이다 — 조건 하나로 순서와 여유를 같이 본다.
 function healTarget(unit, state, heal) {
-  const friends = alive(state, unit.side).filter((u) => missing(u) > 0);
+  // **회복이 통하지 않는 편은 후보에서 뺀다**(언데드, `logic.applyHeal`). 빼지
+  // 않으면 그쪽은 체력이 영영 안 차므로 늘 "가장 많이 깎인 아군"으로 남아,
+  // 힐러가 남은 전투 내내 헛힐만 던진다.
+  const friends = alive(state, unit.side).filter((u) => missing(u) > 0 && !u.healHarm);
   if (!friends.length) return null;
 
   const ordered = friends.slice().sort((a, b) => {
@@ -321,7 +330,8 @@ function chooseSkill(unit, state, target) {
       const hurt = healTarget(unit, state, def.heal);
       if (!hurt || dist(unit, hurt) > reach) continue;
       const covered = alive(state, unit.side)
-        .filter((mate) => dist(mate, hurt) <= def.radius && missing(mate) >= def.heal * EFFICIENT);
+        .filter((mate) => dist(mate, hurt) <= def.radius
+          && missing(mate) >= def.heal * EFFICIENT && !mate.healHarm);
       if (covered.length >= 2) return { id: def.id, targetUid: hurt.uid };
       continue;
     }
@@ -341,8 +351,23 @@ function chooseSkill(unit, state, target) {
     // 것을 막지 못하는데, 목록 앞에 있다는 이유로 쓰러져 가는 탱커를 두고
     // 노래를 불렀다. 힐을 안 들고 온 유닛에게는 걸리지 않는다 — 그런 유닛이
     // 여기서 멈추면 아무것도 하지 않고 서 있게 된다.
-    if ((isBuff(def) || isDebuff(def)) && carriesHeal(unit)
+    if ((isBuff(def) || isDebuff(def) || def.kind === 'confuse') && carriesHeal(unit)
       && alive(state, unit.side).some((mate) => mate.hp / mate.maxHp <= EMERGENCY)) continue;
+
+    // 혼란. 광역 약화와 같은 잣대로 고른다 — 기준점 주변에서 **새로 걸릴 적이 둘
+    // 이상**일 때만 쓴다. 쿨타임이 길어 하나에게 쓰면 그 판에서 다시 못 부른다.
+    // 이미 걸린 적을 세지 않는 것은 기절과 같은 이유다(겹치면 시간만 버린다).
+    if (def.kind === 'confuse') {
+      const pool = foesOf(unit, state)
+        .filter((foe) => dist(unit, foe) <= reach && !confused(state, foe));
+      if (!pool.length) continue;
+      const pick = (target && pool.indexOf(target) >= 0) ? target : nearest(unit, pool);
+      if (!def.radius) return { id: def.id, targetUid: pick.uid };
+      const covered = foesOf(unit, state)
+        .filter((foe) => dist(foe, pick) <= def.radius && !confused(state, foe));
+      if (covered.length >= 2) return { id: def.id, targetUid: pick.uid };
+      continue;
+    }
 
     if (isBuff(def)) {
       // 사거리 0은 자기에게 거는 것이다(전사의 굳히기).
@@ -468,11 +493,44 @@ function anchorOf(unit, state) {
   return nearest(unit, mates(unit, state).filter((u) => roleOf(u) === 'melee'));
 }
 
+// **대열은 처음 선 자리보다 뒤로 밀리지 않는다.** 후열이 설 자리는 앞줄의 뒤인데,
+// 앞줄이 제 뒤로 파고든 적을 잡으러 돌아서면 후열은 그 뒤로 또 물러선다. 그러면
+// 적이 따라오고 앞줄이 다시 돌아서서, 양쪽이 함께 화면 끝까지 걸어간다 — 재 보니
+// 전투 시간의 절반이 전장 왼쪽 3할에서 지나갔고 끝에는 아군도 적도 왼쪽 벽에
+// 붙어 있었다. 밀리지 않으면 적도 거기까지만 들어오므로, 싸움이 처음 만난 자리
+// 근처에 머무른다.
+//
+// **아주 못 물러서게 하지는 않는다**(`LINE_GIVE`). 붙을 앞줄이 다 쓰러진 뒤에도
+// 한 발도 못 빼면 마지막 하나가 적 한가운데에 선 채로 죽는데, 그것은 "도망은
+// 이동일 뿐"이라는 아래 규칙을 없애는 것이다. 한 번 밀리는 폭만 열어 두면 뒤로
+// 걸어가는 일이 쌓이지 않는다 — 밀리는 자리가 기준선에서 재는 절대 위치라
+// 그렇다.
+//
+// **버티는 선은 출발선이 아니라 그보다 앞이다**(`LINE_PUSH`). 양쪽이 제자리에서
+// 버티면 걸어와 붙는 쪽이 상대의 출발선까지 들어가므로, 싸움이 둘 중 한쪽의
+// 자리에서만 열린다 — 아군 대열을 가운데에 세워 두었더니 이번에는 무리가 바뀔
+// 때마다 아군이 적 코앞에서 시작했다. 출발선을 왼쪽 4분의 1로 물리고 버티는
+// 선만 앞에 두면, 양쪽이 저마다 앞으로 나와 **가운데에서 만난다.**
+//
+// **편을 가리는 분기가 아니다** — 앞이 어느 쪽인지만 `forward`로 물어보는, 이
+// 파일의 다른 자리와 같은 방식이다.
+// 버티는 선은 유닛마다 하나씩 들고 있다(`unit.lineX`, `logic.js`가 세울 때
+// 계산한다). 여기서 출발선으로부터 다시 재지 않는 것은, 어디에 세울지는 배치의
+// 일이고 여기는 그 선을 지키는 일만 하기 때문이다.
+const LINE_PUSH = 38;
+const LINE_GIVE = 12;
+
+function holdLine(unit, spot) {
+  if (unit.lineX == null) return spot;
+  const forward = unit.side === 'ally' ? 1 : -1;
+  const limit = unit.lineX - forward * LINE_GIVE;
+  return { x: forward > 0 ? Math.max(spot.x, limit) : Math.min(spot.x, limit), y: spot.y };
+}
+
 // **후열은 맞아도 도망가지 않는다.** 도망가면 어그로를 끌 탱커에게서 멀어지고,
 // 결국 탱커가 닿지 못하는 곳에서 혼자 맞는다. 탱커 곁에 붙어 있어야 탱커가
 // 그 적을 도발 사거리 안에 둔다. 붙을 탱커도 근접 딜러도 없을 때에만 물러선다.
-function chooseMove(unit, state, target) {
-  if (!unit.speed) return null;
+function wantedMove(unit, state, target) {
   const role = roleOf(unit);
 
   if (role === 'healer' || role === 'ranged') {
@@ -494,20 +552,117 @@ function chooseMove(unit, state, target) {
     if (anchor) {
       // 제자리 근처에서는 움직이지 않는다. 조금씩이라도 계속 걸으면 캐스팅이
       // 매번 취소되어 후열이 아무 스킬도 못 쓴다.
-      const spot = behind(unit, anchor, STICK);
+      // **앞줄을 앞지르지 않는 것이 먼저다.** 앞줄이 제 뒤로 물러선 판에서는 두
+      // 규칙이 부딪히는데, 여기서 기준선을 이기게 두면 힐러가 탱커보다 앞에 선다.
+      const spot = holdBehind(unit, anchor, holdLine(unit, behind(unit, anchor, STICK)));
       return dist(unit, spot) > STICK * 0.4 ? spot : null;
     }
 
     // 앞에 아무도 없다. 이제야 물러서되, 공격과 힐은 계속한다 — 도망은
     // 이동일 뿐이고 logic.js는 사거리만 맞으면 때린다.
     const foe = nearest(unit, foesOf(unit, state));
-    if (foe && dist(unit, foe) < RETREAT) return standoff(unit, foe, RETREAT + 4);
+    if (foe && dist(unit, foe) < RETREAT) return holdLine(unit, standoff(unit, foe, RETREAT + 4));
     return null;
   }
 
   if (!target) return null;
   const want = unit.range * 0.85;
-  return dist(unit, target) > want ? standoff(unit, target, want) : null;
+  return dist(unit, target) > want ? approach(unit, state, target, want) : null;
+}
+
+// 겹쳐 서면 화면에서 누가 누구인지 알 수 없고, 장판을 어디에 깔지 고르는 의미도
+// 사라진다. **예전에는 logic.js가 매 틱 서로를 밀어냈다.** 그것을 걷어 낸 자리가
+// 여기다 — 미는 대신 겹친 쪽이 제 발로 비켜선다. 남의 좌표를 옮기는 것은 넉백뿐이다.
+//
+// **양보하는 쪽은 늘 한쪽이다**(uid가 큰 쪽). 둘 다 비키면 서로를 피하다 매 틱
+// 자리를 바꾸며 떠는데, 밀어내기가 사거리 밖에서 떨던 것과 같은 모양이 된다.
+//
+// **가로가 아니라 세로로 비킨다.** 가로 거리가 곧 사거리라서 가로로 옮기면 붙었다
+// 떨어졌다를 반복한다. 세로로 벌리면 사거리를 거의 건드리지 않는다.
+//
+// **편에 따라 벌리는 거리가 다르다.** 같은 편끼리는 서로 붙을 이유가 없어 넉넉히
+// 벌리지만, 적과는 **가장 짧은 근접 사거리(7)보다 좁게** 벌려야 한다 — 사거리
+// 밖으로 비켜서면 붙으려는 힘과 비키려는 힘이 매 틱 싸워, 근접 유닛이 사거리
+// 언저리에서 떤다. 예전에 양쪽을 다 밀어내다 걷어 낸 것이 그 진동이었다.
+const SPACING = 10;
+const CLOSE = 6;
+
+// 이 유닛이 저 유닛에게서 얼마나 떨어져 서야 하는가.
+const gapTo = (unit, other) => (other.side === unit.side ? SPACING : CLOSE);
+
+
+function freeSpot(unit, state, spot) {
+  // **양보하는 쪽은 늘 한쪽이다**(uid가 큰 쪽). 편을 가리지 않고 같은 규칙을
+  // 쓰므로 아군과 적 사이에서도 서로 피하다 떠는 일이 없다.
+  const seniors = alive(state, 'ally').concat(alive(state, 'enemy'))
+    .filter((other) => other.uid < unit.uid)
+    .sort((a, b) => (a.uid < b.uid ? -1 : 1));
+  let y = spot.y;
+  for (const other of seniors) {
+    const gap = gapTo(unit, other);
+    if (Math.abs(other.x - spot.x) >= gap) continue;
+    if (Math.abs(other.y - y) >= gap) continue;
+    y = other.y + (y >= other.y ? gap : -gap);
+  }
+  return { x: spot.x, y: Math.min(D.FIELD.bottom, Math.max(D.FIELD.top, y)) };
+}
+
+// **동료가 길을 막으면 돌아서 붙는다.** 비켜서기(`freeSpot`)는 세로로만 옮기는데,
+// 같은 편끼리 벌리는 거리(`SPACING` 10)가 근접 사거리(7~9)보다 넓어 한 적을 둘이
+// 치려 하면 뒤에 선 쪽이 사거리 밖으로 밀려난다. 그 자리는 스스로 풀리지 않는다 —
+// 재 보니 근접이 대상을 두고도 사거리 밖에 머문 시간이 전투의 9.5%였고, 한 유닛은
+// 50초를 그렇게 서 있었다.
+//
+// 그래서 **대상 둘레를 돌며 빈자리를 찾는다.** 지금 선 쪽에서 가까운 각도부터
+// 보므로 굳이 멀리 돌지 않고, 어느 각도도 비어 있지 않으면 가장 덜 겹치는 자리를
+// 고른다("최대한 가깝게").
+//
+// **비켜서기와 같은 잣대로 잰다.** 여기서 다른 자로 재면 골라 놓은 자리를
+// `freeSpot`이 다시 밀어내, 돌아서 온 것이 헛일이 된다. 손아래(uid가 큰 쪽)에게
+// 자리를 비켜 줄 이유가 없다는 것까지 같다.
+const APPROACH_ANGLES = 24;
+
+function clearance(unit, state, spot) {
+  let room = Infinity;
+  for (const other of alive(state, 'ally').concat(alive(state, 'enemy'))) {
+    if (other.uid >= unit.uid) continue;
+    const box = Math.max(Math.abs(other.x - spot.x), Math.abs(other.y - spot.y));
+    room = Math.min(room, box - gapTo(unit, other));
+  }
+  return room;
+}
+
+function approach(unit, state, target, want) {
+  const direct = standoff(unit, target, want);
+  // 막히지 않았으면 하던 대로 곧장 간다. 둘러보는 값은 막혔을 때만 치른다.
+  if (clearance(unit, state, direct) >= 0) return direct;
+
+  // **둘러보는 반지름은 사거리 끝이다.** 평소 붙는 거리(`want`, 사거리의 85%)로
+  // 돌면 대각선 자리가 대상과의 간격(`CLOSE` 6)에 걸려 전부 막힌 것으로 나온다 —
+  // 사거리 끝까지 나가야 대상의 위아래에 설 자리가 열린다.
+  const reach = unit.range * 0.95;
+  const base = Math.atan2(unit.y - target.y, unit.x - target.x);
+  let best = null;
+  for (let i = 0; i < APPROACH_ANGLES; i++) {
+    const step = Math.ceil(i / 2) * (i % 2 ? 1 : -1);
+    const angle = base + step * ((2 * Math.PI) / APPROACH_ANGLES);
+    const spot = { x: target.x + Math.cos(angle) * reach, y: target.y + Math.sin(angle) * reach };
+    if (spot.y < D.FIELD.top || spot.y > D.FIELD.bottom) continue;
+    const room = clearance(unit, state, spot);
+    if (room >= 0) return spot;
+    if (!best || room > best.room) best = { spot, room };
+  }
+  return best ? best.spot : direct;
+}
+
+function chooseMove(unit, state, target) {
+  if (!unit.speed) return null;
+  const wanted = wantedMove(unit, state, target);
+  const spot = freeSpot(unit, state, wanted || { x: unit.x, y: unit.y });
+  // 가려던 곳이 없으면 겹쳤을 때만 움직인다. 그 문턱이 없으면 비켜설 자리와
+  // 지금 자리가 반 칸 차이일 때에도 매 틱 걸어, 후열의 캐스팅이 계속 끊긴다.
+  if (!wanted) return dist(unit, spot) > 1 ? spot : null;
+  return spot;
 }
 
 function decide(unit, state) {
@@ -526,11 +681,11 @@ function decide(unit, state) {
 }
 
 const api = {
-  dist, alive, byUid, opposite, nearest, roleOf, rankOf, frontTank, anchorOf, behind,
-  tauntReserve, manaTarget,
+  dist, alive, byUid, opposite, confused, nearest, roleOf, rankOf, frontTank, anchorOf, behind,
+  tauntReserve, manaTarget, freeSpot, approach, clearance, SPACING, CLOSE,
   attackersOf, endangered, healReach,
   chooseTarget, healTarget, chooseSkill, choosePotion, chooseMove, decide,
-  POTION_HP, POTION_MP, STICK, RETREAT, SPREAD,
+  POTION_HP, POTION_MP, STICK, RETREAT, SPREAD, LINE_PUSH, LINE_GIVE, holdLine,
   hasAura, buffTarget, carriesHeal,
   EFFICIENT, EMERGENCY,
 };

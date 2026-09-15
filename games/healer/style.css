@@ -36,6 +36,9 @@
   --kind-stun: #8a6a2f;
   --kind-boon: #1f8f8f;
   --kind-wilt: #9c4f7a;
+  /* 혼란. 약화(자홍)와 갈라야 해서 주황 쪽으로 뺐다 — 둘 다 적에게 거는 것이라
+     색이 가까우면 무엇이 걸린 것인지 화면에서 구별되지 않는다. */
+  --kind-daze: #c2611f;
   /* 계열. 역할 색만으로는 궁수와 마법사가 같은 줄로 보인다. */
   --spec-tank: #4a72b8;
   --spec-warrior: #b4453c;
@@ -45,6 +48,7 @@
   --spec-priest: #2f8a8a;
   --spec-shaman: #9a5fb8;
   --spec-bard: #c07a2f;
+  --spec-paladin: #b8912f;
   --spec-grunt: #7a8a4a;
   --spec-chieftain: #a83b2c;
   /* 상위 계열. 아래 계열과 **같은 계통이되 한 단 진하다** — 다른 색을 주면 같은
@@ -93,6 +97,7 @@
     --kind-stun: #d8b45f;
     --kind-boon: #5fd0d0;
     --kind-wilt: #e08ab4;
+    --kind-daze: #f0925a;
     --spec-tank: #7fa6e8;
     --spec-warrior: #e08a80;
     --spec-rogue: #a9b3c4;
@@ -101,6 +106,7 @@
     --spec-priest: #5fc4c4;
     --spec-shaman: #c79ae0;
     --spec-bard: #e8a95f;
+    --spec-paladin: #e0c46a;
     --spec-grunt: #b3c47a;
     --spec-chieftain: #e2705c;
     --spec-bulwark: #9dbdf2;
@@ -126,7 +132,6 @@ body {
   display: flex;
   justify-content: center;
   padding: clamp(10px, 3vmin, 24px) var(--pad-x);
-  overscroll-behavior: none;
   -webkit-user-select: none;
   user-select: none;
 }
@@ -230,6 +235,9 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 #char-job { margin-right: auto; }
 .count { color: var(--muted); font-size: 13px; font-weight: 600; }
 .panel-note { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+/* 방금 무슨 일이 있었는지 알리는 줄. 설명문과 같은 자리에 서므로 색으로 가른다 —
+   전투 화면의 로그는 다른 화면에서 보이지 않는다. */
+.panel-note.said { color: var(--hero); font-weight: 600; }
 
 .skill-picks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 
@@ -248,6 +256,13 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 }
 /* 주인공 줄은 고를 수 있는 것이 아니므로 한 줄을 통째로 쓴다. */
 .roster > li.wide { grid-column: 1 / -1; }
+/* 묶음 이름표. 카드가 아니라 줄 사이의 안내라 배경 없이 글자만 둔다 — 카드처럼
+   그리면 누를 수 있는 것으로 보인다. */
+.roster > li.group {
+  display: flex; align-items: baseline; gap: 8px;
+  padding: 4px 2px 0; font-size: 13px; font-weight: 700;
+}
+.roster > li.group .group-note { font-size: 12px; font-weight: 400; color: var(--muted); }
 
 .pick.card { padding: 0; gap: 0; overflow: hidden; }
 .pick-open {
@@ -257,25 +272,76 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
   text-align: left; cursor: pointer;
 }
 .pick-open[aria-pressed="true"] { background: var(--sel); }
-/* 좁은 칸이라 이름이 두 줄로 감기면 카드 높이가 들쭉날쭉해진다. */
-.pick.card .pick-name { font-size: 14px; line-height: 1.25; }
+/* 좁은 칸이라 이름이 두 줄로 감기면 카드 높이가 들쭉날쭉해진다.
+   **어절 안에서 자르지 않는다**(`keep-all`) — 기본값으로 두었더니 "별을 읽는
+   오릭"이 "별을 읽는 오 / 릭"으로 갈렸다. 띄어쓰기가 없는 긴 이름만 마지막
+   수단으로 아무 데서나 자르고, 두 줄을 넘지 않게 잘라 낸다 — 세 줄이 되면 그
+   카드만 키가 자라 격자가 어긋난다. */
+.pick.card .pick-name {
+  font-size: 14px; line-height: 1.25;
+  word-break: keep-all; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+}
 .pick.card .pick-sub { font-size: 11px; }
 .pick.card .avatar { width: 24px; height: 31px; }
 /* 그림과 레벨을 한 칸에 세로로 쌓는다. 레벨이 글자 줄에서 빠져야 직업·계열이
    한 줄에 들어간다. */
 .pick-face { display: flex; flex-direction: column; align-items: center; gap: 1px; flex: none; }
 .pick-face .lv { font-size: 10px; font-weight: 700; color: var(--muted); }
+.pick-face .power { font-size: 10px; font-weight: 800; color: var(--hero); }
+/* 장비 줄의 전투력 증감. 오르내림을 색으로 갈라 두어야 옵션 줄을 읽기 전에
+   결론이 먼저 보인다. */
+.pick-sub.power-diff { font-weight: 800; }
+.pick-sub.power-diff.up { color: var(--heal); }
+.pick-sub.power-diff.down { color: var(--harm); }
 /* 직업·계열은 한 줄로 둔다. 감기면 카드 높이가 서로 달라진다. */
 .pick.card .job { display: block; font-size: 10.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* 좁은 기기에서는 그림과 표 단추를 줄여 글자 줄에 자리를 준다 — "딜러·음유시인"이
-   들어가지 못하면 그 동료만 계열이 잘려 나간다. */
-@media (max-width: 389px) {
+   들어가지 못하면 그 동료만 계열이 잘려 나간다.
+   **문턱이 389px일 때에는 아이폰(390~430px)이 여기에 걸리지 않았다.** 그 폭에서
+   카드 본문이 110px뿐이라 "대마법사"가 "대마…"로 잘리고 이름이 두 줄로 감겼다 —
+   재 보니 계열이 12px, 보수 줄이 1px 넘쳤다. 문턱을 올려 그 기기들도 여기를
+   타게 한다. */
+@media (max-width: 430px) {
   .pick.card .job { font-size: 9.5px; }
   .pick.card .avatar { width: 20px; height: 26px; }
   .pick-face .lv { font-size: 9px; }
+  .pick-face .power { font-size: 9px; }
   .pick-take { width: 28px; }
   .pick-open { padding: 7px 6px; }
+  /* **데려가기 단추를 아래로 내린다.** 오른쪽에 세워 두면 그 폭(28px)이 그대로
+     글자 자리에서 빠져, 이름이 두 줄로 감기고 계열이 잘린다 — 재 보니 본문이
+     84px에서 118px로 넓어져 웬만한 이름은 한 줄에 들어간다. 손가락으로 누르기도
+     아래쪽 넓은 띠가 낫다. */
+  .pick.card { flex-direction: column; align-items: stretch; }
+  /* 아래 기본 규칙보다 뒤에 오지 않으므로 마디를 하나 더 얹어 이긴다 —
+     같은 무게면 파일에서 나중에 적힌 쪽이 이기는데, 여기가 앞이다. */
+  .pick.card .pick-take {
+    width: auto; align-self: stretch; min-height: 26px;
+    border-left: 0; border-top: 1px solid var(--line);
+  }
+  /* 아랫줄도 함께 줄인다. 신뢰도 값표가 네 자리(+100)고 보수도 네 자리라, 줄이지
+     않으면 카드가 잘라 낸다 — 잘린 숫자는 틀린 숫자로 읽힌다. */
+  .pick.card .trust-tag { font-size: 10px; padding: 0 3px; }
+  .pick-deal { gap: 4px; }
+  .pick-deal .wage { font-size: 11px; }
+  .pick-deal .ico-box svg { width: 11px; height: 11px; }
+  .pick.card .feel-tag { font-size: 9.5px; padding: 0 3px; }
+  .pick-tags { gap: 3px; }
 }
+/* 아주 좁은 기기(320px 언저리)에서는 이름을 세 줄까지 연다. 두 줄로 자르면
+   "별을 읽는…"처럼 이름이 통째로 사라지는데, **이름은 곧 그 동료의 신원이라
+   계열보다 먼저 지킨다.** 글자도 한 단 줄인다 — 여기서는 일곱 자짜리 이름이
+   7px 모자라 두 줄로 감기고, 그 줄만 카드가 17px 높아진다.
+   **칸 수는 줄이지 않는다**: 한 줄에 하나로 접으면 격자로 바꾼 뜻이 그 화면에서만
+   사라진다. */
+@media (max-width: 340px) {
+  .pick.card .pick-name { font-size: 12.5px; -webkit-line-clamp: 3; }
+}
+
+/* **모자라면 자르지 말고 접는다.** 두 줄은 보기에 성기지만 잘린 숫자·이름보다
+   낫다 — 320px 언저리 기기에서는 아무리 줄여도 한 줄에 들어가지 않는다. */
+.pick-deal, .pick-tags { flex-wrap: wrap; }
 /* 데려가기. 표만 있는 단추라 눌린 상태가 색으로 보여야 한다. */
 .pick-take {
   flex: none; width: 34px; align-self: stretch;
@@ -365,6 +431,7 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .chip.skill.stun { color: var(--kind-stun); }
 .chip.skill.boon { color: var(--kind-boon); }
 .chip.skill.wilt { color: var(--kind-wilt); }
+.chip.skill.daze { color: var(--kind-daze); }
 .pick-sub { font-size: 12px; color: var(--muted); line-height: 1.45; }
 .pick-cost { font-size: 12px; color: var(--muted); flex: none; text-align: right; }
 
@@ -412,11 +479,15 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .scene { display: block; width: 50%; height: 100%; flex: none; }
 .field.aiming { cursor: crosshair; }
 .field.aiming::after {
-  content: ""; position: absolute; inset: 0;
+  content: ""; position: absolute; inset: 0; z-index: 90;
   border: 2px dashed #f0e2a8; border-radius: 13px; opacity: 0.75;
   pointer-events: none;
 }
 
+/* 앞뒤는 발이 놓인 높이가 정한다(z-index를 main.js가 준다). 전장이 비스듬히
+   내려다본 자리라 아래에 선 쪽이 앞이고, 그것이 없으면 노드가 만들어진 차례가
+   앞뒤가 되어 뒤에 선 적이 앞의 아군을 덮었다. 장판은 바닥에 놓인 것이라 그
+   아래, 뜨는 숫자와 조준 테두리는 그 위에 둔다 — 층을 여기 한 곳에 모아 둔다. */
 .unit {
   position: absolute;
   /* 폭은 그림마다 다르므로 main.js가 정한다. */
@@ -484,15 +555,10 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 }
 .unit .castbar span { display: block; height: 100%; width: 0; background: #f0e2a8; }
 
-/* 무리와 무리 사이의 걸음. 배경이 흘러가는 동안 유닛도 걷는 티가 나야 이동하는
-   것으로 읽힌다 — 배경만 움직이면 화면이 미끄러지는 것처럼 보인다. */
-/* 주인공은 걷는 프레임이 따로 있으므로 흔들기에서 뺀다 — 겹치면 두 번 걷는다. */
-.field.marching .unit.ally:not(.is-hero) .sprite { animation: trudge 0.42s steps(2, end) infinite; }
-@keyframes trudge {
-  from { transform: translateY(0); }
-  50% { transform: translateY(-4%); }
-  to { transform: translateY(0); }
-}
+/* 무리 사이의 걸음을 흔들기(`trudge`)로 흉내 내던 규칙은 걷어냈다. 걷는 프레임이
+   따로 있는 유닛은 거기서 뺐는데(`is-sheet`), 이제 모든 유닛이 그림 파일이라
+   해당하는 유닛이 하나도 없다 — `main.js`가 이동 중인 아군을 오른쪽 걷기로
+   고정하는 것이 그 일을 대신한다. */
 .unit.dead .castbar { display: none; }
 .unit.low .hpbar span { background: var(--hp-low); }
 
@@ -500,6 +566,10 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
    아무것도 못 한다"가 보여야 기절이 있다는 것을 알 수 있다. */
 .unit.stunned .sprite { filter: drop-shadow(0 0 3px var(--kind-stun)); }
 .unit.stunned .mark { box-shadow: 0 0 0 2px var(--kind-stun); }
+/* 혼란. 굳은 것과 갈라야 해서 색이 다르고, 발판까지 물들여 "편이 뒤집혔다"를
+   알린다 — 발판 색이 곧 편이라(`.mark`), 거기가 흔들리는 것이 이 상태의 뜻이다. */
+.unit.confused .sprite { filter: drop-shadow(0 0 3px var(--kind-daze)); }
+.unit.confused .mark { box-shadow: 0 0 0 2px var(--kind-daze); background: var(--kind-daze); }
 /* 유닛 이름표는 없다. 아홉 그림이 실루엣만으로 갈리도록 그렸고, 아군의 이름은
    아래 초상화 줄에 있다. 뭉쳐 싸울 때 이름표가 서로 겹쳐 읽히지도 않으면서
    화면만 덮었다 — 그림을 구분되게 그린 것이 이름표를 없애기 위해서였다. */
@@ -511,7 +581,7 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .field.aiming .unit:not(.valid) { opacity: 0.4; }
 
 .zone {
-  position: absolute; border-radius: 50%;
+  position: absolute; border-radius: 50%; z-index: 1;
   transform: translate(-50%, -50%);
   pointer-events: none;
   border: 2px solid var(--zone-heal);
@@ -522,14 +592,14 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 /* 주인공의 사거리. 눌러 보고 나서 "사거리 밖"을 듣는 것보다 먼저 보이는 것이
    낫다 — 그동안 다른 스킬의 쿨타임이 돈다. */
 .reach {
-  position: absolute; border-radius: 50%;
+  position: absolute; border-radius: 50%; z-index: 1;
   transform: translate(-50%, -50%);
   border: 1px dashed rgba(240, 226, 168, 0.5);
   pointer-events: none;
 }
 
 .aim {
-  position: absolute; border-radius: 50%;
+  position: absolute; border-radius: 50%; z-index: 1;
   transform: translate(-50%, -50%);
   border: 2px dashed #f0e2a8;
   background: rgba(240, 226, 168, 0.12);
@@ -537,7 +607,7 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 }
 
 .float {
-  position: absolute; transform: translate(-50%, -50%);
+  position: absolute; transform: translate(-50%, -50%); z-index: 80;
   font-size: clamp(11px, 2.2vw, 15px); font-weight: 800;
   pointer-events: none;
   animation: rise 0.9s ease-out forwards;
@@ -552,7 +622,7 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 }
 
 .pulse {
-  position: absolute; border-radius: 50%;
+  position: absolute; border-radius: 50%; z-index: 80;
   transform: translate(-50%, -50%);
   border: 2px solid var(--heal);
   pointer-events: none;
@@ -759,6 +829,33 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 
 .tab-page { display: flex; flex-direction: column; gap: clamp(8px, 2vmin, 14px); }
 
+/* 캐릭터 화면 안의 갈래. 아래 탭바와 달리 화면에 붙여 두지 않고 페이지 맨 위에
+   둔다 — 같은 화면 안에서 무엇을 보고 있는지를 가르는 것이라, 화면을 옮기는
+   탭바와 같은 무게로 보이면 안 된다. */
+.subtabs {
+  display: flex; gap: 4px;
+  background: var(--card-bg);
+  border: 1px solid var(--line); border-radius: 999px;
+  padding: 4px;
+}
+.subtab {
+  flex: 1;
+  border: 0; border-radius: 999px; background: none; color: var(--muted);
+  font-family: inherit; font-size: 13px; font-weight: 700;
+  padding: 8px 4px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+}
+.subtab[aria-pressed="true"] { background: var(--btn-bg); color: var(--btn-fg); }
+/* 안 쓴 점수가 있는 갈래에 점을 찍는다. 갈래로 나눈 값이 "다른 화면에 있는 것을
+   못 본다"라, 이것이 없으면 레벨이 올랐는데 점수를 그냥 지나간다. */
+.subtab.has-point::after {
+  content: ''; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--kind-mend);
+}
+.subtab[aria-pressed="true"].has-point::after { background: var(--btn-fg); }
+
+.char-page { display: flex; flex-direction: column; gap: clamp(8px, 2vmin, 14px); }
+
 .mini {
   border: 1px solid var(--line); border-radius: 999px;
   background: none; color: inherit; font-family: inherit;
@@ -808,6 +905,9 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
   font-size: 14px; padding: 4px 0; border-bottom: 1px solid var(--line);
 }
 .stats li:last-child { border-bottom: 0; }
+/* 동료가 제 몫으로 산 것. 위 줄에 딸린 이야기라 선 없이 한 단 작게 둔다 —
+   같은 무게로 두면 명부 줄이 두 배로 길어 보인다. */
+.stats li.sub-row { border-bottom: 0; padding-top: 0; font-size: 12.5px; }
 .stat-value { font-variant-numeric: tabular-nums; }
 
 .slot-row, .item {
@@ -920,18 +1020,29 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .float.skill.boon { color: var(--kind-boon); }
 .float.skill.wilt { color: var(--kind-wilt); }
 
-/* 걸려 있는 강화·약화. 초상화 위에 작은 점으로만 둔다 — 아이콘까지 늘어놓으면
-   다섯 칸짜리 초상화 줄이 그것으로 덮인다. 색이 좋은 쪽인지 나쁜 쪽인지를 알린다. */
-.auras {
-  position: absolute; top: 2px; right: 3px;
-  display: flex; gap: 2px; pointer-events: none;
+/* 걸려 있는 것 — 지속 피해·지속 회복·기절·도발·혼란·강화·약화. 초상화 오른쪽
+   위에 작게 붙는다. 예전에는 색 점이었는데, 점은 좋은 쪽인지 나쁜 쪽인지만 알리고
+   무엇이 걸렸는지는 알리지 않았다. 색은 스킬 종류 색을 그대로 쓴다 — 스킬 카드에서
+   본 색이 그 스킬이 남긴 상태에도 걸려야 둘이 같은 것으로 읽힌다.
+   접어 내리게 두는 것은, 일곱 가지가 한꺼번에 걸리면 가로로는 초상화를 넘기 때문이다.
+   글자 위가 아니라 그림 위로 접히도록 폭을 절반으로 묶는다. */
+.status {
+  position: absolute; top: 2px; right: 2px;
+  display: flex; flex-wrap: wrap; justify-content: flex-end;
+  max-width: 60%; gap: 1px; pointer-events: none;
+  /* 두 줄까지만 보인다. 일곱 가지가 한꺼번에 걸리면 세로로 흘러넘쳐 초상화 밖까지
+     내려가는데, 목록은 급한 것부터 순서가 잡혀 있으므로(`logic.STATUS_KINDS`)
+     잘리는 것은 늘 강화·약화 쪽이다. */
+  max-height: 23px; overflow: hidden;
 }
-.aura-dot {
-  width: 5px; height: 5px; border-radius: 50%;
-  background: var(--kind-wilt);
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
-}
-.aura-dot.boon { background: var(--kind-boon); }
+.status .ico-box svg { width: 11px; height: 11px; }
+.status .bane { color: var(--kind-bane); }
+.status .mend { color: var(--kind-mend); }
+.status .pull { color: var(--kind-pull); }
+.status .stun { color: var(--kind-stun); }
+.status .daze { color: var(--kind-daze); }
+.status .boon { color: var(--kind-boon); }
+.status .wilt { color: var(--kind-wilt); }
 
 @keyframes pop-rise {
   from { opacity: 1; transform: translate(-50%, 0); }
@@ -998,6 +1109,9 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 
 /* 빗나간 공격. 숫자가 아니라 글자라 피해·회복과 헷갈리지 않는다. */
 .float.miss { color: var(--muted); font-size: clamp(10px, 2vw, 13px); }
+/* 혼란은 빗나감·기절과 같은 작은 글자지만 색이 다르다 — 걸린 순간이 셋 다
+   비슷하게 지나가면 무엇이 걸렸는지 못 읽는다. */
+.float.daze { color: var(--kind-daze); font-size: clamp(10px, 2vw, 13px); font-weight: 700; }
 
 /* 치명타. 색만 다르게 하면 피해·회복과 헷갈리고 숫자만 키우면 그냥 많이 맞은
    것으로 보인다 — 크기와 테두리를 함께 준다. */
@@ -1008,3 +1122,81 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 }
 .float.harm.crit { color: #ff9a3c; }
 .float.heal.crit { color: #8fe07a; }
+
+/* --- 평판과 신뢰도 --- */
+
+/* 평판 한 줄. 게시판 위와 결과 화면 두 곳이 같은 모양을 쓴다 — 두 벌로 두면
+   한쪽만 고치게 된다. */
+.rep { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; }
+.rep-head { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.rep-head .ico-box svg { width: 15px; height: 15px; }
+.rep-head .why { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.rep-bar {
+  position: relative; height: 6px; border-radius: 3px;
+  background: rgba(128, 128, 128, 0.25); overflow: hidden;
+}
+.rep-bar span { display: block; height: 100%; background: var(--hero); }
+.rep-note { margin: 0; font-size: 11.5px; color: var(--muted); }
+
+/* 신뢰도 값표. **단계마다 색이 갈린다** — 숫자만으로는 -20과 -60이 다르다는
+   것이 훑을 때 보이지 않고, 그 둘 사이에 모집 거부가 있다. 색만으로 가르지
+   않도록 상세에는 단계 이름이 글자로도 적힌다. */
+.trust-tag {
+  flex: none; font-size: 11px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  border: 1px solid currentColor; border-radius: 999px; padding: 0 5px;
+}
+.t-broken { color: var(--tier-myth); }
+.t-hate { color: var(--harm); }
+.t-cold { color: var(--spec-bard); }
+.t-neutral { color: var(--muted); }
+.t-warm { color: var(--spec-archer); }
+.t-high { color: var(--heal); }
+.t-bond { color: var(--kind-boon); }
+
+/* 편성 카드의 아랫줄. 신뢰도와 보수, 그리고 난이도가 맞는 동료의 표뿐이라 한
+   줄에 들어간다 — 이유까지 적으면 카드가 다시 네 줄이 되어 격자로 바꾼 뜻이
+   사라진다. */
+.pick-deal { display: flex; align-items: center; gap: 5px; margin-top: 3px; }
+/* **동전과 금액은 한 덩어리다.** 따로 두었더니 줄이 접히는 좁은 화면에서 동전만
+   윗줄에 남아, 값이 아니라 장식으로 보였다. */
+.pick-deal .wage-box { display: inline-flex; align-items: center; gap: 4px; flex: none; }
+
+/* 계열 이름표와 난이도 표가 함께 서는 줄. */
+.pick-tags { display: flex; align-items: center; gap: 4px; min-width: 0; }
+
+/* 이 의뢰를 제 레벨에 맞다고 보는 동료의 표. **게시판의 "알맞음"과 같은 색을
+   쓴다**(`.level.fair`) — 같은 판단을 두 화면이 다른 색으로 알리면 색이 뜻을
+   잃는다. 색만으로 가르지 않도록 글자로도 적는다(등급 색과 같은 잣대다). */
+.feel-tag {
+  flex: none; font-size: 10.5px; font-weight: 700; color: var(--hp);
+  border: 1px solid currentColor; border-radius: 999px; padding: 0 5px;
+}
+.pick-deal .ico-box svg { width: 12px; height: 12px; }
+.pick-deal .wage {
+  font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.pick-deal .wage.no { color: var(--harm); font-weight: 600; }
+
+/* 동료 상세의 신뢰도 자리. 값을 이룬 배수와 대사가 여기에만 있다. */
+.trust { display: flex; flex-direction: column; gap: 4px; margin: 8px 0 2px; }
+.trust-head { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.trust-head .ico-box svg { width: 15px; height: 15px; }
+.trust-line { margin: 0; font-size: 12.5px; }
+.trust-line.no { color: var(--harm); font-weight: 600; }
+.trust-wage { display: flex; align-items: baseline; gap: 6px; font-size: 14px; }
+.trust-wage .ico-box svg { width: 14px; height: 14px; }
+.trust-wage .why { color: var(--muted); font-size: 11.5px; }
+.trust .pick-sub.dim { opacity: 0.85; }
+
+/* 얹어 주기와 선물. 칩이 줄바꿈으로 흘러야 인벤토리가 길어져도 시트가 가로로
+   밀리지 않는다. */
+.favor { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.favor-row { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.favor-row .chip { cursor: pointer; font: inherit; }
+/* 그 동료가 쓸 수 있는 물건. 색만으로 가르지 않도록 칩에 오른 신뢰도가 적혀 있다. */
+.favor-row .chip.liked { border-color: currentColor; font-weight: 700; }
+
+/* 모자라거나 깎인 값. 오르는 쪽(.up)과 짝이다. */
+.count.short, .stat-value.short { color: var(--harm); }
+.count.up { color: var(--hp); }

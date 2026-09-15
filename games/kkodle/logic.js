@@ -79,10 +79,10 @@ function isValidGuess(text) {
   return [...text].every((ch) => H.isSyllable(ch));
 }
 
-/** 공유용 이모지 격자. */
-function shareText(rows, dayLabel, solved) {
+/** 공유용 이모지 격자. 게임 이름은 고른 언어를 타므로 화면 쪽에서 받는다. */
+function shareText(rows, dayLabel, solved, title = '꼬들') {
   const emoji = { correct: '🟩', present: '🟨', absent: '⬜' };
-  const head = `꼬들 ${dayLabel} ${solved ? rows.length : 'X'}/${MAX_TRIES}`;
+  const head = `${title} ${dayLabel} ${solved ? rows.length : 'X'}/${MAX_TRIES}`;
   const body = rows
     .map((row) => row.marks.map((m) => emoji[m]).join(''))
     .join('\n');

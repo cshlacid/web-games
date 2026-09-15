@@ -106,6 +106,55 @@ const SEEDS = [1, 5, 77, 4242, 20260825];
   check('모르는 이름은 참여로 치지 않는다', ghost.every((r) => !r.joined), true);
 }
 
+// --- 제 몫의 골드와 장보기 ------------------------------------------------
+//
+// 길드 골드를 파티가 나눠 가지면서 동료도 지갑을 갖게 됐다. 쓸 데가 없으면
+// 저장본에 숫자만 쌓이므로, 그 돈으로 제 장비를 산다.
+{
+  const roster = R.create(3);
+  const joined = [roster[0].name, roster[1].name];
+  const report = R.awardGold(roster, joined, 400, 9);
+
+  check('모두가 보고에 들어간다', report.length, roster.length);
+  check('데려간 쪽은 몫을 전부 받는다',
+    report.filter((r) => r.joined).every((r) => r.gold === 400), true);
+  // 경험치와 같은 규칙이다 — 규칙을 둘로 두면 한쪽만 고치게 된다.
+  const idle = report.filter((r) => !r.joined);
+  check('남은 쪽은 일부만 받는다', idle.every((r) => r.gold > 0 && r.gold < 400), true);
+  check('받은 만큼 지갑에 쌓인다',
+    roster.every((m) => m.gold === report.find((r) => r.name === m.name).gold), true);
+  R.awardGold(roster, joined, 400, 9);
+  check('다음 판의 몫이 더해진다', roster[0].gold, 800);
+}
+{
+  // 돈이 없으면 아무것도 안 산다. 없는 돈으로 사면 지갑이 음수가 된다.
+  const poor = R.create(11)[0];
+  check('빈 지갑으로는 못 산다', R.goShopping(poor, 5), null);
+
+  const rich = R.create(11)[0];
+  rich.gold = 100000;
+  const deal = R.goShopping(rich, 5);
+  check('돈이 넉넉하면 산다', Boolean(deal), true);
+  check('산 값만큼 지갑이 준다', rich.gold, 100000 - deal.price);
+  check('산 것을 그 자리에서 낀다', rich.gear[deal.slot].uid, deal.item.uid);
+  // 동료는 제 직업 물건만 산다. 아무거나 사면 탱커가 회복 지팡이를 들고 온다.
+  const gearJob = D.GEAR[deal.item.defId].job;
+  check('제 직업에 맞는 것을 산다',
+    !gearJob || gearJob === D.COMPANIONS[rich.defId].job, true);
+
+  // **지금 낀 것보다 나은 것만 산다.** 아니면 돈을 모은다 — 매번 다 써 버리면
+  // 몇 판 참으면 살 수 있는 좋은 등급을 영영 못 산다.
+  const best = R.create(11)[0];
+  best.gold = 100000;
+  for (const slot of Object.keys(best.gear)) {
+    const def = Object.values(D.GEAR).find((g) => g.slot === slot);
+    best.gear[slot] = Items.make(def.id, D.TIERS.length - 1, 7);
+  }
+  const before = best.gold;
+  R.goShopping(best, 5);
+  check('쓰던 것이 나으면 돈을 안 쓴다', best.gold, before);
+}
+
 // --- 스킬 ---------------------------------------------------------------
 {
   const roster = R.create(5);
@@ -168,32 +217,112 @@ const SEEDS = [1, 5, 77, 4242, 20260825];
   check('물약도 들어 있다', party.potions.health, D.JOB_POTIONS.tank.health);
 }
 
+// --- 일이 없으면 마을을 떠난다 --------------------------------------------
+//
+// 명부가 쌓이기만 하면 상한을 올린 것이 그대로 "훑을 목록이 길어짐"이 된다.
+// 새 얼굴이 들어올 자리를 만드는 것이 이 규칙의 값이다.
+{
+  const roster = R.create(5);
+  const taken = [roster[0].name, roster[1].name];
+
+  R.tickIdle(roster, taken, 1);
+  check('데려간 쪽은 0으로 돌아간다', [roster[0].idle, roster[1].idle], [0, 0]);
+  check('안 데려간 쪽은 하나씩 쌓인다', roster[2].idle, 1);
+  R.tickIdle(roster, taken, 2);
+  check('이어서 쌓인다', roster[2].idle, 2);
+  R.tickIdle(roster, [roster[2].name], 3);
+  check('한 번 데려가면 다시 0이다', roster[2].idle, 0);
+
+  // **몇 판은 봐 준다.** 한 판 걸렀다고 사라지면 편성을 바꿔 볼 수가 없다.
+  check('봐 주는 동안은 확률이 0이다', R.leaveChance({ idle: R.IDLE_GRACE }), 0);
+  check('그 뒤로는 오른다',
+    R.leaveChance({ idle: R.IDLE_GRACE + 2 }) > R.leaveChance({ idle: R.IDLE_GRACE + 1 }), true);
+  check('상한에서 멈춘다', R.leaveChance({ idle: 99 }), R.IDLE_CAP);
+  check('반드시 떠나지는 않는다', R.IDLE_CAP < 1, true);
+
+  // 오래 쉬면 결국 떠난다. 확률이라 여러 씨앗으로 본다.
+  let gone = 0;
+  for (let seed = 1; seed <= 40; seed++) {
+    const town = R.create(seed);
+    town.forEach((m) => { m.idle = 20; });
+    for (let i = 0; i < 6; i++) R.tickIdle(town, [], seed * 7 + i);
+    if (town.length < R.create(seed).length) gone++;
+  }
+  check('오래 쉬면 떠난다', gone, 40);
+
+  // **명부가 파티를 못 짤 만큼 줄면 게임이 멈춘다.**
+  const shrink = R.create(11);
+  shrink.forEach((m) => { m.idle = 99; });
+  for (let i = 0; i < 60; i++) R.tickIdle(shrink, [], i);
+  check('바닥 아래로는 안 내보낸다', shrink.length >= R.KEEP_MIN, true);
+
+  // **친구는 떠나지 않는다.** 공들여 쌓은 관계가 몇 판 안 데려간 것으로 사라지면
+  // 친구를 만든 것이 손해가 된다.
+  const friends = R.create(13);
+  friends.forEach((m) => { m.idle = 99; });
+  const keep = friends[0].name;
+  for (let i = 0; i < 60; i++) {
+    R.tickIdle(friends, [], i, (m) => m.name === keep);
+  }
+  check('친구는 남는다', friends.some((m) => m.name === keep), true);
+
+  // 저장본에도 남는다 — 껐다 켜면 쉰 판이 0으로 돌아가면 규칙이 없는 것과 같다.
+  const saved = R.create(19);
+  saved[0].idle = 7;
+  check('쉰 판이 저장본에 남는다', R.adopt(JSON.parse(JSON.stringify(saved)))[0].idle, 7);
+}
+
 // --- 새 동료 ------------------------------------------------------------
+{
+  // **확률을 밖에서 받는다.** 편성 화면의 새로 고침은 연달아 누를 수 있어 의뢰를
+  // 깼을 때와 같은 확률을 쓰면 명부가 몇 번에 상한까지 찬다(재 보니 여덟 번에
+  // 9 → 14였다).
+  check('새로 고침 확률이 더 낮다', R.REDRAW_JOIN_CHANCE < R.JOIN_CHANCE, true);
+  const never = R.create(21);
+  let added = 0;
+  for (let i = 0; i < 50; i++) if (R.maybeJoin(never, i, 0)) added++;
+  check('확률 0이면 아무도 안 들어온다', added, 0);
+  const always = R.create(21);
+  check('확률 1이면 들어온다', Boolean(R.maybeJoin(always, 1, 1)), true);
+}
 {
   // 확률이라 한 번으로는 알 수 없다. 여러 씨앗으로 들어오기도 하고 안 들어오기도
   // 하는지를 본다.
   let joins = 0;
   for (let seed = 1; seed <= 40; seed++) {
     const roster = R.create(seed);
-    if (R.maybeJoin(roster, 5, seed)) joins++;
+    if (R.maybeJoin(roster, seed)) joins++;
   }
   check('가끔 들어온다', joins > 0, true);
   check('늘 들어오지는 않는다', joins < 40, true);
 
   const roster = R.create(2);
   const before = roster.map((m) => m.name);
-  const member = R.maybeJoin(roster, 8, 3) || R.maybeJoin(roster, 8, 5) || R.maybeJoin(roster, 8, 9);
+  const member = R.maybeJoin(roster, 3) || R.maybeJoin(roster, 5) || R.maybeJoin(roster, 9);
   if (member) {
     check('명부에 들어간다', roster.includes(member), true);
     check('이름이 겹치지 않는다', before.includes(member.name), false);
-    // 1레벨이 들어오면 명부에만 있고 아무도 안 데려간다.
-    check('주인공 레벨 근처로 들어온다', Math.abs(member.level - 8) <= 2, true);
+    check('레벨이 1 이상 상한 이하', member.level >= 1 && member.level <= D.LEVEL.maxLevel, true);
   }
+
+  // **길드의 레벨 분포는 주인공과 무관하다.** 갓 등록한 초심자가 가장 많고 위로
+  // 갈수록 드물어야, 명부가 "주인공의 복제품 열넷"이 아니라 길드가 된다.
+  const levels = [];
+  for (let seed = 1; seed <= 3000; seed++) {
+    const guild = [];
+    const joined = R.maybeJoin(guild, seed, 1);
+    if (joined) levels.push(joined.level);
+  }
+  const share = (n) => levels.filter((lv) => lv === n).length / levels.length;
+  check('1레벨이 가장 많다', share(1) > share(2) && share(2) > share(3), true);
+  check('절반 넘게 다섯 아래다', levels.filter((lv) => lv <= 5).length / levels.length > 0.5, true);
+  check('높은 레벨도 가끔 온다', levels.some((lv) => lv >= 10), true);
+  check('상한을 넘지 않는다', levels.every((lv) => lv <= D.LEVEL.maxLevel), true);
 
   // 명부가 너무 길어지면 편성 화면이 목록 훑기가 된다.
   const crowd = R.create(1);
   while (crowd.length < R.MAX_SIZE) crowd.push(R.makeMember(Items.createRng(crowd.length), new Set(crowd.map((m) => m.name)), 1));
-  check('상한을 넘지 않는다', R.maybeJoin(crowd, 5, 1), null);
+  check('상한을 넘지 않는다', R.maybeJoin(crowd, 1), null);
 }
 
 // --- 저장본 -------------------------------------------------------------
@@ -202,9 +331,13 @@ const SEEDS = [1, 5, 77, 4242, 20260825];
   R.offerGear(saved[0], Items.make('shield', 2, 1));
   saved[0].level = 6;
 
+  saved[0].gold = 250;
+
   const loaded = R.adopt(JSON.parse(JSON.stringify(saved)));
   check('그대로 돌아온다', loaded.length, saved.length);
   check('레벨이 남는다', loaded[0].level, 6);
+  check('지갑이 남는다', loaded[0].gold, 250);
+  check('지갑이 없던 저장본은 0으로 채운다', loaded[1].gold, 0);
   check('장비가 남는다', loaded[0].gear.armor.defId, 'shield');
   check('아이템 uid는 새로 붙는다', typeof loaded[0].gear.armor.uid, 'string');
 
@@ -294,6 +427,23 @@ const SEEDS = [1, 5, 77, 4242, 20260825];
   // 이름은 처음 만들 때 정해진 신원이라 계열이 올라가도 그대로다.
   const named = R.makeMember(Items.createRng(7), new Set(), D.SPEC_UP_LEVEL, 'bran');
   check('이름 조각은 아래 계열에서 나온다', named.name, member.name);
+}
+
+// --- 새로 고침 값 --------------------------------------------------------
+//
+// 공짜였을 때에는 마음에 드는 목록이 나올 때까지 누르는 것이 아무 대가 없는
+// 일이라, 뽑기가 사실상 없는 것과 같았다.
+{
+  check('새로 고치는 데 값을 낸다', R.redrawCost(1) > 0, true);
+  check('레벨을 따라 오른다', R.redrawCost(10) > R.redrawCost(1), true);
+  // 진열대 갱신과 같은 곡선을 쓰고 기준값만 낮다. 한 판에 여러 번 누를 수 있는
+  // 자리라, 같은 값이면 새로 고침 두 번이 의뢰 한 판을 먹는다.
+  const Shop = require('./shop.js');
+  check('진열대 갱신보다 싸다', R.redrawCost(8) < Shop.refreshCost(8), true);
+  // 반올림 때문에 소수점 아래가 조금 갈린다 — 곡선이 같은지만 본다.
+  const slope = (fn) => fn(12) / fn(1);
+  check('두 값이 같은 속도로 오른다',
+    Math.abs(slope(R.redrawCost) - slope(Shop.refreshCost)) < 0.05, true);
 }
 
 console.log(`${passed}개 통과, ${failed}개 실패`);

@@ -34,7 +34,7 @@ function even(drops, members, rng) {
   return drops.map((item, i) => ({
     item,
     toId: members[(start + i) % members.length].id,
-    reason: '순서대로',
+    reason: { code: 'hl.loot.inOrder' },
   }));
 }
 
@@ -49,7 +49,7 @@ function rollFor(members, rng) {
 function dice(drops, members, rng) {
   return drops.map((item) => {
     const { winner, rolls } = rollFor(members, rng);
-    return { item, toId: winner.id, reason: `${winner.roll} 최고`, rolls };
+    return { item, toId: winner.id, reason: { code: 'hl.loot.highRoll', vars: { roll: winner.roll } }, rolls };
   });
 }
 
@@ -71,18 +71,18 @@ function byJob(drops, members, rng) {
       const { winner, rolls } = rollFor(members, rng);
       taken[winner.id]++;
       return { item, toId: winner.id, rolls,
-        reason: job ? `${D.JOBS[job].name} 없음 · 주사위` : '직업 무관 · 주사위' };
+        reason: job ? { code: 'hl.loot.noJobDice', vars: { job } } : { code: 'hl.loot.anyJobDice' } };
     }
 
     const fewest = Math.min(...matched.map((m) => taken[m.id]));
     const pool = matched.filter((m) => taken[m.id] === fewest);
     if (pool.length === 1) {
       taken[pool[0].id]++;
-      return { item, toId: pool[0].id, reason: `${D.JOBS[job].name} 우선` };
+      return { item, toId: pool[0].id, reason: { code: 'hl.loot.jobFirst', vars: { job } } };
     }
     const { winner, rolls } = rollFor(pool, rng);
     taken[winner.id]++;
-    return { item, toId: winner.id, rolls, reason: `${D.JOBS[job].name} 우선 · 주사위` };
+    return { item, toId: winner.id, rolls, reason: { code: 'hl.loot.jobFirstDice', vars: { job } } };
   });
 }
 
@@ -92,9 +92,17 @@ const METHODS = {
   dice: { id: 'dice', name: '주사위', desc: '굴려서 가장 높은 사람이 가져간다', run: dice },
 };
 
+// **기본값은 직업 우선이다.** 균등이 기본이던 때에는 탱커 방패가 마법사에게
+// 가는 판이 그냥 지나갔다 — 세 방식 중 파티가 실제로 세지는 것은 이쪽뿐이고,
+// 나머지 둘은 그것을 포기하는 대신 다른 것(고르게 나눔·운)을 얻는 선택이다.
+//
+// **기본값을 한 곳에만 둔다.** 처음 진행·저장본 읽기·모르는 방식의 대체가 저마다
+// 값을 적고 있으면 하나만 고치는 일이 난다.
+const DEFAULT = 'job';
+
 // members: [{ id, name, job }] — 주인공을 포함한 참여자
 function distribute(drops, members, methodId, seed) {
-  const method = METHODS[methodId] || METHODS.even;
+  const method = METHODS[methodId] || METHODS[DEFAULT];
   const awards = method.run(drops, members, createRng(seed));
 
   const byMember = {};
@@ -104,7 +112,7 @@ function distribute(drops, members, methodId, seed) {
   return { method: method.id, awards, byMember };
 }
 
-const api = { METHODS, distribute, createRng };
+const api = { METHODS, DEFAULT, distribute, createRng };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 root.HealerLoot = api;

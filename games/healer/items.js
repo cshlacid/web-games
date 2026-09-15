@@ -243,9 +243,33 @@ function price(item) {
 
 const sellPrice = (item) => Math.max(1, Math.round(price(item) * SELL_RATE));
 
+// --- 재련 ---------------------------------------------------------------
+//
+// **등급과 물건은 그대로 두고 무작위 옵션만 다시 굴린다.** 골드가 진행할수록
+// 쌓이기만 해서 쓸 곳을 만든 자리인데, 등급을 올리는 쪽으로 두면 "상점은 희귀
+// 까지"와 "영웅 위는 적에게서만 나온다"가 함께 무너진다. 등급 구간이 겹치지
+// 않으므로(`AFFIX_RANGE`) 재련은 **그 등급 안에서만** 흔든다.
+//
+// **값이 물건 값을 따라가는 것**이 이 규칙의 핵심이다. 값에는 `quality`가 들어
+// 있으므로 잘 붙은 물건일수록 다시 굴리는 값이 비싸고 못 붙은 물건은 싸다 —
+// 아까운 것을 굴리는 데 값을 더 치르는 셈이라, 언제 멈출지가 고르는 자리가 된다.
+const REFORGE_RATE = 0.4;
+
+const reforgePrice = (item) => Math.max(1, Math.round(price(item) * REFORGE_RATE));
+
+// **새 옵션만 돌려주고 물건은 건드리지 않는다.** uid가 바뀌면 장착 중인 물건을
+// 재련했을 때 슬롯이 가리키던 것이 사라진다 — 상태를 바꾸는 것은 progress.js다.
+function reforge(item, seed) {
+  if (!isGear(item)) return null;
+  const rng = createRng(seedOf(item.defId, item.tier,
+    seed == null ? (Math.random() * 1e9) | 0 : seed));
+  return rollAffixes(item.defId, item.tier, rng);
+}
+
 const api = {
   createRng, seedOf, make, adopt, def, isGear, tier, stats, sum, name, summary, statLine,
   diff, isUpgrade, gainOf, score, quality, price, sellPrice, SELL_RATE,
+  reforge, reforgePrice, REFORGE_RATE,
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = api;

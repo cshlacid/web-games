@@ -262,7 +262,7 @@ function cast(state, skillId, target) {
   // 그 계열이 아니다.
   const core = (spec) => D.SPEC_SKILLS[spec].filter((id) => D.UNIT_SKILLS[id].core);
   const missing = [];
-  for (const spec of ['tank', 'warrior', 'rogue', 'archer', 'mage', 'priest', 'bard']) {
+  for (const spec of ['tank', 'warrior', 'rogue', 'archer', 'mage', 'priest', 'bard', 'paladin']) {
     for (const name of ['가', '나', '다', '라', '마', '바', '사', '아']) {
       const hand = D.skillsFor(spec, level, seedOf(`${spec}-${name}`));
       for (const id of core(spec)) {
@@ -284,6 +284,134 @@ function cast(state, skillId, target) {
   check('씨앗이 없으면 앞에서부터',
     D.skillsFor('tank', level), D.SPEC_SKILLS.tank
       .filter((id) => D.UNIT_SKILLS[id].minLevel <= level).slice(0, D.UNIT_SKILL_MAX));
+}
+
+// --- 둔화 ---------------------------------------------------------------
+//
+// **딜러가 적에게 거는 상태 이상이다.** 기절과 달리 아무것도 못 하게 만들지는
+// 않고 걸음만 늦추므로, 멀리서 거는 계열(마법사)에게도 줄 수 있다 — 기절을
+// 근접 셋으로 묶어 둔 이유(후열이 아무것도 못 하는 판)가 여기에는 걸리지 않는다.
+{
+  const state = battle({ party: [{ defId: 'yuri', level: 8 }] });
+  const mage = unit(state, '마법사 유리');
+  const foe = AI.alive(state, 'enemy')[0];
+  const def = D.UNIT_SKILLS.frostbind;
+
+  // 걸리기 전후로 같은 시간 동안 얼마나 걷는지 잰다. 걸음을 계산하는 자리가
+  // `moveToward` 하나이므로, 거기만 보면 모든 이동에 걸린 것이다.
+  const walk = (u, seconds) => {
+    const from = u.x;
+    L.moveToward(state, u, { x: u.x - 100, y: u.y }, seconds);
+    const moved = from - u.x;
+    u.x = from;
+    return moved;
+  };
+  const plain = walk(foe, 1);
+  L.runUnitSkill(state, mage, { id: 'frostbind', targetUid: foe.uid });
+  const slowed = walk(foe, 1);
+  check('둔화가 걸리면 걸음이 느려진다', Math.round((slowed / plain) * 100) / 100, def.mul);
+  check('굳어 있는 것과는 다르다', L.stunned(state, foe), false);
+
+  // 시간이 지나면 풀린다. 오라이므로 같은 것을 다시 걸면 시간이 새로 시작할
+  // 뿐이고, 쌓이지 않는다.
+  L.runUnitSkill(state, mage, { id: 'frostbind', targetUid: foe.uid });
+  check('겹쳐 쌓이지 않는다',
+    Math.round((walk(foe, 1) / plain) * 100) / 100, def.mul);
+  state.t += def.duration + 0.1;
+  check('시간이 지나면 제 속도로 돌아온다', Math.round(walk(foe, 1)), Math.round(plain));
+}
+
+// 전사의 밀쳐내기는 미는 것과 늦추는 것을 함께 한다. **밀기만 하면 표가 나지
+// 않는다** — 밀어 놓자마자 걸어 돌아오기 때문이고, 그래서 수호자의 방패 밀치기는
+// 굳히기와 한 몸이다. 전사 쪽은 굳히는 대신 늦춘다(같은 스킬이 둘이 되지 않게).
+{
+  const state = battle({ party: [{ defId: 'lyle', level: 8 }] });
+  const warrior = unit(state, '검사 라일');
+  const foe = AI.alive(state, 'enemy')[0];
+  foe.x = warrior.x + 6; foe.y = warrior.y;
+  const before = foe.x;
+  L.runUnitSkill(state, warrior, { id: 'shove', targetUid: foe.uid });
+  check('민다', foe.x > before, true);
+  check('밀린 거리가 적혀 있는 만큼이다',
+    Math.round(foe.x - before), D.UNIT_SKILLS.shove.knock);
+  const slow = (foe.auras || []).find((aura) => aura.stat === 'speed');
+  check('늦추기도 한다', slow ? slow.mul : null, D.UNIT_SKILLS.shove.mul);
+  check('굳히지는 않는다', L.stunned(state, foe), false);
+}
+
+// 궁수의 발목 쏘기는 늦추면서 피도 흘린다. **둔화만 얹으면 서리 결박과 같은
+// 스킬이 되므로** 도트를 남겼고, 그것을 종류가 아니라 얹는 값(`tick`)으로 둔
+// 것은 넉백과 같은 이유다 — 종류로 두면 그 조합을 적을 수 없다.
+{
+  const state = battle({ party: [{ defId: 'mira', level: 8 }] });
+  const archer = unit(state, '궁수 미라');
+  const foe = AI.alive(state, 'enemy')[0];
+  const def = D.UNIT_SKILLS.cripple;
+  L.runUnitSkill(state, archer, { id: 'cripple', targetUid: foe.uid });
+  const slow = (foe.auras || []).find((aura) => aura.stat === 'speed');
+  check('늦춘다', slow ? slow.mul : null, def.mul);
+  check('마법사 것보다 덜 묶는다', def.mul > D.UNIT_SKILLS.frostbind.mul, true);
+  check('피도 흘린다', state.dots.some((dot) => dot.targetUid === foe.uid), true);
+  check('굳히지는 않는다', L.stunned(state, foe), false);
+}
+
+// **적에게도 상태 이상이 있다.** 아군과 적이 같은 논리로 움직인다는 규칙은 같은
+// 표를 본다는 것만이 아니라 같은 수단을 갖는다는 것이기도 하다 — 잡졸과 주술사가
+// 상태 이상을 하나도 못 걸던 동안에는 걸리기만 하는 쪽이었다.
+{
+  const kinds = (spec) => D.SPEC_SKILLS[spec].map((id) => D.UNIT_SKILLS[id])
+    .filter((def) => def.kind === 'stun' || def.kind === 'confuse'
+      || ((def.kind === 'debuff' || def.kind === 'debuff-area') && def.stat));
+  const bare = ['grunt', 'shaman', 'chieftain'].filter((spec) => !kinds(spec).length);
+  check('적 계열도 상태 이상을 하나는 든다', bare, []);
+
+  // 무리로 몰려오는 잡졸에게 기절을 주면 다섯이 돌아가며 걸어 후열이 아무것도
+  // 못 한다. 아군의 근접 셋에게만 기절을 준 것과 같은 잣대다.
+  check('잡졸의 것은 기절이 아니다',
+    kinds('grunt').every((def) => def.kind === 'debuff'), true);
+  // 멀리서 거는 계열이라 걸음도 묶지 않는다. 깎는 것은 손(공격력)이다.
+  check('주술사의 것은 약화다',
+    kinds('shaman').map((def) => def.stat), ['atk']);
+}
+
+// --- 혼란 ---------------------------------------------------------------
+//
+// **적끼리 싸우게 만든다.** 편을 가르는 자리가 `ai.foesOf` 하나뿐이라, 거기만
+// 뒤집으면 노리는 것도 붙으러 가는 것도 스킬을 거는 것도 전부 따라온다.
+{
+  const state = battle({ party: [{ defId: 'finn', level: 8 }] });
+  const bard = unit(state, '음유시인 핀');
+  const foes = AI.alive(state, 'enemy');
+  const foe = foes[0];
+  // 같은 자리에 세워 광역이 둘 다 닿게 한다.
+  for (const other of foes) { other.x = foe.x; other.y = foe.y; }
+
+  check('걸리기 전에는 아군을 노린다', AI.chooseTarget(foe, state).side, 'ally');
+  L.runUnitSkill(state, bard, { id: 'dissonance', targetUid: foe.uid });
+  check('반경 안이 함께 걸린다',
+    foes.filter((u) => L.confused(state, u)).length, foes.length);
+  check('걸린 적은 제 편을 노린다', AI.chooseTarget(foe, state).side, 'enemy');
+  check('굳지는 않는다', L.stunned(state, foe), false);
+
+  // **혼란은 도발을 이긴다.** 탱커의 도발이 전투의 7할을 덮고 있어, 도발이
+  // 이기게 두면 혼란이 걸려도 대부분 아무 일도 일어나지 않는다.
+  foe.tauntUid = bard.uid;
+  foe.tauntUntil = state.t + 5;
+  check('도발이 걸려 있어도 제 편을 노린다', AI.chooseTarget(foe, state).side, 'enemy');
+
+  // 실제로 때리는지까지 본다. 기본 공격에는 편을 가르는 조건이 없으므로,
+  // 대상만 뒤집히면 그대로 제 편에게 들어간다.
+  const victim = foes.find((u) => u.uid !== foe.uid);
+  const before = victim.hp;
+  foe.x = victim.x; foe.y = victim.y;
+  foe.nextAttackAt = 0;
+  run(state, 2);
+  check('제 편의 체력이 깎인다', victim.hp < before, true);
+
+  // 시간이 지나면 제정신으로 돌아온다.
+  state.t += D.UNIT_SKILLS.dissonance.duration + 0.1;
+  check('시간이 지나면 풀린다', L.confused(state, foe), false);
+  check('풀리면 다시 아군을 노린다', AI.chooseTarget(foe, state).side, 'ally');
 }
 
 // --- 기절 ---------------------------------------------------------------
@@ -319,10 +447,14 @@ function cast(state, skillId, target) {
   check('굳어 있는 동안에는 때리지 못한다', hero.hp, before);
   check('걸음도 멈춘다', foe.x, stood);
 
-  // 시간이 지나면 풀리고 다시 움직인다.
+  // 시간이 지나면 풀리고 다시 움직인다. **갈 곳을 만들어 주고 본다** — 붙어
+  // 있는 동안에는 이미 사거리 안이라 풀려도 제자리에 서 있는 것이 정상이다.
   run(state, 2);
   check('시간이 지나면 풀린다', L.stunned(state, foe), false);
-  check('풀리면 다시 움직인다', foe.x !== stood, true);
+  foe.x = hero.x + 30;
+  const far = foe.x;
+  run(state, 0.5);
+  check('풀리면 다시 움직인다', foe.x !== far, true);
 
   // **거는 순간 외우던 것이 끊긴다.** 끊지 않으면 기절이 아무 일도 하지 않은
   // 것으로 보인다.
@@ -342,7 +474,7 @@ function cast(state, skillId, target) {
   // 이유를 그대로 돌려준다.
   hero.stunUntil = state.t + 2;
   check('주인공도 굳으면 못 쓴다',
-    L.castSkill(state, 'touch', { uid: hero.uid }).reason, '기절');
+    L.castSkill(state, 'touch', { uid: hero.uid }).reason, 'hl.st.stun');
 }
 
 // --- 아군의 마나를 채운다 (음유시인) ------------------------------------
@@ -569,7 +701,7 @@ function cast(state, skillId, target) {
   check('아직 회복되지 않았다', tank.hp, 400);
   check('마나는 시작할 때 낸다', hero.mp, before - D.PLAYER_SKILLS.touch.mp);
   check('시전 중에는 다른 스킬을 못 쓴다',
-    L.castSkill(state, 'ripple', { uid: tank.uid }).reason, '시전 중');
+    L.castSkill(state, 'ripple', { uid: tank.uid }).reason, 'hl.why.casting');
 
   run(state, D.PLAYER_SKILLS.touch.cast + 0.1);
   check('시전 시간이 지나면 터진다', state.stats.healed > 0, true);
@@ -593,14 +725,17 @@ function cast(state, skillId, target) {
     moving.mp < paid + D.PLAYER_SKILLS.touch.mp, true);
   check('쿨타임도 돈다', L.skillSlot(moved, 'touch').readyAt > moved.t, true);
 
-  // 대열을 벌리는 힘은 이동이 아니다. 그것까지 취소로 치면 캐스팅 스킬이 아예
-  // 나가지 않는다 — 밀어내기는 매 틱 일어난다.
+  // 넉백으로 밀려나는 것은 이동이 아니다. 그것까지 취소로 치면 시전 중에는
+  // 아무도 나를 건드리지 못한다는 규칙이 하나 더 생긴다.
   const pushed = battle();
-  const shover = L.hero(pushed);
-  unit(pushed, '강철의 브란').hp = 400;
-  L.castSkill(pushed, 'touch', { uid: unit(pushed, '강철의 브란').uid });
-  L.step(pushed, L.TICK);
-  check('밀려나는 것은 취소가 아니다', pushed.units[0].cast !== null, true);
+  const shoved = unit(pushed, '사제 노아');
+  const foe = AI.alive(pushed, 'enemy')[0];
+  shoved.x = 40; shoved.y = 28;
+  L.startCast(pushed, shoved, { id: 'mend', targetUid: shoved.uid });
+  const wasAt = shoved.x;
+  L.knockback(pushed, foe, shoved, 8);
+  check('넉백은 자리를 옮긴다', shoved.x !== wasAt, true);
+  check('밀려나는 것은 취소가 아니다', shoved.cast !== null, true);
 
   // 동료의 캐스팅도 같은 규칙이다.
   const ally = battle();
@@ -871,6 +1006,86 @@ function cast(state, skillId, target) {
     fresh.units.every((u) => u.y >= D.FIELD.top && u.y <= D.FIELD.bottom), true);
 }
 
+// --- 서로 밀지 않는다 ---------------------------------------------------
+//
+// 예전에는 매 틱 같은 편끼리 밀어내 대열을 벌렸다. 그러면 유닛이 제 발로 간 적
+// 없는 자리에 서 있게 된다 — 겹치는 것은 이제 스스로 비켜서서 푼다(`ai.freeSpot`).
+{
+  // 굳은 유닛은 스스로 움직이지 않는다. 그 위에 동료를 겹쳐 세워도 자리가
+  // 그대로여야 "아무도 남을 밀지 않는다"가 지켜진 것이다.
+  const state = battle();
+  const stuck = unit(state, '강철의 브란');
+  const crowd = unit(state, '검사 라일');
+  stuck.x = 40; stuck.y = 28;
+  crowd.x = 40; crowd.y = 28;
+  stuck.stunUntil = state.t + 5;
+  const at = { x: stuck.x, y: stuck.y };
+  run(state, 0.5);
+  check('굳은 유닛은 겹쳐도 밀리지 않는다',
+    [stuck.x, stuck.y], [at.x, at.y]);
+
+  // 겹친 쪽은 제 발로 비켜선다. 여기까지 없으면 다섯이 한 점에 포개 선다.
+  check('겹친 쪽이 비켜선다', AI.dist(stuck, crowd) > 1, true);
+
+  // 양보하는 쪽은 늘 한쪽이다. 둘 다 비키면 매 틱 자리를 바꾸며 떤다.
+  const pair = battle();
+  const a = unit(pair, '강철의 브란');
+  const b = unit(pair, '검사 라일');
+  const senior = a.uid < b.uid ? a : b;
+  a.x = 40; a.y = 28; b.x = 40; b.y = 28;
+  const kept = { x: senior.x, y: senior.y };
+  const spot = AI.freeSpot(senior, pair, { x: senior.x, y: senior.y });
+  check('앞선 쪽은 제자리를 지킨다', [spot.x, spot.y], [kept.x, kept.y]);
+}
+{
+  // **적과도 겹치지 않는다.** 같은 편끼리만 벌리던 때에는 근접 적이 아군 위에
+  // 그대로 올라섰다 — 화면에서 둘이 한 덩어리로 보인다.
+  const state = battle();
+  const ally = unit(state, '강철의 브란');
+  const foe = AI.alive(state, 'enemy')[0];
+  ally.x = 40; ally.y = 28;
+  foe.x = 40; foe.y = 28;
+  const junior = ally.uid < foe.uid ? foe : ally;
+  const spot = AI.freeSpot(junior, state, { x: junior.x, y: junior.y });
+  check('적 위에 겹쳐 서면 비켜선다', Math.abs(spot.y - 28), AI.CLOSE);
+
+  // **적과 벌리는 거리는 가장 짧은 근접 사거리보다 좁다.** 사거리 밖으로 비켜서면
+  // 붙으려는 힘과 비키려는 힘이 매 틱 싸워 근접 유닛이 사거리 언저리에서 떤다.
+  const melee = Object.values(D.UNIT_SKILLS).map((def) => def.range)
+    .concat(Object.values(D.COMPANIONS).map((def) => def.range))
+    .filter((range) => range > 0 && range <= D.MELEE_RANGE);
+  check('적과의 거리가 근접 사거리 안이다', AI.CLOSE < Math.min(...melee), true);
+  // 같은 편끼리는 붙을 이유가 없으니 더 넉넉히 벌린다.
+  check('같은 편끼리 더 벌린다', AI.SPACING > AI.CLOSE, true);
+}
+
+// --- 넉백 ---------------------------------------------------------------
+//
+// **남의 좌표를 옮기는 유일한 길이다.** 대열이 서로 밀리지 않게 된 뒤로, 적을
+// 물러나게 하는 수단은 이렇게 `knock`이 적힌 스킬뿐이다.
+{
+  const state = battle();
+  const tank = unit(state, '강철의 브란');
+  const foe = AI.alive(state, 'enemy')[0];
+  tank.x = 40; tank.y = 28;
+  foe.x = 46; foe.y = 28;
+  tank.skills = [{ id: 'shieldSlam', readyAt: 0 }];
+  tank.mp = tank.maxMp;
+  L.runUnitSkill(state, tank, { id: 'shieldSlam', targetUid: foe.uid });
+  check('밀치면 뒤로 밀려난다', foe.x > 46, true);
+  check('민 거리는 적어 둔 만큼이다',
+    Math.round(AI.dist(tank, foe)), 6 + D.UNIT_SKILLS.shieldSlam.knock);
+  check('밀치면 굳기도 한다', L.stunned(state, foe), true);
+
+  // 밀린 자리도 전장 안이다. 벽 너머로 밀어내면 그대로 화면 밖에 선다.
+  const edge = battle();
+  const pusher = unit(edge, '강철의 브란');
+  const near = AI.alive(edge, 'enemy')[0];
+  pusher.x = 10; near.x = D.FIELD.w - 6; near.y = pusher.y;
+  L.knockback(edge, pusher, near, 40);
+  check('밀려도 전장 안이다', near.x <= D.FIELD.w - 4, true);
+}
+
 // --- 주인공의 계열 스킬 --------------------------------------------------
 //
 // 음유시인은 강화·약화와 마나 나눔이 본업이라, 회복·도트·장판만 다루던 실행부에
@@ -897,10 +1112,13 @@ function cast(state, skillId, target) {
   check('약화가 적에게 걸린다', foe.auras.map((a) => a.skillId), ['lament']);
   check('약화는 아군에게 안 걸린다', tank.auras.length, 1);
 
-  // 광역 약화: 기준점 주변 적 모두에게.
+  // **불협화음은 약화가 아니라 혼란이다.** 광역 약화 자리는 만가(단일)와 짝을
+  // 이루던 것인데, 둘 다 수치를 곱으로 깎는 일이라 음유시인이 하는 일이 하나로
+  // 읽혔다 — 지금은 편을 뒤집는다.
   L.hero(state).mp = L.hero(state).maxMp;
   cast(state, 'dissonance', { x: foe.x, y: foe.y });
-  check('광역 약화가 적에게 걸린다', foe.auras.length, 2);
+  check('혼란이 적에게 걸린다', L.confused(state, foe), true);
+  check('오라로 쌓이지는 않는다', foe.auras.length, 1);
 
   // 마나 나눔: 제 마나값보다 많이 준다(노래로 채우는 것이지 제 것을 나누는 것이 아니다).
   tank.mp = 0;
@@ -1320,7 +1538,7 @@ function cast(state, skillId, target) {
   check('주인공이 쓰러져도 계속한다', dead.status, 'fighting');
   check('동료는 남아 있었다', AI.alive(dead, 'ally').length > 0, true);
   check('스킬은 더 못 쓴다',
-    L.castSkill(dead, 'touch', { uid: AI.alive(dead, 'ally')[0].uid }).reason, '쓰러졌다');
+    L.castSkill(dead, 'touch', { uid: AI.alive(dead, 'ally')[0].uid }).reason, 'hl.why.down');
 
   // 남은 동료가 다 정리하면 주인공이 없어도 이긴다.
   AI.alive(dead, 'enemy').forEach((u) => L.applyDamage(dead, null, u, 99999));
@@ -1522,7 +1740,12 @@ function cast(state, skillId, target) {
   check('이겼다', reward.won, true);
   check('처치 경험치가 들어간다', reward.kills > 0, true);
   check('길드 몫을 그대로 받는다', reward.guild, quest().guildReward.exp);
-  check('골드는 이겼을 때만', reward.gold, quest().guildReward.gold);
+
+  // **골드는 전투가 나누지 않는다.** 모집할 때 부른 보수가 정해져 있고(hire.js),
+  // 그것을 내고 남는 것이 주인공 몫이다 — 같은 일을 하는 규칙을 둘로 두면
+  // 한쪽만 고치게 된다.
+  check('전투는 골드를 세지 않는다',
+    ['purse', 'share', 'gold', 'party'].filter((key) => key in reward), []);
 
   // 힐로도 직업 경험치가 쌓인다. 흘린 힐은 세지 않는다 — 마나를 아껴 쓸 이유를
   // 경험치가 무너뜨리면 안 된다.
@@ -1547,7 +1770,6 @@ function cast(state, skillId, target) {
   const failure = L.rewardOf(lost);
   check('졌다', failure.won, false);
   check('길드 몫의 절반', failure.guild, Math.round(quest().guildReward.exp * 0.5));
-  check('골드는 없다', failure.gold, 0);
 }
 
 // --- 스킬 레벨 ----------------------------------------------------------
@@ -1677,8 +1899,22 @@ function cast(state, skillId, target) {
   const most = (list, key) => Math.max(...list.map((def) => def[key]));
   check('정예가 잡졸보다 세다',
     Math.min(...elite.map((d) => d.atk)) > most(trash, 'atk'), true);
-  check('정예가 잡졸보다 단단하다',
-    Math.min(...elite.map((d) => d.hp)) > most(trash, 'hp'), true);
+
+  // **체력만 놓고 보면 언데드가 이 순서를 벗어난다.** 회복이 그들을 때리게 되면서
+  // 질긴 쪽으로 잡았기 때문이고(체력 1.7배·공격력 0.8배), 좀비의 체력은 가장 무른
+  // 정예인 오크 주술사를 넘는다. 등급이 뜻하는 것은 체력이 아니라 **상대하기
+  // 버거운 정도**이므로, 체력 순서는 언데드를 뺀 채로 보고 진짜 규칙은 아래에서
+  // 본다 — 좀비의 한 방은 잡졸 중에서도 가장 작다.
+  const solid = trash.filter((def) => D.raceOf(def).id !== 'undead');
+  check('정예가 언데드 아닌 잡졸보다 단단하다',
+    Math.min(...elite.map((d) => d.hp)) > most(solid, 'hp'), true);
+
+  // **잡졸 하나가 정예 하나보다 버거우면 등급을 나눈 뜻이 없다.** 잡는 데 걸리는
+  // 시간(체력)과 그동안 맞는 양(초당 피해)을 곱해 견준다 — 둘 중 하나만 보면
+  // "질기지만 안 아픈 것"과 "무르지만 아픈 것"을 가릴 수 없다.
+  const load = (def) => (def.hp * def.atk) / def.attackCd;
+  check('정예 하나가 잡졸 하나보다 버겁다',
+    Math.min(...elite.map(load)) > Math.max(...trash.map(load)), true);
   check('우두머리가 정예보다 세다', boss.atk > most(elite, 'atk'), true);
   check('우두머리가 정예보다 단단하다', boss.hp > most(elite, 'hp'), true);
 
@@ -1699,6 +1935,54 @@ function cast(state, skillId, target) {
     kit.some((id) => D.UNIT_SKILLS[id].kind === 'damage-area'), true);
   check('어그로도 가져간다',
     kit.some((id) => D.UNIT_SKILLS[id].kind.startsWith('taunt')), true);
+}
+
+// --- 싸움이 벌어지는 자리 ------------------------------------------------
+//
+// **전투는 화면 가운데 근처에서 벌어져야 한다.** 적이 걸어와 아군에게 붙으므로
+// 싸움은 아군이 선 자리에서 열리는데, 예전에는 대열이 왼쪽 끝에 있었고 게다가
+// 앞줄이 제 뒤로 파고든 적을 잡으러 돌아설 때마다 후열이 그보다 더 물러서서,
+// 양쪽이 함께 왼쪽 벽까지 걸어갔다(재 보니 전투 위치의 중앙값이 x 25, 전투
+// 시간의 절반이 전장 왼쪽 3할에서 지나갔다). 대열을 가운데로 옮기고
+// `ai.holdLine`으로 밀리지 않게 한 뒤로는 중앙값이 x 48이다.
+{
+  const spots = [];
+  const starts = [];
+  let left = 0;
+  let ticks = 0;
+  for (const seed of [1, 2, 3, 4, 5, 6]) {
+    const state = battle({ seed, quest: quest({ level: 6 }),
+      party: PARTY.map((p) => ({ defId: p.defId, level: 6 })) });
+    let wasMarching = false;
+    for (let i = 0; i < 90 / L.TICK && state.status === 'fighting'; i++) {
+      L.step(state, L.TICK);
+      // 무리 사이 이동이 끝난 순간의 대열 자리. 여기가 다음 무리의 출발선이다.
+      if (wasMarching && !state.marching) {
+        const allies = state.units.filter((u) => !u.dead && u.side === 'ally');
+        if (allies.length) starts.push(allies.reduce((sum, u) => sum + u.x, 0) / allies.length);
+      }
+      wasMarching = state.marching;
+      if (state.marching) continue;
+      const live = state.units.filter((u) => !u.dead);
+      const allies = live.filter((u) => u.side === 'ally');
+      const foes = live.filter((u) => u.side === 'enemy');
+      if (!allies.length || !foes.length) continue;
+      const mid = live.reduce((sum, u) => sum + u.x, 0) / live.length;
+      spots.push(mid);
+      ticks++;
+      if (mid < D.FIELD.w * 0.3) left++;
+    }
+  }
+  const mid = spots.slice().sort((a, b) => a - b)[Math.floor(spots.length / 2)];
+  check('싸움이 전장 가운데 근처에서 벌어진다', mid > 40 && mid < 62, true);
+  // **다음 무리는 왼쪽 4분의 1에서 시작한다.** 대열을 가운데에 세워 두었더니
+  // 무리가 바뀔 때마다 아군이 적 코앞에 서 있어, 걸어가서 만나는 장면이 사라졌다.
+  check('무리가 바뀌면 아군이 왼쪽 4분의 1에서 다시 선다',
+    starts.every((x) => x > D.FIELD.w * 0.15 && x < D.FIELD.w * 0.35), true);
+  check('다시 서는 자리를 실제로 봤다', starts.length > 0, true);
+  // 벽에 붙는 일이 아예 없어야 한다는 뜻은 아니다 — 마지막 하나가 물러설 자리는
+  // 남겨 두었다(`ai.LINE_GIVE`). 그것이 전투의 기본이 되지 않는지를 본다.
+  check('왼쪽 끝에서 싸우는 시간은 드물다', left / ticks < 0.1, true);
 }
 
 // --- 난이도 확인 --------------------------------------------------------
@@ -1829,6 +2113,239 @@ function cast(state, skillId, target) {
     check(`Lv${level}: 힐이 들어간 쪽이 더 이긴다`,
       wins(level, level + 2, true) > wins(level, level + 2, false), true);
   }
+}
+
+// --- 언데드는 신성에 약하다 ---------------------------------------------
+//
+// **종족이 정하고 곱하는 자리는 `applyDamage` 하나다.** 스킬마다 곱하면 새
+// 신성 스킬을 넣을 때마다 잊고, 유닛마다 분기를 두면 언데드를 하나 더할 때마다
+// 규칙이 는다. 앞으로 들일 언데드가 전부 같은 약점을 갖는 것이 이 표의 값이다.
+{
+  // 언데드를 더 들여도 종족이 정하므로 표를 안 고쳐도 된다 — 그것이 이 표의 값이다.
+  check('구울도 언데드라 신성에 약하다',
+    D.schoolMul(D.weakOf(D.ENEMIES.ghoul), 'holy'), 1.6);
+
+  const zombie = D.ENEMIES.zombie;
+  const scout = D.ENEMIES.scout;
+  check('언데드만 신성에 약하다',
+    [D.schoolMul(D.weakOf(zombie), 'holy'), D.schoolMul(D.weakOf(scout), 'holy')],
+    [1.6, 1]);
+  // 갈래를 적지 않은 피해는 언데드에게도 그대로다 — 표에 없는 것은 1이다.
+  check('갈래 없는 피해는 그대로다', D.schoolMul(D.weakOf(zombie), null), 1);
+
+  // 표에 적은 종족과 갈래가 실제로 있는 것이어야 한다. 오타가 나면 조용히
+  // 아무 일도 일어나지 않는다 — 없는 종족의 약점은 아무에게도 안 걸린다.
+  const schools = new Set();
+  for (const def of Object.values(D.UNIT_SKILLS)) if (def.school) schools.add(def.school);
+  for (const def of Object.values(D.PLAYER_SKILLS)) if (def.school) schools.add(def.school);
+  const badRace = Object.keys(D.RACE_WEAK).filter((id) => !D.RACES[id]);
+  check('약점 표의 종족이 실제로 있다', badRace, []);
+  const badSchool = Object.values(D.RACE_WEAK)
+    .flatMap((row) => Object.keys(row)).filter((id) => !schools.has(id));
+  check('약점 표의 갈래를 쓰는 스킬이 있다', badSchool, []);
+
+  // **같은 기술은 주인공 손에서도 신성이다.** 동료 표에서 물려받으므로
+  // 여기가 갈리면 `shared`가 갈래를 빠뜨린 것이다.
+  check('심판은 양쪽 다 신성',
+    [D.UNIT_SKILLS.smite.school, D.PLAYER_SKILLS.smite.school], ['holy', 'holy']);
+
+  // 실제로 전투에서 더 아픈지 본다. 같은 피해를 좀비와 고블린에게 넣어 견준다.
+  const state = battle({ quest: quest({ waves: [['zombie'], ['scout']] }) });
+  const zed = state.units.find((u) => u.defId === 'zombie');
+  const before = zed.hp;
+  L.applyDamage(state, null, zed, 100, false, 'holy');
+  const holy = before - zed.hp;
+  zed.hp = before;
+  L.applyDamage(state, null, zed, 100, false, null);
+  const plain = before - zed.hp;
+  check('좀비는 신성을 더 아프게 맞는다', Math.round((holy / plain) * 10) / 10, 1.6);
+}
+
+// --- 언데드에게는 퍼지는 회복이 공격이다 ---------------------------------
+//
+// **반경으로 퍼지는 회복만이다**(`healSpread`). 아군 하나를 지목하는 회복은
+// 지목한 자리에 적이 설 수 없어 규칙이 닿을 일이 없고, 반경과 장판은 바닥을
+// 덮으므로 그 안에 선 언데드가 함께 맞는다.
+{
+  // **동료를 멀리 치워 둔다.** 좀비의 체력이 줄어든 것이 회복 때문인지 동료가
+  // 때려서인지 갈리지 않으면 아무것도 못 본다.
+  const state = battle({ quest: quest({ waves: [['zombie', 'scout']] }),
+    skills: ['ripple', 'sanctuary', 'touch'] });
+  const me = L.hero(state);
+  const mate = AI.alive(state, 'ally').find((u) => u.uid !== me.uid);
+  for (const ally of AI.alive(state, 'ally')) if (ally.uid !== me.uid) ally.x = -200;
+  const zed = state.units.find((u) => u.defId === 'zombie');
+  const goblin = state.units.find((u) => u.defId === 'scout');
+  zed.x = me.x + 30; zed.y = me.y;
+  goblin.x = zed.x; goblin.y = zed.y;
+
+  const zedBefore = zed.hp;
+  const goblinBefore = goblin.hp;
+  cast(state, 'ripple', { x: zed.x, y: zed.y });
+  check('범위 회복이 좀비를 때린다', zed.hp < zedBefore, true);
+  check('같은 자리의 고블린은 멀쩡하다', goblin.hp, goblinBefore);
+
+  // 회복량과 신성 배수가 함께 걸린다. 방어(좀비의 `armor` 0.9)를 타므로 정확한
+  // 값 대신 "회복량은 넘는다"로 본다 — 1.6배에서 방어만큼 깎여도 그 아래로는
+  // 내려가지 않는다.
+  check('회복량보다 아프게 맞는다', zedBefore - zed.hp > L.playerSkill(state, 'ripple').heal, true);
+
+  // **지목하는 회복은 그대로 회복이다.** 규칙이 반경에만 걸린다는 것을 못 박아
+  // 둔다 — 여기가 갈리면 아군에게 거는 회복이 언데드 파티에서 뜻을 잃는다.
+  mate.x = me.x; mate.y = me.y;   // 위에서 멀리 치워 두었다. 사거리 안으로 돌린다.
+  mate.hp = Math.round(mate.maxHp * 0.5);
+  const hurt = mate.hp;
+  cast(state, 'touch', { uid: mate.uid });
+  check('지목한 아군은 회복된다', mate.hp > hurt, true);
+}
+
+// **언데드에게는 어떤 회복도 통하지 않는다.** 회복이 지나가는 길이 넷(지목·
+// 범위·장판·지속)에 물약과 무리 사이의 쉼까지 여섯인데, 막는 자리는 `applyHeal`
+// 하나이고 그 함수를 안 거치는 둘(물약·쉼)만 따로 적혀 있다.
+{
+  const state = battle({ quest: quest({ waves: [['zombie', 'scout']] }) });
+  const zed = state.units.find((u) => u.defId === 'zombie');
+  const goblin = state.units.find((u) => u.defId === 'scout');
+  zed.hp = Math.round(zed.maxHp * 0.5);
+  goblin.hp = Math.round(goblin.maxHp * 0.5);
+
+  const before = zed.hp;
+  check('좀비는 회복되지 않는다', L.applyHeal(state, null, zed, 500), 0);
+  check('회복을 맞아도 체력이 그대로다', zed.hp, before);
+  // 언데드가 아닌 적은 그대로 회복된다 — 막는 것은 종족이지 편이 아니다.
+  check('고블린은 회복된다', L.applyHeal(state, null, goblin, 200) > 0, true);
+
+  // 지속 회복도 같은 함수를 거치므로 함께 막힌다.
+  L.addDot(state, null, zed, D.UNIT_SKILLS.renew, 'heal', 100);
+  for (let i = 0; i < 90; i++) L.step(state, L.TICK);
+  check('지속 회복도 통하지 않는다', zed.hp <= before, true);
+
+  // 물약은 `applyHeal`을 안 거치고 체력을 직접 더하는 자리다.
+  zed.potions = { health: 3, mana: 3 };
+  zed.potionReadyAt = 0;
+  check('체력 물약을 마시지 못한다',
+    L.drink(state, zed, 'health').reason, 'hl.why.noHeal');
+  check('물약이 그대로 남는다', zed.potions.health, 3);
+  // **마나는 통한다** — 통하지 않는 것은 생명의 힘이지 마력이 아니다.
+  zed.mp = 0;
+  check('마나 물약은 마신다', L.drink(state, zed, 'mana').ok, true);
+}
+
+// 바닥에 깔리는 회복은 **한 번 도는 동안 둘 다 한다** — 아군을 채우면서 같은
+// 자리의 언데드를 때린다. 둘 중 하나만 도는 실수가 나면 화면에서는 "가끔 안
+// 듣는 장판"으로 보인다. 앞 블록과 전투를 나눈 것은, 거기서 파문에 맞은 좀비가
+// 죽어 있으면 "장판이 안 돌았다"와 구별되지 않기 때문이다.
+{
+  const state = battle({ quest: quest({ waves: [['zombie']] }), skills: ['sanctuary'] });
+  const me = L.hero(state);
+  const zed = state.units.find((u) => u.defId === 'zombie');
+  for (const ally of AI.alive(state, 'ally')) if (ally.uid !== me.uid) ally.x = -200;
+  me.hp = Math.round(me.maxHp * 0.5);
+  const mine = me.hp;
+  cast(state, 'sanctuary', { x: me.x, y: me.y });
+  zed.x = me.x; zed.y = me.y;
+  const before = zed.hp;
+  // 좀비가 때리면 회복분이 가려지므로 도는 동안 굳혀 둔다.
+  for (let i = 0; i < 60; i++) { zed.stunUntil = state.t + 5; L.step(state, L.TICK); }
+  check('회복 장판이 좀비를 때린다', zed.hp < before, true);
+  check('같은 장판이 아군은 회복한다', me.hp > mine, true);
+}
+
+// --- 높은 레벨에서는 다른 적이 나온다 -----------------------------------
+//
+// **계열이 올라가는 것(`SPEC_UP`)과 다르다.** 그쪽은 같은 개체가 손을 바꾸고,
+// 이쪽은 개체 자체가 바뀐다 — 좀비가 구울이 되는 것은 강해진 좀비가 아니다.
+{
+  check('문턱 아래에서는 그대로다', D.enemyAt('zombie', 11), 'zombie');
+  check('문턱을 넘으면 갈린다', D.enemyAt('zombie', 12), 'ghoul');
+  check('표에 없는 적은 그대로다', D.enemyAt('scout', 30), 'scout');
+
+  // **바뀐 쪽이 반드시 더 세야 한다.** 상위 대체인데 약하면 레벨이 오를수록
+  // 판이 저절로 쉬워진다. 다만 초당 피해만으로 재지 않는다 — 구울은 한 방이
+  // 오히려 작고 빨리 붙어서 센 쪽이라, 그 값만 보면 상위 대체가 아니라고 나온다.
+  const dps = (id) => D.ENEMIES[id].atk / D.ENEMIES[id].attackCd;
+  for (const [id, up] of Object.entries(D.ENEMY_UP)) {
+    check(`${id} → ${up.to}: 초당 피해가 밀리지 않는다`, dps(up.to) >= dps(id), true);
+    check(`${id} → ${up.to}: 더 빨리 붙는다`,
+      D.ENEMIES[up.to].speed > D.ENEMIES[id].speed, true);
+    // 등급까지 오르면 위협의 몫이 두 배가 되어 무리 크기가 통째로 달라진다.
+    check(`${id} → ${up.to}: 등급은 그대로다`,
+      D.rankOf(D.ENEMIES[up.to]).id, D.rankOf(D.ENEMIES[id]).id);
+  }
+
+  // 실제로 생성되는 의뢰에서 갈리는지 본다. 무리를 짜는 쪽이 이 규칙을 안 거치면
+  // 표만 있고 화면에는 아무 일도 일어나지 않는다.
+  const Quests = require('./quests.js');
+  const seen = (level) => {
+    const out = new Set();
+    for (let i = 1; i <= 30; i++) {
+      for (const q of Quests.generate(level, i * 7)) for (const id of q.waves.flat()) out.add(id);
+    }
+    return out;
+  };
+  check('낮은 레벨 의뢰에는 구울이 없다', seen(6).has('ghoul'), false);
+  check('높은 레벨 의뢰에는 좀비가 없다', seen(18).has('zombie'), false);
+}
+
+// --- 초상화에 뜨는 상태 -------------------------------------------------
+//
+// 화면이 지속 피해·지속 회복·상태 이상을 초상화 오른쪽 위에 그리는데, 그 목록을
+// 규칙 쪽에서 모아 준다. **적과 아군을 가리지 않는다.**
+{
+  const state = battle({ skills: ['regen', 'flame', 'touch', 'quick', 'focus'] });
+  const hero = L.hero(state);
+  const tank = unit(state, '강철의 브란');
+  const foe = AI.alive(state, 'enemy')[0];
+  const kinds = (unit_) => L.statusesOf(state, unit_).map((st) => st.kind);
+
+  check('아무것도 안 걸렸으면 빈 목록', kinds(tank), []);
+
+  cast(state, 'regen', { uid: tank.uid });
+  check('아군의 지속 회복이 보인다', kinds(tank), ['heal-dot']);
+
+  L.stun(state, tank, foe, 3);
+  L.addDot(state, hero, foe, D.PLAYER_SKILLS.flame, 'damage');
+  L.addAura(state, hero, foe, D.UNIT_SKILLS.cripple);
+  check('적에게 걸린 것도 같은 목록으로 나온다', kinds(foe), ['stun', 'dot', 'debuff']);
+
+  // 도발은 걸린 쪽의 초상화에 뜬다. 거는 쪽이 아니다.
+  const brawl = battle({ party: [{ defId: 'bran', level: 8 }] });
+  const bran = unit(brawl, '강철의 브란');
+  const mob = AI.alive(brawl, 'enemy')[0];
+  L.runUnitSkill(brawl, bran, { id: 'taunt', targetUid: mob.uid });
+  check('도발은 끌려간 쪽에 붙는다', L.statusesOf(brawl, mob).map((st) => st.kind), ['taunt']);
+  check('도발한 쪽에는 아무것도 없다', L.statusesOf(brawl, bran), []);
+
+  // 저주 셋이 걸린 유닛의 초상화가 같은 아이콘 셋으로 덮이면 이름과 막대가 가려진다.
+  const many = battle();
+  const target = AI.alive(many, 'enemy')[0];
+  const caster = L.hero(many);
+  L.addDot(many, caster, target, D.PLAYER_SKILLS.flame, 'damage');
+  L.addDot(many, caster, target, D.UNIT_SKILLS.venom, 'damage');
+  const merged = L.statusesOf(many, target);
+  check('같은 종류는 하나로 묶인다', merged.map((st) => st.kind), ['dot']);
+  check('묶인 개수를 들고 있다', merged[0].count, 2);
+  check('남은 시간은 긴 쪽', merged[0].endsAt,
+    Math.max(many.t + D.PLAYER_SKILLS.flame.duration, many.t + D.UNIT_SKILLS.venom.duration));
+
+  // 시간이 지나면 목록에서 빠진다. 남겨 두면 끝난 표시가 초상화에 붙어 있는다.
+  // 전투를 굴리지 않고 시계만 밀어 두는 것은, 그동안 탱커가 이 적을 도발해
+  // 여기서 보려는 것과 다른 표시가 붙기 때문이다.
+  many.t += merged[0].endsAt + 1;
+  check('끝난 것은 빠진다', L.statusesOf(many, target), []);
+
+  // 쓰러진 유닛의 초상화는 흐려진 채 남는다. 거기에 표시가 붙어 있으면 아직
+  // 무언가 돌고 있는 것으로 읽힌다.
+  const gone = battle();
+  const victim = AI.alive(gone, 'enemy')[0];
+  L.addDot(gone, L.hero(gone), victim, D.PLAYER_SKILLS.flame, 'damage');
+  L.applyDamage(gone, null, victim, 99999);
+  check('쓰러진 유닛에는 아무것도 없다', L.statusesOf(gone, victim), []);
+
+  // 종류마다 아이콘과 색이 정해져 있어야 화면이 그릴 수 있다. 그림 자체가
+  // 있는지는 art.test.js가 본다.
+  check('모든 종류에 아이콘과 색이 있다',
+    Object.values(L.STATUS_KINDS).filter((st) => !st.icon || !st.css || !st.name), []);
 }
 
 console.log(`${passed}개 통과, ${failed}개 실패`);

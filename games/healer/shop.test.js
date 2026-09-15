@@ -86,7 +86,7 @@ const LEVELS = [1, 4, 9, 16, 25, 30];
   const price = Items.price(item);
   check('돈이 있으면 산다', Shop.buyGear(price, item).ok, true);
   check('한 골드 모자라면 못 산다', Shop.buyGear(price - 1, item).ok, false);
-  check('이유를 알려 준다', Shop.buyGear(0, item).reason, '골드가 모자란다');
+  check('이유를 알려 준다', Shop.buyGear(0, item).reason, 'hl.why.noGold');
 
   check('물약도 값이 있다', Shop.buyPotion(D.potionPrice('mana', 1), 'mana', 1).ok, true);
   check('모르는 물약은 못 산다', Shop.buyPotion(1e9, '엘릭서', 1).ok, false);
@@ -131,11 +131,17 @@ const LEVELS = [1, 4, 9, 16, 25, 30];
 {
   // 장비 하나가 의뢰 반 판에서 두 판 사이여야 한다. 더 싸면 전리품이 나올
   // 이유가 없고, 더 비싸면 상점을 들를 이유가 없다.
+  //
+  // **견주는 것은 적힌 금액이 아니라 주인공의 몫이다.** 길드 골드에서 동료의
+  // 보수가 먼저 나가므로(`hire.js`), 적힌 금액으로 재면 실제로 살 수 있는 것보다
+  // 다섯 배 후하게 나온다. 보수가 동료마다 다르니 정확한 몫은 편성마다 갈리는데,
+  // 1인 몫이 그 언저리다 — 가득 채워 나가면 그보다 조금 많고 적게 데려가면 더 많다.
   const Q = require('./quests.js');
   const off = [];
   for (const level of [1, 5, 10, 15, 20, 25]) {
     const quests = Q.generate(level, 4242);
-    const gold = quests.reduce((sum, q) => sum + q.guildReward.gold, 0) / quests.length;
+    const gold = quests.reduce((sum, q) => sum + q.guildReward.gold, 0)
+      / quests.length / D.PARTY_MAX;
     const gear = Shop.stock(level, 4242).gear;
     const price = gear.reduce((sum, item) => sum + Items.price(item), 0) / gear.length;
     const ratio = price / gold;

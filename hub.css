@@ -48,6 +48,29 @@ h1 {
   opacity: 0.65;
 }
 
+.title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* 고르개는 게임 페이지가 아니라 여기 한 곳에만 둔다 — 고른 값은 저장돼 모든
+   페이지가 같이 읽는다. 항목 이름은 그 언어 스스로의 표기라 번역하지 않는다. */
+.lang {
+  flex: none;
+  padding: 7px 10px;
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  background: var(--card-bg);
+  color: var(--fg);
+  font: inherit;
+  /* 사파리는 16px보다 작은 글자의 입력에 초점이 가면 화면을 당겨 확대한다.
+     확대는 막아 두었지만 당겨지는 것 자체가 남아 값을 내리지 않는다. */
+  font-size: 16px;
+  line-height: 1.2;
+}
+
 /* 한 줄에 하나씩 늘어놓던 것을 격자로 바꿨다. 게임이 여덟 개가 되면서 한 줄
    목록은 화면 하나에 다 들어오지 않았고, 다 들어오지 않는 목록은 훑는 것이
    아니라 스크롤하는 것이 된다. */
@@ -134,6 +157,32 @@ h1 {
 .card-desc {
   font-size: 12.5px;
   opacity: 0.6;
+}
+
+/* 아직 다듬는 중인 게임은 목록 맨 아래에 따로 모은다. 완성된 것들 사이에 섞어
+   두면 처음 열어 본 사람이 하필 그것부터 눌러 보고 게임 전체를 그 인상으로
+   판단한다. **딱지는 카드에도 그대로 둔다** — 여기까지 내려오지 않고 링크로 바로
+   들어오는 사람도 있다. 다 만들어지면 카드를 위 목록으로 옮기고 딱지만 떼면 된다. */
+.wip {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-top: 1px solid var(--card-border);
+  padding-top: clamp(18px, 4vmin, 28px);
+}
+
+.wip h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  opacity: 0.75;
+}
+
+.wip-note {
+  margin: -6px 0 2px;
+  font-size: 12.5px;
+  opacity: 0.55;
 }
 
 footer {

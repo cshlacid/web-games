@@ -44,9 +44,9 @@ function everyQuest(fn) {
 {
   check('정해진 개수만큼 걸린다', Q.generate(1, 7).length, Q.QUEST_COUNT);
   check('같은 씨앗이면 같은 목록',
-    Q.generate(5, 7).map((q) => q.name), Q.generate(5, 7).map((q) => q.name));
+    Q.generate(5, 7).map((q) => JSON.stringify(q.name)), Q.generate(5, 7).map((q) => JSON.stringify(q.name)));
   check('씨앗이 다르면 달라진다',
-    Q.generate(5, 7).map((q) => q.name).join() === Q.generate(5, 8).map((q) => q.name).join(),
+    JSON.stringify(Q.generate(5, 7).map((q) => q.name)) === JSON.stringify(Q.generate(5, 8).map((q) => q.name)),
     false);
 
   // 쉬운 것부터 보여 주지 않으면 게시판을 훑는 기준이 없다.
@@ -54,11 +54,80 @@ function everyQuest(fn) {
   check('적정 레벨 순으로 정렬', levels.slice().sort((a, b) => a - b), levels);
 }
 
+// --- 늘 서는 자리(친구·고른 동료) ----------------------------------------
+//
+// 명부에서 한 번에 열만 보여 주므로, 공들여 키운 동료가 이번 뽑기에 안 걸리면
+// 데려갈 방법이 없었다. `always`로 넘긴 동료는 뽑기와 상관없이 목록에 선다.
+{
+  const R = require('./roster.js');
+  const roster = R.create(3);
+  const quest = Q.generate(5, 1)[0];
+  const fixed = [roster[2], roster[5]];
+  const list = Q.companionsFor(quest, roster, 11, fixed);
+
+  check('넘긴 동료가 목록에 있다', fixed.every((m) => list.includes(m)), true);
+  check('같은 동료가 두 번 서지 않는다', list.length, new Set(list).size);
+  // **뽑기 자리를 먹지 않는다.** 먹으면 친구가 늘수록 고를 폭이 줄어, 친구를
+  // 만든 것이 손해가 된다.
+  const plain = Q.companionsFor(quest, roster, 11);
+  check('넘긴 만큼 목록이 좁아지지 않는다', list.length >= plain.length, true);
+
+  // 명부에 없는 사람은 넣지 않는다 — 저장본이 어긋났을 때 유령이 목록에 선다.
+  const ghost = Q.companionsFor(quest, roster, 11, [{ name: '없는 사람', defId: 'lyle' }]);
+  check('명부에 없는 사람은 안 선다',
+    ghost.every((m) => roster.includes(m)), true);
+}
+
+// --- 게시판에 여러 난이도가 걸린다 ---------------------------------------
+//
+// **예전에는 넷이 한 가지 난이도로 채워졌다.** 아래쪽 폭이 -1까지뿐이라 평판이
+// 무명인 동안 서로 다른 난이도가 넷 중 1.79뿐이었고, 화면의 "쉬움" 딱지(두 레벨
+// 아래부터)가 붙는 의뢰는 아예 생길 수 없었다.
+{
+  const spreadOf = (level, seed, gap) =>
+    Q.generate(level, seed, gap).map((q) => q.level - level);
+
+  let same = 0;
+  let boards = 0;
+  let narrow = 0;
+  for (let level = 5; level <= 20; level++) {
+    for (let seed = 1; seed <= 30; seed++) {
+      for (const stage of D.REPUTATION.stages) {
+        const offs = spreadOf(level, seed * 71 + level, stage.questGap);
+        if (new Set(offs).size < 3) same++;
+        if (Math.max(...offs) - Math.min(...offs) < 2) narrow++;
+        boards++;
+      }
+    }
+  }
+  check('한 게시판에 세 가지 넘는 난이도가 걸린다', same, 0);
+  check('가장 쉬운 것과 어려운 것이 두 레벨 넘게 벌어진다', narrow, 0);
+
+  // 아래쪽은 평판이 자르지 않는다. 무명이어도 쉬운 판을 고를 수 있어야
+  // 게시판이 한 가지로 채워지지 않는다.
+  const unknown = D.REPUTATION.stages[0];
+  const low = [];
+  for (let seed = 1; seed <= 40; seed++) low.push(...spreadOf(10, seed, unknown.questGap));
+  check('무명이어도 쉬운 의뢰가 걸린다', low.some((n) => n <= -2), true);
+  check('무명이어도 제 레벨 위가 하나는 있다', low.some((n) => n > 0), true);
+
+  // 위쪽만 평판이 연다 — 이 게임에서 "상위 콘텐츠"라고 부를 수 있는 것이
+  // 의뢰의 난이도뿐이라 그렇게 옮겼다(기획서 3장).
+  const top = (gap) => {
+    let best = -99;
+    for (let seed = 1; seed <= 40; seed++) best = Math.max(best, ...spreadOf(10, seed, gap));
+    return best;
+  };
+  const tops = D.REPUTATION.stages.map((stage) => top(stage.questGap));
+  check('평판이 오르면 더 어려운 의뢰가 걸린다',
+    tops.every((n, i) => i === 0 || n > tops[i - 1]), true);
+}
+
 // --- 어떤 씨앗으로도 성립해야 하는 것 -----------------------------------
 {
   check('적정 레벨은 1 이상', everyQuest((q) => (q.level >= 1 ? null : `레벨 ${q.level}`)), []);
   check('주인공 레벨 근처에서 나온다',
-    everyQuest((q, level) => (Math.abs(q.level - level) <= 4 ? null : `${q.level} vs ${level}`)), []);
+    everyQuest((q, level) => (Math.abs(q.level - level) <= 5 ? null : `${q.level} vs ${level}`)), []);
   check('웨이브가 비어 있지 않다',
     everyQuest((q) => (q.waves.length && q.waves.every((w) => w.length) ? null : '빈 웨이브')), []);
   check('아는 적만 나온다',
@@ -123,6 +192,45 @@ function everyQuest(fn) {
     mean(withBoss, (q) => q.exp) > mean(without, (q) => q.exp) * 1.5, true);
 }
 
+// --- 우두머리는 혼자 나오지 않는다 --------------------------------------
+//
+// 뒤에 하나만 붙여 두었을 때에는 파티 다섯이 한 대상에 화력을 모아, 도발도
+// 어그로도 뜻이 없었다. 쫄을 데리고 나오고 레벨이 오르면 제 수가 는다.
+{
+  const rankOf = (id) => D.rankOf(D.ENEMIES[id]).id;
+  const bossWaves = (level) => {
+    const out = [];
+    for (const seed of SEEDS) {
+      for (const quest of Q.generate(level, seed)) {
+        for (const wave of quest.waves) {
+          if (wave.some((id) => rankOf(id) === 'boss')) out.push(wave);
+        }
+      }
+    }
+    return out;
+  };
+  const low = bossWaves(8);
+  check('우두머리 무리가 걸린다', low.length > 0, true);
+  check('혼자 나오지 않는다',
+    low.every((wave) => wave.length > wave.filter((id) => rankOf(id) === 'boss').length), true);
+  // 데리고 나오는 것은 쫄이다. 정예를 섞으면 우두머리 무리가 아니라 정예 무리에
+  // 우두머리가 낀 것이 된다.
+  check('데리고 나오는 것은 쫄이다',
+    low.every((wave) => wave.every((id) => rankOf(id) === 'boss' || rankOf(id) === 'trash')), true);
+  // 우두머리를 계속 살리는 적 힐러가 옆에 서면 아무도 죽일 수 없는 무리가 된다.
+  check('적 힐러는 붙지 않는다',
+    low.every((wave) => wave.every((id) => D.ENEMIES[id].job !== 'healer')), true);
+
+  // 레벨이 오르면 우두머리 자신이 는다. 하나로 고정해 두면 파티만 자라므로
+  // 뒤로 갈수록 저절로 쉬워진다.
+  const most = (level) => Math.max(...bossWaves(level)
+    .map((wave) => wave.filter((id) => rankOf(id) === 'boss').length));
+  check('높은 레벨에서는 여럿이 나온다', most(20) > most(8), true);
+  // 무리 상한이 다섯이라 그 위는 설 자리가 없다.
+  check('그래도 다섯을 넘지 않는다',
+    bossWaves(30).every((wave) => wave.length <= 5), true);
+}
+
 // --- 무리는 머릿수가 아니라 위협의 몫으로 짠다 --------------------------
 //
 // 등급을 가리지 않고 세던 때에는 "잡졸 넷"이 "정예 둘"보다 위험했다. 정예가 잡졸
@@ -167,18 +275,38 @@ function everyQuest(fn) {
   check('같은 동료가 두 번 나오지 않는다', new Set(list.map((c) => c.name)).size, list.length);
   check('명부에 있는 동료만 나온다', list.every((c) => roster.includes(c)), true);
 
-  // 탱커와 힐러가 없으면 편성을 고민하는 것이 아니라 그냥 못 깨는 의뢰가 된다.
-  const bad = [];
-  for (const seed of SEEDS) {
-    for (const level of LEVELS) {
-      for (const q of Q.generate(level, seed)) {
-        const jobs = Q.companionsFor(q, R.create(seed), seed).map((c) => D.COMPANIONS[c.defId].job);
-        if (!jobs.includes('tank')) bad.push(`Lv${level}/${seed}: 탱커 없음`);
-        if (!jobs.includes('healer')) bad.push(`Lv${level}/${seed}: 힐러 없음`);
-      }
-    }
+  // **탱커·힐러를 억지로 끼워 넣지 않는다.** 없는 목록은 못 깨는 의뢰라서 두던
+  // 규칙인데, 편성 화면의 "동료 새로 고침"이 그 자리를 대신한다. 대신 **잦으면
+  // 안 된다** — 매번 새로 고쳐야 하면 그것은 단추가 아니라 절차다.
+  //
+  // **재는 것은 역할이 아니라 "앞에 설 사람이 있는가"다.** 성기사가 동료 계열로
+  // 들어오면서 역할은 힐러인데 도발을 들고 앞에 서는 동료가 생겼다 — `SPEC_CHOICES`가
+  // 전사를 탱커의 선택지로 두는 것과 같은 이야기다. 명부가 상한까지 자란 최악의
+  // 경우로 재면 앞에 설 사람이 없는 목록이 2%, 힐러 없는 목록이 0.5%다.
+  // **탱커 역할만 세면 15%인데**, 그것은 길드 뽑기가 정의마다 고르게 걸려 계열이
+  // 늘수록 탱커 정의 둘의 몫이 줄기 때문이다 — 성기사가 그 자리를 메운다.
+  let noTank = 0;
+  let noFront = 0;
+  let noHealer = 0;
+  let boards = 0;
+  for (let seed = 1; seed <= 200; seed++) {
+    const roster = R.create(seed);
+    while (roster.length < R.MAX_SIZE) R.maybeJoin(roster, roster.length * 7 + seed, 1);
+    const list = Q.companionsFor(Q.generate(8, seed)[0], roster, seed * 13);
+    const jobs = list.map((c) => D.COMPANIONS[c.defId].job);
+    const specs = list.map((c) => R.specOf(c));
+    if (!jobs.includes('tank')) noTank++;
+    if (!jobs.includes('tank') && !specs.includes('paladin')) noFront++;
+    if (!jobs.includes('healer')) noHealer++;
+    boards++;
   }
-  check('탱커와 힐러가 반드시 있다', bad, []);
+  check('앞에 설 사람이 없는 목록은 드물다', noFront / boards < 0.06, true);
+  check('탱커 없는 목록이 흔하지는 않다', noTank / boards < 0.22, true);
+  check('힐러 없는 목록은 더 드물다', noHealer / boards < 0.05, true);
+  // 명부가 목록보다 작으면 전원이 서므로 빠질 수가 없다.
+  const small = Q.companionsFor(Q.generate(5, 9)[0], R.create(9), 9)
+    .map((c) => D.COMPANIONS[c.defId].job);
+  check('명부가 작으면 전원이 선다', ['tank', 'healer'].every((job) => small.includes(job)), true);
 
   // 스킬을 하나도 못 들고 오는 동료는 고를 이유가 없는 동료다.
   const mute = [];

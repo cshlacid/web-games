@@ -7,6 +7,7 @@ const D = require('./data.js');
 const Sprites = require('./sprites.js');
 const Icons = require('./icons.js');
 const Scenes = require('./scenes.js');
+const L = require('./logic.js');
 
 let passed = 0;
 let failed = 0;
@@ -24,40 +25,38 @@ function check(name, actual, expected) {
 
 // --- 그림 자료 ----------------------------------------------------------
 //
-// 도형 하나가 빠지거나 팔레트에 없는 색을 쓴 것은 눈으로 잘 안 보인다 —
-// 화면에서는 팔 하나가 사라진 정도로만 나타난다.
+// 도형을 손으로 적던 때에는 도형 하나가 빠지거나 팔레트에 없는 색을 쓴 것을
+// 여기서 봤다. **지금은 전부 구운 그림 파일이라 그 검사가 통째로 사라졌다** —
+// 자료를 손으로 적는 자리가 없어졌기 때문이고, 대신 시트가 서로 어긋나지
+// 않는지(칸·프레임 수·크기 사다리)를 본다.
 {
-  const KINDS = ['e', 'r', 'p', 'arc'];
-  for (const [kind, sprite] of Object.entries(Sprites.SPRITES)) {
-    check(`${kind}: 크기가 적혀 있다`, sprite.w > 0 && sprite.h > 0, true);
-    check(`${kind}: 도형이 들어 있다`, sprite.parts.length > 0, true);
+  // 열일곱 전부가 시안을 구운 그림 파일이다. 도형은 하나도 남지 않았다.
+  check('그림 파일 열일곱', Object.keys(Sprites.SHEETS).length, 17);
 
-    // 도형은 타원·둥근 사각형·곡선·선 중 하나다. 둘을 함께 적으면 하나만 그려진다.
-    const shapeless = sprite.parts
-      .map((part, i) => (KINDS.filter((k) => part[k]).length === 1 ? null : i))
-      .filter((i) => i !== null);
-    check(`${kind}: 도형 종류가 하나씩이다`, shapeless, []);
-
-    const unknown = new Set();
-    for (const part of sprite.parts) if (!Sprites.PALETTE[part.f]) unknown.add(part.f);
-    check(`${kind}: 팔레트에 있는 색만 쓴다`, [...unknown], []);
-
-    // 선으로만 긋는 것에는 굵기가 있어야 한다. 없으면 브라우저가 1을 쓰는데,
-    // 이 격자에서 1은 활이 아니라 기둥이다.
-    const thin = sprite.parts.filter((part) => part.arc);
-    check(`${kind}: 선에는 굵기가 있다`, thin.filter((part) => !(part.width > 0)).length, 0);
-
-    // 가장자리에 여유 한 칸을 두지 않으면 테두리와 뿔이 잘린다. 렌더러가 그만큼
-    // 넓혀 그리므로 실제 크기는 자료보다 2칸 크다.
-    check(`${kind}: 크기를 밖에서도 같은 값으로 본다`,
-      Sprites.size(kind), { w: sprite.w + 2, h: sprite.h + 2 });
+  // **한 그림을 두 시트가 나눠 쓰지 않는다.** 성기사가 제 시안이 없어 수호자
+  // 것을 빌리던 동안에는 여기에 그 한 쌍을 못 박아 두었다 — 편성 화면에서 둘을
+  // 이름으로만 갈라야 했기 때문이다. 시안이 오면서 그 자리가 없어졌고, 다시
+  // 빌리는 일이 생기면 여기서 걸린다.
+  const byFile = {};
+  for (const [kind, sheet] of Object.entries(Sprites.SHEETS)) {
+    (byFile[sheet.src] = byFile[sheet.src] || []).push(kind);
   }
+  check('그림을 나눠 쓰는 시트가 없다',
+    Object.values(byFile).filter((list) => list.length > 1), []);
 
-  // 주인공만 그림 파일이고 나머지 열하나가 도형이다. 시안이 주인공 하나뿐이라
-  // 화풍이 섞이는 것을 감수했다 — 나머지 시안이 오면 여기부터 바뀐다.
-  check('도형 그림 열하나', Object.keys(Sprites.SPRITES).length, 11);
-  check('그림 파일 하나', Object.keys(Sprites.SHEETS).length, 1);
-  check('주인공은 도형이 아니다', Boolean(Sprites.SPRITES.hero), false);
+  // **시트가 저마다 성립해야 한다.** 칸·줄·프레임 수가 어긋나면 화면에서는
+  // 엉뚱한 칸이 잘려 나오거나 프레임이 사라진다.
+  for (const [kind, sheet] of Object.entries(Sprites.SHEETS)) {
+    check(`${kind}: 칸 크기가 적혀 있다`, sheet.cell.w > 0 && sheet.cell.h > 0, true);
+    const over = Object.entries(sheet.clips)
+      .filter(([, clip]) => clip.frames > sheet.cols || clip.row >= sheet.rows)
+      .map(([name]) => name);
+    check(`${kind}: 프레임이 격자 안에 들어간다`, over, []);
+    const bad = Object.entries(sheet.crops)
+      .filter(([, c]) => c.x < 0 || c.y < 0 || c.x + c.w > 1.001 || c.y + c.h > 1.001)
+      .map(([name]) => name);
+    check(`${kind}: 잘라 내는 자리가 칸 안이다`, bad, []);
+  }
 
   // **계열마다 제 그림이 있어야 한다.** 궁수와 마법사가 같은 그림을 쓰던 때에는
   // 편성 화면에서 이름을 읽어야 어느 쪽인지 알 수 있었고, 전장에서는 아예
@@ -78,48 +77,57 @@ function check(name, actual, expected) {
   check('한 그림을 두 계열이 나눠 쓰지 않는다',
     Object.entries(byPic).filter(([, set]) => set.size > 1).map(([pic]) => pic), []);
 
-  // 우두머리는 상자가 넓다. 화면 크기를 이 폭으로 정하므로 이것이 곧 "크다"이다.
-  // **도형 그림끼리만 견준다** — 주인공의 상자가 넓은 것은 인물이 커서가 아니라
-  // 지팡이가 좌우로 흔들려서다.
-  check('우두머리가 도형 중 가장 크다',
-    Object.keys(Sprites.SPRITES).every((kind) => kind === 'boss'
-      || Sprites.size(kind).w < Sprites.size('boss').w), true);
+  // **적은 등급 순으로 커야 한다.** 상자 폭으로 견주던 검사를 여기로 옮겼다 —
+  // 그쪽은 무기가 좌우로 흔들리는 폭까지 재서, 지팡이를 든 쪽이 덩치와 무관하게
+  // 넓게 나온다. 지금은 인물 키로 잰다: 그림 파일은 `box`에서 칸의 빈자리를 덜어
+  // 낸 값(시안끼리 맞춘 인물 키 76px), 도형은 상자 높이 그대로다.
+  const personH = (kind) => {
+    const sheet = Sprites.SHEETS[kind];
+    return sheet ? (sheet.box * 76) / sheet.cell.h : Sprites.size(kind).h;
+  };
+  const ladder = ['goblin', 'orc', 'ogre', 'chief'];
+  check('적은 등급 순으로 커진다',
+    ladder.every((kind, i) => i === 0 || personH(kind) > personH(ladder[i - 1])), true);
+  // 같은 종족·같은 등급인 둘은 키가 같아야 한다. 크기로 읽히는 것은 등급이지
+  // 계열이 아니다.
+  check('오크 전사와 오크 주술사는 키가 같다',
+    Math.abs(personH('orc') - personH('hexer')) < 0.5, true);
+  // 좀비는 사람 크기의 시체라 고블린보다 크지만, 잡졸이므로 정예를 넘지 않는다.
+  check('좀비는 고블린보다 크고 오크보다 작다',
+    personH('goblin') < personH('zombie') && personH('zombie') < personH('orc'), true);
+  // 구울은 좀비를 갈아 끼우는 자리라 조금 크다. 같은 잡졸이므로 정예는 넘지 않는다.
+  check('구울은 좀비보다 크고 오크보다 작다',
+    personH('zombie') < personH('ghoul') && personH('ghoul') < personH('orc'), true);
 }
 
 // --- 자료가 가리키는 그림이 실제로 있는가 -------------------------------
 {
-  const kinds = new Set(Object.keys(Sprites.SPRITES).concat(Object.keys(Sprites.SHEETS)));
+  const kinds = new Set(Object.keys(Sprites.SHEETS));
   const used = [D.HERO, ...Object.values(D.COMPANIONS), ...Object.values(D.ENEMIES)];
   const missing = used.filter((def) => !kinds.has(def.sprite)).map((def) => def.name);
   check('모든 유닛의 그림이 있다', missing, []);
 
-  // 없는 이름을 넘겨도 화면이 비지 않아야 한다 — 그림 하나가 빠졌다고 전투가
-  // 안 보이면 곤란하다.
-  check('모르는 이름은 대신 그린다', Sprites.svg('없는그림').startsWith('<svg'), true);
+  // **대신 그릴 것이 없다.** 도형 렌더러를 걷어내면서 모르는 이름은 빈 상자가
+  // 되므로, 위의 검사가 그만큼 더 중요해졌다 — 자료에 적힌 이름이 곧 파일이다.
+  check('모르는 이름에는 시트가 없다', Sprites.sheet('없는그림'), null);
 }
 
-// --- 그려 낸 결과 -------------------------------------------------------
+// **정의에 적힌 그림 이름과 계열 이름은 같지 않다.** 계열에서 그림을 지어내던
+// 때에는 고블린(계열 `grunt`)이 전사로, 주인공(계열 `priest`)이 사제로 그려졌다.
+// 계열에서 그림을 만드는 것은 계열을 바꾼 동료뿐이므로, 그때 나올 이름이 전부
+// 실제로 있는 그림인지 여기서 본다.
 {
-  const markup = Sprites.svg('priest');
-  check('여유 한 칸을 두고 그린다', markup.includes('viewBox="-1 -1 18 22"'), true);
-  check('같은 그림을 다시 만들지 않는다', Sprites.svg('priest') === markup, true);
-
-  // **도트를 걷어냈다.** 픽셀을 각지게 그리라는 지시가 남아 있으면 곡선이
-  // 계단으로 나온다.
-  check('각지게 그리지 않는다', markup.includes('crispEdges'), false);
-  check('사각형만으로 그리지 않는다', markup.includes('<ellipse') || markup.includes('<path'), true);
-
-  // 배경이 밝든 어둡든 실루엣이 남아야 한다.
-  check('테두리를 두른다', markup.includes(`stroke="${Sprites.OUTLINE}"`), true);
-
-  // 그늘과 눈에는 테두리를 두르지 않는다. 거기까지 두르면 얼굴이 지저분해진다.
-  const inner = Object.values(Sprites.SPRITES)
-    .flatMap((sprite) => sprite.parts).filter((part) => part.o === 0);
-  check('안에 들어가는 도형은 테두리가 없다', inner.length > 0, true);
-
-  // 활은 채우지 않는다 — 채우면 방패로 보인다.
-  const bow = Sprites.SPRITES.archer.parts.find((part) => part.arc);
-  check('활은 선으로만 긋는다', Sprites.shape(bow).includes('fill="none"'), true);
+  const D2 = require('./data.js');
+  const kinds = new Set(Object.keys(Sprites.SHEETS));
+  const swap = [];
+  for (const list of Object.values(D2.SPEC_CHOICES)) {
+    for (const spec of list) {
+      for (const at of [spec, D2.specAt(spec, D2.SPEC_UP_LEVEL)]) {
+        if (!kinds.has(D2.spriteFor(at))) swap.push(at);
+      }
+    }
+  }
+  check('계열을 바꿔도 나올 그림이 다 있다', swap, []);
 }
 
 // --- 그림 파일로 그리는 유닛 --------------------------------------------
@@ -166,8 +174,9 @@ function check(name, actual, expected) {
     // 들어가 있는 것이다.
     check(`${kind}: 초상화가 전신보다 좁다`,
       s.crops.head.w < s.crops.list.w && s.crops.head.h < s.crops.list.h, true);
-    // 머리는 칸 위쪽에 있다. 아래 절반까지 잡으면 몸통이 따라 들어온다.
-    check(`${kind}: 초상화가 칸 위쪽이다`, s.crops.head.y + s.crops.head.h <= 0.65, true);
+    // 머리는 칸 위쪽에 있다. 아래 절반까지 잡으면 몸통이 따라 들어온다. 문턱이
+    // 반이 아니라 0.7인 것은 SD 비율이라 머리가 키의 삼분의 일을 넘기 때문이다.
+    check(`${kind}: 초상화가 칸 위쪽이다`, s.crops.head.y + s.crops.head.h <= 0.7, true);
 
     // 상자는 칸의 가로세로비에서 나온다. 여기가 어긋나면 인물이 납작해진다.
     const box = Sprites.size(kind);
@@ -178,77 +187,6 @@ function check(name, actual, expected) {
 
 // --- 상자 밖으로 나가지 않는다 ------------------------------------------
 //
-// 그려 낸 SVG는 `viewBox` 밖을 잘라 낸다. 도형 하나가 상자를 넘으면 그만큼이
-// 조용히 사라지는데, 실제로 오크 우두머리의 머리와 마법사의 모자 끝이 그렇게
-// 잘려 있었다. 좌표를 손으로 적는 한 다시 일어나므로 여기서 본다.
-{
-  // 곡선은 조종점이 아니라 실제로 지나가는 자리를 봐야 한다. 조종점까지 상자
-  // 안에 넣으라고 하면 궁수의 활처럼 크게 휜 것이 헛되이 걸린다.
-  function quadExtremes(a, c, b) {
-    const out = [a, b];
-    const denom = a - 2 * c + b;
-    if (Math.abs(denom) > 1e-9) {
-      const t = (a - c) / denom;
-      if (t > 0 && t < 1) {
-        out.push((1 - t) * (1 - t) * a + 2 * (1 - t) * t * c + t * t * b);
-      }
-    }
-    return out;
-  }
-
-  // `M x y`, `L x y`, `Q cx cy x y`, `Z`만 쓴다.
-  function pathBox(d) {
-    const tokens = d.match(/[MLQZ]|-?\d*\.?\d+/g) || [];
-    const xs = [];
-    const ys = [];
-    let i = 0;
-    let cx = 0;
-    let cy = 0;
-    while (i < tokens.length) {
-      const cmd = tokens[i++];
-      const num = () => Number(tokens[i++]);
-      if (cmd === 'M' || cmd === 'L') {
-        cx = num(); cy = num();
-        xs.push(cx); ys.push(cy);
-      } else if (cmd === 'Q') {
-        const qx = num();
-        const qy = num();
-        const ex = num();
-        const ey = num();
-        xs.push(...quadExtremes(cx, qx, ex));
-        ys.push(...quadExtremes(cy, qy, ey));
-        cx = ex; cy = ey;
-      }
-    }
-    return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
-  }
-
-  function partBox(part) {
-    if (part.e) {
-      const [x, y, rx, ry] = part.e;
-      return [x - rx, y - ry, x + rx, y + ry];
-    }
-    if (part.r) {
-      const [x, y, w, h] = part.r;
-      return [x, y, x + w, y + h];
-    }
-    return pathBox(part.p || part.arc);
-  }
-
-  const clipped = [];
-  for (const [kind, sprite] of Object.entries(Sprites.SPRITES)) {
-    for (const part of sprite.parts) {
-      // 선은 좌표를 가운데 두고 양옆으로 반씩 번진다.
-      const half = part.arc ? part.width / 2 : (part.o === 0 ? 0 : Sprites.STROKE / 2);
-      const [x0, y0, x1, y1] = partBox(part);
-      if (x0 - half < -1 || y0 - half < -1
-        || x1 + half > sprite.w + 1 || y1 + half > sprite.h + 1) {
-        clipped.push(`${kind} [${x0 - half}, ${y0 - half}, ${x1 + half}, ${y1 + half}]`);
-      }
-    }
-  }
-  check('모든 도형이 상자 안에 있다', clipped, []);
-}
 
 // --- 스킬도 눈으로 갈린다 -----------------------------------------------
 //
@@ -304,7 +242,16 @@ function check(name, actual, expected) {
 
   // 화면이 이름만 보고 부르는 것들. 자료에 없으므로 여기서 따로 챙긴다.
   check('화면이 쓰는 아이콘도 있다',
-    ['lock', 'coin', 'scroll', 'cart'].filter((name) => !Icons.has(name)), []);
+    ['lock', 'coin', 'scroll', 'cart', 'crest', 'trust', 'gift']
+      .filter((name) => !Icons.has(name)), []);
+
+  // 초상화에 붙는 상태 표시. 하나라도 빠지면 그 자리만 대신 그린 동그라미가 되어
+  // 지속 피해와 기절이 같은 그림으로 보인다.
+  check('상태 표시 아이콘이 전부 그려져 있다',
+    Object.values(L.STATUS_KINDS).map((st) => st.icon).filter((name) => !Icons.has(name)), []);
+  const statusIcons = Object.values(L.STATUS_KINDS).map((st) => st.icon);
+  check('상태끼리 같은 그림을 쓰지 않는다',
+    statusIcons.filter((name, i) => statusIcons.indexOf(name) !== i), []);
 
   // 이모지가 남아 있으면 그 자리만 글꼴이 그린다.
   const emoji = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}]/u;

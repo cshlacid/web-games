@@ -29,9 +29,22 @@ const QUEST_COUNT = 4;
 // 바뀌면서 여섯에서 늘렸다 — 여섯일 때에는 한 번 정한 넷을 계속 쓰게 됐다.
 const COMPANION_COUNT = 10;
 
-// 적정 레벨이 주인공 레벨보다 조금 위아래로 흩어져야 고를 이유가 생긴다.
-// 아래쪽이 좁은 것은, 쉬운 퀘스트만 반복하는 것이 최선이 되면 곤란해서다.
-const LEVEL_SPREAD = [-1, 0, 0, 1, 1, 2, 3];
+// 적정 레벨이 주인공 레벨보다 위아래로 흩어져야 고를 이유가 생긴다. 가운데를
+// 두 번씩 적어 그쪽이 자주 나오게 하고, 양 끝은 한 번씩만 둔다.
+//
+// **아래쪽을 -3까지 연 것은 게시판이 한 가지 난이도로만 채워졌기 때문이다.**
+// 예전에는 -1이 바닥이라, 평판이 무명인 동안 게시판 넷이 전부 내 레벨 아니면
+// 하나 아래였다(재 보니 서로 다른 난이도가 넷 중 1.79뿐이었다). 화면의 "쉬움"
+// 딱지는 두 레벨 아래부터인데 **그 딱지가 붙는 의뢰가 아예 생길 수 없었다.**
+// 쉬운 판만 반복하는 것을 막는 일은 이제 다른 자리가 맡는다 — 보상이 레벨을
+// 따라가고(`questValue`), 평판은 한참 쉬운 판에 이름값을 거의 안 주며
+// (`REP_CHANGE.easyClear`), 동료는 시시한 판에서 신뢰가 깎인다(`TRUST_FEEL`).
+//
+// **위쪽은 평판이 자른다**(기획서 3장). 무명인 힐러에게 길드가 영웅급 의뢰를
+// 내주지 않는다는 것이 이 시스템의 뜻이고, 이 게임에서 "상위 콘텐츠"라고 부를
+// 수 있는 것은 의뢰의 난이도뿐이다. 자르고 나면 목록이 통째로 비는 일이
+// 없도록 아래쪽과 `0`은 어느 평판에서도 남는다.
+const LEVEL_SPREAD = [-3, -2, -2, -1, -1, 0, 0, 1, 1, 2, 3, 4, 5];
 
 // 이 의뢰에 나오는 가장 높은 적 등급. 전리품의 등급은 쓰러뜨린 적에게서
 // 굴려지므로, 게시판이 미리 말할 수 있는 것은 "무엇이 나오는가"까지다.
@@ -64,6 +77,53 @@ const THREAT = { trash: 1, elite: 2.2, boss: 6 };
 // 정예가 든 무리의 머릿수가 줄어 전체가 헐거워졌고, 이 배수로 되돌렸다 —
 // 난이도 확인의 세 승률이 등급을 나누기 전 수치로 돌아오는 자리다.
 const threatOf = (id) => THREAT[D.rankOf(D.ENEMIES[id]).id] || 1;
+// 한 무리의 머릿수 상한. 전장의 세로 줄이 다섯이라(`laneY`) 그 위로는 설 자리가
+// 없다. 예산이 남아도 여기서 멈춘다.
+const WAVE_MAX = 5;
+// **우두머리는 레벨을 따라 는다.** 하나로 고정해 두면 12레벨의 우두머리 무리와
+// 20레벨의 것이 같은 그림이고, 파티만 자라므로 뒤로 갈수록 저절로 쉬워진다.
+//
+// **둘에서 멈춘다.** 셋을 열어 보니 장비를 갖춘 파티로도 한 판을 못 깼다(승률 0%) —
+// 무리 상한이 다섯이라 셋을 세울 자리는 있어도 이길 자리가 없다. 여기를 더 열려면
+// 상한(`WAVE_MAX`)이 아니라 우두머리 자신의 수치부터 봐야 한다.
+const BOSS_STEP = 8;
+const BOSS_MAX = 2;
+const bossCount = (region, level) =>
+  Math.max(1, Math.min(BOSS_MAX, 1 + Math.floor((level - (region.minLevel + 2)) / BOSS_STEP)));
+
+// **우두머리는 혼자 나오지 않는다.** 뒤에 하나만 붙여 두었을 때에는 파티 다섯이
+// 한 대상에 화력을 모아 도발도 어그로도 뜻이 없었다 — 등급이 정한 위협이 수치로만
+// 남고 화면에서는 오래 걸리는 한 대상이었다. 남은 자리를 그 지역의 적으로 채운다.
+// **데리고 나오는 것은 쫄이다.** 자리가 남는 대로 지역의 적을 채웠더니 절반이
+// 정예라, 우두머리 무리가 아니라 정예 무리에 우두머리가 낀 것이 됐다.
+//
+// **머릿수도 위협의 몫으로 끊는다** — 다른 무리와 같은 잣대다. 우두머리가 그 몫을
+// 먹으므로 **하나면 쫄 셋을 데려오고 둘이면 저희끼리 온다.** 재 보니 벽은 우두머리
+// 수가 아니라 몸의 수였다(장비를 갖춘 파티로 잰 승률: 우두머리 둘만 13%, 거기에
+// 쫄 하나만 붙여도 2%, 셋이면 0%). 몫으로 끊으면 그 벽에 닿지 않으면서 레벨을
+// 따라 무리의 그림만 바뀐다.
+const BOSS_BUDGET = THREAT.boss + 3;
+function bossWave(region, level, rng) {
+  const bosses = bossCount(region, level);
+  const wave = [];
+  for (let i = 0; i < bosses; i++) wave.push(region.boss);
+  // **적 힐러는 붙이지 않는다.** 다른 무리에서는 하나까지 두지만, 우두머리를
+  // 계속 살리는 힐러가 옆에 서면 파티의 화력으로는 아무도 죽일 수 없는 무리가
+  // 된다 — 여기만 예외로 둔다.
+  // 쫄도 레벨을 따라 바뀐다 — 보통 무리와 같은 규칙을 타지 않으면 우두머리
+  // 옆에만 예전 적이 선다.
+  const others = region.enemies.map((id) => D.enemyAt(id, level))
+    .filter((id) => D.ENEMIES[id].job !== 'healer');
+  const trash = others.filter((id) => D.rankOf(D.ENEMIES[id]).id === 'trash');
+  const pool = (trash.length ? trash : others);
+  let spent = bosses * THREAT.boss;
+  while (spent < BOSS_BUDGET && wave.length < WAVE_MAX) {
+    const id = pick(rng, pool.length ? pool : others);
+    wave.push(id);
+    spent += threatOf(id);
+  }
+  return wave;
+}
 
 function buildWaves(region, level, rng) {
   const count = level < 3 ? 2 : range(rng, 2, 3);
@@ -72,16 +132,19 @@ function buildWaves(region, level, rng) {
     // 뒤 웨이브가 더 무겁다. 같은 크기로 두면 첫 웨이브에서 마나를 어떻게 쓰든
     // 결과가 같아진다.
     const budget = (3 + i + (rng() < 0.35 ? 1 : 0)) * 1.6;
-    const healer = region.enemies.find((id) => D.ENEMIES[id].job === 'healer');
-    const others = region.enemies.filter((id) => D.ENEMIES[id].job !== 'healer');
+    // **레벨이 문턱을 넘으면 같은 자리를 다른 적이 채운다**(`D.enemyAt`). 지역의
+    // 적 목록을 레벨마다 따로 적지 않으려고 여기 한 곳에서 갈아 끼운다 —
+    // 위협의 몫도 바뀐 쪽으로 세야 무리 크기가 맞는다.
+    const pool = region.enemies.map((id) => D.enemyAt(id, level));
+    const healer = pool.find((id) => D.ENEMIES[id].job === 'healer');
+    const others = pool.filter((id) => D.ENEMIES[id].job !== 'healer');
 
     // 힐러는 한 웨이브에 하나까지. 여럿이 서로를 살리면 파티의 화력으로는
     // 아무도 죽일 수 없는 웨이브가 나온다.
     const wave = [];
     let spent = 0;
-    // 다섯을 넘기지 않는 것은 전장의 세로 줄 수다(laneY). 예산이 남아도 여기서 멈춘다.
-    while (spent < budget && wave.length < 5) {
-      const id = pick(rng, others.length ? others : region.enemies);
+    while (spent < budget && wave.length < WAVE_MAX) {
+      const id = pick(rng, others.length ? others : pool);
       wave.push(id);
       spent += threatOf(id);
     }
@@ -91,7 +154,7 @@ function buildWaves(region, level, rng) {
   }
   // 마지막 웨이브의 우두머리. 지역에 우두머리가 있고 적정 레벨이 충분할 때만 나온다.
   if (region.boss && level >= region.minLevel + 2) {
-    waves.push([region.boss, pick(rng, region.enemies)]);
+    waves.push(bossWave(region, level, rng));
   }
   return waves;
 }
@@ -114,11 +177,19 @@ function makeQuest(rng, level, index) {
     region: region.id,
     scene: region.scene,
     level,
-    name: `${pick(rng, region.prefix)} ${region.name} ${pick(rng, region.task)}`,
-    desc: `적정 레벨 ${level}. ${waves.length}개의 무리를 상대한다.`,
+    // 이름은 문장이 아니라 조각의 번호로 담는다 — 붙이는 순서와 빈칸이 언어마다 다르다.
+    name: { code: 'hl.questName', vars: {
+      prefix: `hl.prefix.${region.id}.${Math.floor(rng() * region.prefix.length)}`,
+      region: `healer.region.${region.id}.name`,
+      task: `hl.task.${region.id}.${Math.floor(rng() * region.task.length)}`,
+    } },
+    desc: { code: 'hl.quest.note', vars: { level, waves: waves.length } },
     waves,
     guildReward: {
-      gold: Math.round(60 + value * 1.6),
+      // **게시판에 적힌 골드는 파티 전체 몫이다.** 나눠 갖게 되면서 한 사람 몫이
+      // 아니라 판 전체의 값이 되었으므로, 예전 금액에 `PARTY_MAX`를 곱해 둔다 —
+      // 가득 채워 나가면 주인공 몫이 예전과 같고, 적게 데려가면 제 몫이 커진다.
+      gold: Math.round((60 + value * 1.6) * D.PARTY_MAX),
       // 길드 확정 보상에 경험치가 섞여 있는 것은, 전멸해도 아무것도 없이 끝나지
       // 않게 하려는 것이다 — 실패하면 이 몫만 절반으로 받는다.
       exp: Math.round(value * 0.45),
@@ -130,11 +201,36 @@ function makeQuest(rng, level, index) {
   };
 }
 
-function generate(playerLevel, seed) {
+// `gap`은 평판이 허락하는 적정 레벨의 상한(주인공 레벨 대비)이다. 안 넘기면
+// 자르지 않는다 — 난이도 확인처럼 평판을 모르는 자리에서 부르기 때문이다.
+function spreadFor(gap) {
+  if (gap == null) return LEVEL_SPREAD;
+  const open = LEVEL_SPREAD.filter((n) => n <= gap);
+  return open.length ? open : [0];
+}
+
+// 게시판에 이미 걸린 난이도는 피해서 뽑는다. 넷을 따로따로 뽑으면 같은 값이
+// 겹쳐 **고를 것이 없는 게시판**이 나온다 — 가중치를 넓힌 것만으로는 안 됐다.
+// 몇 번 다시 뽑고 그래도 안 되면 남은 값에서 고르며, 쓸 수 있는 난이도가 넷보다
+// 적으면(평판이 낮을 때) 그때는 겹쳐도 둔다.
+function pickLevel(rng, spread, used) {
+  for (let i = 0; i < 8; i++) {
+    const n = pick(rng, spread);
+    if (!used.has(n)) return n;
+  }
+  const rest = spread.filter((n) => !used.has(n));
+  return rest.length ? pick(rng, rest) : pick(rng, spread);
+}
+
+function generate(playerLevel, seed, gap) {
   const rng = createRng(seed);
+  const spread = spreadFor(gap);
   const quests = [];
+  const used = new Set();
   for (let i = 0; i < QUEST_COUNT; i++) {
-    const level = Math.max(1, playerLevel + pick(rng, LEVEL_SPREAD));
+    const off = pickLevel(rng, spread, used);
+    used.add(off);
+    const level = Math.max(1, playerLevel + off);
     quests.push(makeQuest(rng, level, i));
   }
   // 쉬운 것부터 보여 준다. 게시판을 훑을 때 고르는 기준이 레벨이기 때문이다.
@@ -148,27 +244,32 @@ function generate(playerLevel, seed) {
 //
 // **탱커와 힐러는 반드시 하나씩 넣는다.** 없는 목록은 편성을 고민할 의뢰가
 // 아니라 그냥 못 깨는 의뢰다.
-function companionsFor(quest, roster, seed) {
+// `always`는 뽑기와 상관없이 목록에 서는 동료다 — 친구(신뢰도 마지막 단계)와
+// 지금 데려가기로 눌러 둔 동료가 여기로 온다. **뽑기 자리를 먹지 않는다**:
+// 공들여 키운 동료가 목록에 없어서 못 데려가는 것을 막는 것이 이 인자의 목적인데,
+// 자리를 먹으면 친구가 늘수록 고를 수 있는 폭이 줄어 목적과 반대가 된다.
+// **탱커와 힐러를 억지로 끼워 넣지 않는다.** 없는 목록은 못 깨는 의뢰라서 두던
+// 규칙인데, 편성 화면에 "동료 새로 고침"이 생기면서 그 자리가 사라졌다 — 마음에
+// 안 드는 목록은 사람이 다시 뽑으면 된다. 억지로 넣던 동안에는 열 자리 중 둘이
+// 늘 정해져 있어, 명부를 키워도 뽑히는 폭이 그만큼 좁았다.
+function companionsFor(quest, roster, seed, always) {
   const rng = createRng((seed ^ 0x9e3779b9) >>> 0);
-  const byJob = (job) => roster.filter((member) => D.COMPANIONS[member.defId].job === job);
+  const fixed = (always || []).filter((member) => roster.includes(member));
+  const rest = roster.filter((member) => !fixed.includes(member));
 
   const chosen = [];
-  for (const job of ['tank', 'healer']) {
-    const pool = byJob(job);
-    if (pool.length) chosen.push(pick(rng, pool));
-  }
-
-  const rest = roster.filter((member) => !chosen.includes(member));
   while (chosen.length < COMPANION_COUNT && rest.length) {
     chosen.push(rest.splice((rng() * rest.length) | 0, 1)[0]);
   }
+  chosen.push(...fixed);
 
   const order = { tank: 0, dealer: 1, healer: 2 };
   return chosen.sort((a, b) =>
     order[D.COMPANIONS[a.defId].job] - order[D.COMPANIONS[b.defId].job]);
 }
 
-const api = { generate, companionsFor, makeQuest, createRng, QUEST_COUNT, COMPANION_COUNT };
+const api = { generate, companionsFor, makeQuest, createRng, spreadFor,
+  QUEST_COUNT, COMPANION_COUNT, LEVEL_SPREAD };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 root.HealerQuests = api;

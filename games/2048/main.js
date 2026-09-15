@@ -3,6 +3,7 @@
 (function () {
   const L = window.Game2048Logic;
   const Sound = window.Game2048Sound;
+  const t = SharedI18n.t;
   const BEST_KEY = 'web-games.2048.best';
   const MOVE_MS = 110; // style.css의 .tile transition과 맞춰야 한다.
 
@@ -178,16 +179,16 @@
       if (state.status === 'playing' && L.hasWon(state.grid)) {
         state.status = 'won';
         Sound.play('win');
-        showOverlay('2048 달성!', [
-          { label: '계속하기', run: hideOverlay },
-          { label: '새 게임', run: newGame },
+        showOverlay(t('g2048.won'), [
+          { label: t('g2048.continue'), run: hideOverlay },
+          { label: t('ui.newGame'), run: newGame },
         ]);
         return;
       }
       if (!L.canMove(state.grid)) {
         state.status = 'over';
         Sound.play('gameOver');
-        showOverlay('게임 오버', [{ label: '다시 하기', run: newGame }]);
+        showOverlay(t('g2048.over'), [{ label: t('ui.retry'), run: newGame }]);
       }
     }, animMs());
   }

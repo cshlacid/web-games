@@ -88,7 +88,7 @@ const names = (list) => list.map((item) => Items.name(item));
 
   // 파티에 탱커가 하나뿐이면 다른 후보가 없으므로 주사위를 굴리지 않는다.
   check('후보가 하나면 그냥 준다', result.awards[0].rolls, undefined);
-  check('이유가 적혀 있다', result.awards[0].reason, '탱커 우선');
+  check('이유가 적혀 있다', result.awards[0].reason.code, 'hl.loot.jobFirst');
 
   // 같은 직업이 둘이면 적게 받은 쪽부터. 딜러 둘에게 활 둘이면 하나씩이다.
   const two = Loot.distribute([gear('bow'), gear('bow')], MEMBERS, 'job', 7);
@@ -98,12 +98,12 @@ const names = (list) => list.map((item) => Items.name(item));
   // 쓸 직업이 파티에 없으면 우선권이 생기지 않는다.
   const noTank = MEMBERS.filter((m) => m.job !== 'tank');
   const orphan = Loot.distribute([gear('shield')], noTank, 'job', 7);
-  check('쓸 직업이 없으면 주사위로 넘어간다', orphan.awards[0].reason, '탱커 없음 · 주사위');
+  check('쓸 직업이 없으면 주사위로 넘어간다', orphan.awards[0].reason.code, 'hl.loot.noJobDice');
   check('그때는 굴린 값이 남는다', orphan.awards[0].rolls.length, noTank.length);
 
   // 직업을 가리지 않는 물건도 마찬가지다.
   const plain = Loot.distribute([gear('crystal')], MEMBERS, 'job', 7);
-  check('직업 무관 물건도 주사위', plain.awards[0].reason, '직업 무관 · 주사위');
+  check('직업 무관 물건도 주사위', plain.awards[0].reason.code, 'hl.loot.anyJobDice');
 }
 
 // --- 주사위 -------------------------------------------------------------
@@ -151,9 +151,13 @@ const names = (list) => list.map((item) => Items.name(item));
     result.awards.every((a) => small.some((m) => m.id === a.toId)), true);
   check('빠진 사람에게는 가지 않는다', result.byMember.mira, undefined);
 
-  // 모르는 방식을 넘기면 균등으로 떨어진다 — 화면이 잘못 불러도 보상이 사라지면 안 된다.
+  // 모르는 방식을 넘기면 기본값으로 떨어진다 — 화면이 잘못 불러도 보상이 사라지면
+  // 안 된다. **기본값을 여기 적지 않는 것은** 그 값을 정하는 곳이 `Loot.DEFAULT`
+  // 하나여야 하기 때문이다.
   const fallback = Loot.distribute([gear('fang')], MEMBERS, '경매', 2);
-  check('모르는 방식은 균등으로', fallback.method, 'even');
+  check('모르는 방식은 기본값으로', fallback.method, Loot.DEFAULT);
+  check('기본값은 아는 방식이다', Boolean(Loot.METHODS[Loot.DEFAULT]), true);
+  check('기본값은 직업 우선이다', Loot.DEFAULT, 'job');
 }
 
 // --- 이름 표시 ----------------------------------------------------------
