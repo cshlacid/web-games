@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title data-i18n="game.idioms">사자성어 찾기</title>
+<meta name="description" content="격자에 숨은 사자성어를 길로 이어 남김없이 찾는 퍼즐" data-i18n-attr="content=meta.desc">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23b4714a' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'><path d='M4.5 19.5 V9 H12 V15 H19.5 V4.5'/><circle cx='4.5' cy='19.5' r='2.2' fill='%23b4714a' stroke='none'/><circle cx='19.5' cy='4.5' r='2.2' fill='%23b4714a' stroke='none'/></svg>">
+<link rel="manifest" href="../../manifest.json">
+<link rel="apple-touch-icon" href="../../icons/icon-180.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="사자성어 찾기" data-i18n-attr="content=game.idioms">
+<meta name="theme-color" content="#f8f5f0" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1a1714" media="(prefers-color-scheme: dark)">
+<link rel="stylesheet" href="../../shared/base.css">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="../../shared/result.css">
+<link rel="stylesheet" href="../../shared/sheet.css">
+<script src="../../shared/analytics.js"></script>
+<script src="../../shared/i18n.js"></script>
+<script src="../../shared/strings.js"></script>
+<script src="strings.js"></script>
+</head>
+<body>
+<main class="app">
+  <header class="head">
+    <div class="title-row">
+      <div class="head-nav">
+        <a class="back" href="../../" data-i18n="ui.back">← 목록</a>
+        <button class="toggle" id="help-open" type="button" aria-pressed="false" data-i18n="ui.help">도움말</button>
+      </div>
+      <h1 data-i18n="game.idioms">사자성어 찾기</h1>
+      <div class="head-actions">
+        <button class="toggle sound" id="toggle-bgm" type="button" aria-pressed="true" data-i18n="ui.bgm">BGM</button>
+        <button class="toggle sound" id="toggle-sfx" type="button" aria-pressed="true" data-i18n="ui.sfx">효과음</button>
+      </div>
+    </div>
+    <div class="picker-row">
+      <div class="picker" id="sizes" role="group" aria-label="판 크기" data-i18n-attr="aria-label=ui.boardSize"></div>
+      <span class="best" id="best"></span>
+      <span class="timer" id="timer">0:00</span>
+    </div>
+  </header>
+
+  <div class="board-wrap">
+    <div class="board" id="board"></div>
+    <div class="veil" id="veil" hidden data-i18n="ui.making">만드는 중…</div>
+    <div class="result" id="result" role="status" aria-live="polite" hidden>
+      <div class="result-card">
+        <p class="sheet-title" id="result-title"></p>
+        <p class="sheet-note" id="result-note"></p>
+        <div class="sheet-actions">
+          <button class="btn" id="again" type="button" data-i18n="ui.again">한 판 더</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="toast" id="toast" role="status" aria-live="polite"></p>
+
+  <div class="pad">
+    <div class="tools">
+      <button class="tool" id="undo" type="button">
+        <span class="tool-icon" data-icon="undo"></span><span class="tool-label" data-i18n="ui.undo">되돌리기</span>
+      </button>
+      <button class="tool" id="clear" type="button">
+        <span class="tool-icon" data-icon="backspace"></span><span class="tool-label" data-i18n="ui.erase">지우기</span>
+      </button>
+      <button class="tool" id="hint" type="button">
+        <span class="tool-icon" data-icon="hint"></span><span class="tool-label" data-i18n="ui.hint">힌트</span>
+      </button>
+      <button class="tool" id="new-game" type="button">
+        <span class="tool-icon" data-icon="plus"></span><span class="tool-label" data-i18n="ui.newBoard">새 판</span>
+      </button>
+    </div>
+  </div>
+
+  <ul class="found" id="found"></ul>
+
+  <div class="sheet" id="help" hidden>
+    <p class="sheet-title" data-i18n="ui.rules">규칙</p>
+    <ul class="help-list">
+      <li data-i18n-html="idioms.rule1">격자에 <b>사자성어</b>가 숨어 있습니다. 네 글자를 길로 이어
+        찾아냅니다.</li>
+      <li data-i18n-html="idioms.rule2">길은 <b>위아래·양옆으로만</b> 꺾입니다. 대각선은 없습니다.</li>
+      <li data-i18n-html="idioms.rule3"><b>어두운 칸을 뺀 모든 칸을 정확히 한 번씩</b> 씁니다. 남는
+        글자도, 두 성어가 나눠 쓰는 글자도 없습니다.</li>
+      <li data-i18n-html="idioms.rule4">그래서 <b>맞는 성어인데 틀린 자리</b>가 있습니다. 하나를 잘못
+        놓으면 나머지가 막힙니다.</li>
+      <li data-i18n-html="idioms.rule5">찾은 성어를 <b>톡 누르면</b> 지워집니다.</li>
+      <li data-i18n-html="idioms.rule6"><b>이 게임의 모든 판은 덮는 방법이 하나뿐입니다.</b> 다 덮었다면
+        그게 정답입니다.</li>
+      <li data-i18n-html="idioms.rule7"><b>흔히 쓰는 성어만</b> 나옵니다. 찾은 성어의 뜻은 판 아래에
+        차례로 쌓입니다.</li>
+      <li data-i18n-html="idioms.rule8"><b>힌트</b>는 아직 못 찾은 성어 하나를 대신 놓아 줍니다. 힌트를
+        쓴 판은 최고 기록으로 남기지 않습니다.</li>
+    </ul>
+    <div class="sheet-actions">
+      <button class="btn" id="help-close" type="button" data-i18n="ui.close">닫기</button>
+    </div>
+  </div>
+</main>
+
+<script>SharedI18n.apply();</script>
+<script src="../../shared/base.js"></script>
+<script src="words.js"></script>
+<script src="rules.js"></script>
+<script src="solver.js"></script>
+<script src="generator.js"></script>
+<script src="../../shared/icons.js"></script>
+<script src="../../shared/audio.js"></script>
+<script src="audio.js"></script>
+<script src="../../shared/snap.js"></script>
+<script src="../../shared/sheet.js"></script>
+<script src="main.js"></script>
+</body>
+</html>

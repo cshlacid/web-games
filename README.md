@@ -17,6 +17,7 @@
 | [왕관 놓기](games/queens/) | 행·열·색마다 왕관을 하나씩 놓는다 | 순수 HTML/CSS/JS |
 | [Patches](games/patches/) | 격자를 직사각형 조각으로 남김없이 나눈다 | 순수 HTML/CSS/JS |
 | [Tango](games/tango/) | 해와 달을 반씩, 셋 연달아 오지 않게 놓는다 | 순수 HTML/CSS/JS |
+| [사자성어 찾기](games/idioms/) | 격자에 숨은 사자성어를 길로 이어 찾는다 | 순수 HTML/CSS/JS |
 | [힐러](games/healer/) | 파티에서 힐러 하나만 맡는다 | 순수 HTML/CSS/JS |
 | [점령전](games/conquest/) | 거점을 이어 병력을 보내 지도를 차지한다 | 순수 HTML/CSS/JS |
 | [다리 잇기](games/hashi/) | 섬을 숫자만큼 이어 하나로 만든다 | 순수 HTML/CSS/JS |
@@ -60,6 +61,9 @@ node games/patches/generator.test.js
 node games/tango/rules.test.js
 node games/tango/solver.test.js
 node games/tango/generator.test.js
+node games/idioms/rules.test.js
+node games/idioms/solver.test.js
+node games/idioms/generator.test.js
 node games/healer/logic.test.js
 node games/healer/ai.test.js
 node games/healer/attrs.test.js
