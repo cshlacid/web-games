@@ -125,8 +125,8 @@ function addExp(progress, charExp, jobExp) {
 // 더할 때마다 분기가 는다.
 function canChangeJob(progress, jobId) {
   const job = D.HERO_JOBS[jobId];
-  if (!job) return { ok: false, reason: '없는 계열' };
-  if (progress.job === jobId) return { ok: false, reason: '이미 맡고 있다' };
+  if (!job) return { ok: false, reason: 'hl.why.noJob' };
+  if (progress.job === jobId) return { ok: false, reason: 'hl.why.sameJob' };
   const need = job.need || {};
   if (need.charLevel && progress.charLevel < need.charLevel) {
     return { ok: false, reason: `캐릭터 레벨 ${need.charLevel} 필요` };
@@ -180,8 +180,8 @@ function spentPoints(progress) {
 const freePoints = (progress) => Math.max(0, earnedPoints(progress) - spentPoints(progress));
 
 function spendPoint(progress, attr) {
-  if (!D.ATTRS[attr]) return { ok: false, reason: '없는 능력치' };
-  if (freePoints(progress) <= 0) return { ok: false, reason: '남은 점수가 없다' };
+  if (!D.ATTRS[attr]) return { ok: false, reason: 'hl.why.noAttr' };
+  if (freePoints(progress) <= 0) return { ok: false, reason: 'hl.why.noPoints' };
   progress.spent[attr] = (progress.spent[attr] || 0) + 1;
   return { ok: true, left: freePoints(progress) };
 }
@@ -259,7 +259,7 @@ function equip(progress, itemUid) {
   const index = findItem(progress, itemUid);
   const item = progress.inventory[index];
   const def = item && D.GEAR[item.defId];
-  if (!def) return { ok: false, reason: '장착할 수 없는 물건' };
+  if (!def) return { ok: false, reason: 'hl.why.cannotEquip' };
 
   const previous = progress.equipped[def.slot];
   progress.equipped[def.slot] = item;
@@ -271,7 +271,7 @@ function equip(progress, itemUid) {
 // --- 상점 ---------------------------------------------------------------
 
 function spend(progress, cost) {
-  if (progress.gold < cost) return { ok: false, reason: '골드가 모자란다' };
+  if (progress.gold < cost) return { ok: false, reason: 'hl.why.noGold' };
   progress.gold -= cost;
   return { ok: true, cost };
 }
@@ -285,7 +285,7 @@ function buyGear(progress, item) {
 
 function buyPotion(progress, potionId) {
   const potion = D.POTIONS[potionId];
-  if (!potion) return { ok: false, reason: '모르는 물약' };
+  if (!potion) return { ok: false, reason: 'hl.why.noSuchPotion' };
   if ((progress.potions[potionId] || 0) >= D.POTION_MAX) {
     return { ok: false, reason: `${D.POTION_MAX}개까지만 들고 간다` };
   }
@@ -308,8 +308,8 @@ function reforge(progress, itemUid) {
   const slot = Object.keys(progress.equipped)
     .find((key) => progress.equipped[key] && progress.equipped[key].uid === itemUid);
   const item = index >= 0 ? progress.inventory[index] : (slot ? progress.equipped[slot] : null);
-  if (!item) return { ok: false, reason: '없는 물건' };
-  if (!Items.isGear(item)) return { ok: false, reason: '재련할 수 없는 물건' };
+  if (!item) return { ok: false, reason: 'hl.why.noSuchItem' };
+  if (!Items.isGear(item)) return { ok: false, reason: 'hl.why.cannotReforge' };
 
   const paid = spend(progress, Items.reforgePrice(item));
   if (!paid.ok) return paid;
@@ -323,7 +323,7 @@ function reforge(progress, itemUid) {
 function sell(progress, itemUid) {
   const index = findItem(progress, itemUid);
   const item = progress.inventory[index];
-  if (!item) return { ok: false, reason: '없는 물건' };
+  if (!item) return { ok: false, reason: 'hl.why.noSuchItem' };
   const gold = Items.sellPrice(item);
   progress.inventory.splice(index, 1);
   progress.gold += gold;
@@ -332,7 +332,7 @@ function sell(progress, itemUid) {
 
 function unequip(progress, slot) {
   const item = progress.equipped[slot];
-  if (!item) return { ok: false, reason: '비어 있다' };
+  if (!item) return { ok: false, reason: 'hl.why.empty' };
   progress.equipped[slot] = null;
   progress.inventory.push(item);
   return { ok: true };
@@ -428,14 +428,14 @@ const freeSkillPoints = (progress, jobId) =>
 // 단추 이름을 갈라야 하기 때문이다 — "배우기"와 "＋"는 다른 일로 보여야 한다.
 function spendSkill(progress, id, learning) {
   const def = D.PLAYER_SKILLS[id];
-  if (!def) return { ok: false, reason: '없는 스킬' };
-  if (def.job !== progress.job) return { ok: false, reason: '다른 계열의 스킬' };
-  if (def.unlock > jobLevel(progress)) return { ok: false, reason: '아직 열리지 않았다' };
+  if (!def) return { ok: false, reason: 'hl.why.noSkill' };
+  if (def.job !== progress.job) return { ok: false, reason: 'hl.why.otherJobSkill' };
+  if (def.unlock > jobLevel(progress)) return { ok: false, reason: 'hl.why.locked' };
   const level = skillLevel(progress, id);
-  if (learning && level > 0) return { ok: false, reason: '이미 배웠다' };
-  if (!learning && level <= 0) return { ok: false, reason: '아직 안 배웠다' };
-  if (level >= D.SKILL.max) return { ok: false, reason: '더 올릴 수 없다' };
-  if (freeSkillPoints(progress) <= 0) return { ok: false, reason: '남은 점수가 없다' };
+  if (learning && level > 0) return { ok: false, reason: 'hl.why.known' };
+  if (!learning && level <= 0) return { ok: false, reason: 'hl.why.unknown' };
+  if (level >= D.SKILL.max) return { ok: false, reason: 'hl.why.maxed' };
+  if (freeSkillPoints(progress) <= 0) return { ok: false, reason: 'hl.why.noPoints' };
   if (!progress.learned) progress.learned = {};
   progress.learned[id] = level + 1;
   return { ok: true, level: progress.learned[id], left: freeSkillPoints(progress) };

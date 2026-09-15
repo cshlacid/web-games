@@ -3,40 +3,43 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>힐러</title>
-<meta name="description" content="파티에서 힐러 하나만 맡는다. 나머지는 알아서 싸운다">
+<title data-i18n="game.healer">힐러</title>
+<meta name="description" content="파티에서 힐러 하나만 맡는다. 나머지는 알아서 싸운다" data-i18n-attr="content=meta.desc">
 <meta name="color-scheme" content="light dark">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M10 3 H14 V10 H21 V14 H14 V21 H10 V14 H3 V10 H10 Z' fill='%23e05c6e'/></svg>">
 <link rel="manifest" href="../../manifest.json">
 <link rel="apple-touch-icon" href="../../icons/icon-180.png">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="힐러">
+<meta name="apple-mobile-web-app-title" content="힐러" data-i18n-attr="content=game.healer">
 <meta name="theme-color" content="#f2f4f8" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#161a21" media="(prefers-color-scheme: dark)">
 <link rel="stylesheet" href="../../shared/base.css">
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="../../shared/sheet.css">
 <script src="../../shared/analytics.js"></script>
+<script src="../../shared/i18n.js"></script>
+<script src="../../shared/strings.js"></script>
+<script src="strings.js"></script>
 </head>
 <body>
 <main class="app">
   <header class="head">
     <div class="title-row">
       <div class="head-nav">
-        <a class="back" href="../../">← 목록</a>
-        <button class="toggle" id="help-open" type="button" aria-pressed="false">도움말</button>
+        <a class="back" href="../../" data-i18n="ui.back">← 목록</a>
+        <button class="toggle" id="help-open" type="button" aria-pressed="false" data-i18n="ui.help">도움말</button>
       </div>
-      <h1>힐러</h1>
+      <h1 data-i18n="game.healer">힐러</h1>
       <div class="head-actions">
-        <button class="toggle sound" id="toggle-bgm" type="button" aria-pressed="true">BGM</button>
-        <button class="toggle sound" id="toggle-sfx" type="button" aria-pressed="true">효과음</button>
+        <button class="toggle sound" id="toggle-bgm" type="button" aria-pressed="true" data-i18n="ui.bgm">BGM</button>
+        <button class="toggle sound" id="toggle-sfx" type="button" aria-pressed="true" data-i18n="ui.sfx">효과음</button>
       </div>
     </div>
     <div class="sub-row">
-      <button class="step-back" id="step-back" type="button" hidden>← 뒤로</button>
-      <span class="step" id="step-name">퀘스트</span>
-      <span class="step-note" id="step-note">모험가 길드 게시판</span>
+      <button class="step-back" id="step-back" type="button" hidden data-i18n="hl.back">← 뒤로</button>
+      <span class="step" id="step-name" data-i18n="hl.stepQuest">퀘스트</span>
+      <span class="step-note" id="step-note" data-i18n="hl.stepQuestNote">모험가 길드 게시판</span>
     </div>
   </header>
 
@@ -45,10 +48,10 @@
     <div class="tab-page" id="tab-quest">
       <div class="panel">
         <div class="panel-head">
-          <h2>의뢰 게시판</h2>
-          <button class="mini" id="refresh" type="button">새 의뢰</button>
+          <h2 data-i18n="hl.board">의뢰 게시판</h2>
+          <button class="mini" id="refresh" type="button" data-i18n="hl.refresh">새 의뢰</button>
         </div>
-        <p class="panel-note">의뢰는 그때그때 들어온다. 적정 레벨을 보고 고른다.</p>
+        <p class="panel-note" data-i18n="hl.boardNote">의뢰는 그때그때 들어온다. 적정 레벨을 보고 고른다.</p>
         <!-- 게시판에 걸리는 의뢰의 상한을 평판이 정하므로, 목록 바로 위에 둔다 —
              다른 화면에 있으면 목록이 왜 그 범위인지 알 수 없다. -->
         <div class="rep" id="rep"></div>
@@ -61,15 +64,15 @@
            갈리고 한 번에 하나만 한다. 한 페이지에 이어 붙였더니 폰에서 화면 세
            장이었다 — 스킬과 인벤토리는 진행할수록 더 길어지는 쪽이라 갈래를 나눈다. -->
       <nav class="subtabs" id="char-tabs">
-        <button class="subtab" type="button" data-page="stats" aria-pressed="true">능력치</button>
-        <button class="subtab" type="button" data-page="skill" aria-pressed="false">스킬</button>
-        <button class="subtab" type="button" data-page="gear" aria-pressed="false">장비</button>
+        <button class="subtab" type="button" data-page="stats" aria-pressed="true" data-i18n="hl.tabStats">능력치</button>
+        <button class="subtab" type="button" data-page="skill" aria-pressed="false" data-i18n="hl.tabSkill">스킬</button>
+        <button class="subtab" type="button" data-page="gear" aria-pressed="false" data-i18n="hl.tabGear">장비</button>
       </nav>
 
       <div class="char-page" id="char-page-stats">
         <div class="panel">
           <div class="panel-head">
-            <h2>주인공</h2>
+            <h2 data-i18n="hl.hero">주인공</h2>
             <span id="char-job"></span>
             <span class="count" id="char-gold">0 골드</span>
           </div>
@@ -79,52 +82,52 @@
 
         <div class="panel">
           <div class="panel-head">
-            <h2>능력치</h2>
+            <h2 data-i18n="hl.attrs">능력치</h2>
             <span class="count" id="attr-points">남은 점수 0</span>
           </div>
-          <p class="panel-note">캐릭터 레벨이 오를 때마다 점수를 받는다. 한번 넣으면 되돌릴 수 없다.</p>
+          <p class="panel-note" data-i18n="hl.attrNote">캐릭터 레벨이 오를 때마다 점수를 받는다. 한번 넣으면 되돌릴 수 없다.</p>
           <ul class="attrs" id="char-attrs"></ul>
         </div>
       </div>
 
       <div class="char-page" id="char-page-skill" hidden>
         <div class="panel">
-          <div class="panel-head"><h2>계열</h2></div>
-          <p class="panel-note">회복을 맡는 계열만 고를 수 있다. 직업 레벨과 스킬 점수는 계열마다 따로 쌓이고, 배운 스킬은 계열을 바꿔도 남는다.</p>
+          <div class="panel-head"><h2 data-i18n="hl.jobs">계열</h2></div>
+          <p class="panel-note" data-i18n="hl.jobsNote">회복을 맡는 계열만 고를 수 있다. 직업 레벨과 스킬 점수는 계열마다 따로 쌓이고, 배운 스킬은 계열을 바꿔도 남는다.</p>
           <div class="job-cards" id="char-jobs"></div>
         </div>
 
         <div class="panel">
           <div class="panel-head">
-            <h2>스킬</h2>
+            <h2 data-i18n="hl.skills">스킬</h2>
             <span class="count" id="skill-points">남은 점수 0</span>
             <span class="count" id="skill-open">0 / 8</span>
           </div>
-          <p class="panel-note">배우는 데 1점, 한 칸 올리는 데 1점이 든다. 전투에는 다섯까지 가져간다.</p>
+          <p class="panel-note" data-i18n="hl.skillNote">배우는 데 1점, 한 칸 올리는 데 1점이 든다. 전투에는 다섯까지 가져간다.</p>
           <ul class="skill-list" id="char-skills"></ul>
-          <p class="panel-note">다른 계열에서 배운 스킬. 그대로 들고 갈 수 있지만 올리는 점수는 그 계열에서만 쓴다.</p>
+          <p class="panel-note" data-i18n="hl.otherSkillNote">다른 계열에서 배운 스킬. 그대로 들고 갈 수 있지만 올리는 점수는 그 계열에서만 쓴다.</p>
           <ul class="skill-list" id="char-kept" hidden></ul>
         </div>
       </div>
 
       <div class="char-page" id="char-page-gear" hidden>
         <div class="panel">
-          <div class="panel-head"><h2>장비</h2></div>
-          <p class="panel-note">인벤토리의 물건을 눌러 장착한다. 슬롯을 누르면 벗는다.</p>
+          <div class="panel-head"><h2 data-i18n="hl.gear">장비</h2></div>
+          <p class="panel-note" data-i18n="hl.gearNote">인벤토리의 물건을 눌러 장착한다. 슬롯을 누르면 벗는다.</p>
           <ul class="slots" id="char-slots"></ul>
         </div>
 
         <div class="panel">
           <div class="panel-head">
-            <h2>인벤토리</h2>
+            <h2 data-i18n="hl.bag">인벤토리</h2>
             <span class="count" id="inv-count">0</span>
           </div>
           <ul class="inventory" id="inventory"></ul>
         </div>
 
         <div class="panel">
-          <div class="panel-head"><h2>물약</h2></div>
-          <p class="panel-note">전투에 들고 간다. 상점에서 사서 채운다. 동료는 직업에 맞는 물약을 알아서 챙긴다.</p>
+          <div class="panel-head"><h2 data-i18n="hl.potions">물약</h2></div>
+          <p class="panel-note" data-i18n="hl.potionNote">전투에 들고 간다. 상점에서 사서 채운다. 동료는 직업에 맞는 물약을 알아서 챙긴다.</p>
           <ul class="stats" id="char-potions"></ul>
         </div>
       </div>
@@ -133,29 +136,29 @@
     <div class="tab-page" id="tab-shop" hidden>
       <div class="panel">
         <div class="panel-head">
-          <h2>상점</h2>
+          <h2 data-i18n="hl.shop">상점</h2>
           <span class="count" id="shop-gold">0 골드</span>
         </div>
-        <p class="panel-note">진열대는 의뢰를 깨면 바뀐다. 그 전에 바꾸려면 값을 낸다.</p>
-        <button class="mini" id="shop-refresh" type="button">진열대 바꾸기</button>
+        <p class="panel-note" data-i18n="hl.shopNote">진열대는 의뢰를 깨면 바뀐다. 그 전에 바꾸려면 값을 낸다.</p>
+        <button class="mini" id="shop-refresh" type="button" data-i18n="hl.shopRefresh">진열대 바꾸기</button>
       </div>
 
       <div class="panel">
-        <div class="panel-head"><h2>물약</h2></div>
+        <div class="panel-head"><h2 data-i18n="hl.potions">물약</h2></div>
         <ul class="inventory" id="shop-potions"></ul>
       </div>
 
       <div class="panel">
-        <div class="panel-head"><h2>장비</h2></div>
+        <div class="panel-head"><h2 data-i18n="hl.gear">장비</h2></div>
         <ul class="inventory" id="shop-gear"></ul>
       </div>
 
       <div class="panel">
         <div class="panel-head">
-          <h2>재련</h2>
+          <h2 data-i18n="hl.reforge">재련</h2>
           <span class="count" id="reforge-count">0</span>
         </div>
-        <p class="panel-note">값을 내고 붙은 옵션을 다시 굴린다. 등급은 그대로고, 더 나빠질 수도 있다. 장착 중인 것도 된다.</p>
+        <p class="panel-note" data-i18n="hl.reforgeNote">값을 내고 붙은 옵션을 다시 굴린다. 등급은 그대로고, 더 나빠질 수도 있다. 장착 중인 것도 된다.</p>
         <!-- 굴린 결과가 뜨는 자리. 전투 화면의 로그(`#log`)는 여기서 보이지 않는다. -->
         <p class="panel-note said" id="reforge-note" role="status" aria-live="polite" hidden></p>
         <ul class="inventory" id="shop-reforge"></ul>
@@ -163,10 +166,10 @@
 
       <div class="panel">
         <div class="panel-head">
-          <h2>팔기</h2>
+          <h2 data-i18n="hl.sell">팔기</h2>
           <span class="count" id="sell-count">0</span>
         </div>
-        <p class="panel-note">장착 중인 것은 팔 수 없다. 벗은 다음에 판다.</p>
+        <p class="panel-note" data-i18n="hl.sellNote">장착 중인 것은 팔 수 없다. 벗은 다음에 판다.</p>
         <ul class="inventory" id="shop-sell"></ul>
       </div>
     </div>
@@ -178,11 +181,11 @@
 
     <div class="panel">
       <div class="panel-head">
-        <h2>동료</h2>
+        <h2 data-i18n="hl.roster">동료</h2>
         <span class="count" id="party-count">1 / 5</span>
-        <button class="mini" id="roster-refresh" type="button">동료 새로 고침</button>
+        <button class="mini" id="roster-refresh" type="button" data-i18n="hl.rosterRefresh">동료 새로 고침</button>
       </div>
-      <p class="panel-note">이번 의뢰에 붙일 수 있는 동료다. 이름을 누르면 무엇을
+      <p class="panel-note" data-i18n="hl.rosterNote">이번 의뢰에 붙일 수 있는 동료다. 이름을 누르면 무엇을
         들고 오는지 보이고, 오른쪽 표를 누르면 데려간다. 새로 고치면 아직 안 고른
         자리가 다시 뽑히고, 길드에 새 얼굴이 들어와 있기도 하다.</p>
       <!-- 새 얼굴이 들어왔다는 알림이 뜨는 자리. 전투 화면의 로그(`#log`)는
@@ -195,29 +198,29 @@
          계약을 확정하기 전에 합계를 한 자리에서 보여 준다. -->
     <div class="panel" id="deal-panel">
       <div class="panel-head">
-        <h2>보수</h2>
+        <h2 data-i18n="hl.pay">보수</h2>
         <span class="count" id="deal-hero"></span>
       </div>
-      <p class="panel-note">동료가 부르는 값이다. 신뢰도·평판·난이도·분배 방식이 값을 흔든다.</p>
+      <p class="panel-note" data-i18n="hl.payNote">동료가 부르는 값이다. 신뢰도·평판·난이도·분배 방식이 값을 흔든다.</p>
       <ul class="stats" id="deal"></ul>
     </div>
 
     <div class="panel">
       <div class="panel-head">
-        <h2>스킬 등록</h2>
+        <h2 data-i18n="hl.skillSlots">스킬 등록</h2>
         <span class="count" id="skill-count">0 / 5</span>
       </div>
-      <p class="panel-note">전투 중에는 바꿀 수 없다.</p>
+      <p class="panel-note" data-i18n="hl.skillSlotsNote">전투 중에는 바꿀 수 없다.</p>
       <ul class="skill-picks" id="skill-picks"></ul>
     </div>
 
     <div class="panel">
-      <div class="panel-head"><h2>보상 분배</h2></div>
-      <p class="panel-note">진행 중 얻은 것을 나누는 방식. 전투 전에 정해 둔다.</p>
+      <div class="panel-head"><h2 data-i18n="hl.split">보상 분배</h2></div>
+      <p class="panel-note" data-i18n="hl.splitNote">진행 중 얻은 것을 나누는 방식. 전투 전에 정해 둔다.</p>
       <div class="methods" id="methods"></div>
     </div>
 
-    <button class="btn primary" id="start" type="button" disabled>전투 시작</button>
+    <button class="btn primary" id="start" type="button" disabled data-i18n="hl.start">전투 시작</button>
   </section>
 
   <!-- 전투 -->
@@ -262,19 +265,19 @@
     <!-- 전투 리포트. 전투 중에는 체력 막대로만 보이고 끝나면 그것도 사라져,
          누구를 다음에 데려갈지 판단할 근거가 남지 않는다. -->
     <div class="panel">
-      <div class="panel-head"><h2>전투 리포트</h2></div>
+      <div class="panel-head"><h2 data-i18n="hl.report">전투 리포트</h2></div>
       <ul class="report" id="battle-report"></ul>
     </div>
 
     <div class="panel" id="exp-panel">
-      <div class="panel-head"><h2>경험치</h2></div>
+      <div class="panel-head"><h2 data-i18n="hl.exp">경험치</h2></div>
       <ul class="levels" id="exp-gained"></ul>
       <p class="panel-note" id="exp-note"></p>
     </div>
 
     <div class="panel" id="guild-panel">
-      <div class="panel-head"><h2>모험가 길드 확정 보상</h2></div>
-      <p class="panel-note">동료에게 약속한 보수를 내고 남는 것이 주인공 몫이다.</p>
+      <div class="panel-head"><h2 data-i18n="hl.guildReward">모험가 길드 확정 보상</h2></div>
+      <p class="panel-note" data-i18n="hl.guildRewardNote">동료에게 약속한 보수를 내고 남는 것이 주인공 몫이다.</p>
       <ul class="loot" id="guild-loot"></ul>
     </div>
 
@@ -282,7 +285,7 @@
          둘을 한 패널에 담으면 어느 쪽이 움직였는지 읽히지 않는다. -->
     <div class="panel" id="rep-panel">
       <div class="panel-head">
-        <h2>평판</h2>
+        <h2 data-i18n="hl.repTitle">평판</h2>
         <span class="count" id="rep-delta"></span>
       </div>
       <div class="rep" id="rep-after"></div>
@@ -291,39 +294,39 @@
 
     <div class="panel" id="drop-panel">
       <div class="panel-head">
-        <h2>진행 중 획득</h2>
+        <h2 data-i18n="hl.gotDuring">진행 중 획득</h2>
         <span class="count" id="method-name"></span>
       </div>
       <ul class="awards" id="awards"></ul>
     </div>
 
     <div class="panel" id="roster-panel">
-      <div class="panel-head"><h2>동료</h2></div>
-      <p class="panel-note">데려간 동료가 받은 보수와 이번 판으로 움직인 신뢰도, 마을을 떠난 동료다.</p>
+      <div class="panel-head"><h2 data-i18n="hl.roster">동료</h2></div>
+      <p class="panel-note" data-i18n="hl.companionsNote">데려간 동료가 받은 보수와 이번 판으로 움직인 신뢰도, 마을을 떠난 동료다.</p>
       <ul class="stats" id="roster-report"></ul>
     </div>
 
     <div class="panel" id="gain-panel">
-      <div class="panel-head"><h2>내 몫</h2></div>
-      <p class="panel-note">장비는 바로 장착할 수 있다. 재료는 모험가 길드에 팔아 골드가 된다.</p>
+      <div class="panel-head"><h2 data-i18n="hl.myShare">내 몫</h2></div>
+      <p class="panel-note" data-i18n="hl.myShareNote">장비는 바로 장착할 수 있다. 재료는 모험가 길드에 팔아 골드가 된다.</p>
       <ul class="inventory" id="gained"></ul>
     </div>
 
     <div class="result-actions">
-      <button class="btn" id="retry" type="button">다시 도전</button>
-      <button class="btn primary" id="to-quests" type="button">게시판으로</button>
+      <button class="btn" id="retry" type="button" data-i18n="hl.retry">다시 도전</button>
+      <button class="btn primary" id="to-quests" type="button" data-i18n="hl.toQuests">게시판으로</button>
     </div>
   </section>
 
   <nav class="tabbar" id="tabbar">
     <button class="tab" type="button" data-tab="quest" aria-pressed="true">
-      <span class="tab-icon" data-icon="scroll"></span><span>퀘스트</span>
+      <span class="tab-icon" data-icon="scroll"></span><span data-i18n="hl.tabQuest">퀘스트</span>
     </button>
     <button class="tab" type="button" data-tab="character" aria-pressed="false">
-      <span class="tab-icon" data-icon="cross"></span><span>캐릭터</span>
+      <span class="tab-icon" data-icon="cross"></span><span data-i18n="hl.tabChar">캐릭터</span>
     </button>
     <button class="tab" type="button" data-tab="shop" aria-pressed="false">
-      <span class="tab-icon" data-icon="cart"></span><span>상점</span>
+      <span class="tab-icon" data-icon="cart"></span><span data-i18n="hl.tabShop">상점</span>
     </button>
   </nav>
 
@@ -344,71 +347,71 @@
     <!-- 부른 값에 얹어 주기와 선물. 둘 다 신뢰도를 올리는 수단이라 한자리에 둔다. -->
     <div class="favor" id="member-favor" hidden></div>
     <div class="sheet-actions">
-      <button class="btn primary" id="member-take" type="button">데려간다</button>
-      <button class="btn" id="member-close" type="button">닫기</button>
+      <button class="btn primary" id="member-take" type="button" data-i18n="hl.memberTake">데려간다</button>
+      <button class="btn" id="member-close" type="button" data-i18n="ui.close">닫기</button>
     </div>
   </div>
 
   <div class="sheet" id="help" hidden>
-    <p class="sheet-title">힐러만 맡는다</p>
+    <p class="sheet-title" data-i18n="hl.helpTitle">힐러만 맡는다</p>
     <ul class="help-list">
-      <li><b>직접 조작하는 것은 주인공 힐러의 스킬뿐이다.</b> 동료는 직업에 따라
+      <li data-i18n-html="hl.help.r1"><b>직접 조작하는 것은 주인공 힐러의 스킬뿐이다.</b> 동료는 직업에 따라
         알아서 싸운다 — 탱커는 앞에서 어그로를 잡고(레벨이 높으면 광역 도발도
         쓴다), 딜러는 탱커가 잡은 적을 먼저 치며, 동료 힐러는 탱커의 체력을 본다.</li>
-      <li><b>같은 계열이라도 들고 오는 스킬이 다르다.</b> 계열마다 스킬이 열 개이고
+      <li data-i18n-html="hl.help.r2"><b>같은 계열이라도 들고 오는 스킬이 다르다.</b> 계열마다 스킬이 열 개이고
         그중 넷을 들고 나오는데, 어느 넷인지는 그 동료에게 정해져 있다 — 편성에서
         동료를 눌러 무엇을 들고 오는지 확인한다. <b>근접 계열(수호·전사·도적)에는
         기절이 있다</b>: 굳은 동안에는 아무것도 못 하고, 외우던 스킬도 끊긴다.
         <b>주인공도 기절한다</b> — 그동안은 스킬바가 흐려진다.</li>
-      <li><b>전투에 가져갈 스킬은 다섯 개까지 전투 전에 등록한다.</b> 전투 중에는
+      <li data-i18n-html="hl.help.r3"><b>전투에 가져갈 스킬은 다섯 개까지 전투 전에 등록한다.</b> 전투 중에는
         바꿀 수 없다.</li>
-      <li><b>마나는 아주 느리게만 돌아온다.</b> 크게 채우는 것은 마나 회복 스킬과
+      <li data-i18n-html="hl.help.r4"><b>마나는 아주 느리게만 돌아온다.</b> 크게 채우는 것은 마나 회복 스킬과
         물약, 그리고 <b>음유시인</b>뿐이다 — 음유시인은 아군의 마나를 채우는 유일한
         계열이다. 무리와 무리 사이를 걷는 동안에는 체력과 마나가 함께 조금 찬다. 조금
         깎였다고 큰 힐을 쓰면 남는 힐량이 그대로 사라진다. <b>동료도 마나를
         쓰고 물약을 마신다</b> — 탱커는 체력 물약, 마나를 쓰는 직업은 마나 물약을
         직업에 따라 알아서 챙겨 온다.</li>
-      <li><b>동료는 명부에 남아 함께 자란다.</b> 같은 이름이면 같은 동료이고,
+      <li data-i18n-html="hl.help.r5"><b>동료는 명부에 남아 함께 자란다.</b> 같은 이름이면 같은 동료이고,
         데려가지 않은 동료도 다른 파티에서 경험을 쌓는다. 분배로 동료에게 간
         장비는 그 동료가 계속 쓴다.</li>
-      <li><b>그림 아래의 금빛 숫자가 전투력이다.</b> 능력치와 장비와 들고 오는
+      <li data-i18n-html="hl.help.r6"><b>그림 아래의 금빛 숫자가 전투력이다.</b> 능력치와 장비와 들고 오는
         스킬을 하나로 접은 값이고, 캐릭터 창과 동료 상세에도 적힌다. <b>같은
         역할끼리만 견주는 값이다</b> — 탱커는 버티는 것을, 딜러는 때리는 것을,
         힐러는 살리는 것을 재므로 역할이 다르면 같은 저울이 아니다. 장비 목록의
         <b>전투력 증감</b>이 "이걸 껴야 하나"의 답이다.</li>
-      <li><b>평판은 세상이, 신뢰도는 동료가 나를 보는 눈이다.</b> 평판은 하나뿐이고
+      <li data-i18n-html="hl.help.r7"><b>평판은 세상이, 신뢰도는 동료가 나를 보는 눈이다.</b> 평판은 하나뿐이고
         의뢰를 깰수록 오르며, <b>게시판에 걸리는 의뢰의 상한을 정한다</b> — 어려운
         의뢰를 깰수록 크게 오른다. 신뢰도는 동료마다 따로이고 −100에서 +100까지다.
         <b>동료가 전투불능이 되면 그 동료의 신뢰도가 크게 깎인다.</b></li>
-      <li><b>보수는 동료가 먼저 부른다.</b> 게시판의 금액에서 동료에게 줄 보수를 내고
+      <li data-i18n-html="hl.help.r8"><b>보수는 동료가 먼저 부른다.</b> 게시판의 금액에서 동료에게 줄 보수를 내고
         남는 것이 내 몫이라, <b>0이나 음수가 될 수도 있다</b>(그때는 내 돈을 보탠다).
         부르는 값은 신뢰도·평판·분배 방식과 <b>그 동료가 이 의뢰를 어떻게 보는가</b>로
         정해진다 — 시시할 만큼 쉬워도, 목숨을 걸 만큼 어려워도 값이 오른다.
         <b>실패하면 아무도 받지 못한다.</b></li>
-      <li><b>신뢰도는 관계를 관리해 올린다.</b> 알맞거나 조금 벅찬 의뢰를 함께
+      <li data-i18n-html="hl.help.r9"><b>신뢰도는 관계를 관리해 올린다.</b> 알맞거나 조금 벅찬 의뢰를 함께
         깨는 것이 가장 크고, 부른 값보다 보수를 더 얹어 주거나 인벤토리의 물건을
         선물해도 오른다 — 둘 다 동료를 눌러 여는 상세에 있다. 반대로 <b>시시한
         의뢰만 반복하면 오히려 깎인다.</b> 관계가 끊어진 동료는 모집에 응하지 않는다.</li>
-      <li><b>범위·장판 스킬은 기준점을 고른다.</b> 아래쪽 <b>동료 초상화</b>를
+      <li data-i18n-html="hl.help.r10"><b>범위·장판 스킬은 기준점을 고른다.</b> 아래쪽 <b>동료 초상화</b>를
         누르면 그 동료를 기준으로, <b>전투 화면</b>을 누르면 그 위치를 기준으로
         발동한다.</li>
-      <li><b>초상화 오른쪽 위의 작은 아이콘이 지금 걸려 있는 것이다</b> — 지속
+      <li data-i18n-html="hl.help.r11"><b>초상화 오른쪽 위의 작은 아이콘이 지금 걸려 있는 것이다</b> — 지속
         피해·지속 회복·기절·도발·혼란·강화·약화. <b>적과 아군 모두에 붙는다.</b></li>
-      <li><b>능력치가 모든 수치를 정한다.</b> 힘은 물리 공격력, 민첩은 회피,
+      <li data-i18n-html="hl.help.r12"><b>능력치가 모든 수치를 정한다.</b> 힘은 물리 공격력, 민첩은 회피,
         지능은 마법 공격력·회복량·최대 마나, 체력은 최대 체력을 올린다.
         <b>민첩은 치명타 확률도, 힘은 치명타 피해도 올린다</b> — 공격도 회복도
         터지고, 회피가 높은 상대는 치명타를 무르거나 덜 아프게 받는다.
         <b>캐릭터 레벨이 오를 때마다 점수를 받아 캐릭터 메뉴에서 나눈다.</b></li>
-      <li><b>레벨이 둘이다.</b> 캐릭터 레벨은 능력치를, 직업 레벨은 스킬 해금과
+      <li data-i18n-html="hl.help.r13"><b>레벨이 둘이다.</b> 캐릭터 레벨은 능력치를, 직업 레벨은 스킬 해금과
         스킬 레벨을 맡는다. <b>직업 레벨이 오르면 스킬 점수를 하나 받아</b> 캐릭터
         메뉴에서 스킬 하나를 올린다 — 효과가 오르고 소비 마나도 조금 오른다.
         <b>회복시킨 만큼 직업 경험치가 쌓인다</b> — 흘린 힐은 빼고 실제로
         채운 만큼만이다.</li>
-      <li>주인공이 쓰러지거나 파티가 전멸하면 실패한다. 실패해도 모험가 길드 몫의 절반은
+      <li data-i18n-html="hl.help.r14">주인공이 쓰러지거나 파티가 전멸하면 실패한다. 실패해도 모험가 길드 몫의 절반은
         받는다.</li>
     </ul>
     <div class="sheet-actions">
-      <button class="btn" id="help-close" type="button">닫기</button>
+      <button class="btn" id="help-close" type="button" data-i18n="ui.close">닫기</button>
     </div>
   </div>
 </main>
@@ -437,6 +440,8 @@
 <script src="logic.js"></script>
 <script src="audio.js"></script>
 <script src="../../shared/sheet.js"></script>
+<script>SharedI18n.apply();</script>
+<script src="i18n-data.js"></script>
 <script src="main.js"></script>
 </body>
 </html>

@@ -34,7 +34,7 @@ function even(drops, members, rng) {
   return drops.map((item, i) => ({
     item,
     toId: members[(start + i) % members.length].id,
-    reason: '순서대로',
+    reason: { code: 'hl.loot.inOrder' },
   }));
 }
 
@@ -49,7 +49,7 @@ function rollFor(members, rng) {
 function dice(drops, members, rng) {
   return drops.map((item) => {
     const { winner, rolls } = rollFor(members, rng);
-    return { item, toId: winner.id, reason: `${winner.roll} 최고`, rolls };
+    return { item, toId: winner.id, reason: { code: 'hl.loot.highRoll', vars: { roll: winner.roll } }, rolls };
   });
 }
 
@@ -71,18 +71,18 @@ function byJob(drops, members, rng) {
       const { winner, rolls } = rollFor(members, rng);
       taken[winner.id]++;
       return { item, toId: winner.id, rolls,
-        reason: job ? `${D.JOBS[job].name} 없음 · 주사위` : '직업 무관 · 주사위' };
+        reason: job ? { code: 'hl.loot.noJobDice', vars: { job } } : { code: 'hl.loot.anyJobDice' } };
     }
 
     const fewest = Math.min(...matched.map((m) => taken[m.id]));
     const pool = matched.filter((m) => taken[m.id] === fewest);
     if (pool.length === 1) {
       taken[pool[0].id]++;
-      return { item, toId: pool[0].id, reason: `${D.JOBS[job].name} 우선` };
+      return { item, toId: pool[0].id, reason: { code: 'hl.loot.jobFirst', vars: { job } } };
     }
     const { winner, rolls } = rollFor(pool, rng);
     taken[winner.id]++;
-    return { item, toId: winner.id, rolls, reason: `${D.JOBS[job].name} 우선 · 주사위` };
+    return { item, toId: winner.id, rolls, reason: { code: 'hl.loot.jobFirstDice', vars: { job } } };
   });
 }
 

@@ -44,9 +44,9 @@ function everyQuest(fn) {
 {
   check('정해진 개수만큼 걸린다', Q.generate(1, 7).length, Q.QUEST_COUNT);
   check('같은 씨앗이면 같은 목록',
-    Q.generate(5, 7).map((q) => q.name), Q.generate(5, 7).map((q) => q.name));
+    Q.generate(5, 7).map((q) => JSON.stringify(q.name)), Q.generate(5, 7).map((q) => JSON.stringify(q.name)));
   check('씨앗이 다르면 달라진다',
-    Q.generate(5, 7).map((q) => q.name).join() === Q.generate(5, 8).map((q) => q.name).join(),
+    JSON.stringify(Q.generate(5, 7).map((q) => q.name)) === JSON.stringify(Q.generate(5, 8).map((q) => q.name)),
     false);
 
   // 쉬운 것부터 보여 주지 않으면 게시판을 훑는 기준이 없다.

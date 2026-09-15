@@ -135,8 +135,8 @@ function skillsOf(member) {
 const specChoices = (member) => D.SPEC_CHOICES[jobOf(member)] || [];
 
 function canChangeSpec(member, spec) {
-  if (!specChoices(member).includes(spec)) return { ok: false, reason: '고를 수 없는 계열' };
-  if (spec === baseSpecOf(member)) return { ok: false, reason: '이미 그 계열이다' };
+  if (!specChoices(member).includes(spec)) return { ok: false, reason: 'hl.why.badSpec' };
+  if (spec === baseSpecOf(member)) return { ok: false, reason: 'hl.why.sameSpec' };
   if (member.level < D.SPEC_CHANGE_LEVEL) {
     return { ok: false, reason: `레벨 ${D.SPEC_CHANGE_LEVEL} 필요` };
   }
@@ -248,11 +248,11 @@ function goShopping(member, seed) {
 // 동료는 인벤토리가 없다. 분배로 받은 장비가 지금 낀 것보다 나으면 갈아 끼우고,
 // 아니면 알아서 처분한다 — 동료의 창고까지 관리하게 하면 화면이 하나 더 는다.
 function offerGear(member, item) {
-  if (!Items.isGear(item)) return { taken: false, reason: '장비가 아니다' };
+  if (!Items.isGear(item)) return { taken: false, reason: 'hl.why.notGear' };
   const slot = D.GEAR[item.defId].slot;
   const current = member.gear[slot];
   const better = !current || Items.score(item, jobOf(member)) > Items.score(current, jobOf(member));
-  if (!better) return { taken: false, reason: '쓰던 것이 낫다' };
+  if (!better) return { taken: false, reason: 'hl.why.worseGear' };
   member.gear[slot] = item;
   return { taken: true, slot, previous: current };
 }

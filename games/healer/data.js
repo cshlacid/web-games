@@ -1835,45 +1835,29 @@ function skillAt(def, level) {
 
 // 스킬이 지금 레벨에서 실제로 얼마를 하는지. 정의에 적어 둔 문장으로는 레벨이
 // 오른 것이 화면에 보이지 않는다.
+// 스킬이 무엇을 하는지는 화면에 적는 글이라 여기서 문장으로 만들지 않는다.
+// 조각만 골라 돌려주고, main.js가 고른 언어로 엮는다.
 function skillEffect(def) {
-  if (!def) return '';
-  // 강화·약화는 무엇을 몇 배로 만드는지가 전부다. 이름만으로는 공격력인지
-  // 받는 피해인지 알 수 없다.
-  if (def.stat) {
-    const name = AURA_STATS[def.stat] || def.stat;
-    const where = def.radius ? `반경 ${def.radius} 안, ` : '';
-    // 도트를 얹은 약화가 있다(발목 쏘기). 곱만 적으면 화면에서 피해가 사라진다.
-    const bleed = def.tick ? ` · 1초마다 ${def.tick} 피해` : '';
-    return `${where}${name} ×${def.mul} (${def.duration}초)${bleed}`;
-  }
-  if (def.mana && def.targeting === 'ally') return `동료의 마나 ${def.mana} 회복`;
-  if (def.mana && def.radius) return `반경 ${def.radius} 안 아군의 마나 ${def.mana} 회복`;
-  if (def.mana) return `마나 ${def.mana} 회복`;
-  if (def.kind === 'taunt-area') {
-    return `반경 ${def.radius} 안의 적을 ${def.duration}초 동안 끌어온다`;
-  }
-  if (def.kind === 'taunt') return `${def.duration}초 동안 자신에게 끌어온다`;
-  if (def.kind === 'stun') return `${def.damage} 피해 · ${def.duration}초 기절`;
-  if (def.kind === 'confuse') {
-    const where = def.radius ? `반경 ${def.radius} 안의 ` : '';
-    return `${where}적이 ${def.duration}초 동안 서로를 친다`;
-  }
-  if (def.damage) {
-    return def.radius ? `반경 ${def.radius} 안의 적에게 ${def.damage} 피해`
-      : `${def.damage} 피해`;
-  }
-  const kind = def.targeting === 'enemy' || def.targeting === 'area-enemy' ? '피해' : '회복';
-  if (def.heal) {
-    const cleanse = def.cleanse ? ' · 약화 제거' : '';
-    return def.radius ? `반경 ${def.radius} 안의 아군을 ${def.heal}씩 회복${cleanse}`
-      : `${def.heal} 회복${cleanse}`;
-  }
+  if (!def) return null;
+  if (def.stat) return { code: 'hl.eff.aura', stat: def.stat, radius: def.radius, mul: def.mul, duration: def.duration, tick: def.tick };
+  if (def.mana && def.targeting === 'ally') return { code: 'hl.eff.manaAlly', mana: def.mana };
+  if (def.mana && def.radius) return { code: 'hl.eff.manaArea', mana: def.mana, radius: def.radius };
+  if (def.mana) return { code: 'hl.eff.manaSelf', mana: def.mana };
+  if (def.kind === 'taunt-area') return { code: 'hl.eff.tauntArea', radius: def.radius, duration: def.duration };
+  if (def.kind === 'taunt') return { code: 'hl.eff.taunt', duration: def.duration };
+  if (def.kind === 'stun') return { code: 'hl.eff.stun', damage: def.damage, duration: def.duration };
+  if (def.kind === 'confuse') return { code: 'hl.eff.confuse', radius: def.radius, duration: def.duration };
+  if (def.damage) return { code: 'hl.eff.damage', damage: def.damage, radius: def.radius };
+  if (def.heal) return { code: 'hl.eff.heal', heal: def.heal, radius: def.radius, cleanse: !!def.cleanse };
   if (def.tick) {
-    const total = Math.round(def.tick * (def.duration / (def.interval || 1)));
-    const where = def.radius ? `반경 ${def.radius} 장판, ` : '';
-    return `${where}${def.duration}초 동안 1초마다 ${def.tick} ${kind} (총 ${total})`;
+    return {
+      code: 'hl.eff.tick',
+      tick: def.tick, duration: def.duration, interval: def.interval || 1, radius: def.radius,
+      total: Math.round(def.tick * (def.duration / (def.interval || 1))),
+      harm: def.targeting === 'enemy' || def.targeting === 'area-enemy',
+    };
   }
-  return '';
+  return null;
 }
 
 // 소모성 물약. 전투 중 마나를 회복하는 두 방법 가운데 하나다.
