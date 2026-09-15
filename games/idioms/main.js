@@ -11,7 +11,9 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 
 const SIZE_KEY = 'web-games.idioms.size';
 const BEST_KEY = 'web-games.idioms.best';
-const COLORS = 5;
+// 한 판에 성어가 일곱 개까지 오므로 색도 일곱이다. 모자라면 같은 색 길이 둘이
+// 되어 어느 길이 어느 성어인지 눈으로 따라갈 수 없다.
+const COLORS = 7;
 
 const el = {
   sizes: document.getElementById('sizes'),
