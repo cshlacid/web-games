@@ -12,6 +12,9 @@
 const Route = (typeof module !== 'undefined' && module.exports)
   ? require('./route.js')
   : window.MetroRoute;
+const Geom = (typeof module !== 'undefined' && module.exports)
+  ? require('./geom.js')
+  : window.MetroGeom;
 
 const DWELL = 25;        // 역 한 곳에 서 있는 시간(초). 급행이 아낀 것이 이 시간이다
 const TRAIN_COST = 22;   // 열차 한 대 값(억)
@@ -64,6 +67,53 @@ function withExtension(line, station, mids = []) {
     })),
   };
   return next;
+}
+
+// 이미 깔린 선 밑에 역을 놓았을 때 **그 노선에 끼워 넣은 사본**. 없으면 null.
+//
+// 노선을 끝에서만 늘릴 수 있으면, 지나가는 선 아래에 놓은 역은 쓸 방법이 없다 —
+// 노선을 지우고 처음부터 다시 긋는 것 말고는. 선로는 이미 그 위를 지나고 있으므로
+// 새로 뚫을 것이 없고, 끼워 넣기만 하면 된다.
+//
+// 어디에 끼울지는 **그려진 경로**로 찾는다. 제어점을 잇는 꺾은선이 아니라 눈에 보이는
+// 선이라야 "이 선 위에 놓았다"는 플레이어의 판단과 어긋나지 않는다.
+function withInsertion(line, station, tol) {
+  if (!line.path || !line.anchors || line.stations.includes(station)) return null;
+
+  const near = Geom.nearestOnPolyline(station.x, station.y, line.path.pts);
+  if (near.d > tol) return null;
+
+  // 그 샘플을 앞뒤로 감싸는 두 정차역. 순환선은 마지막 마디가 0번 역으로 돌아온다.
+  let seg = -1;
+  for (let i = 0; i + 1 < line.anchors.length; i++) {
+    if (line.anchors[i].at <= near.index && near.index <= line.anchors[i + 1].at) { seg = i; break; }
+  }
+  if (seg < 0) return null;
+
+  // 그 마디의 중간점들을 새 역의 앞뒤로 가른다. 가르지 않고 한쪽에 몰면 선이 역을
+  // 지나쳤다가 되돌아온다.
+  const mids = (line.mids[seg] || []).map((m) => ({ x: m.x, y: m.y }));
+  const ends = [line.stations[seg], ...mids, line.stations[(seg + 1) % line.stations.length]];
+  const cut = Geom.nearestOnPolyline(station.x, station.y, ends).index - 1;
+
+  const stations = line.stations.slice();
+  stations.splice(seg + 1, 0, station);
+  const nextMids = line.mids.map((m) => m.map((q) => ({ x: q.x, y: q.y })));
+  nextMids.splice(seg, 1, mids.slice(0, cut), mids.slice(cut));
+
+  const next = {
+    ...line,
+    stations,
+    mids: nextMids,
+    // **급행은 양 옆에 다 서는 경우에만 새 역에도 선다.** 통과하던 구간 한가운데에
+    // 역이 생겼다고 급행이 말없이 서기 시작하면, 플레이어가 짠 패턴이 뒤집힌다.
+    patterns: line.patterns.map((p) => {
+      const stops = p.stops.slice();
+      stops.splice(seg + 1, 0, !!(p.stops[seg] && p.stops[(seg + 1) % p.stops.length]));
+      return { ...p, stops };
+    }),
+  };
+  return { seg, d: near.d, line: next };
 }
 
 // 왜 못 잇는지를 문장이 아니라 열쇠로 돌려준다. 이 파일이 한 언어에 묶이면 node
@@ -311,7 +361,7 @@ function trainsOf(line) {
 
 const Lines = {
   DWELL, TRAIN_COST, MAX_TRAINS, MAX_PATTERNS,
-  controlPoints, create, withExtension, whyNot, rebuild, plan, timetable, at, pointAt, rideTime,
+  controlPoints, create, withExtension, withInsertion, whyNot, rebuild, plan, timetable, at, pointAt, rideTime,
   holdFactor, trackFactor, overtakeFactor, runTime, MIN_GAP,
   expressPattern, canToggle, trainsOf,
   reset() { nextId = 1; },
