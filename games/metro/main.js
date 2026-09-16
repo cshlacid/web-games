@@ -38,6 +38,8 @@ const ART = {
   draft: 34, built: 40, slowHalo: 24,
   handle: 46, handleRing: 14,
   label: 78, train: 30,
+  // 열차는 네모다. 선로를 따라 눕혀 그리고, 안을 채운 길이가 그 열차가 실은 몫이다.
+  carW: 156, carH: 66, carRing: 10,
 };
 
 // 이 거리 안에서 선 밑에 놓은 역은 그 노선에 끼어든다. 역 반지름의 두 배쯤이라
@@ -335,8 +337,7 @@ function addService(line, track, pattern, dir, reversed) {
   const table = Lines.timetable(track, reversed);
   if (!table) return;
   const plan = Lines.plan(track, reversed);
-  runs.push({ line: track, table, trains: reversed.trains, headway: plan.headway, dir });
-  services.push({
+  const svc = {
     line, pattern, dir,
     stations: track.stations,
     stopAt: reversed.stops,
@@ -348,7 +349,10 @@ function addService(line, track, pattern, dir, reversed) {
     // 막힌 구간을 판 위에 짚으려면 그 방향의 경로와 정차 자리가 있어야 한다.
     path: track.path,
     marks: track.anchors.filter((a) => reversed.stops[a.station]),
-  });
+  };
+  services.push(svc);
+  // 열차를 그릴 때 그 운행의 부하를 봐야 하므로 같은 객체를 들려 보낸다.
+  runs.push({ line: track, table, trains: reversed.trains, headway: plan.headway, dir, svc });
 }
 
 function syncNetwork() {
@@ -541,20 +545,56 @@ function renderLines() {
 
 // 열차는 시간표를 따라 돈다. 한 운행의 열차들은 주기를 배차간격만큼씩 나눠 가지므로,
 // 시각에 그 간격을 더해 넣으면 저절로 고르게 퍼진다.
+// 열차가 지금 지나는 구간에 실린 몫. 구간은 정차역과 정차역 사이이고, 그 경계는
+// 시간표가 쓰는 정차 자리(`marks`)와 같다.
+function loadAt(svc, s) {
+  if (!svc || !svc.peak || !svc.peak.loads || !svc.capacity) return 0;
+  const marks = svc.marks;
+  let k = 0;
+  for (let i = 0; i + 1 < marks.length; i++) {
+    if (s >= svc.path.s[marks[i].at]) k = i;
+  }
+  const load = svc.peak.loads[k];
+  return load == null ? 0 : load / svc.capacity;
+}
+
+// **열차를 네모로 그리고 안을 실은 만큼 채운다.** 점으로 두면 "몇 대가 도는가"밖에
+// 못 읽는데, 정작 알아야 하는 것은 **그 열차가 터지고 있는가**다. 노선 패널의 혼잡률은
+// 노선 하나에 숫자 하나라 어느 구간의 열차가 밀리는지를 가리지 못한다.
 function renderTrains() {
   clear(layer.trains);
   for (const run of runs) {
-    const group = svg('g', { stroke: lineColor(run.line), 'stroke-width': 10 * K() });
+    const color = lineColor(run.line);
     for (let k = 0; k < run.trains; k++) {
       const at = Lines.at(run.line, run.table, clock + k * run.headway);
-      group.appendChild(svg('circle', {
-        cx: r1(at.x), cy: r1(at.y), r: ART.train * K(),
-        // 서 있는 열차는 속을 채운다. 이것이 없으면 정차 시간도 가감속도 숫자로만
-        // 남고, 화면에서는 그냥 점이 미끄러지는 것으로 보인다.
-        fill: at.halted ? lineColor(run.line) : 'var(--station-fill)',
+      const ratio = loadAt(run.svc, at.s);
+      const w = ART.carW * K();
+      const h = ART.carH * K();
+      const ring = ART.carRing * K();
+      // 넘치는 몫은 칸 밖으로 못 나가니 색으로 낸다. 100%까지는 노선 색이 차오르고,
+      // 넘으면 가득 찬 채로 밀린 색이 된다 — 같은 "꽉 참"이라도 둘은 다른 상태다.
+      const over = ratio > 1;
+      const fill = Math.max(0, Math.min(1, ratio));
+      const car = svg('g', {
+        transform: `translate(${r1(at.x)} ${r1(at.y)}) rotate(${r1(at.ang * 180 / Math.PI)})`,
+      });
+      car.appendChild(svg('rect', {
+        x: -w / 2, y: -h / 2, width: w, height: h, rx: h * 0.32,
+        fill: 'var(--station-fill)', stroke: over ? 'var(--jam)' : color,
+        // 서 있는 열차는 테를 두껍게 한다. 안을 채우는 자리를 부하가 가져갔으므로
+        // 정차는 테로 낸다.
+        'stroke-width': at.halted ? ring * 1.9 : ring,
       }));
+      if (fill > 0.02) {
+        const inner = w - ring * 2;
+        car.appendChild(svg('rect', {
+          x: -inner / 2, y: -(h - ring * 2) / 2,
+          width: r1(inner * fill), height: h - ring * 2, rx: (h - ring * 2) * 0.3,
+          fill: over ? 'var(--jam)' : color,
+        }));
+      }
+      layer.trains.appendChild(car);
     }
-    layer.trains.appendChild(group);
   }
 }
 

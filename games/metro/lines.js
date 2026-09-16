@@ -303,25 +303,37 @@ function at(line, table, time) {
   // 서 있는 동안은 시간만 가고 거리가 그대로다. 화면이 그것을 달리 그린다 —
   // 열차가 역에 선다는 것이 보이지 않으면 정차 시간도 가감속도 숫자로만 남는다.
   spot.halted = b.t > a.t && Math.abs(b.s - a.s) < 1e-6;
+  spot.s = s;
   return spot;
 }
 
+// 향하는 쪽까지 함께 돌려준다. 열차를 네모로 그리려면 어느 쪽으로 누워야 하는지를
+// 알아야 하고, 그것은 그 자리 선로의 방향이다.
 function pointAt(path, s) {
   const arr = path.s;
+  const last = arr.length - 1;
   let lo = 0;
-  let hi = arr.length - 1;
-  if (s <= 0) return path.pts[0];
-  if (s >= arr[hi]) return path.pts[hi];
-  while (lo + 1 < hi) {
-    const mid = (lo + hi) >> 1;
-    if (arr[mid] <= s) lo = mid; else hi = mid;
+  let hi = last;
+  if (s <= 0) lo = 0;
+  else if (s >= arr[last]) lo = last - 1;
+  else {
+    while (lo + 1 < hi) {
+      const mid = (lo + hi) >> 1;
+      if (arr[mid] <= s) lo = mid; else hi = mid;
+    }
   }
-  const k = (s - arr[lo]) / (arr[hi] - arr[lo] || 1);
+  const a = path.pts[lo];
+  const b = path.pts[lo + 1] || a;
+  const span = arr[lo + 1] != null ? arr[lo + 1] - arr[lo] : 0;
+  const k = span > 0 ? clamp((s - arr[lo]) / span, 0, 1) : 0;
   return {
-    x: path.pts[lo].x + (path.pts[hi].x - path.pts[lo].x) * k,
-    y: path.pts[lo].y + (path.pts[hi].y - path.pts[lo].y) * k,
+    x: a.x + (b.x - a.x) * k,
+    y: a.y + (b.y - a.y) * k,
+    ang: Math.atan2(b.y - a.y, b.x - a.x),
   };
 }
+
+function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
 
 // 정차역 하나에서 다른 정차역까지 걸리는 시간. 왕복 노선은 어느 쪽으로 가나 같고,
 // 순환선은 한 방향뿐이라 지나쳤으면 한 바퀴를 돌아야 한다.
