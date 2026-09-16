@@ -262,22 +262,41 @@ function assign(demands, services) {
     const peak = peakOf(svc, demands);
     svc.pressure = svc.capacity > 0 ? peak.load / svc.capacity : 0;
     svc.peak = peak;   // 화면이 이 구간을 굵게 덧그어 "여기가 막혔다"를 짚는다
+    // **역에 서는 줄도 깎기 전의 그림이다.** 깎고 나면 못 탄 사람은 지상으로 가 버려
+    // 줄이 0이 된다 — 그러면 "얼마나 못 태우고 있는가"가 화면에서 사라진다.
+    svc.press = flowOf(svc, demands, true);
   }
 
   // 넘치는 만큼 깎기를 되풀이한다. 깎으면 부하가 줄고, 한 운행이 줄면 그것을 함께
   // 쓰던 다른 운행의 사정도 바뀐다. **줄이기만 하므로 되돌아오지 않는다** — 매번
   // 다시 재서 비율을 새로 잡으면 깎았다 풀었다를 되풀이한다.
+  //
+  // **깎는 비율은 "정원 ÷ 가장 무거운 구간"이 아니라 "실제로 탄 사람 ÷ 타려던 사람"이다.**
+  // 앞엣것은 한 구간만 보므로, 붐비는 구간을 지나지 않는 승객까지 같이 깎였다.
   for (let pass = 0; pass < 4; pass++) {
     let changed = false;
     services.forEach((svc, si) => {
-      const load = loadOf(svc, demands);
-      if (load > svc.capacity && load > 0) { factor[si] *= svc.capacity / load; changed = true; }
+      const flow = flowOf(svc, demands);
+      if (!flow) return;
+      const stuck = sum(flow.left) + (flow.leftBack ? sum(flow.leftBack) : 0);
+      if (stuck <= 0) return;
+      const wanted = sum(flow.occ) > 0 || stuck > 0 ? boardedOf(svc, demands) : 0;
+      if (wanted <= 0) return;
+      const got = Math.max(0, wanted - stuck);
+      factor[si] *= got / wanted;
+      changed = true;
     });
     if (!changed) break;
     apply();
   }
 
-  for (const svc of services) { svc.load = loadOf(svc, demands); svc.crowd = svc.pressure; }
+  for (const svc of services) {
+    svc.load = loadOf(svc, demands);
+    svc.crowd = svc.pressure;
+    // 열차가 실제로 싣고 가는 인원과 역마다 남은 줄. 화면이 이것으로 열차를 채우고
+    // 역에 숫자를 붙인다.
+    svc.flow = flowOf(svc, demands);
+  }
 
   // **잡았는지는 혼잡이 아니라 길로 따진다.** 혼잡까지 섞어 버리면 길을 아무리 잘
   // 놓아도 붐비는 동안은 "못 잡은 수요"로 남아 지도가 영영 지워지지 않고, 두 가지
@@ -339,6 +358,95 @@ function peakOf(svc, demands) {
   return { load, at, dir, loads, back, from: order[at], to: order[(at + 1) % order.length] };
 }
 
+// **승객은 역에서만 타고 내린다.** 여태는 구간마다의 통행량을 그대로 "재차 인원"으로
+// 썼는데, 그러면 정원을 넘는 값이 열차 안에 그려지고(실제로는 못 탄 사람이 승강장에
+// 남는다) **종점에 닿아도 열차가 비지 않는다.** 여기서는 정차역을 차례로 돌며 내리고
+// 태운다 — 태우는 것은 **빈자리만큼**이고, 남은 사람은 그 역에 줄로 남는다.
+//
+//   역 i에서:  재차 −= 내리는 사람
+//             탈 수 있는 만큼 = min(타려는 사람, 정원 − 재차)
+//             줄 = 타려는 사람 − 탄 사람
+//
+// 단위는 분당 인원이다. 정원도 `정원 × 60 ÷ 배차간격`이라 같은 단위이고, 그래서
+// 나눗셈 하나로 "그 열차가 얼마나 찼는가"가 나온다.
+const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+
+// 그 운행에 타려는 사람 전부(깎기 전이 아니라 지금 이용률 기준).
+function boardedOf(svc, demands) {
+  let total = 0;
+  for (const od of demands) {
+    if (!od.via || !od.usage) continue;
+    for (const leg of od.via.legs) if (leg.svc === svc) total += od.people * od.usage;
+  }
+  return total;
+}
+
+function flowOf(svc, demands, useBase = false) {
+  const order = [];
+  for (let i = 0; i < svc.stations.length; i++) if (svc.stopAt[i]) order.push(i);
+  const pos = new Map(order.map((i, k) => [i, k]));
+  const stops = order.length;
+  if (stops < 2) return null;
+
+  const loop = !!(svc.line && svc.line.loop);
+  const empty = () => ({ board: new Array(stops).fill(0), alight: new Array(stops).fill(0) });
+  const fwd = empty();
+  const rev = loop ? null : empty();
+
+  for (const od of demands) {
+    if (!od.via || !(useBase ? od.base : od.usage)) continue;
+    for (const leg of od.via.legs) {
+      if (leg.svc !== svc) continue;
+      const p = pos.get(leg.from);
+      const q = pos.get(leg.to);
+      if (p == null || q == null) continue;
+      const flow = od.people * (useBase ? od.base : od.usage);
+      // 순환선은 한 방향뿐이라 지나쳤으면 한 바퀴를 돌아 온다.
+      const side = loop || p < q ? fwd : rev;
+      side.board[p] += flow;
+      side.alight[q] += flow;
+    }
+  }
+
+  const cap = svc.capacity > 0 ? svc.capacity : Infinity;
+
+  // 정차역을 차례로 돌며 내리고 태운다. `seq`는 도는 차례이고, 왕복선은 종점에서
+  // 모두 내리므로 한 바퀴면 끝이지만 순환선은 돌고 돌아 제자리로 오므로 몇 바퀴를
+  // 돌려 값이 자리를 잡게 한다.
+  const walk = (side, seq, laps) => {
+    const occ = new Array(seq.length - 1).fill(0);
+    const left = new Array(stops).fill(0);
+    let carry = 0;
+    for (let lap = 0; lap < laps; lap++) {
+      left.fill(0);
+      for (let k = 0; k + 1 < seq.length; k++) {
+        const i = seq[k];
+        // 깎인 뒤에는 실제로 탄 사람보다 내릴 사람이 많게 잡힐 수 있다. 0에서 막는다.
+        carry = Math.max(0, carry - side.alight[i]);
+        const want = side.board[i];
+        const got = Math.min(want, Math.max(0, cap - carry));
+        carry += got;
+        left[i] = want - got;
+        occ[k] = carry;
+      }
+      if (!loop) carry = 0;   // 종점에서는 남김없이 내린다
+    }
+    return { occ, left };
+  };
+
+  const upTo = (n) => Array.from({ length: n }, (_, k) => k);
+  const ahead = walk(fwd, loop ? [...upTo(stops), 0] : upTo(stops), loop ? 3 : 1);
+  const behind = rev ? walk(rev, upTo(stops).reverse(), 1) : null;
+
+  // 뒤로 도는 쪽의 구간 번호는 앞쪽과 반대라 뒤집어 맞춰 둔다 — 화면이 같은 번호로 읽는다.
+  const backOcc = behind ? behind.occ.slice().reverse() : null;
+  return {
+    occ: ahead.occ, back: backOcc,
+    left: ahead.left, leftBack: behind ? behind.left : null,
+    order, cap,
+  };
+}
+
 // 계기판에 올릴 사람 수. **셋으로 남김없이 갈린다** — 지금 타는 사람, 타려는데 자리가
 // 없는 사람, 길이 없거나 나빠서 지상으로 가는 사람. 건수로만 두면 "몇 건"과 "몇 명"이
 // 한 줄에 섞여 서로 견줄 수가 없었다.
@@ -359,19 +467,24 @@ function tally(demands) {
   return { riding, missed, away };
 }
 
-// 역마다 타려다 못 탄 사람. **깎인 몫은 첫 승차역에 쌓인다** — 실제로 줄이 서는 곳이
-// 거기이고, 어느 구간이 막혔든 그 줄은 출발역에서 길어진다. 노선 패널의 혼잡률
-// 하나로는 어디가 막혔는지 알 수 없어, 그 숫자를 지도 위로 끌어내리는 것이 이 함수다.
-function waitingAt(demands) {
+// 역마다 타려다 못 탄 사람. **빈자리가 없어 그 역에 남은 사람**이고, 태우고 내리며
+// 걸어서 나온 값이다(`flowOf`). 전에는 깎인 몫을 첫 승차역에 몰아 두었는데, 그러면
+// 정작 사람이 못 타는 역이 아니라 출발역에 줄이 섰다.
+function waitingAt(services) {
   const out = new Map();
-  for (const od of demands) {
-    if (!od.via || !od.via.legs.length) continue;
-    const missed = od.people * Math.max(0, od.base - od.usage);
-    if (missed < 0.5) continue;
-    const leg = od.via.legs[0];
-    const station = leg.svc.stations[leg.from];
-    if (!station) continue;
-    out.set(station, (out.get(station) || 0) + missed);
+  const add = (svc, left) => {
+    if (!left) return;
+    left.forEach((n, k) => {
+      if (n < 0.5) return;
+      const station = svc.stations[svc.press.order[k]];
+      if (!station) return;
+      out.set(station, (out.get(station) || 0) + n);
+    });
+  };
+  for (const svc of services) {
+    if (!svc.press) continue;
+    add(svc, svc.press.left);
+    add(svc, svc.press.leftBack);
   }
   return out;
 }
@@ -394,7 +507,7 @@ function income(od, minutes, scale = 1) {
 }
 
 const Demand = {
-  waitingAt, peakOf, tally,
+  waitingAt, peakOf, tally, flowOf,
   WALK_SPEED, WALK_WEIGHT, R_WALK, SURFACE_SPEED, SURFACE_ACCESS, MIN_DIST,
   MAX_WAITING, MAX_TOTAL, PATIENCE, SPAWN_EVERY, SERVED, FARE, ANCHOR_R, BOTH_ENDS,
   TRANSFER, TRAIN_CAPACITY, BUS_SPEED, BUS_WEIGHT, BUS_ACCESS, R_ACCESS,
