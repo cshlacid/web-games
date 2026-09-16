@@ -185,13 +185,14 @@ h1 {
 .flow {
   margin: 0;
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
-  gap: 14px;
+  gap: 6px 14px;
   font-size: 12px;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
-.flow span { display: inline-flex; align-items: center; gap: 4px; }
+.flow > span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .flow b { color: var(--fg); font-weight: 700; }
 .dot.caught { background: var(--metro); }
 .dot.waiting { background: var(--demand); }

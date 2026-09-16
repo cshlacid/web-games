@@ -288,6 +288,46 @@ function ok(name, cond, extra = '') {
   ok('넉넉하면 줄이 없다', D.waitingAt(same).size === 0);
 }
 
+// 오는 쪽과 가는 쪽을 따로 센다. 한 배열에 합치면 A→B 가는 열차가 B→A 손님까지
+// 실은 것으로 잡혀 혼잡이 두 배 가까이 부풀고, 종점에 닿은 열차가 비지 않는다.
+{
+  const stations = [{ x: 0, y: 0 }, { x: 3000, y: 0 }, { x: 6000, y: 0 }];
+  const make = () => ({
+    stations, stopAt: [true, true, true], headway: 300, capacity: 500,
+    ride: (i, j) => Math.abs(i - j) * 420,
+  });
+  const oneWay = () => [{ a: { x: 80, y: 50 }, b: { x: 5900, y: 50 }, km: 5.8, people: 400 }];
+  const twoWay = () => [
+    { a: { x: 80, y: 50 }, b: { x: 5900, y: 50 }, km: 5.8, people: 400 },
+    { a: { x: 5900, y: 120 }, b: { x: 80, y: 120 }, km: 5.8, people: 400 },
+  ];
+
+  const one = make();
+  D.assign(oneWay(), [one]);
+  ok('한쪽으로만 가면 오는 쪽은 비어 있다',
+    one.peak.loads.every((n) => n > 0) && one.peak.back.every((n) => n === 0),
+    `${JSON.stringify(one.peak.loads)} / ${JSON.stringify(one.peak.back)}`);
+  ok('막힌 방향을 짚는다', one.peak.dir === 1);
+
+  const two = make();
+  D.assign(twoWay(), [two]);
+  ok('양쪽으로 가면 방향마다 반씩이다',
+    Math.abs(two.peak.loads[0] - two.peak.back[0]) < 2,
+    `${two.peak.loads[0].toFixed(0)} / ${two.peak.back[0].toFixed(0)}`);
+  // 합쳐 세던 때는 이 값이 두 배(1.6)라 정원을 넘은 것으로 잡혔다. 수송력은 원래
+  // 한 방향치이므로 그쪽이 틀렸다.
+  ok('합쳐 세지 않는다', two.crowd < 1 && two.crowd > 0.7, String(two.crowd));
+
+  // 순환선은 한 방향뿐이라 오는 쪽 배열이 없다.
+  const ring = {
+    line: { loop: true },
+    stations: [{ x: 0, y: 0 }, { x: 3000, y: 0 }, { x: 3000, y: 3000 }],
+    stopAt: [true, true, true], headway: 300, capacity: 1e9, ride: () => 400,
+  };
+  D.assign([{ a: { x: 80, y: 50 }, b: { x: 2900, y: 50 }, km: 2.8, people: 200 }], [ring]);
+  ok('순환선에는 오는 쪽이 없다', ring.peak.back === null);
+}
+
 // 순환선은 마지막 역에서 첫 역으로 돌아오는 구간도 센다. 이웃한 쌍만 세던 때는 그
 // 한 구간이 빠져, 한 바퀴 도는 노선에서 정작 가장 붐비는 자리를 놓쳤다.
 {

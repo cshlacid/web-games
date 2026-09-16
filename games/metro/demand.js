@@ -302,7 +302,14 @@ function peakOf(svc, demands) {
   // **순환선은 마지막 역에서 첫 역으로 돌아오는 구간도 센다.** 이웃한 쌍만 세던 때는
   // 그 한 구간이 빠져, 한 바퀴 도는 노선에서 정작 가장 붐비는 자리를 놓칠 수 있었다.
   const loop = !!(svc.line && svc.line.loop);
-  const loads = new Array(loop ? order.length : order.length - 1).fill(0);
+  const n = loop ? order.length : order.length - 1;
+
+  // **오는 쪽과 가는 쪽을 따로 센다.** 한 배열에 합치면 A→B 가는 열차가 B→A 손님까지
+  // 실은 것으로 잡혀 혼잡이 두 배 가까이 부풀고, **종점에 닿은 열차가 비지 않는다** —
+  // 내린 사람 몫이 그대로 남아 있기 때문이다. 수송력(`정원 × 60 ÷ 배차간격`)도 원래
+  // 한 방향치라, 나누어야 둘이 같은 단위가 된다. 순환선은 한 방향뿐이라 앞쪽만 쓴다.
+  const loads = new Array(n).fill(0);
+  const back = loop ? null : new Array(n).fill(0);
 
   for (const od of demands) {
     if (!od.via || !od.usage) continue;
@@ -313,16 +320,23 @@ function peakOf(svc, demands) {
       if (p == null || q == null) continue;
       const flow = od.people * od.usage;
       // 순환선은 한 방향뿐이라 지나쳤으면 한 바퀴를 돌아 온다 — `rideTime`과 같은 셈이다.
-      if (loop) for (let k = p; k !== q; k = (k + 1) % loads.length) loads[k] += flow;
-      else for (let k = Math.min(p, q); k < Math.max(p, q); k++) loads[k] += flow;
+      if (loop) { for (let k = p; k !== q; k = (k + 1) % n) loads[k] += flow; continue; }
+      const side = p < q ? loads : back;
+      for (let k = Math.min(p, q); k < Math.max(p, q); k++) side[k] += flow;
     }
   }
+
   let at = 0;
-  for (let k = 1; k < loads.length; k++) if (loads[k] > loads[at]) at = k;
+  let dir = 1;
+  let load = 0;
+  for (let k = 0; k < n; k++) {
+    if (loads[k] > load) { load = loads[k]; at = k; dir = 1; }
+    if (back && back[k] > load) { load = back[k]; at = k; dir = -1; }
+  }
   // 구간마다의 부하를 통째로 돌려준다. 화면이 **열차가 지금 지나는 구간**의 부하로
   // 그 열차를 채워 그린다 — 혼잡을 노선 하나의 숫자로만 두면 어느 열차가 터지는지가
   // 안 보인다.
-  return { load: loads[at], at, loads, from: order[at], to: order[(at + 1) % order.length] };
+  return { load, at, dir, loads, back, from: order[at], to: order[(at + 1) % order.length] };
 }
 
 // 역마다 타려다 못 탄 사람. **깎인 몫은 첫 승차역에 쌓인다** — 실제로 줄이 서는 곳이

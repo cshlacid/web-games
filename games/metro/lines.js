@@ -304,6 +304,15 @@ function at(line, table, time) {
   // 열차가 역에 선다는 것이 보이지 않으면 정차 시간도 가감속도 숫자로만 남는다.
   spot.halted = b.t > a.t && Math.abs(b.s - a.s) < 1e-6;
   spot.s = s;
+  // **지금 향하는 쪽.** 서 있는 동안에는 곧 떠날 쪽을 본다 — 종점에 선 열차가 들고
+  // 있는 것은 방금 싣고 온 몫이 아니라 되돌아가며 실을 몫이다. 순환선은 한 방향뿐이라
+  // 표 끝에서 s가 0으로 돌아가는 것을 뒤로 가는 것으로 읽으면 안 된다.
+  spot.dir = 1;
+  if (!table.loop) {
+    let j = hi;
+    while (j < marks.length && Math.abs(marks[j].s - a.s) < 1e-6) j++;
+    if (j < marks.length && marks[j].s < a.s) spot.dir = -1;
+  }
   return spot;
 }
 
