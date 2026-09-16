@@ -265,6 +265,14 @@ h1 {
 .step:disabled { opacity: 0.3; cursor: default; }
 .step .ico { width: 15px; height: 15px; display: block; }
 
+.crowd {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.crowd.over { color: var(--under); }
+
 .plan {
   margin-inline-start: auto;
   font-size: 12px;
