@@ -38,10 +38,13 @@ const DISTRICT = {
 
 // 난이도는 구역의 넓이 배합과 건물·지형으로 낸다. 규칙을 바꾸지 않고 지형만 바꾸는
 // 것이라, 쉬운 판에서 익힌 감각이 어려운 판에서도 그대로 통한다.
+// `fare`는 난이도가 요금에 거는 배수다. 어려울수록 같은 승객이 덜 벌어 주고, 그래서
+// 같은 망을 깔아도 돈이 늦게 모인다. **규칙이 아니라 숫자만 바꾸는 손잡이라** 쉬운
+// 판에서 익힌 감각이 어려운 판에서도 그대로 통한다.
 const LEVELS = [
-  { id: 'easy',   oldR: 620,  town: [2200, 1900], density: 0.78, hills: 1, sea: 0.3 },
-  { id: 'normal', oldR: 1150, town: [1700, 1450], density: 1.0,  hills: 2, sea: 0.55 },
-  { id: 'hard',   oldR: 1750, town: [1100, 950],  density: 1.25, hills: 3, sea: 0.85 },
+  { id: 'easy',   oldR: 620,  town: [2200, 1900], density: 0.78, hills: 1, sea: 0.3,  fare: 1 },
+  { id: 'normal', oldR: 1150, town: [1700, 1450], density: 1.0,  hills: 2, sea: 0.55, fare: 0.66 },
+  { id: 'hard',   oldR: 1750, town: [1100, 950],  density: 1.25, hills: 3, sea: 0.85, fare: 0.45 },
 ];
 
 // 처음에는 도시가 듬성듬성하다. 후보의 이만큼만 서 있고 나머지는 빈 터로 남아,
@@ -438,7 +441,7 @@ function create(seed = 1, level = 1) {
   town.y = clamp(core.y + Math.sin(away) * (core.r + town.h * 0.62) - town.h / 2, 120, WORLD.h - town.h - 120);
 
   const city = {
-    seed, level: spec.id, world: WORLD, view: VIEW, core, town,
+    seed, level: spec.id, fare: spec.fare, world: WORLD, view: VIEW, core, town,
     roads: [], stations: [], growSeed: (seed * 2246822519) >>> 0,
   };
 

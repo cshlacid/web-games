@@ -323,6 +323,12 @@ for (const level of [0, 1, 2]) {
     `${count(0)} < ${count(1)} < ${count(2)}`);
 
   const lumps = (level) => SEEDS.reduce((sum, seed) => sum + C.create(seed, level).hills.length, 0);
+  ok('어려울수록 요금이 짜다',
+    C.LEVELS[0].fare > C.LEVELS[1].fare && C.LEVELS[1].fare > C.LEVELS[2].fare,
+    C.LEVELS.map((l) => l.fare).join(' > '));
+  ok('난이도의 요금 배수가 도시에 실려 나온다',
+    [0, 1, 2].every((lv) => C.create(1, lv).fare === C.LEVELS[lv].fare));
+
   ok('어려울수록 산이 많다', lumps(0) < lumps(1) && lumps(1) < lumps(2),
     `${lumps(0)} < ${lumps(1)} < ${lumps(2)}`);
 

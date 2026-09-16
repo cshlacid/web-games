@@ -52,9 +52,16 @@ function ok(name, cond, extra = '') {
   const rare = line([{ x: 100, y: 0 }, { x: 5900, y: 0 }], 1800, 520);
   ok('배차가 벌어지면 덜 탄다', D.evaluate(od, [rare]).usage < r1.usage);
 
-  // 역이 멀면 후보에서 빠진다.
-  const far = line([{ x: 100, y: 3000 }, { x: 5900, y: 3000 }], 300, 520);
-  ok('걸어갈 수 없는 역은 안 쓴다', D.evaluate(od, [far]).via === null);
+  // 걸어갈 수 없어도 버스로 닿으면 쓴다. 다만 값이 비싸 덜 탄다.
+  const busRide = line([{ x: 100, y: 1500 }, { x: 5900, y: 1500 }], 300, 520);
+  const byBus = D.evaluate(od, [busRide]);
+  ok('걸어갈 수 없어도 버스로 역까지 간다', byBus.via !== null && byBus.via.busA && byBus.via.busB,
+    JSON.stringify(byBus.via && { busA: byBus.via.busA, busB: byBus.via.busB }));
+  ok('버스를 타고 가면 더 비싸다', byBus.cost > r1.cost, `${Math.round(byBus.cost)} vs ${Math.round(r1.cost)}`);
+
+  // 버스로도 못 닿을 만큼 멀면 후보에서 빠진다.
+  const far = line([{ x: 100, y: 6000 }, { x: 5900, y: 6000 }], 300, 520);
+  ok('버스로도 못 닿는 역은 안 쓴다', D.evaluate(od, [far]).via === null);
 
   // 조금 더 걸어도 훨씬 빠른 쪽을 고른다 — 가장 가까운 역이 답이 아니다.
   const slowClose = line([{ x: 50, y: 0 }, { x: 5950, y: 0 }], 300, 2400);
@@ -216,11 +223,29 @@ function ok(name, cond, extra = '') {
   ok('안 타면 수입이 없다', D.income({ ...od, usage: 0 }, 5) === 0);
 }
 
+// --- 역까지 가는 값 ---
+{
+  ok('가까우면 걷는 편이 싸다', D.accessCost(200) < D.BUS_ACCESS);
+  ok('멀면 버스가 싸다', D.accessCost(D.R_WALK) < 200 / D.WALK_SPEED * D.WALK_WEIGHT * 4);
+  ok('걷기와 버스 중 싼 쪽을 고른다',
+    D.accessCost(760) <= 760 / D.WALK_SPEED * D.WALK_WEIGHT + 1e-9);
+  ok('멀수록 비싸다', D.accessCost(1500) > D.accessCost(700));
+  ok('너무 멀면 못 간다', !Number.isFinite(D.accessCost(D.R_ACCESS + 1)));
+
+  // 갈림목을 지나면 버스가 이긴다.
+  let flip = 0;
+  for (let d = 100; d < D.R_WALK; d += 20) {
+    if (D.accessCost(d) < d / D.WALK_SPEED * D.WALK_WEIGHT - 1e-9) { flip = d; break; }
+  }
+  ok('어느 거리부터는 버스를 탄다', flip > 250 && flip < 700, `${flip}m`);
+}
+
 // --- 어느 쪽 끝이 닿았는가 ---
 {
   const stations = [{ x: 0, y: 0 }];
-  ok('가까우면 닿았다', D.reach({ x: 300, y: 0 }, stations));
-  ok('멀면 안 닿았다', !D.reach({ x: D.R_WALK + 50, y: 0 }, stations));
+  ok('걸어갈 수 있으면 2', D.reach({ x: 300, y: 0 }, stations) === 2);
+  ok('버스로 닿으면 1', D.reach({ x: D.R_WALK + 200, y: 0 }, stations) === 1);
+  ok('그보다 멀면 0', D.reach({ x: D.R_ACCESS + 200, y: 0 }, stations) === 0);
 }
 
 console.log(`${passed}개 통과, ${failed}개 실패`);

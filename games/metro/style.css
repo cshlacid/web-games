@@ -210,7 +210,9 @@ h1 {
 }
 
 .linepanel .picker { flex-wrap: wrap; }
-.patternrow { display: flex; align-items: center; gap: 6px; }
+.linerow, .patternrow { display: flex; align-items: center; gap: 6px; }
+.linerow .picker { flex: 1; min-width: 0; }
+.pick.drop { border-color: var(--under); color: var(--under); }
 .patternrow .picker { flex: 1; min-width: 0; }
 .pick.add { border-style: dashed; }
 .pick:disabled { opacity: 0.35; cursor: default; }
