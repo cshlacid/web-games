@@ -344,6 +344,28 @@ function ok(name, cond, extra = '') {
     `${svc.peak.from}→${svc.peak.to} 부하 ${svc.peak.load.toFixed(0)}`);
 }
 
+// --- 계기판의 사람 수 ---
+// 건수로만 두면 "몇 건"과 "몇 명"이 한 줄에 섞여 서로 견줄 수가 없다. 셋이 남김없이
+// 갈려야 "못 탐은 열차, 안 탐은 노선"이라는 읽기가 성립한다.
+{
+  const ds = [
+    { people: 100, base: 1, usage: 0.4 },    // 길은 좋은데 60%가 못 탐
+    { people: 200, base: 0.5, usage: 0.5 },  // 절반만 쓸 만한 길
+    { people: 50, base: 0, usage: 0 },       // 길이 아예 없음
+  ];
+  const t = D.tally(ds);
+  ok('타는 사람', Math.abs(t.riding - 140) < 0.001, String(t.riding));
+  ok('못 타는 사람', Math.abs(t.missed - 60) < 0.001, String(t.missed));
+  ok('안 타는 사람', Math.abs(t.away - 150) < 0.001, String(t.away));
+  ok('셋을 더하면 전체 인원이다',
+    Math.abs(t.riding + t.missed + t.away - 350) < 0.001,
+    String(t.riding + t.missed + t.away));
+
+  // 아무것도 안 깔린 판에서는 전부 "안 탐"이다.
+  const bare = D.tally([{ people: 80, base: 0, usage: 0 }]);
+  ok('망이 없으면 전부 안 탐', bare.riding === 0 && bare.missed === 0 && bare.away === 80);
+}
+
 // --- 어느 쪽 끝이 닿았는가 ---
 {
   const stations = [{ x: 0, y: 0 }];

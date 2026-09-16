@@ -339,6 +339,26 @@ function peakOf(svc, demands) {
   return { load, at, dir, loads, back, from: order[at], to: order[(at + 1) % order.length] };
 }
 
+// 계기판에 올릴 사람 수. **셋으로 남김없이 갈린다** — 지금 타는 사람, 타려는데 자리가
+// 없는 사람, 길이 없거나 나빠서 지상으로 가는 사람. 건수로만 두면 "몇 건"과 "몇 명"이
+// 한 줄에 섞여 서로 견줄 수가 없었다.
+//
+//   people = people·usage  +  people·(base − usage)  +  people·(1 − base)
+//              탐               못 탐                    안 탐
+function tally(demands) {
+  let riding = 0;
+  let missed = 0;
+  let away = 0;
+  for (const od of demands) {
+    const base = od.base || 0;
+    const usage = od.usage || 0;
+    riding += od.people * usage;
+    missed += od.people * Math.max(0, base - usage);
+    away += od.people * Math.max(0, 1 - base);
+  }
+  return { riding, missed, away };
+}
+
 // 역마다 타려다 못 탄 사람. **깎인 몫은 첫 승차역에 쌓인다** — 실제로 줄이 서는 곳이
 // 거기이고, 어느 구간이 막혔든 그 줄은 출발역에서 길어진다. 노선 패널의 혼잡률
 // 하나로는 어디가 막혔는지 알 수 없어, 그 숫자를 지도 위로 끌어내리는 것이 이 함수다.
@@ -374,7 +394,7 @@ function income(od, minutes, scale = 1) {
 }
 
 const Demand = {
-  waitingAt, peakOf,
+  waitingAt, peakOf, tally,
   WALK_SPEED, WALK_WEIGHT, R_WALK, SURFACE_SPEED, SURFACE_ACCESS, MIN_DIST,
   MAX_WAITING, MAX_TOTAL, PATIENCE, SPAWN_EVERY, SERVED, FARE, ANCHOR_R, BOTH_ENDS,
   TRANSFER, TRAIN_CAPACITY, BUS_SPEED, BUS_WEIGHT, BUS_ACCESS, R_ACCESS,
