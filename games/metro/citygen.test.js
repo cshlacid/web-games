@@ -66,13 +66,19 @@ for (const level of [0, 1, 2]) {
 
     // 건물이 길 위에 올라앉으면 "역은 도로나 빈 땅에만"이라는 규칙이 무너진다.
     // 굽은 골목은 블록이 사각형이 아니라, 기각 표집이 제대로 걸렀는지 여기서 본다.
+    //
+    // **전수가 아니라 표본이다.** 건물 수천 채 × 선분 수만 개는 곱이 억을 넘어 지도를
+    // 키운 뒤로는 테스트가 분 단위로 늘어졌다. 거르개가 망가지면 몇 채가 아니라 수십
+    // 채가 걸리므로, 씨앗마다 고정된 표본 삼백 채면 잡힌다.
     let onRoad = 0;
-    for (const b of city.buildings) {
+    const pick = C.mulberry32(seed * 31 + level);
+    const sample = city.buildings.filter(() => pick() < 300 / city.buildings.length);
+    for (const b of sample) {
       for (const s of city.segments) {
         if (C.segRectDistance(s, b) < s.w / 2) { onRoad++; break; }
       }
     }
-    ok(`${name}/${seed}: 건물이 도로를 침범하지 않는다`, onRoad === 0, `${onRoad}채`);
+    ok(`${name}/${seed}: 건물이 도로를 침범하지 않는다`, onRoad === 0, `${sample.length}채 중 ${onRoad}채`);
 
     // 물이나 산 위의 건물은 지을 수 없다.
     const drowned = city.buildings.filter((b) =>
@@ -167,16 +173,17 @@ for (const level of [0, 1, 2]) {
 {
   const rng = C.mulberry32(4242);
   const cross = [];
-  for (let t = 600; t < 5400; t += 600) cross.push(t);
+  const SPAN = C.WORLD.h;
+  for (let t = 600; t < SPAN; t += 600) cross.push(t);
   let bent = 0;
   let cutShort = 0;
   const N = 400;
   for (let i = 0; i < N; i++) {
-    const pts = C.arterial(2400, 5400, cross, rng, true);
+    const pts = C.arterial(C.WORLD.w / 2, SPAN, cross, rng, true);
     if (pts.length === 4) bent++;
     const from = Math.min(pts[0].y, pts[pts.length - 1].y);
     const to = Math.max(pts[0].y, pts[pts.length - 1].y);
-    if (from > 1 || to < 5399) cutShort++;
+    if (from > 1 || to < SPAN - 1) cutShort++;
   }
   ok('어긋나는 간선이 제법 나온다', bent > N * 0.2 && bent < N * 0.7, `${bent}/${N}`);
   ok('중간에서 끊기는 간선도 나온다', cutShort > N * 0.15 && cutShort < N * 0.5, `${cutShort}/${N}`);
@@ -184,10 +191,10 @@ for (const level of [0, 1, 2]) {
   // 끊긴 간선이 도시를 반으로 가르면 안 된다 — 자를 자리는 가장자리 쪽으로 물려 둔다.
   let middleCut = 0;
   for (let i = 0; i < N; i++) {
-    const pts = C.arterial(2400, 5400, cross, rng, true);
+    const pts = C.arterial(C.WORLD.w / 2, SPAN, cross, rng, true);
     const from = Math.min(pts[0].y, pts[pts.length - 1].y);
     const to = Math.max(pts[0].y, pts[pts.length - 1].y);
-    if (from > 5400 * 0.45 || to < 5400 * 0.55) middleCut++;
+    if (from > SPAN * 0.45 || to < SPAN * 0.55) middleCut++;
   }
   ok('한가운데서 자르지는 않는다', middleCut === 0, `${middleCut}줄`);
 }

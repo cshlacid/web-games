@@ -41,6 +41,7 @@
       <span class="budget"><span data-i18n="metro.budget">예산</span> <b id="budget">0</b></span>
       <span class="clock" id="clock">06:00</span>
       <button class="toggle" id="pause" type="button" aria-pressed="true" data-i18n="metro.speedSlow">보통</button>
+      <button class="toggle" id="wide" type="button" aria-pressed="false" data-i18n="metro.wide" data-i18n-attr="title=metro.wideHint" title="지도 전체를 한 화면에 봅니다. 누른 자리로 내려갑니다">전체</button>
       <button class="toggle" id="new-city" type="button" data-i18n="metro.newCity">새 도시</button>
     </div>
   </header>
@@ -127,7 +128,9 @@
     <p class="sheet-note" data-i18n="metro.draftNote">아직 만드는 중입니다. 균형(요금·건설비·열차값)은 아직 잡지 않았습니다.</p>
     <ul class="help-list">
       <li data-i18n-html="metro.ruleMap">지도는 화면보다 넓습니다. <b>빈 곳을 끌면</b> 지도가 움직입니다. 고른 역이 화면 밖으로 나가면 가장자리에 점으로 남습니다.</li>
-      <li data-i18n-html="metro.ruleStation"><b>건설</b> 모드에서 빈 자리를 누르면 임시 역이 생깁니다. <b>끌어서 자리를 잡고</b> 확정을 눌러야 지어집니다. 물·산·건물 위에는 놓을 수 없고, 역을 다시 누르면 철거되고 절반을 돌려받습니다.</li>
+      <li data-i18n-html="metro.ruleClock"><b>시계 빠르기를 고를 수 있습니다</b>(멈춤·보통·빠름). 가속과 감속, 역에 서 있는 시간은 <b>보통</b>에서 잘 보이고, 돈과 도시가 자라는 것은 <b>빠름</b>에서 빨리 진행됩니다. 무언가를 끌고 있는 동안에는 시계가 저절로 멈춥니다.</li>
+      <li data-i18n-html="metro.ruleWide"><b>전체</b>를 누르면 지도 전체가 한 화면에 들어옵니다. 어디를 이을지 고르고 <b>그 자리를 누르면</b> 다시 원래 크기로 내려갑니다. 전체 보기에서는 짓거나 끌 수 없습니다.</li>
+      <li data-i18n-html="metro.ruleStation"><b>건설</b> 모드에서 빈 자리를 누르면 임시 역이 생깁니다. <b>끌어서 자리를 잡고</b> 확정을 눌러야 지어집니다. 물·산·건물 위에는 놓을 수 없습니다. 이미 있는 역을 누르면 <b>골라지고, 철거를 눌러야</b> 없어지며 절반을 돌려받습니다 — 노선이 붙은 역은 철거할 수 없습니다.</li>
       <li data-i18n-html="metro.ruleJoin"><b>이미 지나가는 선 밑에 역을 놓으면 그 노선에 끼어듭니다.</b> 선로는 이미 그 자리를 지나고 있으므로 역값만 내면 되고, 끼어들 노선은 임시 역을 잡고 있는 동안 굵게 덧그려집니다. 선이 둘 겹친 자리면 한 번에 환승역이 됩니다.</li>
       <li data-i18n-html="metro.rule1"><b>기본</b> 모드에서 역을 누르면 <b>새 노선</b>이나 <b>연장</b>을 고를 수 있고, 이을 역을 누르면 둘을 잇는 직선이 생깁니다.</li>
       <li data-i18n-html="metro.rule2">그 선을 <b>잡아 끌면</b> 그 자리에 중간점이 생기며 경로가 휩니다. 중간점은 <b>세 개</b>까지입니다.</li>
@@ -136,8 +139,8 @@
       <li data-i18n-html="metro.rule5">급하게 굽으면 그 구간의 <b>제한속도</b>가 걸려 느려집니다. 너무 급하면 아예 지을 수 없습니다.</li>
       <li data-i18n-html="metro.ruleExtend">노선을 연장할 때 <b>역에서 꺾이는 각</b>이 허용 범위를 넘으면 잇지 못합니다. 마지막 역을 <b>첫 역으로 이으면 순환선</b>이 되어 한 방향으로만 돕니다.</li>
       <li data-i18n-html="metro.rule6">열차는 역에서 <b>서 있다가 출발해 다음 역에서 섭니다.</b> 그래서 역이 가까우면 최고 속도에 닿지 못합니다.</li>
-      <li data-i18n-html="metro.ruleTrains"><b>노선</b> 모드에서 노선을 고르고 <b>정차역</b>과 <b>열차 수</b>를 정합니다. 열차는 노선 하나를 왕복하고, 순환선이면 한 방향으로 계속 돕니다. <b>급행</b>은 중간 역을 빼 둔 운행 패턴이라 정차 시간도 가감속도 덜 써서 훨씬 빠릅니다.</li>
-      <li data-i18n-html="metro.ruleDemand">도시에 <b>수요</b>가 생깁니다. 지도의 굽은 선이 "여기서 저기로 가고 싶다"이고, <b>길수록 요금이 비싸고 두꺼울수록 사람이 많습니다.</b> 끝이 찬 동그라미면 그쪽은 이미 역이 가깝다는 뜻입니다.</li>
+      <li data-i18n-html="metro.ruleTrains"><b>노선</b> 모드에서 노선을 고르고 <b>정차역</b>과 <b>열차 수</b>를 정합니다. 열차는 노선 하나를 왕복하고, 순환선이면 한 방향으로 계속 돕니다. <b>급행</b>은 중간 역을 빼 둔 운행 패턴이라 정차 시간도 가감속도 덜 써서 훨씬 빠릅니다. 노선을 통째로 없애면 <b>쓴 돈의 절반</b>이 돌아오고 역은 남습니다.</li>
+      <li data-i18n-html="metro.ruleDemand">도시에 <b>수요</b>가 생깁니다. 지도의 굽은 선이 "여기서 저기로 가고 싶다"이고, <b>길수록 요금이 비싸고 두꺼울수록 사람이 많습니다.</b> 양 끝의 동그라미가 <b>차 있으면 역이 걸어갈 거리</b>, 점선이면 버스로만 닿고, 흐리면 아무것도 닿지 않는다는 뜻입니다.</li>
       <li data-i18n-html="metro.ruleUse">승객은 <b>가장 가까운 역이 아니라 목적지까지 가장 싼 길</b>을 고릅니다. 걷는 시간·기다리는 시간·타고 가는 시간을 다 더한 값이 지상 교통보다 나아야 탑니다. 그래서 <b>역을 가까이 놓고, 곧게 뚫고, 열차를 늘리는 것</b>이 모두 같은 숫자를 낮춥니다.</li>
       <li data-i18n-html="metro.ruleTransfer">두 노선이 <b>같은 역을 함께 쓰면 갈아탈 수 있습니다.</b> 갈아탈 때마다 번거로움과 기다리는 시간이 붙으므로, 직통으로 가는 운행이 있으면 승객은 그쪽을 고릅니다.</li>
       <li data-i18n-html="metro.ruleBus">역이 멀어도 <b>버스로 역까지 갈 수 있습니다.</b> 기다리는 몫이 붙어 사백 미터쯤부터는 걷는 것보다 버스가 낫고, 그보다 더 멀면 그냥 지상으로 갑니다. 수요 끝의 동그라미가 <b>점선이면 버스로만 닿는다</b>는 뜻입니다.</li>
