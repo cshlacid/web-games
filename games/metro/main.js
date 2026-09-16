@@ -52,7 +52,8 @@ const el = {};
 for (const id of ['map', 'status', 'readout', 'actions', 'budget', 'clock', 'pause', 'newCity',
   'wide', 'levels', 'modes', 'tools', 'flow', 'vCaught', 'vWaiting', 'vMissed', 'missedBox', 'vIncome',
   'linepanel', 'lineList', 'dropLine', 'patternList', 'stops', 'trainCount', 'trainMinus',
-  'trainPlus', 'trainLabel', 'plan', 'crowd', 'backRow', 'backMinus', 'backCount',
+  'trainPlus', 'trainLabel', 'plan', 'crowd', 'trainpanel', 'tpName', 'tpWhere',
+  'tpClose', 'tpBar', 'tpFill', 'tpLoad', 'tpCap', 'tpMinus', 'tpCars', 'tpPlus', 'tpCarnote', 'backRow', 'backMinus', 'backCount',
   'backPlus', 'backPlan', 'backCrowd', 'addPattern', 'undo', 'cancel', 'remove', 'confirm',
   'help', 'helpOpen', 'helpClose', 'toggleBgm', 'toggleSfx']) {
   el[id] = document.getElementById(id.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`));
@@ -122,7 +123,10 @@ let services = [];       // 수요가 보는 운행 목록
 let waiting = new Map();
 // 열차가 보여 주는 재차 인원은 **역을 지날 때만** 바뀐다. 수요는 몇 초마다 다시
 // 풀리므로 그때마다 값을 새로 읽으면, 달리는 중에 사람이 타고 내리는 것처럼 보인다.
-let cars = new Map();
+let carLoads = new Map();
+// 판 위에서 고른 열차. 그 운행과 몇 번째 열차인지만 들고 있고, 자리와 재차 인원은
+// 매 프레임 시간표에서 다시 읽는다 — 열차는 멈춰 있지 않으므로 값을 붙들어 두면 낡는다.
+let picked = null;
 // 순환선마다 역 순서를 뒤집은 짝. 망이 바뀔 때 한 번만 짓는다 — 화면을 그릴 때마다
 // 다시 지으면 `Route.build`가 매번 도는데, 바뀐 것이 없으면 같은 답이 나온다.
 let mirrors = new Map();
@@ -138,6 +142,8 @@ const fill = (key, n) => t(key).replace('{n}', n);
 // 천 명을 넘으면 `2.4k`로 줄인다. 계기판도 역 배지도 같은 규칙이라야 두 숫자를 견준다.
 const short = (n) => (n >= 1000 ? `${Math.round(n / 100) / 10}k` : String(Math.round(n)));
 const people = (n) => short(n) + t('metro.unitPeople');
+// 계기판은 흐름(명/분)이고 열차 안은 지금 타고 있는 사람이다. 단위를 갈라 둔다.
+const heads = (n) => short(n) + t('metro.unitHeads');
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const r1 = (v) => Math.round(v * 10) / 10;
 
@@ -164,7 +170,8 @@ function makeCity(nextSeed, nextLevel) {
   clock = 6 * 3600;
   demands = [];
   waiting = new Map();
-  cars = new Map();
+  carLoads = new Map();
+  picked = null;
   growWork = 0;
   nextSpawn = 0;
   income = 0;
@@ -340,6 +347,30 @@ function connectedStations() {
 // 노선이나 열차가 바뀔 때마다 **운행 목록을 다시 만든다.** 수요가 보는 것은 노선이
 // 아니라 운행(노선 × 패턴)이고, 화면이 보는 것도 그것이다. 매 프레임 다시 만들면
 // 시간표를 다시 푸는 꼴이라 바뀔 때만 만든다.
+// 두드린 자리에 열차가 있는가. 그린 자리를 그대로 다시 재는 것이라, 보이는 칸을
+// 누르면 잡힌다.
+function trainAt(w) {
+  const reach = HIT_PX * 1.4 * w.scale;
+  let best = null;
+  let near = reach;
+  for (const run of runs) {
+    for (let k = 0; k < run.trains; k++) {
+      const at = Lines.at(run.line, run.table, clock + k * run.headway);
+      const d = Geom.dist(w.x, w.y, at.x, at.y);
+      if (d < near) { near = d; best = { key: run.key, k }; }
+    }
+  }
+  return best;
+}
+
+// 고른 열차가 아직 판 위에 있는가. 노선을 고치거나 열차를 줄이면 사라진다.
+function pickedRun() {
+  if (!picked) return null;
+  const run = runs.find((r) => r.key === picked.key);
+  if (!run || picked.k >= run.trains) return null;
+  return run;
+}
+
 // 한 방향치를 목록에 올린다. **순환선의 역방향은 역 순서를 뒤집은 또 하나의 노선**이라
 // (`Lines.reverse`), 시간표도 수요도 혼잡도 정방향과 똑같은 코드로 돈다. 여기서
 // 넘기는 `track`이 그 뒤집힌 노선이고, `line`은 화면이 가리키는 원래 노선이다.
@@ -353,9 +384,7 @@ function addService(line, track, pattern, dir, reversed) {
     stations: track.stations,
     stopAt: reversed.stops,
     headway: plan.headway,
-    // 분당 수송력. 열차 한 대가 배차간격마다 한 번씩 지나가므로 대수는 여기
-    // 배차간격 안에 이미 들어 있다.
-    capacity: Demand.TRAIN_CAPACITY * 60 / plan.headway,
+    capacity: Lines.capacityOf(reversed, plan.headway),
     ride: (i, j) => Lines.rideTime(table, i, j),
     // 막힌 구간을 판 위에 짚으려면 그 방향의 경로와 정차 자리가 있어야 한다.
     path: track.path,
@@ -372,7 +401,7 @@ function addService(line, track, pattern, dir, reversed) {
 function syncNetwork() {
   services = [];
   runs = [];
-  cars = new Map();
+  carLoads = new Map();
   mirrors = new Map();
   for (const line of lines) {
     if (!line.path) continue;
@@ -439,9 +468,9 @@ function boardTrains() {
       const at = Lines.at(run.line, run.table, clock + k * run.headway);
       const seg = segmentOf(svc, at.s);
       const key = `${run.key}:${k}`;
-      const held = cars.get(key);
+      const held = carLoads.get(key);
       if (held && held.seg === seg && held.dir === at.dir) continue;
-      cars.set(key, { seg, dir: at.dir, ratio: loadAt(svc, at.s, at.dir) });
+      carLoads.set(key, { seg, dir: at.dir, ratio: loadAt(svc, at.s, at.dir) });
       if (!held) continue;   // 첫 프레임에는 지나온 역이 없다
 
       // 뒤로 가는 열차가 구간 seg에 들어섰다는 것은 seg+1번 역을 떠났다는 뜻이다.
@@ -519,6 +548,7 @@ function frame(now) {
   renderTrains();
   // 승강장의 줄이 시계와 함께 오르내린다. 역이 수십 개라 매 프레임 다시 그려도 된다.
   renderStations();
+  renderTrainPanel();
   renderMeters();
 }
 
@@ -577,6 +607,7 @@ function refresh() {
   renderTools();
   renderPanel();
   renderLinePanel();
+  renderTrainPanel();
   renderMeters();
   renderStatus();
 }
@@ -637,7 +668,7 @@ function loadAt(svc, s, dir) {
 // 내리는 것처럼** 보인다. 실제로 값이 바뀌는 자리는 역뿐이라(재 보니 달리는 동안 0번),
 // 마지막으로 지난 역이 같으면 들고 있던 값을 그대로 쓴다.
 function carLoad(run, k, at) {
-  const held = cars.get(`${run.key}:${k}`);
+  const held = carLoads.get(`${run.key}:${k}`);
   if (held) return held.ratio;
   return loadAt(run.svc, at.s, at.dir);
 }
@@ -1030,7 +1061,9 @@ function renderMeters() {
   el.vWaiting.textContent = people(heads.away);
   el.missedBox.hidden = heads.missed < 1;
   el.vMissed.textContent = people(heads.missed);
-  el.vIncome.textContent = income.toFixed(1);
+  // **수입도 흐름이다.** `분당 수입 0.1`로 두었더니 옆의 명/분과 달리 단위가 값에
+  // 안 붙어, 같은 줄에서 혼자 읽는 법이 달랐다.
+  el.vIncome.textContent = money(income) + t('metro.unitPerMin');
 }
 
 function renderPanel() {
@@ -1080,6 +1113,75 @@ function renderPanel() {
 const patternName = (line, i) => (i === 0 ? t('metro.local')
   : line.patterns.length > 2 ? `${t('metro.express')}${i}` : t('metro.express'));
 
+// 고른 열차 하나를 들여다본다. **자리와 재차 인원은 매 프레임 다시 읽는다** — 열차는
+// 멈춰 있지 않으므로 값을 붙들어 두면 낡는다. 다만 **단추를 새로 만들지는 않는다**.
+// 다시 그리면 누르던 단추가 손 밑에서 사라진다(루트 규칙).
+function renderTrainPanel() {
+  const run = pickedRun();
+  el.trainpanel.hidden = !run;
+  if (!run) return;
+
+  const svc = run.svc;
+  const line = svc.line;
+  const pattern = svc.pattern;
+  const at = Lines.at(run.line, run.table, clock + picked.k * run.headway);
+  const ratio = carLoad(run, picked.k, at);
+  const seats = Lines.carsOf(pattern) * Lines.CAR_CAPACITY;
+
+  const way = line.loop ? ` · ${t(run.dir < 0 ? 'metro.backward' : 'metro.forward')}` : '';
+  el.tpName.textContent = `${lineName(line)} · ${patternName(line, line.patterns.indexOf(pattern))}${way}`;
+
+  // 지금 어디쯤인가. 선 자리는 그 역이고, 달리는 중이면 다음 역이다.
+  const stop = at.dir < 0 ? segmentOf(svc, at.s) + 1 : segmentOf(svc, at.s);
+  const ahead = at.dir < 0 ? stop - 1 : stop + 1;
+  const which = at.halted ? stop : ahead;
+  const idx = svc.press && svc.press.order[clamp(which, 0, (svc.press.order.length || 1) - 1)];
+  const number = line.stations.indexOf(svc.stations[idx]) + 1;
+  el.tpWhere.textContent = number > 0
+    ? fill(at.halted ? 'metro.atStation' : 'metro.toStation', number)
+    : (at.halted ? t('metro.atStop') : '');
+
+  const full = ratio >= 0.995;
+  el.tpFill.style.width = `${Math.round(Math.min(1, ratio) * 100)}%`;
+  el.tpBar.classList.toggle('over', full);
+  el.tpLoad.textContent = heads(ratio * seats);
+  el.tpCap.textContent = `/ ${heads(seats)} · ${Math.round(ratio * 100)}%`;
+
+  const count = Lines.carsOf(pattern);
+  el.tpCars.textContent = String(count);
+  el.tpMinus.disabled = count <= Lines.CARS.min;
+  el.tpPlus.disabled = count >= Lines.CARS.max || budget < carPrice(pattern, line);
+  el.tpCarnote.textContent = count >= Lines.CARS.max
+    ? fill('metro.carMax', Lines.CARS.max)
+    : money(carPrice(pattern, line));
+}
+
+// 한 량을 붙이는 값. **그 운행의 열차 전부에 한 량씩 붙는다** — 한 대만 긴 편성은
+// 배차가 고르지 않아 시간표가 성립하지 않는다.
+function carPrice(pattern, line) {
+  const fleet = Math.max(1, pattern.trains + (line.loop ? (pattern.back || 0) : 0));
+  return Lines.CAR_COST * fleet;
+}
+
+function setCars(delta) {
+  const run = pickedRun();
+  if (!run) return;
+  const line = run.svc.line;
+  const pattern = run.svc.pattern;
+  const now = Lines.carsOf(pattern);
+  const next = clamp(now + delta, Lines.CARS.min, Lines.CARS.max);
+  if (next === now) return;
+  const price = carPrice(pattern, line);
+  if (delta > 0) {
+    if (budget < price) { renderStatus('metro.noMoney', true); Sound.play('deny'); return; }
+    budget -= price;
+  } else budget += price * REFUND;
+  pattern.cars = next;
+  Sound.play(delta > 0 ? 'place' : 'erase');
+  syncNetwork();
+  refresh();
+}
+
 function renderLinePanel() {
   el.linepanel.hidden = mode !== 'lines';
   if (mode !== 'lines') return;
@@ -1118,7 +1220,7 @@ function renderLinePanel() {
     button.type = 'button';
     button.textContent = String(i + 1);
     button.setAttribute('aria-pressed', String(!!pattern.stops[i]));
-    button.disabled = !Lines.canToggle(line, i);
+    button.disabled = !Lines.canToggle(line, i, pattern);
     button.addEventListener('click', () => {
       pattern.stops[i] = !pattern.stops[i];
       Sound.play(pattern.stops[i] ? 'place' : 'erase');
@@ -1301,7 +1403,7 @@ function onDown(event) {
   const station = draft ? null
     : city.stations.find((s) => Geom.dist(w.x, w.y, s.x, s.y) < HIT_PX * 1.3 * w.scale);
   drag = {
-    kind: 'pan', station, moved: 0, at: { x: w.x, y: w.y },
+    kind: 'pan', station, train: draft ? null : trainAt(w), moved: 0, at: { x: w.x, y: w.y },
     camX: cam.x, camY: cam.y, sx: event.clientX, sy: event.clientY,
   };
   el.map.setPointerCapture(event.pointerId);
@@ -1349,6 +1451,11 @@ function onUp(event) {
   // 전체 보기에서 누른 자리로 내려간다. 단추로 나오면 들어갈 때 보던 자리로
   // 돌아와, 반대편을 보려고 연 것이 헛일이 된다.
   if (wide) { setWide(false, done.at); return; }
+
+  // **열차가 역보다 먼저다.** 역에 선 열차를 누르면 그 열차를 보고 싶은 것이지
+  // 노선을 잇고 싶은 것이 아니다 — 잇는 것은 열차가 없는 쪽 역에서 하면 된다.
+  if (done.train) { picked = done.train; Sound.play('select'); refresh(); return; }
+  if (picked) { picked = null; refresh(); }
 
   if (mode === 'build') tapBuild(done);
   else {
@@ -1573,6 +1680,10 @@ function setTrains(delta, dir = 1) {
 
 el.trainPlus.addEventListener('click', () => setTrains(1));
 el.trainMinus.addEventListener('click', () => setTrains(-1));
+el.tpPlus.addEventListener('click', () => setCars(1));
+el.tpMinus.addEventListener('click', () => setCars(-1));
+el.tpClose.addEventListener('click', () => { picked = null; Sound.play('select'); refresh(); });
+
 el.backPlus.addEventListener('click', () => setTrains(1, -1));
 el.backMinus.addEventListener('click', () => setTrains(-1, -1));
 

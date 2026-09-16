@@ -298,15 +298,49 @@ const ground = () => 'empty';
   near('서 있는 자리는 그 역', during.x, 1500, 2);
 }
 
-// --- 정차역 토글의 경계 ---
+// --- 정차역 토글과 구간 운행 ---
+// **어느 역이든 끌 수 있고 둘만 남으면 된다.** 전에는 양 끝을 잠가 두어 바깥 몇
+// 정거장만 빼고 도는 구간 운행을 만들 수가 없었다.
 {
-  let line = L.create(st(0, 0), st(1000, 0));
-  line = L.withExtension(line, st(2000, 0));
-  ok('종착역은 끌 수 없다', !L.canToggle(line, 0) && !L.canToggle(line, 2));
-  ok('중간 역은 끌 수 있다', L.canToggle(line, 1));
+  let line = L.create(st(0, 0), st(2000, 0));
+  for (const p of [st(4000, 0), st(6000, 0), st(8000, 0)]) line = L.withExtension(line, p);
+  L.rebuild(line, ground);
+  const p0 = line.patterns[0];
 
-  const loop = L.withExtension(L.withExtension(line, st(1000, 900)), line.stations[0]);
-  ok('순환선은 첫 역만 고정', loop.loop && !L.canToggle(loop, 0) && L.canToggle(loop, 1));
+  ok('종착역도 끌 수 있다', L.canToggle(line, 0, p0) && L.canToggle(line, 4, p0));
+  const whole = L.spanOf(line, p0);
+  ok('다 켜 두면 경로 전체다',
+    whole.from === 0 && whole.to === line.path.pts.length - 1, JSON.stringify(whole));
+
+  const full = L.runTime(line, p0);
+  p0.stops[0] = false;
+  p0.stops[4] = false;
+  const span = L.spanOf(line, p0);
+  ok('켜 둔 첫 역과 마지막 역이 종착역이 된다',
+    span.from === line.anchors[1].at && span.to === line.anchors[3].at, JSON.stringify(span));
+  ok('바깥으로는 가지 않으니 더 짧다', L.runTime(line, p0) < full * 0.7,
+    `${L.runTime(line, p0).toFixed(0)}초 vs ${full.toFixed(0)}초`);
+
+  const table = L.timetable(line, p0);
+  ok('표가 그 구간만 담는다',
+    Math.abs(Math.min(...table.marks.map((m) => m.s)) - line.path.s[span.from]) < 1
+    && Math.abs(Math.max(...table.marks.map((m) => m.s)) - line.path.s[span.to]) < 1);
+  ok('종착역 밖으로는 열차가 안 간다',
+    [0, 0.25, 0.5, 0.75].every((f) => L.at(line, table, table.cycle * f).x >= 1999));
+
+  // 둘만 남으면 더 끄지 못한다.
+  p0.stops[2] = false;
+  ok('둘이 남으면 잠긴다', !L.canToggle(line, 1, p0) && !L.canToggle(line, 3, p0));
+  ok('꺼진 것은 언제든 켤 수 있다', L.canToggle(line, 0, p0) && L.canToggle(line, 2, p0));
+
+  // 순환선은 한 바퀴가 곧 주기라 잘라 낼 자리가 없다.
+  let loop = L.withExtension(L.create(st(0, 0), st(2000, 0)), st(2000, 2000));
+  loop = L.withExtension(loop, loop.stations[0]);
+  L.rebuild(loop, ground);
+  loop.patterns[0].stops[0] = false;
+  const ring = L.spanOf(loop, loop.patterns[0]);
+  ok('순환선은 경로 전체를 쓴다',
+    ring.from === 0 && ring.to === loop.path.pts.length - 1, JSON.stringify(ring));
 }
 
 // --- 열차 수 세기 ---
@@ -440,6 +474,35 @@ const ground = () => 'empty';
   ok('정방향만 선로 한계에 걸린다',
     L.holdFactor(line, line.patterns[0]) > 1 && L.holdFactor(many, many.patterns[0]) === 1,
     `${L.holdFactor(line, line.patterns[0]).toFixed(2)} / ${L.holdFactor(many, many.patterns[0]).toFixed(2)}`);
+}
+
+// --- 편성 량수 ---
+// 열차를 더 사면 배차가 좁아지지만 선로 간격(`MIN_GAP`)에서 막힌다. 그때 남는 길이
+// **한 대를 길게 만드는 것**이다 — 실어 나르는 양만 늘고 배차는 그대로다.
+{
+  const line = L.withExtension(L.create(st(0, 0), st(2400, 0)), st(4800, 0));
+  L.rebuild(line, ground);
+  const p = line.patterns[0];
+
+  ok('기본 편성이 붙어 있다', L.carsOf(p) === L.CARS.base, String(L.carsOf(p)));
+  ok('없으면 기본값으로 본다', L.carsOf({}) === L.CARS.base);
+  ok('한 량은 두 량보다 적을 수 없고 다섯 량을 넘지 않는다',
+    L.CARS.min === 2 && L.CARS.max === 5);
+
+  const head = 300;
+  const base = L.capacityOf(p, head);
+  near('기본 편성의 수송력', base, L.CARS.base * L.CAR_CAPACITY * 60 / head, 0.001);
+  ok('량을 늘리면 그만큼 는다',
+    Math.abs(L.capacityOf({ cars: 5 }, head) / base - 5 / L.CARS.base) < 1e-9,
+    `${Math.round(L.capacityOf({ cars: 5 }, head))} vs ${Math.round(base)}`);
+  ok('배차가 좁아져도 량과는 따로다',
+    L.capacityOf(p, head / 2) === base * 2);
+  ok('배차가 없으면 0', L.capacityOf(p, Infinity) === 0);
+
+  // 량은 배차를 바꾸지 않는다 — 기다리는 시간은 그대로다.
+  const before = L.plan(line, p).headway;
+  p.cars = 5;
+  ok('량을 늘려도 배차는 그대로다', L.plan(line, p).headway === before);
 }
 
 console.log(`${passed}개 통과, ${failed}개 실패`);

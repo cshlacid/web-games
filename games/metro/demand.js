@@ -43,7 +43,6 @@ const PATIENCE = 16 * 60;   // 게임 초. 이 안에 못 잡으면 사라진다
 const SPAWN_EVERY = 70;     // 게임 초마다 하나씩 생긴다
 const SERVED = 0.6;         // 이 이상이면 잡은 것으로 보고 지도에서 걷는다
 const TRANSFER = 100;       // 갈아타는 데 드는 초. 계단과 통로와 번거로움
-const TRAIN_CAPACITY = 700; // 열차 한 대가 한 번에 실어 나르는 사람
 // 억 / (사람 × km × 게임분). 망이 어중간할 때도 돈이 조금은 들어와야 다음 한 수를
 // 둘 수 있다. 진짜 균형은 아직 잡지 않았다.
 // 인원을 6분의 1로 줄이면서 한 번 같은 배로 올렸다가 도로 내렸다. 정원이 더는 발목을
@@ -524,7 +523,7 @@ const Demand = {
   peakOf, tally, flowOf,
   WALK_SPEED, WALK_WEIGHT, R_WALK, SURFACE_SPEED, SURFACE_ACCESS, MIN_DIST,
   MAX_WAITING, MAX_TOTAL, PATIENCE, SPAWN_EVERY, SERVED, FARE, ANCHOR_R, BOTH_ENDS,
-  TRANSFER, TRAIN_CAPACITY, BUS_SPEED, BUS_WEIGHT, BUS_ACCESS, R_ACCESS,
+  TRANSFER, BUS_SPEED, BUS_WEIGHT, BUS_ACCESS, R_ACCESS,
   share, spawn, evaluate, assign, loadOf, surfaceCost, accessCost, reach, income,
 };
 
