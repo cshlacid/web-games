@@ -277,10 +277,9 @@ const sumOf = (arr) => arr.reduce((a, b) => a + b, 0);
 
   // 줄은 **타려다 못 탄 그 역에** 선다. 1번 역에서 타려는 사람은 0번에서 온 열차가
   // 이미 차 있어 못 탄다.
-  const wait = D.waitingAt([svc]);
-  ok('못 탄 사람이 그 역에 남는다', wait.get(stations[1]) > 0,
-    [...wait].map(([st, n]) => `${stations.indexOf(st)}:${Math.round(n)}`).join(' '));
-  ok('아무도 안 타는 역에는 줄이 없다', !wait.has(stations[3]));
+  ok('못 탄 사람이 그 역에 남는다', svc.press.left[1] > 0,
+    JSON.stringify(svc.press.left.map((n) => Math.round(n))));
+  ok('아무도 안 타는 역에는 줄이 없다', svc.press.left[3] === 0);
 
   // 넉넉하면 줄이 서지 않는다.
   const easy = { ...svc, capacity: 1e9 };
@@ -289,7 +288,8 @@ const sumOf = (arr) => arr.reduce((a, b) => a + b, 0);
     { a: { x: 3100, y: 60 }, b: { x: 8900, y: 60 }, km: 5.8, people: 200 },
   ];
   D.assign(same, [easy]);
-  ok('넉넉하면 줄이 없다', D.waitingAt([easy]).size === 0);
+  ok('넉넉하면 줄이 없다', easy.press.left.every((n) => n < 0.001),
+    JSON.stringify(easy.press.left));
 }
 
 // --- 타고 내리는 대로 열차가 차고 빈다 ---
@@ -409,12 +409,19 @@ const sumOf = (arr) => arr.reduce((a, b) => a + b, 0);
     svc.flow.occ.every((n) => n <= svc.capacity + 0.001),
     JSON.stringify(svc.flow.occ.map((n) => Math.round(n))));
 
-  const queue = [...D.waitingAt([svc]).values()];
-  ok('못 탄 사람이 그 역에 남는다', queue.length > 0 && sumOf(queue) > 0,
-    JSON.stringify(queue.map((n) => Math.round(n))));
-  ok('줄의 합이 계기판의 못 탐과 같다',
-    Math.abs(sumOf(queue) - D.tally(riders).missed) < 1,
-    `${Math.round(sumOf(queue))} vs ${Math.round(D.tally(riders).missed)}`);
+  const stuck = sumOf(svc.press.left) + sumOf(svc.press.leftBack);
+  ok('못 탄 사람이 그 역에 남는다', stuck > 0,
+    JSON.stringify(svc.press.left.map((n) => Math.round(n))));
+  ok('못 타는 몫이 계기판의 못 탐과 같다',
+    Math.abs(stuck - D.tally(riders).missed) < 1,
+    `${Math.round(stuck)} vs ${Math.round(D.tally(riders).missed)}`);
+
+  // 승강장의 줄이 쌓이고 빠지는 셈은 이 둘로 떨어진다 — 타려는 사람과 빈자리.
+  ok('타려는 사람과 빈자리를 역마다 돌려준다',
+    svc.press.want.length === 4 && svc.press.room.length === 4);
+  ok('빈자리가 모자란 역이 있다',
+    svc.press.want.some((n, k) => n > svc.press.room[k]),
+    JSON.stringify([svc.press.want.map(Math.round), svc.press.room.map(Math.round)]));
 }
 
 // --- 계기판의 사람 수 ---
