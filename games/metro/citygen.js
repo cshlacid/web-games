@@ -13,11 +13,16 @@ const Geom = (typeof module !== 'undefined' && module.exports)
   : window.MetroGeom;
 
 // 한 화면에 보이는 창(VIEW)보다 도시(WORLD)가 넉넉히 크다. 차이만큼 팬으로 돈다.
+//
+// **창의 세 배씩, 넓이로 아홉 배다.** 두 배(넓이 넷)로 시작했는데 역을 열댓 개 놓고
+// 노선을 둘 긋고 나면 더 갈 데가 없었다 — 망이 도시를 다 덮어 버려 "다음에 어디를
+// 이을까"가 남지 않는다. 걷는 거리도 역 간격도 사람의 크기(800m, 2.2km)에 묶여 있어
+// **지도만 키우면 필요한 역 수가 그만큼 는다.**
 const VIEW = { w: 2400, h: 2700 };
-const WORLD = { w: 4800, h: 5400 };
+const WORLD = { w: 7200, h: 8100 };
 
 const GRID = 90;             // 공간 색인 칸 크기
-const MAX_BUILDINGS = 3000;  // 안전망. 보통 이천 채 안팎에서 저절로 멎는다
+const MAX_BUILDINGS = 7000;  // 안전망. 보통 그 아래에서 저절로 멎는다
 
 const ROAD_W = { arterial: 36, avenue: 32, planned: 20, suburb: 18, alley: 13 };
 
@@ -42,9 +47,9 @@ const DISTRICT = {
 // 같은 망을 깔아도 돈이 늦게 모인다. **규칙이 아니라 숫자만 바꾸는 손잡이라** 쉬운
 // 판에서 익힌 감각이 어려운 판에서도 그대로 통한다.
 const LEVELS = [
-  { id: 'easy',   oldR: 620,  town: [2200, 1900], density: 0.78, hills: 1, sea: 0.3,  fare: 1 },
-  { id: 'normal', oldR: 1150, town: [1700, 1450], density: 1.0,  hills: 2, sea: 0.55, fare: 0.66 },
-  { id: 'hard',   oldR: 1750, town: [1100, 950],  density: 1.25, hills: 3, sea: 0.85, fare: 0.45 },
+  { id: 'easy',   oldR: 950,  town: [3300, 2850], density: 0.78, hills: 3, sea: 0.3,  fare: 1 },
+  { id: 'normal', oldR: 1750, town: [2550, 2200], density: 1.0,  hills: 5, sea: 0.55, fare: 0.66 },
+  { id: 'hard',   oldR: 2650, town: [1650, 1450], density: 1.25, hills: 7, sea: 0.85, fare: 0.45 },
 ];
 
 // 처음에는 도시가 듬성듬성하다. 후보의 이만큼만 서 있고 나머지는 빈 터로 남아,
@@ -217,7 +222,9 @@ function makeTerrain(city, spec, rng) {
   // 두면 판정이 거리 비교 한 줄이고, 불투명하게 겹쳐 그리면 화면에서도 한 덩어리로 보인다.
   for (let k = 0; k < spec.hills; k++) {
     const ang = rng() * Math.PI * 2;
-    const away = city.core.r + 500 + rng() * 900;
+    // 지도가 넓어지면서 도심 둘레에만 몰면 바깥이 통째로 밋밋해진다. 짧은 변에
+    // 비례해 흩는다.
+    const away = city.core.r + 500 + rng() * Math.min(w, h) * 0.42;
     let at = {
       x: clamp(city.core.x + Math.cos(ang) * away, 300, w - 300),
       y: clamp(city.core.y + Math.sin(ang) * away, 300, h - 300),

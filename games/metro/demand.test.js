@@ -176,10 +176,15 @@ function ok(name, cond, extra = '') {
     for (let i = 0; i < 500; i++) { const od = D.spawn(c, r); if (od) { sum += od.people; n++; } }
     return sum / n;
   };
+  //
+  // 중심 수를 도시 크기에 맞춰 잡는다. 고정 마흔 개로 두었더니 지도를 키운 뒤
+  // 자란 동네가 도시 전체에서 차지하는 몫이 줄어, 되먹임은 그대로인데 평균이
+  // 5%를 못 넘겼다(164 → 172).
   const before = average(city, 77);
-  const centers = city.buildings.filter((b) => b.level > 0).slice(0, 40)
+  const standing = city.buildings.filter((b) => b.level > 0);
+  const centers = standing.slice(0, Math.round(standing.length * 0.1))
     .map((b) => ({ x: b.x, y: b.y }));
-  for (let i = 0; i < 40; i++) C.grow(city, centers, 900, 40);
+  for (let i = 0; i < 60; i++) C.grow(city, centers, 900, 40);
   const after = average(city, 77);
   ok('도시가 자라면 수요도 커진다', after > before * 1.05, `${before.toFixed(0)} → ${after.toFixed(0)}`);
 }

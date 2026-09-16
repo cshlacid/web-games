@@ -48,7 +48,7 @@ const GROUND = ['road', 'empty', 'building', 'hill', 'water'];
 
 const el = {};
 for (const id of ['map', 'status', 'readout', 'actions', 'budget', 'clock', 'pause', 'newCity',
-  'levels', 'modes', 'tools', 'flow', 'vCaught', 'vWaiting', 'vIncome',
+  'wide', 'levels', 'modes', 'tools', 'flow', 'vCaught', 'vWaiting', 'vIncome',
   'linepanel', 'lineList', 'dropLine', 'patternList', 'stops', 'trainCount', 'trainMinus',
   'trainPlus', 'plan', 'crowd', 'addPattern', 'undo', 'cancel', 'remove', 'confirm',
   'help', 'helpOpen', 'helpClose', 'toggleBgm', 'toggleSfx']) {
@@ -81,6 +81,19 @@ try {
 } catch { /* 저장된 값이 없거나 접근 불가: 기본값 */ }
 
 const cam = { x: 0, y: 0 };
+
+// **전체 보기.** 지도가 창의 아홉 배라 한 화면씩 밀어서는 반대편까지 가는 데 여러 번
+// 끌어야 한다. 브라우저 확대는 `shared/base.js`가 문서 전체에서 막고 있어(손가락 둘의
+// `touchmove`를 취소한다) 핀치로는 길이 없지만, **viewBox를 우리가 바꾸는 것은 그
+// 규칙에 닿지 않는다.** 연속 확대가 아니라 두 단계뿐인 것은 그 이상이 필요 없어서다 —
+// 여기서 하는 일은 "어디로 갈지 고르는 것" 하나다.
+let wide = false;
+const span = () => (wide ? city.world : VIEW);
+
+// 전체 보기에서는 판이 삼분의 일로 줄어 역과 선이 점이 된다. 도로와 건물은 줄어드는
+// 것이 맞지만 **우리가 놓은 것은 아니다** — 무엇이 어디 있는지 보려고 여는 화면이라
+// 역·선·열차는 화면에서 비슷한 굵기로 남아야 한다.
+const K = () => (wide ? 2.6 : 1);
 let mode = 'run';        // run | build | lines
 let budget = START_BUDGET;
 let lines = [];
@@ -130,6 +143,7 @@ function makeCity(nextSeed, nextLevel) {
   history = [];
   drag = null;
   mode = 'run';
+  wide = false;
   sel = { line: 0, pattern: 0 };
   clock = 6 * 3600;
   demands = [];
@@ -231,16 +245,31 @@ function drawBuildings() {
 // --- 카메라 ---
 
 function setCam(x, y) {
-  cam.x = clamp(x, 0, city.world.w - VIEW.w);
-  cam.y = clamp(y, 0, city.world.h - VIEW.h);
-  el.map.setAttribute('viewBox', `${r1(cam.x)} ${r1(cam.y)} ${VIEW.w} ${VIEW.h}`);
+  const v = span();
+  cam.x = clamp(x, 0, city.world.w - v.w);
+  cam.y = clamp(y, 0, city.world.h - v.h);
+  el.map.setAttribute('viewBox', `${r1(cam.x)} ${r1(cam.y)} ${v.w} ${v.h}`);
 }
 
-function centerOn(x, y) { setCam(x - VIEW.w / 2, y - VIEW.h / 2); }
+function centerOn(x, y) { setCam(x - span().w / 2, y - span().h / 2); }
 
 function inView(p, margin = 0) {
-  return p.x > cam.x + margin && p.x < cam.x + VIEW.w - margin
-    && p.y > cam.y + margin && p.y < cam.y + VIEW.h - margin;
+  const v = span();
+  return p.x > cam.x + margin && p.x < cam.x + v.w - margin
+    && p.y > cam.y + margin && p.y < cam.y + v.h - margin;
+}
+
+// 전체 보기로 들고 날 때 보던 자리를 잃지 않는다. 들어갈 때는 중심을 기억해 두고,
+// 나올 때는 마지막으로 누른 자리로 간다.
+function setWide(on, at = null) {
+  if (wide === on) return;
+  const focus = at || { x: cam.x + span().w / 2, y: cam.y + span().h / 2 };
+  wide = on;
+  // 전체 보기는 판을 고르는 화면이라, 만들다 만 것을 들고 들어가지 않는다.
+  if (wide) { pending = null; draft = null; ghost = null; marked = null; history = []; }
+  centerOn(focus.x, focus.y);
+  Sound.play('select');
+  refresh();
 }
 
 // --- 노선 ---
@@ -446,7 +475,7 @@ function renderLines() {
     const chosen = mode === 'lines' && lines[sel.line] === line;
     layer.lines.appendChild(svg('path', {
       d: Route.svgPath(line.path.pts), fill: 'none', stroke: lineColor(line),
-      'stroke-width': chosen ? ART.built * 1.35 : ART.built,
+      'stroke-width': (chosen ? ART.built * 1.35 : ART.built) * K(),
       'stroke-linecap': 'round', 'stroke-linejoin': 'round',
       opacity: mode === 'lines' && !chosen ? 0.45 : 1,
     }));
@@ -458,11 +487,11 @@ function renderLines() {
 function renderTrains() {
   clear(layer.trains);
   for (const run of runs) {
-    const group = svg('g', { stroke: lineColor(run.line), 'stroke-width': 10 });
+    const group = svg('g', { stroke: lineColor(run.line), 'stroke-width': 10 * K() });
     for (let k = 0; k < run.trains; k++) {
       const at = Lines.at(run.line, run.table, clock + k * run.headway);
       group.appendChild(svg('circle', {
-        cx: r1(at.x), cy: r1(at.y), r: ART.train,
+        cx: r1(at.x), cy: r1(at.y), r: ART.train * K(),
         // 서 있는 열차는 속을 채운다. 이것이 없으면 정차 시간도 가감속도 숫자로만
         // 남고, 화면에서는 그냥 점이 미끄러지는 것으로 보인다.
         fill: at.halted ? lineColor(run.line) : 'var(--station-fill)',
@@ -653,10 +682,10 @@ function renderStations() {
     if (!inView(s, -ART.station * 2)) continue;
     const line = onLine.get(s);
     layer.stations.appendChild(svg('circle', {
-      cx: s.x, cy: s.y, r: ART.station,
+      cx: s.x, cy: s.y, r: ART.station * K(),
       fill: live.has(s) ? (line ? lineColor(line) : 'var(--metro)') : 'var(--station-fill)',
       stroke: active.has(s) ? 'var(--metro)' : 'var(--station-ring)',
-      'stroke-width': active.has(s) ? ART.stationRing * 1.5 : ART.stationRing,
+      'stroke-width': (active.has(s) ? ART.stationRing * 1.5 : ART.stationRing) * K(),
     }));
   }
 
@@ -666,8 +695,8 @@ function renderStations() {
   for (const s of active) {
     if (inView(s, pad)) continue;
     layer.stations.appendChild(svg('circle', {
-      cx: clamp(s.x, cam.x + pad, cam.x + VIEW.w - pad),
-      cy: clamp(s.y, cam.y + pad, cam.y + VIEW.h - pad),
+      cx: clamp(s.x, cam.x + pad, cam.x + span().w - pad),
+      cy: clamp(s.y, cam.y + pad, cam.y + span().h - pad),
       r: ART.station * 0.6, fill: 'var(--metro)', opacity: 0.55,
     }));
   }
@@ -776,6 +805,7 @@ function renderMeters() {
   el.clock.classList.toggle('held', !running());
   el.pause.textContent = t(['metro.speedStop', 'metro.speedSlow', 'metro.speedFast'][speed]);
   el.pause.setAttribute('aria-pressed', String(speed > 0));
+  el.wide.setAttribute('aria-pressed', String(wide));
   el.vCaught.textContent = String(demands.length - waitingCount());
   el.vWaiting.textContent = String(waitingCount());
   el.vIncome.textContent = income.toFixed(1);
@@ -923,7 +953,7 @@ function renderStatus(key, warn = false, n = null) {
 
 function toWorld(event) {
   const rect = el.map.getBoundingClientRect();
-  const scale = VIEW.w / rect.width;
+  const scale = span().w / rect.width;
   return {
     x: cam.x + (event.clientX - rect.left) * scale,
     y: cam.y + (event.clientY - rect.top) * scale,
@@ -946,6 +976,17 @@ function grabHandle(w) {
 // 노선이 휘고, 노선을 휘려다 지도가 밀린다.
 function onDown(event) {
   const w = toWorld(event);
+
+  // 전체 보기에서는 편집이 없다. 판이 삼분의 일이라 몇 미터를 다투는 조작이
+  // 정확할 수 없고, 여기서 하는 일은 어디로 갈지 고르는 것 하나다.
+  if (wide) {
+    drag = {
+      kind: 'pan', station: null, moved: 0, at: { x: w.x, y: w.y },
+      camX: cam.x, camY: cam.y, sx: event.clientX, sy: event.clientY,
+    };
+    el.map.setPointerCapture(event.pointerId);
+    return;
+  }
 
   if (ghost && Geom.dist(w.x, w.y, ghost.x, ghost.y) < HIT_PX * 1.6 * w.scale) {
     drag = { kind: 'ghost' };
@@ -1045,6 +1086,10 @@ function onUp(event) {
   const done = drag;
   drag = null;
   if (done.kind !== 'pan' || done.moved > TAP_PX) return;
+
+  // 전체 보기에서 누른 자리로 내려간다. 단추로 나오면 들어갈 때 보던 자리로
+  // 돌아와, 반대편을 보려고 연 것이 헛일이 된다.
+  if (wide) { setWide(false, done.at); return; }
 
   if (mode === 'build') tapBuild(done);
   else {
@@ -1272,6 +1317,8 @@ el.remove.addEventListener('click', removeStation);
 
 // 배속은 단추 하나를 돌려 쓴다. 멈춤·보통·빠름 셋뿐이라 고르개를 따로 두면
 // 머리줄이 그만큼 좁아지는데, 얻는 것이 없다.
+el.wide.addEventListener('click', () => setWide(!wide));
+
 el.pause.addEventListener('click', () => {
   speed = (speed + 1) % SPEEDS.length;
   Sound.play('select');
