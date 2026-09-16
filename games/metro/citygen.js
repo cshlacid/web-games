@@ -22,7 +22,7 @@ const VIEW = { w: 2400, h: 2700 };
 const WORLD = { w: 7200, h: 8100 };
 
 const GRID = 90;             // 공간 색인 칸 크기
-const MAX_BUILDINGS = 7000;  // 안전망. 보통 그 아래에서 저절로 멎는다
+const MAX_BUILDINGS = 9000;  // 안전망. 보통 그 아래에서 저절로 멎는다 — 걸리면 한쪽이 통째로 빈다
 
 const ROAD_W = { arterial: 36, avenue: 32, planned: 20, suburb: 18, alley: 13 };
 
@@ -602,10 +602,16 @@ function create(seed = 1, level = 1) {
   }
 
   // 2) 국지도로. 간선 블록마다 그 자리의 구역 성격대로 깐다.
+  //
+  // **블록은 간선 사이가 아니라 지도 끝까지다.** 간선끼리의 칸만 쓰면 바깥쪽 간선과
+  // 지도 끝 사이(240~940)가 어느 블록에도 안 들어가, 넓이의 삼분의 일인 가장자리 띠에
+  // 건물이 3%밖에 없었다. 지도 끝을 경계로 한 줄씩 더 두면 그 띠도 여느 블록처럼 찬다.
+  const bx = [0, ...xs, WORLD.w];
+  const by = [0, ...ys, WORLD.h];
   const blocks = [];
-  for (let i = 0; i + 1 < xs.length; i++) {
-    for (let j = 0; j + 1 < ys.length; j++) {
-      const b = { x: xs[i], y: ys[j], w: xs[i + 1] - xs[i], h: ys[j + 1] - ys[j] };
+  for (let i = 0; i + 1 < bx.length; i++) {
+    for (let j = 0; j + 1 < by.length; j++) {
+      const b = { x: bx[i], y: by[j], w: bx[i + 1] - bx[i], h: by[j + 1] - by[j] };
       b.kind = districtAt(city, b.x + b.w / 2, b.y + b.h / 2);
       blocks.push(b);
       const d = DISTRICT[b.kind];
@@ -722,8 +728,12 @@ function create(seed = 1, level = 1) {
 
     // 외곽은 도시에서 멀어질수록 더 성기다. 같은 비율로 깔면 지도 끝까지 똑같이
     // 생긴 동네가 이어져 어디쯤 와 있는지 알 수가 없다.
+    //
+    // **다만 바닥을 너무 낮게 두면 안 된다.** 기울기 1.7에 바닥 0.16이던 때는 지도가
+    // 넓어지면서 바깥 절반이 사실상 빈 들판이 됐다 — 성긴 것과 없는 것은 다르다.
+    // 멀수록 성기다는 것은 그대로 두고 바닥만 두 배로 올린다.
     const off = Math.hypot(b.x + b.w / 2 - cx, b.y + b.h / 2 - cy) / maxD;
-    const fade = b.kind === 'suburb' ? clamp(1.3 - off * 1.7, 0.16, 1) : 1;
+    const fade = b.kind === 'suburb' ? clamp(1.25 - off, 0.34, 1) : 1;
     const lotArea = ((d.size[0] + d.size[1]) / 2) ** 2;
     const target = Math.round(b.w * b.h * d.fill * fade * spec.density / lotArea);
 
