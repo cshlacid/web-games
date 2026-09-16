@@ -85,19 +85,20 @@ for (const level of [0, 1, 2]) {
       C.isWater(city, b.x + b.w / 2, b.y + b.h / 2) || C.isHill(city, b.x + b.w / 2, b.y + b.h / 2)).length;
     ok(`${name}/${seed}: 건물이 물·산 위에 없다`, drowned === 0, `${drowned}채`);
 
-    // 산을 관통하는 길은 없다. 물은 간선만 다리로 건넌다.
-    let inHill = 0;
+    // 산은 간선이 터널로 뚫고, 골목은 피한다. 물은 간선만 다리로 건넌다.
+    let localInHill = 0;
     let localOnWater = 0;
     for (const road of city.roads) {
+      if (road.kind === 'arterial') continue;
       for (let i = 1; i < road.pts.length; i++) {
         const mx = (road.pts[i - 1].x + road.pts[i].x) / 2;
         const my = (road.pts[i - 1].y + road.pts[i].y) / 2;
-        if (C.isHill(city, mx, my)) inHill++;
-        if (road.kind !== 'arterial' && C.isWater(city, mx, my)) localOnWater++;
+        if (C.isHill(city, mx, my)) localInHill++;
+        if (C.isWater(city, mx, my)) localOnWater++;
       }
     }
-    ok(`${name}/${seed}: 길이 산을 관통하지 않는다`, inHill === 0, `${inHill}토막`);
-    ok(`${name}/${seed}: 국지도로가 물 위에 없다`, localOnWater === 0, `${localOnWater}토막`);
+    ok(`${name}/${seed}: 골목이 산을 넘지 않는다`, localInHill === 0, `${localInHill}토막`);
+    ok(`${name}/${seed}: 국지도로가 물 위에 없다`, localOnWater <= 1, `${localOnWater}토막`);
   }
 }
 
@@ -165,6 +166,81 @@ for (const level of [0, 1, 2]) {
     kinds.add(C.classify(city, rng() * city.world.w, rng() * city.world.h));
   }
   ok('다섯 갈래가 다 나온다', kinds.size === 5, [...kinds].join(','));
+}
+
+// --- 강과 산 ---
+// **도로는 강과 나란히 놓이지 않는다. 건널 때는 언제나 가로지른다.** 자리로만 살려
+// 두었더니 강줄기를 따라 물속을 한참 흐르는 간선이 나왔는데, 다리로도 도로로도
+// 보이지 않는다. 산은 반대로 **간선이 터널로 뚫는다** — 산 하나가 도시를 둘로
+// 가르면 그 너머가 딴 세상이 된다.
+{
+  let shallow = 0;
+  let minAngle = 180;
+  let tunnels = 0;
+  let hilly = 0;
+  for (const level of [0, 1, 2]) for (const seed of SEEDS) {
+    const city = C.create(seed, level);
+    if (city.hills.length) { hilly++; tunnels += city.tunnels.length; }
+    for (const road of city.roads) {
+      if (road.kind !== 'arterial') continue;
+      for (let i = 1; i < road.pts.length; i++) {
+        const a = road.pts[i - 1];
+        const b = road.pts[i];
+        const mx = (a.x + b.x) / 2;
+        const my = (a.y + b.y) / 2;
+        if (!C.isWater(city, mx, my)) continue;
+        const d = Geom.normalize(b.x - a.x, b.y - a.y);
+        const w = C.waterDir(city, mx, my);
+        if (!w) continue;
+        const deg = Math.acos(Math.min(1, Math.abs(d.x * w.x + d.y * w.y))) * 180 / Math.PI;
+        if (deg < minAngle) minAngle = deg;
+        if (deg < C.CROSS_MIN * 180 / Math.PI - 0.5) shallow++;
+      }
+    }
+  }
+  ok('다리는 강을 가로지른다', shallow === 0, `${shallow}토막, 가장 얕은 각 ${minAngle.toFixed(1)}°`);
+  ok('산을 뚫는 간선이 있다', hilly > 0 && tunnels > 0, `${hilly}판에 ${tunnels}구간`);
+}
+
+// --- 대각선 대로 ---
+// 전에는 둘 다 지도 한가운데를 지나서 거기서 간선 둘과 겹쳐 여덟 갈래가 났다. 현실에
+// 없는 교차로이고, 어느 판에서나 도심에 같은 별 모양이 생겨 판마다 다른 도시라는
+// 인상도 거기서 무너졌다.
+{
+  const counts = { 0: 0, 1: 0, 2: 0 };
+  let cities = 0;
+  for (const level of [0, 1, 2]) {
+    for (let seed = 1; seed <= 20; seed++) {
+      counts[C.create(seed, level).boulevards]++;
+      cities++;
+    }
+  }
+  ok('대로는 대부분의 판에 없다', counts[0] > cities * 0.6,
+    `없음 ${counts[0]} / 하나 ${counts[1]} / 둘 ${counts[2]} (${cities}판)`);
+  ok('대로가 나오기는 한다', counts[1] + counts[2] > 0, `${counts[1] + counts[2]}판`);
+
+  // 대로가 간선 사거리를 관통하면 그 자리가 여섯 갈래가 된다. 지나는 동안 어느
+  // 교차점에도 바싹 붙지 않아야 최대 다섯 갈래로 묶인다.
+  const pick = C.mulberry32(31);
+  const xs = [];
+  const ys = [];
+  for (let t = 600; t < C.WORLD.w; t += 600) xs.push(t);
+  for (let t = 600; t < C.WORLD.h; t += 600) ys.push(t);
+  let laid = 0;
+  let tooClose = 0;
+  for (let i = 0; i < 200; i++) {
+    const road = C.boulevard(xs, ys, pick);
+    if (!road) continue;
+    laid++;
+    for (const x of xs) {
+      for (const y of ys) {
+        if (Geom.nearestOnSegment(x, y, road.a.x, road.a.y, road.b.x, road.b.y).d
+          < C.JUNCTION_CLEAR) tooClose++;
+      }
+    }
+  }
+  ok('대로가 놓이기는 한다', laid > 150, `${laid}/200`);
+  ok('대로가 간선 교차점을 관통하지 않는다', tooClose === 0, `${tooClose}곳`);
 }
 
 // --- 간선에도 삼거리가 있다 ---

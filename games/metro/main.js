@@ -198,6 +198,16 @@ function drawCity() {
     layer.hills.appendChild(group);
   }
 
+  // 산을 뚫는 구간. 길 위에 산 색을 점선으로 덧그어 "산 밑으로 지난다"를 만든다.
+  const tunnels = () => {
+    if (!city.tunnels || !city.tunnels.length) return;
+    layer.roads.appendChild(svg('path', {
+      d: city.tunnels.map(polyD).join(''), fill: 'none', stroke: 'var(--hill)',
+      'stroke-width': City.ROAD_W.arterial + 6, 'stroke-dasharray': '46 30',
+      'stroke-linecap': 'butt',
+    }));
+  };
+
   const byWidth = new Map();
   for (const road of city.roads) {
     if (!byWidth.has(road.w)) byWidth.set(road.w, []);
@@ -220,6 +230,7 @@ function drawCity() {
       }));
     }
   }
+  tunnels();
 
   drawBuildings();
 }
