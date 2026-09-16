@@ -129,6 +129,9 @@ let frameAt = 0;
 
 const t = (key) => SharedI18n.t(key);
 const fill = (key, n) => t(key).replace('{n}', n);
+// 천 명을 넘으면 `2.4k`로 줄인다. 계기판도 역 배지도 같은 규칙이라야 두 숫자를 견준다.
+const short = (n) => (n >= 1000 ? `${Math.round(n / 100) / 10}k` : String(Math.round(n)));
+const people = (n) => short(n) + t('metro.unitPeople');
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const r1 = (v) => Math.round(v * 10) / 10;
 
@@ -792,10 +795,9 @@ function renderStations() {
   // **역마다 타려다 못 탄 사람을 적는다.** 혼잡률은 노선 하나의 숫자라, 어느 역에
   // 줄이 서 있는지가 화면에 없으면 고칠 데를 짚을 수가 없다. 0인 역은 적지 않는다 —
   // 잘 도는 역까지 숫자를 달면 판이 숫자밭이 되고, 읽어야 하는 것은 밀린 곳뿐이다.
-  for (const [station, people] of waiting) {
-    if (people < 1 || !inView(station, -ART.station * 3)) continue;
-    const text = people >= 1000
-      ? `${Math.round(people / 100) / 10}k` : String(Math.round(people));
+  for (const [station, count] of waiting) {
+    if (count < 1 || !inView(station, -ART.station * 3)) continue;
+    const text = short(count);
     // **동그라미가 아니라 알약이다.** 원에 네 글자를 넣으면 글자가 테를 뚫고 나간다 —
     // 글자 수에 따라 가로로 늘어나야 어떤 숫자든 안에 들어간다.
     const h = ART.station * (wide ? 1.55 : 1.0);
@@ -931,19 +933,15 @@ function renderMeters() {
   el.pause.textContent = t(['metro.speedStop', 'metro.speedSlow', 'metro.speedFast'][speed]);
   el.pause.setAttribute('aria-pressed', String(speed > 0));
   el.wide.setAttribute('aria-pressed', String(wide));
-  // **단위를 숫자에 붙여 쓴다.** 앞의 둘은 수요 건수이고 못 탐만 사람 수인데, 단위가
-  // 없으면 셋이 같은 것을 세는 줄로 읽힌다. 조각으로 나눠 빈칸으로 잇지 않는 것은
-  // 루트 규칙이다 — 일본어·중국어는 사이를 띄우지 않으므로 사전이 정하게 둔다.
-  const trips = t('metro.unitTrips');
-  el.vCaught.textContent = (demands.length - waitingCount()) + trips;
-  el.vWaiting.textContent = waitingCount() + trips;
-  // **못 탄 사람을 계기판에 올린다.** 이용 30 · 대기 0인데 혼잡이 970%이면 화면은
-  // "다 잘 되고 있다"고 말하는 셈이라, 무엇이 문제인지 알 길이 없었다.
-  let missed = 0;
-  for (const people of waiting.values()) missed += people;
-  el.missedBox.hidden = missed < 1;
-  el.vMissed.textContent = (missed >= 1000
-    ? `${Math.round(missed / 100) / 10}k` : String(Math.round(missed))) + t('metro.unitPeople');
+  // **셋 다 사람 수이고, 남김없이 갈린다** — 타는 사람 + 못 타는 사람 + 안 타는 사람.
+  // 건수로 두었더니 "몇 건"과 "몇 명"이 한 줄에 섞여 서로 견줄 수가 없었다. 단위는
+  // 숫자에 붙여 쓰되 조각을 빈칸으로 잇지 않는다(루트 규칙) — 일본어·중국어는 사이를
+  // 띄우지 않으므로 사전이 정하게 둔다.
+  const heads = Demand.tally(demands);
+  el.vCaught.textContent = people(heads.riding);
+  el.vWaiting.textContent = people(heads.away);
+  el.missedBox.hidden = heads.missed < 1;
+  el.vMissed.textContent = people(heads.missed);
   el.vIncome.textContent = income.toFixed(1);
 }
 
