@@ -547,14 +547,17 @@ function renderLines() {
 // 시각에 그 간격을 더해 넣으면 저절로 고르게 퍼진다.
 // 열차가 지금 지나는 구간에 실린 몫. 구간은 정차역과 정차역 사이이고, 그 경계는
 // 시간표가 쓰는 정차 자리(`marks`)와 같다.
-function loadAt(svc, s) {
+function loadAt(svc, s, dir) {
   if (!svc || !svc.peak || !svc.peak.loads || !svc.capacity) return 0;
   const marks = svc.marks;
   let k = 0;
   for (let i = 0; i + 1 < marks.length; i++) {
     if (s >= svc.path.s[marks[i].at]) k = i;
   }
-  const load = svc.peak.loads[k];
+  // 오는 쪽과 가는 쪽의 부하가 다르다. 그래서 **종점에 닿은 열차가 눈에 띄게 비고**,
+  // 돌아 나갈 때 그 방향의 몫으로 다시 찬다.
+  const side = dir < 0 && svc.peak.back ? svc.peak.back : svc.peak.loads;
+  const load = side[k];
   return load == null ? 0 : load / svc.capacity;
 }
 
@@ -567,7 +570,7 @@ function renderTrains() {
     const color = lineColor(run.line);
     for (let k = 0; k < run.trains; k++) {
       const at = Lines.at(run.line, run.table, clock + k * run.headway);
-      const ratio = loadAt(run.svc, at.s);
+      const ratio = loadAt(run.svc, at.s, at.dir);
       const w = ART.carW * K();
       const h = ART.carH * K();
       const ring = ART.carRing * K();
@@ -791,17 +794,23 @@ function renderStations() {
   // 잘 도는 역까지 숫자를 달면 판이 숫자밭이 되고, 읽어야 하는 것은 밀린 곳뿐이다.
   for (const [station, people] of waiting) {
     if (people < 1 || !inView(station, -ART.station * 3)) continue;
-    const r = ART.station * (wide ? 1.6 : 1.05);
-    const x = station.x + ART.station * (wide ? 2.0 : 1.35);
-    const y = station.y - ART.station * (wide ? 2.0 : 1.35);
-    layer.stations.appendChild(svg('circle', {
-      cx: x, cy: y, r, fill: 'var(--jam)', stroke: 'var(--ground)', 'stroke-width': r * 0.28,
+    const text = people >= 1000
+      ? `${Math.round(people / 100) / 10}k` : String(Math.round(people));
+    // **동그라미가 아니라 알약이다.** 원에 네 글자를 넣으면 글자가 테를 뚫고 나간다 —
+    // 글자 수에 따라 가로로 늘어나야 어떤 숫자든 안에 들어간다.
+    const h = ART.station * (wide ? 1.55 : 1.0);
+    const w = Math.max(h, h * 0.58 * text.length + h * 0.5);
+    const x = station.x + ART.station * (wide ? 1.9 : 1.25) + (w - h) / 2;
+    const y = station.y - ART.station * (wide ? 1.9 : 1.25);
+    layer.stations.appendChild(svg('rect', {
+      x: r1(x - w / 2), y: r1(y - h / 2), width: r1(w), height: r1(h), rx: h / 2,
+      fill: 'var(--jam)', stroke: 'var(--ground)', 'stroke-width': r1(h * 0.16),
     }));
     const label = svg('text', {
-      x, y, fill: 'var(--on-jam)', 'font-size': r * 1.25, 'font-weight': 800,
+      x: r1(x), y: r1(y), fill: 'var(--on-jam)', 'font-size': r1(h * 0.64), 'font-weight': 800,
       'text-anchor': 'middle', 'dominant-baseline': 'central',
     });
-    label.textContent = people >= 1000 ? `${Math.round(people / 100) / 10}k` : String(Math.round(people));
+    label.textContent = text;
     layer.stations.appendChild(label);
   }
 
@@ -922,15 +931,19 @@ function renderMeters() {
   el.pause.textContent = t(['metro.speedStop', 'metro.speedSlow', 'metro.speedFast'][speed]);
   el.pause.setAttribute('aria-pressed', String(speed > 0));
   el.wide.setAttribute('aria-pressed', String(wide));
-  el.vCaught.textContent = String(demands.length - waitingCount());
-  el.vWaiting.textContent = String(waitingCount());
+  // **단위를 숫자에 붙여 쓴다.** 앞의 둘은 수요 건수이고 못 탐만 사람 수인데, 단위가
+  // 없으면 셋이 같은 것을 세는 줄로 읽힌다. 조각으로 나눠 빈칸으로 잇지 않는 것은
+  // 루트 규칙이다 — 일본어·중국어는 사이를 띄우지 않으므로 사전이 정하게 둔다.
+  const trips = t('metro.unitTrips');
+  el.vCaught.textContent = (demands.length - waitingCount()) + trips;
+  el.vWaiting.textContent = waitingCount() + trips;
   // **못 탄 사람을 계기판에 올린다.** 이용 30 · 대기 0인데 혼잡이 970%이면 화면은
   // "다 잘 되고 있다"고 말하는 셈이라, 무엇이 문제인지 알 길이 없었다.
   let missed = 0;
   for (const people of waiting.values()) missed += people;
   el.missedBox.hidden = missed < 1;
-  el.vMissed.textContent = missed >= 1000
-    ? `${Math.round(missed / 100) / 10}k` : String(Math.round(missed));
+  el.vMissed.textContent = (missed >= 1000
+    ? `${Math.round(missed / 100) / 10}k` : String(Math.round(missed))) + t('metro.unitPeople');
   el.vIncome.textContent = income.toFixed(1);
 }
 

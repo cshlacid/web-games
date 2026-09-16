@@ -65,10 +65,12 @@
   <div class="picker modes" id="modes" role="group" aria-label="모드" data-i18n-attr="aria-label=metro.mode"></div>
   <div class="picker tools" id="tools" role="group" aria-label="도구" data-i18n-attr="aria-label=metro.tool" hidden></div>
 
+  <!-- 앞의 둘은 수요 건수이고 못 탐만 사람 수다. 단위를 붙이지 않으면 셋이 같은
+       것을 세는 줄로 읽힌다. -->
   <p class="flow" id="flow">
-    <span><i class="dot caught"></i><span data-i18n="metro.caught">이용</span> <b id="v-caught">0</b></span>
-    <span><i class="dot waiting"></i><span data-i18n="metro.waiting">대기</span> <b id="v-waiting">0</b></span>
-    <span class="jam" hidden id="missed-box"><i class="dot missed"></i><span data-i18n="metro.missed">못 탐</span> <b id="v-missed">0</b></span>
+    <span data-i18n-attr="title=metro.tipCaught" title="지하철로 갈 만한 길이 있는 수요 건수입니다"><i class="dot caught"></i><span data-i18n="metro.caught">길 있음</span> <b id="v-caught">0</b></span>
+    <span data-i18n-attr="title=metro.tipWaiting" title="길이 없거나 너무 돌아가는 수요 건수입니다. 지도에 호로 뜹니다"><i class="dot waiting"></i><span data-i18n="metro.waiting">길 없음</span> <b id="v-waiting">0</b></span>
+    <span class="jam" hidden id="missed-box" data-i18n-attr="title=metro.tipMissed" title="길은 있는데 열차가 꽉 차 못 탄 사람 수입니다"><i class="dot missed"></i><span data-i18n="metro.missed">못 탐</span> <b id="v-missed">0</b></span>
     <span><span data-i18n="metro.perMinute">분당 수입</span> <b id="v-income">0.0</b></span>
   </p>
 
@@ -156,7 +158,8 @@
       <li data-i18n-html="metro.ruleBus">역이 멀어도 <b>버스로 역까지 갈 수 있습니다.</b> 기다리는 몫이 붙어 사백 미터쯤부터는 걷는 것보다 버스가 낫고, 그보다 더 멀면 그냥 지상으로 갑니다. 수요 끝의 동그라미가 <b>점선이면 버스로만 닿는다</b>는 뜻입니다.</li>
       <li data-i18n-html="metro.ruleCrowd">열차에는 <b>실을 수 있는 양이 있습니다.</b> 가장 붐비는 구간이 정원을 넘으면 넘친 사람은 못 타고 지상으로 갑니다. 노선 모드의 <b>혼잡</b>이 100%를 넘으면 그만큼 놓치고 있다는 뜻이고, <b>열차를 늘리거나 급행으로 나누면</b> 내려갑니다.</li>
       <li data-i18n-html="metro.ruleJam"><b>혼잡이 100%를 넘으면 지도가 어디인지 짚어 줍니다.</b> 노선 모드에서 가장 막힌 구간이 붉게 덧그려지고, 역마다 <b>타려다 못 탄 사람 수</b>가 붙습니다. 계기판의 <b>못 탐</b>이 그 합입니다. 배차 옆에 <b>선로 한계</b>가 뜨면 열차를 더 넣어도 소용없다는 뜻이라, 노선을 나누거나 급행으로 갈라야 합니다.</li>
-      <li data-i18n-html="metro.ruleCar"><b>열차는 네모이고, 안을 채운 길이가 그 열차가 실은 몫입니다.</b> 지금 지나는 구간의 부하로 채우므로, 같은 노선이라도 붐비는 구간을 지나는 열차만 가득 찹니다. <b>정원을 넘으면 가득 찬 채 붉어지고</b>, 역에 서 있는 동안은 테가 두꺼워집니다.</li>
+      <li data-i18n-html="metro.ruleCar"><b>열차는 네모이고, 안을 채운 길이가 그 열차가 실은 몫입니다.</b> 지금 지나는 구간의 부하로 채우므로, 같은 노선이라도 붐비는 구간을 지나는 열차만 가득 찹니다. <b>정원을 넘으면 가득 찬 채 붉어지고</b>, 역에 서 있는 동안은 테가 두꺼워집니다. 채우는 값은 <b>가는 쪽의 몫</b>이라, <b>종점에 닿으면 눈에 띄게 비고</b> 돌아 나가며 그 방향의 몫으로 다시 찹니다.</li>
+      <li data-i18n-html="metro.ruleMeters">판 아래 숫자 셋은 서로 다른 것을 셉니다. <b>길 있음</b>은 지하철로 갈 만한 길이 있는 <b>수요 건수</b>, <b>길 없음</b>은 길이 없거나 너무 돌아가는 건수(지도에 호로 뜨는 것들), <b>못 탐</b>은 길은 있는데 열차가 꽉 차 못 탄 <b>사람 수</b>입니다. 앞의 둘은 <b>길</b>의 문제이고 못 탐은 <b>열차</b>의 문제라, 고치는 방법이 다릅니다.</li>
       <li data-i18n-html="metro.ruleTrack"><b>선로는 하나뿐입니다.</b> 열차를 아무리 사도 서로 붙어 갈 수는 없어서, 배차간격이 최소 간격 아래로는 내려가지 않고 그 위로는 다 같이 느려집니다. 그리고 <b>급행은 통과하는 역에서만 완행을 추월</b>할 수 있어, 완행이 잦으면 급행도 제 속도를 못 냅니다.</li>
       <li data-i18n-html="metro.ruleGrow">수요를 <b>실어 나른 만큼 도시가 자랍니다.</b> 빈 터에 건물이 들어서고 있던 건물은 높아지며, 자란 동네는 다시 더 큰 수요를 부릅니다. <b>얼마나 높아질지는 건물의 종류가 정합니다.</b></li>
       <li data-i18n-html="metro.ruleDistrict"><b>구시가지</b>는 골목이 좁고 굽은 데다 막다른 길과 삼거리가 많아 길을 따라가기 어렵습니다. <b>계획도시</b>는 그 반대입니다. 난이도는 둘의 배합을 바꿉니다.</li>
