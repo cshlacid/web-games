@@ -301,6 +301,37 @@ function axisLines(center, span, gap, rng) {
   return lines.sort((p, q) => p - q);
 }
 
+// 간선 한 줄. 곧게 관통하기만 하면 교차점이 전부 사거리라 어느 길로 가나 같다.
+// **어긋나게 하거나 중간에서 끊으면 삼거리가 생기고**, 그제야 "이쪽으로는 끝까지
+// 가는데 저쪽은 아니다"가 길마다 다른 성질이 된다.
+function arterial(fixed, span, cross, rng, vertical) {
+  const at = (v, t) => (vertical ? { x: v, y: t } : { x: t, y: v });
+  // 자를 수 있는 자리는 가장자리에서 한 칸씩 물린 교차선들이다. 끝에서 자르면
+  // 그냥 짧은 길이고, 한가운데를 자르면 도시가 반으로 갈린다.
+  const inner = cross.filter((t) => t > span * 0.16 && t < span * 0.84);
+  let from = 0;
+  let to = span;
+
+  // ① 한쪽 끝을 교차선에서 멈춘다. 거기가 T자다. **자르는 자리는 바깥 삼분의 일로
+  //    묶는다** — 한가운데를 자르면 그 줄이 토막만 남아 도시의 한쪽이 통째로 비어 보인다.
+  if (rng() < 0.32) {
+    const head = inner.filter((t) => t < span * 0.36);
+    const tail = inner.filter((t) => t > span * 0.64);
+    if (rng() < 0.5) { if (head.length) from = head[Math.floor(rng() * head.length)]; }
+    else if (tail.length) to = tail[Math.floor(rng() * tail.length)];
+  }
+
+  // ② 한 교차선에서 옆으로 어긋난다. 사거리 하나가 삼거리 둘로 갈린다.
+  const mids = inner.filter((t) => t > from + span * 0.12 && t < to - span * 0.12);
+  if (mids.length && rng() < 0.42) {
+    const bend = mids[Math.floor(rng() * mids.length)];
+    const shift = (rng() < 0.5 ? -1 : 1) * (150 + rng() * 170);
+    const other = clamp(fixed + shift, 120, span === WORLD.w ? WORLD.h - 120 : WORLD.w - 120);
+    return [at(fixed, from), at(fixed, bend), at(other, bend), at(other, to)];
+  }
+  return [at(fixed, from), at(fixed, to)];
+}
+
 function straightish(from, to, jitter, rng) {
   if (!jitter) return [from, to];
   const len = Geom.dist(from.x, from.y, to.x, to.y);
@@ -424,8 +455,8 @@ function create(seed = 1, level = 1) {
   const xs = axisLines(cx, WORLD.w, 600, rng);
   const ys = axisLines(cy, WORLD.h, 600, rng);
   const arterials = [];
-  for (const x of xs) arterials.push([{ x, y: 0 }, { x, y: WORLD.h }]);
-  for (const y of ys) arterials.push([{ x: 0, y }, { x: WORLD.w, y }]);
+  for (const x of xs) arterials.push(arterial(x, WORLD.h, ys, rng, true));
+  for (const y of ys) arterials.push(arterial(y, WORLD.w, xs, rng, false));
   for (let k = 0; k < 2; k++) {
     // 대로 둘. 격자만 있으면 노선이 전부 ㄱ자로 꺾여 휜 선로를 그릴 자리가 없다.
     const ang = Math.PI / 4 + (rng() * 0.5 - 0.25) + k * Math.PI / 2;
@@ -601,6 +632,20 @@ function classify(city, x, y) {
   return 'empty';
 }
 
+// 어떤 자리 둘레에 서 있는 건물들. 수요가 "역세권에서 생긴다"를 쓰려면 필요하다.
+function buildingsNear(city, x, y, radius) {
+  const out = [];
+  const seen = new Set();
+  for (const id of query(city.buildIndex, x, y, radius)) {
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const b = city.buildings[id];
+    if (b.level < 1) continue;
+    if (Geom.dist(b.x + b.w / 2, b.y + b.h / 2, x, y) <= radius) out.push(b);
+  }
+  return out;
+}
+
 // 가장 가까운 도로 중심선 위의 자리. 없으면 null. 중간점을 끌 때의 자석이다.
 function snapToRoad(city, x, y, radius) {
   let best = null;
@@ -674,8 +719,8 @@ function grow(city, centers, radius, budget) {
 
 const CityGen = {
   VIEW, WORLD, GRID, MAX_BUILDINGS, ROAD_W, DISTRICT, LEVELS, CAP, STATION_GAP, START_FILL,
-  create, classify, snapToRoad, districtAt, canPlaceStation, addStation, grow,
-  isWater, isSea, isHill, segRectDistance, clipPolyline, mulberry32,
+  create, classify, snapToRoad, districtAt, canPlaceStation, addStation, grow, buildingsNear,
+  isWater, isSea, isHill, segRectDistance, clipPolyline, arterial, mulberry32,
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = CityGen;

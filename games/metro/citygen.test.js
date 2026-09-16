@@ -161,6 +161,37 @@ for (const level of [0, 1, 2]) {
   ok('다섯 갈래가 다 나온다', kinds.size === 5, [...kinds].join(','));
 }
 
+// --- 간선에도 삼거리가 있다 ---
+// 곧게 관통하기만 하면 교차점이 전부 사거리라 어느 길로 가나 같다. 어긋나거나
+// 중간에서 끊기는 간선이 있어야 길마다 성질이 갈린다.
+{
+  const rng = C.mulberry32(4242);
+  const cross = [];
+  for (let t = 600; t < 5400; t += 600) cross.push(t);
+  let bent = 0;
+  let cutShort = 0;
+  const N = 400;
+  for (let i = 0; i < N; i++) {
+    const pts = C.arterial(2400, 5400, cross, rng, true);
+    if (pts.length === 4) bent++;
+    const from = Math.min(pts[0].y, pts[pts.length - 1].y);
+    const to = Math.max(pts[0].y, pts[pts.length - 1].y);
+    if (from > 1 || to < 5399) cutShort++;
+  }
+  ok('어긋나는 간선이 제법 나온다', bent > N * 0.2 && bent < N * 0.7, `${bent}/${N}`);
+  ok('중간에서 끊기는 간선도 나온다', cutShort > N * 0.15 && cutShort < N * 0.5, `${cutShort}/${N}`);
+
+  // 끊긴 간선이 도시를 반으로 가르면 안 된다 — 자를 자리는 가장자리 쪽으로 물려 둔다.
+  let middleCut = 0;
+  for (let i = 0; i < N; i++) {
+    const pts = C.arterial(2400, 5400, cross, rng, true);
+    const from = Math.min(pts[0].y, pts[pts.length - 1].y);
+    const to = Math.max(pts[0].y, pts[pts.length - 1].y);
+    if (from > 5400 * 0.45 || to < 5400 * 0.55) middleCut++;
+  }
+  ok('한가운데서 자르지는 않는다', middleCut === 0, `${middleCut}줄`);
+}
+
 // --- 격자가 아닌 구시가지 ---
 // 격자에서는 노선을 그을 때 고민할 것이 없다. 어느 길을 타도 비슷하기 때문이다.
 // 각도가 축(0°·90°)에서 얼마나 벗어나는지로 "격자인가"를 잰다.

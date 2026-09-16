@@ -6,6 +6,7 @@
 const City = window.MetroCity;
 const Route = window.MetroRoute;
 const Lines = window.MetroLines;
+const Demand = window.MetroDemand;
 const Geom = window.MetroGeom;
 const Sound = window.MetroSound;
 const NS = 'http://www.w3.org/2000/svg';
@@ -20,8 +21,11 @@ const START_BUDGET = 480;
 const STATION_COST = 14;
 const REFUND = 0.5;
 const GROW_RADIUS = 520;
-const GROW_BUDGET = 18;
-const INCOME_PER_GROWTH = 2.5;
+// 실제 1초가 게임 1분이다. 주기가 5~13분인 노선이 화면에서 5~13초에 한 바퀴를
+// 돌아 열차가 도는 것이 보이고, 수입과 성장도 같은 시계를 탄다.
+const SPEED = 60;
+const GROW_WORK = 7000;   // 이만큼 실어 나르면 한 채가 자란다
+const GROW_FLASH = 3;     // 자란 자리를 짚어 두는 시간(실제 초)
 
 const GRAB_PX = 22;
 const HIT_PX = 26;
@@ -39,15 +43,16 @@ const ART = {
 const GROUND = ['road', 'empty', 'building', 'hill', 'water'];
 
 const el = {};
-for (const id of ['map', 'status', 'readout', 'actions', 'budget', 'newCity', 'levels', 'modes',
-  'tools', 'linepanel', 'lineList', 'patternList', 'stops', 'trainCount', 'trainMinus',
-  'trainPlus', 'plan', 'addPattern', 'undo', 'cancel', 'confirm',
+for (const id of ['map', 'status', 'readout', 'actions', 'budget', 'clock', 'pause', 'newCity',
+  'levels', 'modes', 'tools', 'flow', 'vCaught', 'vWaiting', 'vIncome',
+  'linepanel', 'lineList', 'patternList', 'stops', 'trainCount', 'trainMinus',
+  'trainPlus', 'plan', 'addPattern', 'undo', 'cancel', 'remove', 'confirm',
   'help', 'helpOpen', 'helpClose', 'toggleBgm', 'toggleSfx']) {
   el[id] = document.getElementById(id.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`));
 }
 const layer = {};
-for (const name of ['water', 'hills', 'roads', 'buildings', 'grown', 'lines', 'trains',
-  'draft', 'stations', 'handles']) {
+for (const name of ['water', 'hills', 'roads', 'buildings', 'grown', 'demand', 'lines',
+  'trains', 'draft', 'stations', 'handles']) {
   layer[name] = document.getElementById(`layer-${name}`);
 }
 const value = {
@@ -75,7 +80,7 @@ const cam = { x: 0, y: 0 };
 let mode = 'run';        // run | build | lines
 let budget = START_BUDGET;
 let lines = [];
-let grown = [];
+let grown = [];          // { id, at } — 방금 자란 자리
 let drag = null;
 let lastTap = { index: -1, at: 0 };
 let history = [];
@@ -83,7 +88,20 @@ let history = [];
 let pending = null;      // 기본 모드: { kind:'new'|'extend', line, from }
 let draft = null;        // 경로 편집 중
 let ghost = null;        // 건설 모드의 임시 역
+let marked = null;       // 건설 모드에서 고른 기존 역
 let sel = { line: 0, pattern: 0 };
+
+// 시뮬레이션
+let clock = 6 * 3600;    // 게임 초. 아침 여섯 시에 시작한다
+let paused = false;
+let demands = [];
+let services = [];       // 수요가 보는 운행 목록
+let runs = [];           // 화면이 보는 열차 목록 { line, table, trains, headway }
+let growWork = 0;
+let nextSpawn = 0;
+let income = 0;          // 억/게임분
+let simRng = City.mulberry32(1);
+let frameAt = 0;
 
 const t = (key) => SharedI18n.t(key);
 const fill = (key, n) => t(key).replace('{n}', n);
@@ -104,10 +122,18 @@ function makeCity(nextSeed, nextLevel) {
   pending = null;
   draft = null;
   ghost = null;
+  marked = null;
   history = [];
   drag = null;
   mode = 'run';
   sel = { line: 0, pattern: 0 };
+  clock = 6 * 3600;
+  demands = [];
+  growWork = 0;
+  nextSpawn = 0;
+  income = 0;
+  simRng = City.mulberry32(seed * 7919 + 13);
+  syncNetwork();
   setCam(city.core.x - VIEW.w / 2, city.core.y - VIEW.h / 2);
   drawCity();
   renderGrown();
@@ -247,6 +273,108 @@ function connectedStations() {
   return [...set];
 }
 
+// --- 망과 수요 ---
+
+// 노선이나 열차가 바뀔 때마다 **운행 목록을 다시 만든다.** 수요가 보는 것은 노선이
+// 아니라 운행(노선 × 패턴)이고, 화면이 보는 것도 그것이다. 매 프레임 다시 만들면
+// 시간표를 다시 푸는 꼴이라 바뀔 때만 만든다.
+function syncNetwork() {
+  services = [];
+  runs = [];
+  for (const line of lines) {
+    if (!line.path) continue;
+    for (const pattern of line.patterns) {
+      const table = Lines.timetable(line, pattern);
+      if (!table) continue;
+      const plan = Lines.plan(line, pattern);
+      if (pattern.trains > 0) {
+        runs.push({ line, table, trains: pattern.trains, headway: plan.headway });
+        services.push({
+          stations: line.stations,
+          stopAt: pattern.stops,
+          headway: plan.headway,
+          ride: (i, j) => Lines.rideTime(table, i, j),
+        });
+      }
+    }
+  }
+  evaluateDemands();
+}
+
+function evaluateDemands() {
+  income = 0;
+  for (const od of demands) {
+    const got = Demand.evaluate(od, services);
+    od.usage = got.usage;
+    od.via = got.via;
+    od.served = got.usage >= Demand.SERVED;
+    income += Demand.income(od, 1);
+  }
+  renderDemands();
+}
+
+function waitingCount() { return demands.filter((od) => !od.served).length; }
+
+function tick(dt) {
+  clock += dt;
+  const minutes = dt / 60;
+
+  nextSpawn -= dt;
+  if (nextSpawn <= 0) {
+    nextSpawn = Demand.SPAWN_EVERY;
+    if (waitingCount() < Demand.MAX_WAITING && demands.length < Demand.MAX_TOTAL) {
+      const od = Demand.spawn(city, simRng, city.stations);
+      if (od) {
+        od.born = clock;
+        demands.push(od);
+        evaluateDemands();
+      }
+    }
+  }
+
+  // 못 잡은 수요는 기다리다 사라진다. 잡은 수요는 남아 이용객이 된다.
+  const before = demands.length;
+  demands = demands.filter((od) => od.served || clock - od.born < Demand.PATIENCE);
+  if (demands.length !== before) evaluateDemands();
+
+  // 실어 나른 만큼 도시가 자란다. **수요를 처리한 자리가 자란다**는 규칙이 이제
+  // 대리물이 아니라 진짜다 — 실제로 탄 사람 수가 그대로 성장의 재료다.
+  let work = 0;
+  const centers = [];
+  for (const od of demands) {
+    if (!od.usage || !od.via) continue;
+    budget += Demand.income(od, minutes);
+    work += od.people * od.usage * minutes;
+    centers.push(od.via.svc.stations[od.via.i], od.via.svc.stations[od.via.j]);
+  }
+  growWork += work;
+  while (growWork >= GROW_WORK && centers.length) {
+    growWork -= GROW_WORK;
+    const ids = City.grow(city, centers, GROW_RADIUS, 1);
+    if (!ids.length) { growWork = 0; break; }
+    for (const id of ids) grown.push({ id, at: frameAt });
+    drawBuildings();
+  }
+}
+
+function running() {
+  return !paused && !draft && !ghost && !marked && lines.length > 0;
+}
+
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = frameAt ? Math.min(0.12, (now - frameAt) / 1000) : 0;
+  frameAt = now;
+
+  const fade = grown.length && grown.some((g) => now - g.at > GROW_FLASH * 1000);
+  if (fade) { grown = grown.filter((g) => now - g.at <= GROW_FLASH * 1000); renderGrown(); }
+
+  if (!running() || dt <= 0) return;
+  tick(dt * SPEED);
+  renderTrains();
+  renderMeters();
+}
+
 // --- 경로 편집 ---
 
 function startDraft(kind, line, from, to) {
@@ -294,6 +422,7 @@ function pushHistory() {
 function refresh() {
   renderLines();
   renderTrains();
+  renderDemands();
   renderDraft();
   renderStations();
   renderModes();
@@ -301,6 +430,7 @@ function refresh() {
   renderTools();
   renderPanel();
   renderLinePanel();
+  renderMeters();
   renderStatus();
 }
 
@@ -318,21 +448,50 @@ function renderLines() {
   }
 }
 
-// 열차는 아직 움직이지 않는다. **그래도 그린다** — 노선에 몇 대가 도는지가
-// 배차간격이라는 숫자로만 남으면, 열차를 사는 일이 화면과 아무 상관이 없어진다.
+// 열차는 시간표를 따라 돈다. 한 운행의 열차들은 주기를 배차간격만큼씩 나눠 가지므로,
+// 시각에 그 간격을 더해 넣으면 저절로 고르게 퍼진다.
 function renderTrains() {
   clear(layer.trains);
-  for (const line of lines) {
-    if (!line.path) continue;
-    const total = Lines.trainsOf(line);
-    if (!total) continue;
-    const group = svg('g', { fill: 'var(--station-fill)', stroke: lineColor(line), 'stroke-width': 10 });
-    for (let k = 0; k < total; k++) {
-      const at = Math.round((k + 0.5) / total * (line.path.pts.length - 1));
-      const p = line.path.pts[at];
-      group.appendChild(svg('circle', { cx: p.x, cy: p.y, r: ART.train }));
+  for (const run of runs) {
+    const group = svg('g', { fill: 'var(--station-fill)', stroke: lineColor(run.line), 'stroke-width': 10 });
+    for (let k = 0; k < run.trains; k++) {
+      const at = Lines.at(run.line, run.table, clock + k * run.headway);
+      group.appendChild(svg('circle', { cx: r1(at.x), cy: r1(at.y), r: ART.train }));
     }
     layer.trains.appendChild(group);
+  }
+}
+
+// 못 잡은 수요만 그린다. 잡은 것까지 그리면 화면이 금세 실타래가 되고, 정작
+// 읽어야 하는 것은 **아직 못 잡은 돈**이다.
+//
+// 호의 길이가 곧 요금이라(요금은 직선거리 비례) 긴 호가 값진 수요다. 두께는 인원.
+// 양 끝은 따로 그린다 — 그쪽이 역에 닿았는지를 끝마다 달리 표시하면 "이 수요는
+// 저쪽만 이으면 딴다"가 그림에 적힌다.
+function renderDemands() {
+  clear(layer.demand);
+  if (mode === 'lines') return;
+  for (const od of demands) {
+    if (od.served) continue;
+    const dx = od.b.x - od.a.x;
+    const dy = od.b.y - od.a.y;
+    const cx = (od.a.x + od.b.x) / 2 - dy * 0.13;
+    const cy = (od.a.y + od.b.y) / 2 + dx * 0.13;
+    const width = 9 + od.people / 16;
+    layer.demand.appendChild(svg('path', {
+      d: `M${r1(od.a.x)} ${r1(od.a.y)}Q${r1(cx)} ${r1(cy)} ${r1(od.b.x)} ${r1(od.b.y)}`,
+      fill: 'none', stroke: 'var(--demand)', 'stroke-width': width,
+      'stroke-linecap': 'round', 'stroke-dasharray': `${width * 2.2} ${width * 2}`,
+      opacity: 0.45 + od.usage * 0.45,
+    }));
+    for (const end of [od.a, od.b]) {
+      const near = Demand.reach(end, city.stations);
+      layer.demand.appendChild(svg('circle', {
+        cx: r1(end.x), cy: r1(end.y), r: 34,
+        fill: near ? 'var(--demand)' : 'var(--ground)',
+        stroke: 'var(--demand)', 'stroke-width': 12,
+      }));
+    }
   }
 }
 
@@ -498,19 +657,15 @@ function renderGrown() {
   clear(layer.grown);
   if (!grown.length) return;
   layer.grown.appendChild(svg('path', {
-    d: grown.map((id) => {
-      const b = city.buildings[id];
+    d: grown.map((g) => {
+      const b = city.buildings[g.id];
       return `M${r1(b.x)} ${r1(b.y)}h${r1(b.w)}v${r1(b.h)}h${r1(-b.w)}z`;
     }).join(''),
     fill: 'none', stroke: 'var(--metro)', 'stroke-width': 9, opacity: 0.9,
   }));
 }
 
-function clearGrown() {
-  if (!grown.length) return;
-  grown = [];
-  renderGrown();
-}
+
 
 // --- 고르개 ---
 
@@ -545,6 +700,7 @@ function renderModes() {
     pending = null;
     draft = null;
     ghost = null;
+    marked = null;
     history = [];
     Sound.play('select');
     refresh();
@@ -580,7 +736,7 @@ function renderTools() {
 function money(v) { return `${v.toFixed(1)}${t('metro.unitMoney')}`; }
 function metres(v) { return v < 1000 ? `${Math.round(v)}m` : `${(v / 1000).toFixed(2)}km`; }
 
-function clock(sec) {
+function mmss(sec) {
   // 초를 먼저 반올림한다. 분을 먼저 떼면 119.6초가 "1:60"으로 나온다.
   if (!Number.isFinite(sec)) return '–';
   const total = Math.round(sec);
@@ -588,17 +744,34 @@ function clock(sec) {
   return `${m}:${String(total - m * 60).padStart(2, '0')}`;
 }
 
-function renderPanel() {
+// 예산·시계·수요는 매 프레임 갱신된다. 패널 전체를 다시 그리면 그때마다 단추가
+// 새로 만들어져 누르던 것이 손 밑에서 사라진다.
+function renderMeters() {
   el.budget.textContent = money(budget);
+  const hh = Math.floor(clock / 3600) % 24;
+  const mm = Math.floor(clock / 60) % 60;
+  el.clock.textContent = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+  el.clock.classList.toggle('held', !running());
+  el.vCaught.textContent = String(demands.length - waitingCount());
+  el.vWaiting.textContent = String(waitingCount());
+  el.vIncome.textContent = income.toFixed(1);
+}
 
-  if (ghost) {
+function renderPanel() {
+
+  if (ghost || marked) {
     el.readout.hidden = true;
     el.actions.hidden = false;
     el.undo.hidden = true;
-    el.confirm.disabled = !!ghost.why || budget < STATION_COST;
+    el.remove.hidden = !marked;
+    el.confirm.hidden = !!marked;
+    el.confirm.disabled = !ghost || !!ghost.why || budget < STATION_COST;
+    el.remove.disabled = !!marked && lines.some((line) => line.stations.includes(marked));
     return;
   }
   el.undo.hidden = false;
+  el.remove.hidden = true;
+  el.confirm.hidden = false;
 
   const live = draftOk();
   el.readout.hidden = !draft;
@@ -614,7 +787,7 @@ function renderPanel() {
   }
 
   value.cost.textContent = money(draft.cost.cost);
-  value.time.textContent = clock(draft.prof.time);
+  value.time.textContent = mmss(draft.prof.time);
   value.length.textContent = metres(draft.path.length);
   // 이 노선의 발목을 잡는 속도. 최고 속도는 곧은 구간이 늘 최고속에 닿아 언제나
   // 같은 값이 나오고, 평균 속도는 길이가 늘면 같이 올라 곡선의 손해가 묻힌다.
@@ -668,6 +841,7 @@ function renderLinePanel() {
     button.addEventListener('click', () => {
       pattern.stops[i] = !pattern.stops[i];
       Sound.play(pattern.stops[i] ? 'place' : 'erase');
+      syncNetwork();
       refresh();
     });
     el.stops.appendChild(button);
@@ -679,7 +853,7 @@ function renderLinePanel() {
 
   const p = Lines.plan(line, pattern);
   el.plan.textContent = p
-    ? `${t('metro.cycle')} ${clock(p.cycle)} · ${t('metro.headway')} ${clock(p.headway)}`
+    ? `${t('metro.cycle')} ${mmss(p.cycle)} · ${t('metro.headway')} ${mmss(p.headway)}`
     : '';
 }
 
@@ -694,6 +868,11 @@ function renderStatus(key, warn = false, n = null) {
   let text = '';
   let bad = false;
   if (ghost) { text = ghost.why ? t(`metro.bad.${ghost.why}`) : t('metro.ghostHint'); bad = !!ghost.why; }
+  else if (marked) {
+    const used = lines.some((line) => line.stations.includes(marked));
+    text = used ? t('metro.inUse') : t('metro.removeHint');
+    bad = used;
+  }
   else if (draft) {
     text = draftOk() ? t('metro.editHint') : t(`metro.bad.${draft.why}`);
     bad = !draftOk();
@@ -731,7 +910,6 @@ function grabHandle(w) {
 // 역이 편집의 것이고 나머지는 전부 팬이다. 이 경계가 없으면 지도를 옮기려다
 // 노선이 휘고, 노선을 휘려다 지도가 밀린다.
 function onDown(event) {
-  clearGrown();
   const w = toWorld(event);
 
   if (ghost && Geom.dist(w.x, w.y, ghost.x, ghost.y) < HIT_PX * 1.6 * w.scale) {
@@ -834,8 +1012,12 @@ function onUp(event) {
   if (done.kind !== 'pan' || done.moved > TAP_PX) return;
 
   if (mode === 'build') tapBuild(done);
-  else if (mode === 'run') tapRun(done.station);
-  else if (done.station) selectLineOf(done.station);
+  else {
+    // **노선 모드에서도 역을 눌러 잇는다.** 정차역을 만지다 "여기서 한 정거장 더"가
+    // 떠오르는 것이 자연스러운데, 그때마다 모드를 옮겨 다니게 하면 흐름이 끊긴다.
+    if (mode === 'lines' && done.station) selectLineOf(done.station);
+    tapRun(done.station);
+  }
 }
 
 // --- 건설 모드 ---
@@ -848,25 +1030,32 @@ function moveGhost(x, y) {
   renderStatus();
 }
 
+// **두드린다고 바로 없어지지 않는다.** 역 하나가 몇십억이고 그 둘레의 동네가
+// 거기 달려 있는데, 손가락이 스친 것으로 사라지면 되돌릴 방법이 없다. 고르고,
+// 무엇을 고른 건지 보고, 철거를 눌러야 없어진다.
 function tapBuild(done) {
   if (done.station) {
-    // 노선이 붙은 역은 못 없앤다. 없애면 그 구간을 어떻게 할지까지 정해야 하는데,
-    // 지금 단계에서 답할 필요가 없는 질문이다.
-    if (lines.some((line) => line.stations.includes(done.station))) {
-      renderStatus('metro.inUse', true);
-      Sound.play('deny');
-      return;
-    }
-    city.stations.splice(city.stations.indexOf(done.station), 1);
-    budget += STATION_COST * REFUND;
     ghost = null;
-    Sound.play('erase');
+    marked = marked === done.station ? null : done.station;
+    Sound.play('select');
     refresh();
-    renderStatus('metro.removed');
     return;
   }
+  marked = null;
   Sound.play('place');
   moveGhost(done.at.x, done.at.y);
+}
+
+function removeStation() {
+  if (!marked) return;
+  if (lines.some((line) => line.stations.includes(marked))) { Sound.play('deny'); return; }
+  city.stations.splice(city.stations.indexOf(marked), 1);
+  budget += STATION_COST * REFUND;
+  marked = null;
+  Sound.play('erase');
+  syncNetwork();
+  refresh();
+  renderStatus('metro.removed');
 }
 
 // --- 기본 모드 ---
@@ -901,24 +1090,18 @@ function tapRun(station) {
 
 function selectLineOf(station) {
   const i = lines.findIndex((line) => line.stations.includes(station));
-  if (i < 0) return;
+  if (i < 0 || i === sel.line) return;
   sel = { line: i, pattern: 0 };
-  Sound.play('select');
-  refresh();
 }
 
 // --- 확정 ---
 
 function afterBuild(cost) {
   budget -= cost;
-  // 한 구간을 놓을 때마다 도시가 한 걸음 자란다. 지금은 확정이 곧 한 턴이다.
-  grown = City.grow(city, connectedStations(), GROW_RADIUS, GROW_BUDGET);
-  budget += grown.length * INCOME_PER_GROWTH;
-  drawBuildings();
-  renderGrown();
   Sound.play('build');
+  syncNetwork();
   refresh();
-  renderStatus(grown.length ? 'metro.grew' : 'metro.built', false, grown.length);
+  renderStatus('metro.built');
 }
 
 function confirm() {
@@ -928,6 +1111,7 @@ function confirm() {
     budget -= STATION_COST;
     ghost = null;
     Sound.play('place');
+    syncNetwork();
     refresh();
     renderStatus('metro.stationBuilt');
     return;
@@ -964,6 +1148,7 @@ el.cancel.addEventListener('click', () => {
   draft = null;
   pending = null;
   ghost = null;
+  marked = null;
   history = [];
   Sound.play('erase');
   refresh();
@@ -983,6 +1168,7 @@ el.addPattern.addEventListener('click', () => {
   line.patterns.push(Lines.expressPattern(line));
   sel.pattern = line.patterns.length - 1;
   Sound.play('select');
+  syncNetwork();
   refresh();
 });
 
@@ -998,11 +1184,21 @@ function setTrains(delta) {
   } else budget += Lines.TRAIN_COST * REFUND;
   pattern.trains = next;
   Sound.play(delta > 0 ? 'place' : 'erase');
+  syncNetwork();
   refresh();
 }
 
 el.trainPlus.addEventListener('click', () => setTrains(1));
 el.trainMinus.addEventListener('click', () => setTrains(-1));
+
+el.remove.addEventListener('click', removeStation);
+
+el.pause.addEventListener('click', () => {
+  paused = !paused;
+  el.pause.setAttribute('aria-pressed', String(!paused));
+  Sound.play('select');
+  renderMeters();
+});
 
 el.newCity.addEventListener('click', () => {
   Sound.play('select');
@@ -1038,5 +1234,6 @@ bindSoundToggle(el.toggleBgm, 'bgm', (on) => Sound.setBgm(on));
 bindSoundToggle(el.toggleSfx, 'sfx', (on) => Sound.setSfx(on));
 
 makeCity(seed, level);
+requestAnimationFrame(frame);
 
 })();

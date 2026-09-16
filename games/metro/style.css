@@ -33,6 +33,7 @@
   --line5: #7a4fb5;
   --under: #d9534f;
   --slow: #c9862b;
+  --demand: #d1892b;
   --station-fill: #ffffff;
   --station-ring: #3c465a;
   /* 노선이 비싼 땅을 지나는 토막에 덧칠하는 색. 그 땅의 색을 진하게 한 것이라
@@ -75,6 +76,7 @@
     --line5: #a487e0;
     --under: #e4736f;
     --slow: #d8a13a;
+    --demand: #e0a84a;
     --station-fill: #12161c;
     --station-ring: #c3cbd8;
     --cut-building: #e4736f;
@@ -165,8 +167,30 @@ h1 {
   color: var(--btn-fg);
 }
 
-.budget { font-size: 12px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
+.budget, .clock { font-size: 12px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
 .budget b { color: var(--fg); }
+.clock { margin-inline-start: auto; }
+/* 시계가 멈춰 있다는 것을 숫자 자체로 알린다. 일시정지 단추만으로는 판을 보다가
+   "왜 안 움직이지"를 묻게 된다 — 편집 중에도 시간은 멈춘다. */
+.clock.held { opacity: 0.4; }
+.picker-row { flex-wrap: wrap; }
+.picker-row .toggle { margin-inline-start: 0; }
+
+.flow {
+  margin: 0;
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.flow span { display: inline-flex; align-items: center; gap: 4px; }
+.flow b { color: var(--fg); font-weight: 700; }
+.dot.caught { background: var(--metro); }
+.dot.waiting { background: var(--demand); }
+
+.btn.warn { background: var(--under); }
 
 /* 도구 고르개는 판 바로 아래에 둔다. 판 안은 touch-action: none이라 click이 나지
    않으므로 단추를 그 안에 둘 수 없고, 헤더까지 올리면 지금 무슨 모드인지가 눈이
