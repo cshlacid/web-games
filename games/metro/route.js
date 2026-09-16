@@ -35,6 +35,9 @@ const GROUND = Object.keys(UNIT_COST);
 // 가까워 수치가 불안정해진다.
 const STRAIGHT = 0.02;  // rad
 
+// 역에서 꺾을 때 쓸 수 있는 여유. 양쪽 구간의 이만큼이 역 구내 곡선에 들어간다고 본다.
+const STATION_ARC = 0.2;
+
 // 모서리 하나를 원호로 다듬는다.
 //
 // 반경은 **가능한 한 크게** 잡는다. 크면 빠르기 때문이고, 그래서 플레이어가 점을
@@ -71,6 +74,30 @@ function fillet(a, c, b, limits) {
   };
 }
 
+// 역에서의 꺾임. **역은 다듬지 않는다** — 열차가 서는 곳이라 경로가 그 점을 정확히
+// 지나야 하고, 다듬으면 승강장이 선로 옆으로 밀려난다.
+//
+// 대신 그 꺾임이 **통과 속도**를 정한다. 서는 열차에게는 아무 상관이 없지만
+// 급행은 그 역을 지나가므로 역 구내 곡선의 반경만큼만 낼 수 있다. 반경이 최소
+// 곡선반경 아래로 떨어지면 아예 못 잇는다 — 노선을 연장할 때의 "굴곡 허용 범위"가
+// 이것이다.
+function stationTurn(a, c, b, limits) {
+  const u = Geom.normalize(a.x - c.x, a.y - c.y);
+  const v = Geom.normalize(b.x - c.x, b.y - c.y);
+  if (u.len === 0 || v.len === 0) return { ok: false, reason: 'degenerate' };
+
+  let cosT = u.x * v.x + u.y * v.y;
+  if (cosT > 1) cosT = 1; else if (cosT < -1) cosT = -1;
+  const theta = Math.acos(cosT);
+  if (Math.PI - theta < STRAIGHT) return { ok: true, vlim: limits.V_MAX, r: Infinity };
+  if (theta < STRAIGHT) return { ok: false, reason: 'doubled' };
+
+  const half = theta / 2;
+  const r = STATION_ARC * Math.min(u.len, v.len) * Math.tan(half);
+  if (r < limits.R_MIN) return { ok: false, reason: 'stationTurn', r };
+  return { ok: true, r, vlim: Math.min(limits.V_MAX, Math.sqrt(limits.A_LAT * r)) };
+}
+
 // 찍은 점들 → 샘플 배열. 직선과 원호를 같은 점 목록으로 떨어뜨린다.
 //
 // **그린 선과 잰 값이 같은 자료에서 나오게 하려는 것이다.** 화면은 SVG 호 명령으로
@@ -80,15 +107,13 @@ function build(points, limits = LIMITS) {
   const lim = limits;
   if (points.length < 2) return { ok: false, reason: 'short' };
 
-  const corners = [];
-  for (let i = 1; i < points.length - 1; i++) {
-    const f = fillet(points[i - 1], points[i], points[i + 1], lim);
-    corners.push(f);
-    if (!f.ok) return { ok: false, reason: f.reason, at: i, corners };
-  }
-
   const pts = [];
   const segLim = [];
+  const corners = [];
+  // 제어점 하나하나가 경로의 몇 번째 샘플에 앉았는지. 역이 어디인지 알아야 정차
+  // 계획을 세울 수 있어서 돌려준다. 다듬여 사라진 점은 -1이다.
+  const anchors = new Array(points.length).fill(-1);
+  const stopLim = [];
 
   function lineTo(from, to, vlim) {
     const len = Geom.dist(from.x, from.y, to.x, to.y);
@@ -109,15 +134,35 @@ function build(points, limits = LIMITS) {
   }
 
   pts.push({ x: points[0].x, y: points[0].y });
+  anchors[0] = 0;
   let from = points[0];
+
   for (let i = 1; i < points.length - 1; i++) {
-    const c = corners[i - 1];
-    if (c.straight) continue;          // 다듬을 것이 없으면 다음 점까지 한 번에 간다
-    lineTo(from, c.t1, lim.V_MAX);
-    arcTo(c, c.vlim);
-    from = c.t2;
+    const p = points[i];
+
+    if (p.stop) {
+      const turn = stationTurn(points[i - 1], p, points[i + 1], lim);
+      if (!turn.ok) return { ok: false, reason: turn.reason, at: i, turn };
+      corners.push(null);
+      lineTo(from, p, lim.V_MAX);
+      anchors[i] = pts.length - 1;
+      if (turn.vlim < lim.V_MAX) stopLim.push([anchors[i], turn.vlim]);
+      from = p;
+      continue;
+    }
+
+    const f = fillet(points[i - 1], p, points[i + 1], lim);
+    corners.push(f);
+    if (!f.ok) return { ok: false, reason: f.reason, at: i, corners };
+    if (f.straight) continue;
+    lineTo(from, f.t1, lim.V_MAX);
+    arcTo(f, f.vlim);
+    anchors[i] = pts.length - 1;
+    from = f.t2;
   }
+
   lineTo(from, points[points.length - 1], lim.V_MAX);
+  anchors[points.length - 1] = pts.length - 1;
 
   // 마디마다의 제한이 아니라 **점마다의 제한**으로 바꾼다. 한 점은 앞뒤 두 마디에
   // 걸쳐 있으니 둘 중 엄한 쪽을 따른다.
@@ -130,28 +175,38 @@ function build(points, limits = LIMITS) {
     nodeLim[i] = Math.min(before, after);
     if (i > 0) s[i] = s[i - 1] + Geom.dist(pts[i - 1].x, pts[i - 1].y, pts[i].x, pts[i].y);
   }
+  for (const [at, v] of stopLim) nodeLim[at] = Math.min(nodeLim[at], v);
 
-  return { ok: true, corners, pts, segLim, nodeLim, s, length: s[pts.length - 1] };
+  return { ok: true, corners, anchors, pts, segLim, nodeLim, s, length: s[pts.length - 1] };
 }
 
-// 전진·후진 스윕. 역에서 서 있다가 출발해 다음 역에서 선다.
+// 전진·후진 스윕. 정차역에서 서 있다가 출발해 다음 정차역에서 선다.
 //
 // 전진만 하면 다음 역 앞에서 감속할 자리를 남기지 않아 열차가 역을 지나쳐 버린다.
 // 후진 스윕이 "여기서부터는 이미 줄이고 있어야 한다"를 거꾸로 심는다.
-function profile(path, limits = LIMITS) {
+//
+// **어디에 서는지를 받는다.** 급행은 중간 역을 지나치므로 거기서 속도를 0으로
+// 묶지 않고, 그래서 완행보다 훨씬 빠르다. 이 한 인자가 급행을 실제로 급행이게 한다.
+function profile(path, limits = LIMITS, stops = null) {
   const { pts, nodeLim, s } = path;
   const n = pts.length;
   const v = new Array(n);
+  const halt = new Array(n).fill(false);
+  halt[0] = true;
+  halt[n - 1] = true;
+  if (stops) for (const at of stops) if (at > 0 && at < n - 1) halt[at] = true;
 
   v[0] = 0;
   for (let i = 0; i + 1 < n; i++) {
     const ds = s[i + 1] - s[i];
-    v[i + 1] = Math.min(nodeLim[i + 1], Math.sqrt(v[i] * v[i] + 2 * limits.ACCEL * ds));
+    v[i + 1] = halt[i + 1] ? 0
+      : Math.min(nodeLim[i + 1], Math.sqrt(v[i] * v[i] + 2 * limits.ACCEL * ds));
   }
 
   v[n - 1] = 0;
   for (let i = n - 2; i >= 0; i--) {
     const ds = s[i + 1] - s[i];
+    if (halt[i]) { v[i] = 0; continue; }
     v[i] = Math.min(v[i], Math.sqrt(v[i + 1] * v[i + 1] + 2 * limits.DECEL * ds));
   }
 
@@ -203,7 +258,7 @@ function svgPath(pts, from = 0, to = -1) {
   return d;
 }
 
-const Route = { LIMITS, UNIT_COST, fillet, build, profile, cost, svgPath };
+const Route = { LIMITS, UNIT_COST, STATION_ARC, fillet, stationTurn, build, profile, cost, svgPath };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = Route;
 if (typeof window !== 'undefined') window.MetroRoute = Route;

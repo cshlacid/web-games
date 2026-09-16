@@ -24,6 +24,13 @@
   --metro: #3f6fd8;
   --metro-soft: #8fa9e4;
   --reach: #cfdcf3;
+  /* 노선 색. 다섯을 돌려 쓴다 — 여섯 번째 노선까지 가는 판이 아직 없고, 색이
+     늘수록 서로 구별되지 않는다. */
+  --line1: #3f6fd8;
+  --line2: #c0453f;
+  --line3: #2f8f5b;
+  --line4: #b5761f;
+  --line5: #7a4fb5;
   --under: #d9534f;
   --slow: #c9862b;
   --station-fill: #ffffff;
@@ -61,6 +68,11 @@
     --metro: #6f9bf0;
     --metro-soft: #3a4c70;
     --reach: #26344b;
+    --line1: #6f9bf0;
+    --line2: #e07a74;
+    --line3: #57b485;
+    --line4: #d8a13a;
+    --line5: #a487e0;
     --under: #e4736f;
     --slow: #d8a13a;
     --station-fill: #12161c;
@@ -159,8 +171,85 @@ h1 {
 /* 도구 고르개는 판 바로 아래에 둔다. 판 안은 touch-action: none이라 click이 나지
    않으므로 단추를 그 안에 둘 수 없고, 헤더까지 올리면 지금 무슨 모드인지가 눈이
    가는 곳에서 멀어진다. */
-.modes { justify-content: center; }
+.modes, .tools { justify-content: center; flex-wrap: wrap; }
 .modes .pick { padding: 6px 16px; font-size: 13px; }
+.tools .pick { font-size: 12px; }
+
+/* 노선 관리. 지도를 보면서 만져야 해서 시트가 아니라 판 아래 패널이다. */
+.linepanel {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 9px 10px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.linepanel .picker { flex-wrap: wrap; }
+.patternrow { display: flex; align-items: center; gap: 6px; }
+.patternrow .picker { flex: 1; min-width: 0; }
+.pick.add { border-style: dashed; }
+.pick:disabled { opacity: 0.35; cursor: default; }
+
+/* 정차역 줄. 역이 많아지면 옆으로 넘긴다 — 줄바꿈으로 두면 노선의 순서가
+   끊겨 보여 "이 역 다음에 저 역"이라는 것이 읽히지 않는다. */
+.stops {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.stop {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: 2px solid var(--line);
+  background: none;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.stop[aria-pressed="true"] {
+  background: var(--metro);
+  border-color: var(--metro);
+  color: var(--btn-fg);
+}
+
+.stop:disabled { cursor: default; opacity: 0.85; }
+
+.trainrow { display: flex; align-items: center; gap: 7px; }
+.trainlabel { font-size: 12px; font-weight: 600; color: var(--muted); }
+.trainrow b { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; min-width: 1.2em; text-align: center; }
+
+.step {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: none;
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.step:disabled { opacity: 0.3; cursor: default; }
+.step .ico { width: 15px; height: 15px; display: block; }
+
+.plan {
+  margin-inline-start: auto;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.pick .ico { width: 13px; height: 13px; vertical-align: -2px; }
 .picker-row .toggle { margin-inline-start: auto; }
 
 /* 지도는 화면 한 장에 다 들어온다. 확대·팬이 없는 것은 게으름이 아니라 결정이다 —
