@@ -39,6 +39,7 @@ function ok(name, cond, extra = '') {
     stations,
     stopAt: stations.map(() => true),
     headway,
+    capacity: 1e9,
     ride: (i, j) => Math.abs(i - j) * per,
   });
 
@@ -59,12 +60,86 @@ function ok(name, cond, extra = '') {
   const slowClose = line([{ x: 50, y: 0 }, { x: 5950, y: 0 }], 300, 2400);
   const fastFar = line([{ x: 400, y: 400 }, { x: 5600, y: 400 }], 300, 380);
   const both = D.evaluate(od, [slowClose, fastFar]);
-  ok('더 걷더라도 빠른 쪽을 고른다', both.via && both.via.svc === fastFar,
-    JSON.stringify({ cost: both.cost }));
+  ok('더 걷더라도 빠른 쪽을 고른다', both.via && both.via.legs[0].svc === fastFar,
+    JSON.stringify({ cost: Math.round(both.cost) }));
 
   // 안 서는 역은 못 쓴다.
   const express = { ...near, stopAt: [true, false] };
   ok('안 서는 역으로는 못 간다', D.evaluate(od, [express]).via === null);
+}
+
+// --- 갈아타기 ---
+{
+  const hub = { x: 3000, y: 0 };
+  const line = (stations, headway, per) => ({
+    stations, stopAt: stations.map(() => true), headway, capacity: 1e9,
+    ride: (i, j) => Math.abs(i - j) * per,
+  });
+
+  const west = line([{ x: 200, y: 0 }, hub], 300, 600);
+  const east = line([hub, { x: 6200, y: 0 }], 300, 640);
+  const od = { a: { x: 150, y: 120 }, b: { x: 6150, y: 120 }, km: 6, people: 100 };
+
+  ok('한 노선만으로는 못 간다', D.evaluate(od, [west]).via === null);
+  const both = D.evaluate(od, [west, east]);
+  ok('역을 공유하면 갈아타서 간다', both.via !== null && both.via.transfers === 1,
+    JSON.stringify(both.via && { transfers: both.via.transfers, legs: both.via.legs.length }));
+  ok('탄 구간이 둘로 나뉜다', both.via && both.via.legs.length === 2);
+  ok('갈아타도 탈 만하다', both.usage > 0, String(both.usage));
+
+  // 갈아타는 데는 대가가 있다. 같은 길을 직통으로 가는 운행이 있으면 그쪽을 고른다.
+  const through = line([{ x: 200, y: 0 }, hub, { x: 6200, y: 0 }], 300, 620);
+  const mixed = D.evaluate(od, [west, east, through]);
+  ok('직통이 있으면 갈아타지 않는다', mixed.via && mixed.via.transfers === 0,
+    JSON.stringify(mixed.via && mixed.via.transfers));
+  ok('직통이 더 싸다', mixed.cost < both.cost, `${Math.round(mixed.cost)} vs ${Math.round(both.cost)}`);
+  ok('환승 벌점만큼 차이가 난다', both.cost - mixed.cost > D.TRANSFER * 0.5);
+
+  // 만나는 역이 없으면 갈아탈 수 없다.
+  const apart = line([{ x: 3400, y: 0 }, { x: 6200, y: 0 }], 300, 640);
+  ok('만나지 않는 노선끼리는 못 갈아탄다', D.evaluate(od, [west, apart]).via === null);
+}
+
+// --- 수송량 한도 ---
+{
+  const hub = [{ x: 0, y: 0 }, { x: 3000, y: 0 }];
+  const make = (capacity) => ({
+    stations: hub, stopAt: [true, true], headway: 300, capacity,
+    ride: () => 420,
+  });
+  const riders = () => [0, 1, 2].map((k) => ({
+    a: { x: 100, y: 80 + k }, b: { x: 2900, y: 80 + k }, km: 2.9, people: 200,
+  }));
+
+  const roomy = [make(1e9)];
+  const packed = [make(200)];
+  const a = D.assign(riders(), roomy);
+  const b = D.assign(riders(), packed);
+
+  ok('넉넉하면 비용대로 탄다', a.every((od) => od.usage === od.base));
+  ok('좁으면 못 탄 사람이 생긴다', b.every((od) => od.usage < od.base),
+    JSON.stringify(b.map((od) => [od.base.toFixed(2), od.usage.toFixed(2)])));
+  ok('혼잡률이 1을 넘는다', packed[0].crowd > 1, String(packed[0].crowd));
+  ok('넉넉한 쪽은 붐비지 않는다', roomy[0].crowd < 1, String(roomy[0].crowd));
+
+  // 열차를 늘리면(=배차가 좁아지면) 수송력이 늘어 다시 탄다.
+  const doubled = [{ ...make(200), capacity: 400 }];
+  const c = D.assign(riders(), doubled);
+  ok('수송력을 늘리면 더 탄다',
+    c[0].usage > b[0].usage, `${b[0].usage.toFixed(2)} → ${c[0].usage.toFixed(2)}`);
+
+  // 가장 붐비는 구간이 정원을 정한다. 끝에서 끝까지 가는 수요와 절반만 가는 수요가
+  // 섞이면, 겹치는 구간이 그 노선의 한도를 정한다.
+  const three = {
+    stations: [{ x: 0, y: 0 }, { x: 1500, y: 0 }, { x: 3000, y: 0 }],
+    stopAt: [true, true, true], headway: 300, capacity: 1e9, ride: () => 400,
+  };
+  const flows = [
+    { via: { legs: [{ svc: three, si: 0, from: 0, to: 1 }] }, people: 100, usage: 1 },
+    { via: { legs: [{ svc: three, si: 0, from: 0, to: 2 }] }, people: 100, usage: 1 },
+  ];
+  ok('겹치는 구간에 둘이 함께 실린다', D.loadOf(three, flows) === 200,
+    String(D.loadOf(three, flows)));
 }
 
 // --- 수요가 생기는 자리 ---
@@ -116,6 +191,7 @@ function ok(name, cond, extra = '') {
     stations: line.stations,
     stopAt: line.patterns[0].stops,
     headway: plan.headway,
+    capacity: 1e9,
     ride: (i, j) => L.rideTime(table, i, j),
   };
 

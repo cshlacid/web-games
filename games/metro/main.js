@@ -46,7 +46,7 @@ const el = {};
 for (const id of ['map', 'status', 'readout', 'actions', 'budget', 'clock', 'pause', 'newCity',
   'levels', 'modes', 'tools', 'flow', 'vCaught', 'vWaiting', 'vIncome',
   'linepanel', 'lineList', 'patternList', 'stops', 'trainCount', 'trainMinus',
-  'trainPlus', 'plan', 'addPattern', 'undo', 'cancel', 'remove', 'confirm',
+  'trainPlus', 'plan', 'crowd', 'addPattern', 'undo', 'cancel', 'remove', 'confirm',
   'help', 'helpOpen', 'helpClose', 'toggleBgm', 'toggleSfx']) {
   el[id] = document.getElementById(id.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`));
 }
@@ -290,9 +290,13 @@ function syncNetwork() {
       if (pattern.trains > 0) {
         runs.push({ line, table, trains: pattern.trains, headway: plan.headway });
         services.push({
+          line, pattern,
           stations: line.stations,
           stopAt: pattern.stops,
           headway: plan.headway,
+          // 분당 수송력. 열차 한 대가 배차간격마다 한 번씩 지나가므로 대수는 여기
+          // 배차간격 안에 이미 들어 있다.
+          capacity: Demand.TRAIN_CAPACITY * 60 / plan.headway,
           ride: (i, j) => Lines.rideTime(table, i, j),
         });
       }
@@ -302,14 +306,11 @@ function syncNetwork() {
 }
 
 function evaluateDemands() {
+  // **한 수요씩 따로 풀 수 없다.** 수송량 한도 때문에 한 운행에 누가 얼마나 탔는지가
+  // 다른 수요의 이용률을 바꾼다. 그래서 전부 한꺼번에 배정한다.
+  Demand.assign(demands, services);
   income = 0;
-  for (const od of demands) {
-    const got = Demand.evaluate(od, services);
-    od.usage = got.usage;
-    od.via = got.via;
-    od.served = got.usage >= Demand.SERVED;
-    income += Demand.income(od, 1);
-  }
+  for (const od of demands) income += Demand.income(od, 1);
   renderDemands();
 }
 
@@ -345,7 +346,7 @@ function tick(dt) {
     if (!od.usage || !od.via) continue;
     budget += Demand.income(od, minutes);
     work += od.people * od.usage * minutes;
-    centers.push(od.via.svc.stations[od.via.i], od.via.svc.stations[od.via.j]);
+    for (const s of od.via.stations) centers.push(s);
   }
   growWork += work;
   while (growWork >= GROW_WORK && centers.length) {
@@ -852,9 +853,14 @@ function renderLinePanel() {
   el.trainPlus.disabled = pattern.trains >= Lines.MAX_TRAINS || budget < Lines.TRAIN_COST;
 
   const p = Lines.plan(line, pattern);
+  const svc = services.find((x) => x.line === line && x.pattern === pattern);
+  const crowd = svc ? Math.round(svc.crowd * 100) : 0;
   el.plan.textContent = p
     ? `${t('metro.cycle')} ${mmss(p.cycle)} · ${t('metro.headway')} ${mmss(p.headway)}`
     : '';
+  // 혼잡률은 **깎기 전의 부하**다. 100%를 넘으면 그만큼이 못 타고 지상으로 간다.
+  el.crowd.textContent = svc ? `${t('metro.crowd')} ${crowd}%` : '';
+  el.crowd.classList.toggle('over', crowd > 100);
 }
 
 // --- 상태줄 ---

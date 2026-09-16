@@ -108,6 +108,7 @@
       <b id="train-count">0</b>
       <button class="step" id="train-plus" type="button" aria-label="한 대 늘리기" data-i18n-attr="aria-label=metro.trainPlus"><span data-icon="plus"></span></button>
       <span class="plan" id="plan"></span>
+      <span class="crowd" id="crowd"></span>
     </div>
   </div>
 
@@ -120,7 +121,7 @@
 
   <div class="sheet" id="help" hidden>
     <p class="sheet-title" data-i18n="ui.rules">규칙</p>
-    <p class="sheet-note" data-i18n="metro.draftNote">아직 만드는 중입니다. 환승은 아직 세지 않아 한 번에 가는 노선만 승객이 씁니다.</p>
+    <p class="sheet-note" data-i18n="metro.draftNote">아직 만드는 중입니다. 균형(요금·건설비·열차값)은 아직 잡지 않았습니다.</p>
     <ul class="help-list">
       <li data-i18n-html="metro.ruleMap">지도는 화면보다 넓습니다. <b>빈 곳을 끌면</b> 지도가 움직입니다. 고른 역이 화면 밖으로 나가면 가장자리에 점으로 남습니다.</li>
       <li data-i18n-html="metro.ruleStation"><b>건설</b> 모드에서 빈 자리를 누르면 임시 역이 생깁니다. <b>끌어서 자리를 잡고</b> 확정을 눌러야 지어집니다. 물·산·건물 위에는 놓을 수 없고, 역을 다시 누르면 철거되고 절반을 돌려받습니다.</li>
@@ -134,6 +135,8 @@
       <li data-i18n-html="metro.ruleTrains"><b>노선</b> 모드에서 노선을 고르고 <b>정차역</b>과 <b>열차 수</b>를 정합니다. 열차는 노선 하나를 왕복하고, 순환선이면 한 방향으로 계속 돕니다. <b>급행</b>은 중간 역을 빼 둔 운행 패턴이라 정차 시간도 가감속도 덜 써서 훨씬 빠릅니다.</li>
       <li data-i18n-html="metro.ruleDemand">도시에 <b>수요</b>가 생깁니다. 지도의 굽은 선이 "여기서 저기로 가고 싶다"이고, <b>길수록 요금이 비싸고 두꺼울수록 사람이 많습니다.</b> 끝이 찬 동그라미면 그쪽은 이미 역이 가깝다는 뜻입니다.</li>
       <li data-i18n-html="metro.ruleUse">승객은 <b>가장 가까운 역이 아니라 목적지까지 가장 싼 길</b>을 고릅니다. 걷는 시간·기다리는 시간·타고 가는 시간을 다 더한 값이 지상 교통보다 나아야 탑니다. 그래서 <b>역을 가까이 놓고, 곧게 뚫고, 열차를 늘리는 것</b>이 모두 같은 숫자를 낮춥니다.</li>
+      <li data-i18n-html="metro.ruleTransfer">두 노선이 <b>같은 역을 함께 쓰면 갈아탈 수 있습니다.</b> 갈아탈 때마다 번거로움과 기다리는 시간이 붙으므로, 직통으로 가는 운행이 있으면 승객은 그쪽을 고릅니다.</li>
+      <li data-i18n-html="metro.ruleCrowd">열차에는 <b>실을 수 있는 양이 있습니다.</b> 가장 붐비는 구간이 정원을 넘으면 넘친 사람은 못 타고 지상으로 갑니다. 노선 모드의 <b>혼잡</b>이 100%를 넘으면 그만큼 놓치고 있다는 뜻이고, <b>열차를 늘리거나 급행으로 나누면</b> 내려갑니다.</li>
       <li data-i18n-html="metro.ruleGrow">수요를 <b>실어 나른 만큼 도시가 자랍니다.</b> 빈 터에 건물이 들어서고 있던 건물은 높아지며, 자란 동네는 다시 더 큰 수요를 부릅니다. <b>얼마나 높아질지는 건물의 종류가 정합니다.</b></li>
       <li data-i18n-html="metro.ruleDistrict"><b>구시가지</b>는 골목이 좁고 굽은 데다 막다른 길과 삼거리가 많아 길을 따라가기 어렵습니다. <b>계획도시</b>는 그 반대입니다. 난이도는 둘의 배합을 바꿉니다.</li>
       <li data-i18n-html="metro.rule7"><b>확정</b>을 누르기 전에는 아무것도 지어지지 않습니다. 마음껏 끌어 보세요.</li>
