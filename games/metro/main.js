@@ -48,7 +48,7 @@ const GROUND = ['road', 'empty', 'building', 'hill', 'water'];
 
 const el = {};
 for (const id of ['map', 'status', 'readout', 'actions', 'budget', 'clock', 'pause', 'newCity',
-  'wide', 'levels', 'modes', 'tools', 'flow', 'vCaught', 'vWaiting', 'vIncome',
+  'wide', 'levels', 'modes', 'tools', 'flow', 'vCaught', 'vWaiting', 'vMissed', 'missedBox', 'vIncome',
   'linepanel', 'lineList', 'dropLine', 'patternList', 'stops', 'trainCount', 'trainMinus',
   'trainPlus', 'plan', 'crowd', 'addPattern', 'undo', 'cancel', 'remove', 'confirm',
   'help', 'helpOpen', 'helpClose', 'toggleBgm', 'toggleSfx']) {
@@ -113,6 +113,7 @@ let clock = 6 * 3600;    // 게임 초. 아침 여섯 시에 시작한다
 let speed = 1;   // SPEEDS의 자리
 let demands = [];
 let services = [];       // 수요가 보는 운행 목록
+let waiting = new Map(); // 역 → 타려다 못 탄 사람
 let runs = [];           // 화면이 보는 열차 목록 { line, table, trains, headway }
 let growWork = 0;
 let nextSpawn = 0;
@@ -353,9 +354,12 @@ function evaluateDemands() {
   // **한 수요씩 따로 풀 수 없다.** 수송량 한도 때문에 한 운행에 누가 얼마나 탔는지가
   // 다른 수요의 이용률을 바꾼다. 그래서 전부 한꺼번에 배정한다.
   Demand.assign(demands, services);
+  waiting = Demand.waitingAt(demands);
   income = 0;
   for (const od of demands) income += Demand.income(od, 1, city.fare);
   renderDemands();
+  // 역에 붙는 대기 인원이 여기서 바뀐다. 다시 그리지 않으면 판 위의 숫자만 낡는다.
+  renderStations();
 }
 
 function waitingCount() { return demands.filter((od) => !od.served).length; }
@@ -479,8 +483,29 @@ function refresh() {
   renderStatus();
 }
 
+// 노선 패널의 혼잡률은 **한 구간**의 이야기인데, 숫자만 띄우면 970%를 보고도 어디를
+// 고쳐야 하는지 알 수가 없다. 그 구간을 판 위에 굵게 덧그어 짚어 준다.
+function renderJam() {
+  const line = lines[sel.line];
+  if (mode !== 'lines' || !line || !line.path) return;
+  const pattern = line.patterns[sel.pattern];
+  const svc = services.find((x) => x.line === line && x.pattern === pattern);
+  if (!svc || !svc.peak || svc.peak.at < 0 || svc.crowd <= 1) return;
+
+  const marks = line.anchors.filter((a) => pattern.stops[a.station]);
+  const a = marks[svc.peak.at];
+  const b = marks[svc.peak.at + 1];
+  if (!a || !b || a.at < 0 || b.at < 0) return;
+  layer.lines.appendChild(svg('path', {
+    d: Route.svgPath(line.path.pts.slice(a.at, b.at + 1)), fill: 'none',
+    stroke: 'var(--jam)', 'stroke-width': ART.built * 2.2 * K(),
+    'stroke-linecap': 'round', 'stroke-linejoin': 'round', opacity: 0.55,
+  }));
+}
+
 function renderLines() {
   clear(layer.lines);
+  renderJam();
   for (const line of lines) {
     if (!line.path) continue;
     const chosen = mode === 'lines' && lines[sel.line] === line;
@@ -700,6 +725,25 @@ function renderStations() {
     }));
   }
 
+  // **역마다 타려다 못 탄 사람을 적는다.** 혼잡률은 노선 하나의 숫자라, 어느 역에
+  // 줄이 서 있는지가 화면에 없으면 고칠 데를 짚을 수가 없다. 0인 역은 적지 않는다 —
+  // 잘 도는 역까지 숫자를 달면 판이 숫자밭이 되고, 읽어야 하는 것은 밀린 곳뿐이다.
+  for (const [station, people] of waiting) {
+    if (people < 1 || !inView(station, -ART.station * 3)) continue;
+    const r = ART.station * (wide ? 1.6 : 1.05);
+    const x = station.x + ART.station * (wide ? 2.0 : 1.35);
+    const y = station.y - ART.station * (wide ? 2.0 : 1.35);
+    layer.stations.appendChild(svg('circle', {
+      cx: x, cy: y, r, fill: 'var(--jam)', stroke: 'var(--ground)', 'stroke-width': r * 0.28,
+    }));
+    const label = svg('text', {
+      x, y, fill: 'var(--on-jam)', 'font-size': r * 1.25, 'font-weight': 800,
+      'text-anchor': 'middle', 'dominant-baseline': 'central',
+    });
+    label.textContent = people >= 1000 ? `${Math.round(people / 100) / 10}k` : String(Math.round(people));
+    layer.stations.appendChild(label);
+  }
+
   // 고른 역이 화면 밖으로 나가면 가장자리에 표시를 남긴다. 지도가 화면보다
   // 넓어서, 팬으로 옮긴 순간 무엇을 고른 채인지 알 길이 없어진다.
   const pad = ART.station * 1.4;
@@ -819,6 +863,13 @@ function renderMeters() {
   el.wide.setAttribute('aria-pressed', String(wide));
   el.vCaught.textContent = String(demands.length - waitingCount());
   el.vWaiting.textContent = String(waitingCount());
+  // **못 탄 사람을 계기판에 올린다.** 이용 30 · 대기 0인데 혼잡이 970%이면 화면은
+  // "다 잘 되고 있다"고 말하는 셈이라, 무엇이 문제인지 알 길이 없었다.
+  let missed = 0;
+  for (const people of waiting.values()) missed += people;
+  el.missedBox.hidden = missed < 1;
+  el.vMissed.textContent = missed >= 1000
+    ? `${Math.round(missed / 100) / 10}k` : String(Math.round(missed));
   el.vIncome.textContent = income.toFixed(1);
 }
 
@@ -920,9 +971,14 @@ function renderLinePanel() {
   const p = Lines.plan(line, pattern);
   const svc = services.find((x) => x.line === line && x.pattern === pattern);
   const crowd = svc ? Math.round(svc.crowd * 100) : 0;
+  // **선로 한계에 닿았으면 그렇게 적는다.** 열차를 더 넣어도 배차가 줄지 않는데,
+  // 화면에 그 말이 없으면 혼잡을 보고 열차부터 더 사게 된다 — 돈만 나간다.
+  const held = Lines.holdFactor(line, pattern) > 1.001;
   el.plan.textContent = p
     ? `${t('metro.cycle')} ${mmss(p.cycle)} · ${t('metro.headway')} ${mmss(p.headway)}`
+      + (held ? ` (${t('metro.tracked')})` : '')
     : '';
+  el.trainPlus.disabled = el.trainPlus.disabled || held;
   // 혼잡률은 **깎기 전의 부하**다. 100%를 넘으면 그만큼이 못 타고 지상으로 간다.
   el.crowd.textContent = svc ? `${t('metro.crowd')} ${crowd}%` : '';
   el.crowd.classList.toggle('over', crowd > 100);

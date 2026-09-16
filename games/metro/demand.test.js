@@ -245,6 +245,57 @@ function ok(name, cond, extra = '') {
   ok('어느 거리부터는 버스를 탄다', flip > 250 && flip < 700, `${flip}m`);
 }
 
+// --- 어디가 막혔고 어디에 줄이 서는가 ---
+// 혼잡률은 **한 구간**의 이야기인데 숫자 하나로만 띄우면 970%를 보고도 무엇을 고쳐야
+// 하는지 알 수가 없다. 막힌 구간과 역마다의 대기 인원을 함께 돌려준다.
+{
+  const stations = [{ x: 0, y: 0 }, { x: 3000, y: 0 }, { x: 6000, y: 0 }, { x: 9000, y: 0 }];
+  const svc = {
+    stations, stopAt: [true, true, true, true], headway: 300, capacity: 150,
+    ride: (i, j) => Math.abs(i - j) * 420,
+  };
+  // 가운데 구간(1→2)만 겹치게 태운다.
+  const riders = [
+    { a: { x: 100, y: 60 }, b: { x: 5900, y: 60 }, km: 5.8, people: 200 },
+    { a: { x: 3100, y: 60 }, b: { x: 8900, y: 60 }, km: 5.8, people: 200 },
+  ];
+  D.assign(riders, [svc]);
+  ok('가장 붐비는 구간을 짚는다', svc.peak.from === 1 && svc.peak.to === 2,
+    `${svc.peak.from}→${svc.peak.to}`);
+  ok('막힌 구간의 부하가 정원을 넘는다', svc.peak.load > svc.capacity,
+    `${svc.peak.load.toFixed(0)} vs ${svc.capacity}`);
+
+  const wait = D.waitingAt(riders);
+  ok('못 탄 사람이 첫 승차역에 쌓인다', wait.get(stations[0]) > 0 && wait.get(stations[1]) > 0,
+    [...wait.values()].map((n) => Math.round(n)).join(','));
+  ok('타지 않은 역에는 줄이 없다', !wait.has(stations[2]) && !wait.has(stations[3]));
+
+  // 넉넉하면 줄이 서지 않는다.
+  const easy = { ...svc, capacity: 1e9 };
+  const same = [
+    { a: { x: 100, y: 60 }, b: { x: 5900, y: 60 }, km: 5.8, people: 200 },
+    { a: { x: 3100, y: 60 }, b: { x: 8900, y: 60 }, km: 5.8, people: 200 },
+  ];
+  D.assign(same, [easy]);
+  ok('넉넉하면 줄이 없다', D.waitingAt(same).size === 0);
+}
+
+// 순환선은 마지막 역에서 첫 역으로 돌아오는 구간도 센다. 이웃한 쌍만 세던 때는 그
+// 한 구간이 빠져, 한 바퀴 도는 노선에서 정작 가장 붐비는 자리를 놓쳤다.
+{
+  const ring = [{ x: 0, y: 0 }, { x: 3000, y: 0 }, { x: 3000, y: 3000 }, { x: 0, y: 3000 }];
+  const svc = {
+    line: { loop: true },
+    stations: ring, stopAt: [true, true, true, true], headway: 300, capacity: 1e9,
+    ride: () => 500,
+  };
+  // 3번 역에서 0번 역으로 — 순환선에서는 닫는 구간을 지난다.
+  const riders = [{ a: { x: 100, y: 2900 }, b: { x: 100, y: 100 }, km: 2.8, people: 300 }];
+  D.assign(riders, [svc]);
+  ok('순환선의 닫는 구간도 센다', svc.peak.from === 3 && svc.peak.to === 0,
+    `${svc.peak.from}→${svc.peak.to} 부하 ${svc.peak.load.toFixed(0)}`);
+}
+
 // --- 어느 쪽 끝이 닿았는가 ---
 {
   const stations = [{ x: 0, y: 0 }];
