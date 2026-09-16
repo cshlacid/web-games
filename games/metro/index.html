@@ -51,13 +51,15 @@
       <g id="layer-buildings"></g>
       <g id="layer-grown"></g>
       <g id="layer-lines"></g>
+      <g id="layer-trains"></g>
       <g id="layer-draft"></g>
       <g id="layer-stations"></g>
       <g id="layer-handles"></g>
     </svg>
   </div>
 
-  <div class="picker modes" id="modes" role="group" aria-label="도구" data-i18n-attr="aria-label=metro.tool"></div>
+  <div class="picker modes" id="modes" role="group" aria-label="모드" data-i18n-attr="aria-label=metro.mode"></div>
+  <div class="picker tools" id="tools" role="group" aria-label="도구" data-i18n-attr="aria-label=metro.tool" hidden></div>
 
   <p class="status" id="status" role="status" aria-live="polite"></p>
 
@@ -84,6 +86,22 @@
     </p>
   </div>
 
+  <div class="linepanel" id="linepanel" hidden>
+    <div class="picker" id="line-list" role="group" aria-label="노선" data-i18n-attr="aria-label=metro.line"></div>
+    <div class="patternrow">
+      <div class="picker" id="pattern-list" role="group" aria-label="운행 패턴" data-i18n-attr="aria-label=metro.pattern"></div>
+      <button class="pick add" id="add-pattern" type="button" data-i18n="metro.addExpress">급행 추가</button>
+    </div>
+    <div class="stops" id="stops" role="group" aria-label="정차역" data-i18n-attr="aria-label=metro.stops"></div>
+    <div class="trainrow">
+      <span class="trainlabel" data-i18n="metro.trains">열차</span>
+      <button class="step" id="train-minus" type="button" aria-label="한 대 줄이기" data-i18n-attr="aria-label=metro.trainMinus"><span data-icon="minus"></span></button>
+      <b id="train-count">0</b>
+      <button class="step" id="train-plus" type="button" aria-label="한 대 늘리기" data-i18n-attr="aria-label=metro.trainPlus"><span data-icon="plus"></span></button>
+      <span class="plan" id="plan"></span>
+    </div>
+  </div>
+
   <div class="actions" id="actions" hidden>
     <button class="btn ghost" id="undo" type="button" data-i18n="ui.undo">되돌리기</button>
     <button class="btn ghost" id="cancel" type="button" data-i18n="metro.cancel">취소</button>
@@ -95,13 +113,15 @@
     <p class="sheet-note" data-i18n="metro.draftNote">아직 만드는 중입니다. 승객 수요와 요금 수입은 들어오지 않았습니다.</p>
     <ul class="help-list">
       <li data-i18n-html="metro.ruleMap">지도는 화면보다 넓습니다. <b>빈 곳을 끌면</b> 지도가 움직입니다. 고른 역이 화면 밖으로 나가면 가장자리에 점으로 남습니다.</li>
-      <li data-i18n-html="metro.ruleStation"><b>역 놓기</b>에서 빈 자리를 누르면 역이 생깁니다. 물·산·건물 위에는 놓을 수 없습니다. 역을 다시 누르면 철거되고 절반을 돌려받습니다.</li>
-      <li data-i18n-html="metro.rule1"><b>노선 잇기</b>로 바꾸고 역 두 개를 차례로 누르면 둘을 잇는 직선이 생깁니다.</li>
+      <li data-i18n-html="metro.ruleStation"><b>건설</b> 모드에서 빈 자리를 누르면 임시 역이 생깁니다. <b>끌어서 자리를 잡고</b> 확정을 눌러야 지어집니다. 물·산·건물 위에는 놓을 수 없고, 역을 다시 누르면 철거되고 절반을 돌려받습니다.</li>
+      <li data-i18n-html="metro.rule1"><b>기본</b> 모드에서 역을 누르면 <b>새 노선</b>이나 <b>연장</b>을 고를 수 있고, 이을 역을 누르면 둘을 잇는 직선이 생깁니다.</li>
       <li data-i18n-html="metro.rule2">그 선을 <b>잡아 끌면</b> 그 자리에 중간점이 생기며 경로가 휩니다. 중간점은 <b>세 개</b>까지입니다.</li>
       <li data-i18n-html="metro.rule3">중간점을 <b>두 번 두드리면</b> 지워집니다. 끌 때 도로 가까이 가면 도로에 <b>달라붙습니다</b>.</li>
       <li data-i18n-html="metro.rule4">땅마다 값이 다릅니다. <b>도로 밑</b>이 가장 싸고, 빈 땅, 건물 밑, 산 밑 순으로 오르며 <b>물 밑</b>이 가장 비쌉니다.</li>
       <li data-i18n-html="metro.rule5">급하게 굽으면 그 구간의 <b>제한속도</b>가 걸려 느려집니다. 너무 급하면 아예 지을 수 없습니다.</li>
+      <li data-i18n-html="metro.ruleExtend">노선을 연장할 때 <b>역에서 꺾이는 각</b>이 허용 범위를 넘으면 잇지 못합니다. 마지막 역을 <b>첫 역으로 이으면 순환선</b>이 되어 한 방향으로만 돕니다.</li>
       <li data-i18n-html="metro.rule6">열차는 역에서 <b>서 있다가 출발해 다음 역에서 섭니다.</b> 그래서 역이 가까우면 최고 속도에 닿지 못합니다.</li>
+      <li data-i18n-html="metro.ruleTrains"><b>노선</b> 모드에서 노선을 고르고 <b>정차역</b>과 <b>열차 수</b>를 정합니다. 열차는 노선 하나를 왕복하고, 순환선이면 한 방향으로 계속 돕니다. <b>급행</b>은 중간 역을 빼 둔 운행 패턴이라 정차 시간도 가감속도 덜 써서 훨씬 빠릅니다.</li>
       <li data-i18n-html="metro.ruleGrow">구간을 확정하면 <b>이어진 역 둘레의 동네가 자랍니다.</b> 빈 터에 건물이 들어서고 있던 건물은 높아지며, 자란 만큼 예산이 들어옵니다. <b>얼마나 높아질지는 건물의 종류가 정합니다.</b></li>
       <li data-i18n-html="metro.ruleDistrict"><b>구시가지</b>는 골목이 좁고 굽은 데다 막다른 길과 삼거리가 많아 길을 따라가기 어렵습니다. <b>계획도시</b>는 그 반대입니다. 난이도는 둘의 배합을 바꿉니다.</li>
       <li data-i18n-html="metro.rule7"><b>확정</b>을 누르기 전에는 아무것도 지어지지 않습니다. 마음껏 끌어 보세요.</li>
@@ -117,6 +137,8 @@
 <script src="geom.js"></script>
 <script src="citygen.js"></script>
 <script src="route.js"></script>
+<script src="lines.js"></script>
+<script src="../../shared/icons.js"></script>
 <script src="../../shared/audio.js"></script>
 <script src="audio.js"></script>
 <script src="../../shared/sheet.js"></script>
