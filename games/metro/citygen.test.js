@@ -336,7 +336,19 @@ for (const level of [0, 1, 2]) {
 
   ok('지도 밖은 거절한다', C.canPlaceStation(city, 5, 5) === 'outside');
 
-  const spot = find('empty');
+  // 간격 규칙만 보려는 자리라 **옆자리도 함께 비어 있어야** 한다. 한 점만 보고 골랐더니
+  // 지도 끝까지 건물이 차면서 옆자리가 건물이 되어, 간격이 아니라 땅 때문에 거절됐다.
+  const clearRun = () => {
+    for (let i = 0; i < 20000; i++) {
+      const at = find('empty');
+      if (!at) return null;
+      const near = C.canPlaceStation(city, at.x + C.STATION_GAP * 0.5, at.y);
+      const far = C.canPlaceStation(city, at.x + C.STATION_GAP * 1.2, at.y);
+      if (near === null && far === null) return at;
+    }
+    return null;
+  };
+  const spot = clearRun();
   ok('빈 땅에는 놓을 수 있다', spot && C.canPlaceStation(city, spot.x, spot.y) === null);
   const made = C.addStation(city, spot.x, spot.y);
   ok('놓으면 역 목록에 들어간다', made && city.stations.length === 1);
