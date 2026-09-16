@@ -17,6 +17,7 @@ const DWELL = 25;        // 역 한 곳에 서 있는 시간(초). 급행이 아
 const TRAIN_COST = 22;   // 열차 한 대 값(억)
 const MAX_TRAINS = 12;
 const MAX_PATTERNS = 3;
+const MIN_GAP = 110;     // 선로 위 두 열차 사이의 최소 간격(초). 복복선은 없다
 
 let nextId = 1;
 
@@ -93,22 +94,88 @@ function rebuild(line, classify) {
   return path;
 }
 
+// **선로가 하나뿐이다.** 복복선이 아니라, 한 노선 위의 모든 열차가 같은 길을 쓴다.
+// 여기서 두 가지 제약이 나온다.
+//
+// ① **선로 간격.** 열차를 아무리 사도 서로 붙어 갈 수는 없다. 노선 위 열차 간격이
+//    최소 간격보다 좁아지면 그만큼 다 같이 느려진다 — 그래서 열차를 사는 데 적정선이
+//    생기고, 그 위로는 돈만 나간다.
+//
+// ② **급행은 역에서만 추월한다.** 앞서가는 완행을 따라잡으면 그 뒤에 붙어 갈 수밖에
+//    없고, 완행이 역에 선 사이에만 지나칠 수 있다. 그래서 급행이 완행보다 아낄 수
+//    있는 시간은 **통과역 수 × 완행 배차간격**을 넘지 못한다. 완행이 안 다니면
+//    막을 것이 없어 이 제약도 없다.
+//
+// 둘 중 엄한 쪽을 따른다. 지금 숫자로는 대개 ①이 먼저 걸린다.
+function holdFactor(line, pattern) {
+  return Math.max(trackFactor(line), overtakeFactor(line, pattern));
+}
+
+function trackFactor(line) {
+  const total = trainsOf(line);
+  if (total <= 1) return 1;
+  const slow = slowest(line);
+  if (!slow) return 1;
+  const cycle = (runTime(line, slow) + slow.stops.filter(Boolean).length * DWELL)
+    * (line.loop ? 1 : 2);
+  const gap = cycle / total;
+  return gap < MIN_GAP ? MIN_GAP / gap : 1;
+}
+
+function overtakeFactor(line, pattern) {
+  const mine = pattern.stops.filter(Boolean).length;
+  let local = null;
+  for (const other of line.patterns) {
+    if (other === pattern || other.trains <= 0) continue;
+    const stops = other.stops.filter(Boolean).length;
+    if (stops <= mine) continue;
+    if (!local || stops > local.stops.filter(Boolean).length) local = other;
+  }
+  if (!local) return 1;
+
+  const free = runTime(line, pattern);
+  const slow = runTime(line, local);
+  if (free <= 0 || slow <= free) return 1;
+
+  const passes = local.stops.filter(Boolean).length - mine;
+  const localCycle = (slow + local.stops.filter(Boolean).length * DWELL) * (line.loop ? 1 : 2);
+  const allowed = passes * (localCycle / local.trains);
+  return Math.max(free, slow - allowed) / free;
+}
+
+// 가장 많이 서는 패턴. 선로를 가장 오래 차지하는 것이라 간격의 기준이 된다.
+function slowest(line) {
+  let best = null;
+  for (const p of line.patterns) {
+    if (p.trains <= 0) continue;
+    if (!best || p.stops.filter(Boolean).length > best.stops.filter(Boolean).length) best = p;
+  }
+  return best || line.patterns[0];
+}
+
+// 제약을 빼고 순수하게 달리는 데 걸리는 시간.
+function runTime(line, pattern) {
+  if (!line.path) return 0;
+  const stops = line.anchors.filter((a) => pattern.stops[a.station]).map((a) => a.at);
+  return Route.profile(line.path, Route.LIMITS, stops).time;
+}
+
 // 한 운행 패턴이 한 바퀴 도는 데 걸리는 시간과 그때의 배차간격.
 //
 // **왕복이 기본이고 순환선만 한 방향으로 돈다.** 왕복은 같은 길을 되짚어 오므로
 // 주행시간이 두 배이고 정차도 두 번씩 한다.
 function plan(line, pattern) {
   if (!line.path) return null;
-  const stops = line.anchors.filter((a) => pattern.stops[a.station]).map((a) => a.at);
-  const prof = Route.profile(line.path, Route.LIMITS, stops);
   const count = pattern.stops.filter(Boolean).length;
-  const oneWay = prof.time;
-  const cycle = line.loop
-    ? oneWay + count * DWELL
-    : (oneWay + count * DWELL) * 2;
+  // **막히면 서 있는 시간도 같이 늘어난다.** 앞차에 걸린 열차는 역에서도 기다리게
+  // 되고, 주행만 늘리면 배차간격이 최소 간격 아래로 내려가 규칙이 무의미해진다.
+  const hold = holdFactor(line, pattern);
+  const oneWay = runTime(line, pattern) * hold;
+  const cycle = (oneWay + count * DWELL * hold) * (line.loop ? 1 : 2);
   return {
     oneWay,
     cycle,
+    hold,
     stops: count,
     headway: pattern.trains > 0 ? cycle / pattern.trains : Infinity,
     length: line.path.length * (line.loop ? 1 : 2),
@@ -128,6 +195,9 @@ function timetable(line, pattern) {
   const halt = new Set(marks.map((a) => a.at));
   const prof = Route.profile(path, Route.LIMITS, [...halt]);
   const n = path.pts.length;
+  // 앞차에 막혀 늦어지는 몫. 실제로는 따라잡는 지점에서 몰려 생기지만, 화면에서
+  // 읽히는 차이가 없어 고르게 늘려 둔다.
+  const hold = holdFactor(line, pattern);
 
   const out = [];
   const stops = [];
@@ -135,9 +205,9 @@ function timetable(line, pattern) {
   for (let i = 0; i < n; i++) {
     const last = i === n - 1;
     if (halt.has(i) && !(line.loop && last)) {
-      stops.push({ at: i, arrive: t, depart: t + DWELL });
+      stops.push({ at: i, arrive: t, depart: t + DWELL * hold });
       out.push({ t, s: path.s[i] });
-      t += DWELL;
+      t += DWELL * hold;
       out.push({ t, s: path.s[i] });
     } else {
       out.push({ t, s: path.s[i] });
@@ -145,7 +215,7 @@ function timetable(line, pattern) {
     if (!last) {
       const ds = path.s[i + 1] - path.s[i];
       const sum = prof.v[i] + prof.v[i + 1];
-      if (sum > 0) t += 2 * ds / sum;
+      if (sum > 0) t += 2 * ds / sum * hold;
     }
   }
 
@@ -179,7 +249,11 @@ function at(line, table, time) {
   const b = marks[hi];
   const k = b.t > a.t ? (t - a.t) / (b.t - a.t) : 0;
   const s = a.s + (b.s - a.s) * k;
-  return pointAt(line.path, s);
+  const spot = pointAt(line.path, s);
+  // 서 있는 동안은 시간만 가고 거리가 그대로다. 화면이 그것을 달리 그린다 —
+  // 열차가 역에 선다는 것이 보이지 않으면 정차 시간도 가감속도 숫자로만 남는다.
+  spot.halted = b.t > a.t && Math.abs(b.s - a.s) < 1e-6;
+  return spot;
 }
 
 function pointAt(path, s) {
@@ -238,6 +312,7 @@ function trainsOf(line) {
 const Lines = {
   DWELL, TRAIN_COST, MAX_TRAINS, MAX_PATTERNS,
   controlPoints, create, withExtension, whyNot, rebuild, plan, timetable, at, pointAt, rideTime,
+  holdFactor, trackFactor, overtakeFactor, runTime, MIN_GAP,
   expressPattern, canToggle, trainsOf,
   reset() { nextId = 1; },
 };

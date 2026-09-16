@@ -21,9 +21,9 @@ const START_BUDGET = 480;
 const STATION_COST = 14;
 const REFUND = 0.5;
 const GROW_RADIUS = 520;
-// 실제 1초가 게임 1분이다. 주기가 5~13분인 노선이 화면에서 5~13초에 한 바퀴를
-// 돌아 열차가 도는 것이 보이고, 수입과 성장도 같은 시계를 탄다.
-const SPEED = 60;
+// 실제 1초에 게임이 몇 초 가는가. **보통을 20으로 둔 것은 가감속과 정차를 눈으로
+// 보기 위해서다** — 60배로는 역에 서는 25초가 0.4초라 아예 안 보인다.
+const SPEEDS = [0, 20, 60];
 const GROW_WORK = 7000;   // 이만큼 실어 나르면 한 채가 자란다
 const GROW_FLASH = 3;     // 자란 자리를 짚어 두는 시간(실제 초)
 
@@ -45,7 +45,7 @@ const GROUND = ['road', 'empty', 'building', 'hill', 'water'];
 const el = {};
 for (const id of ['map', 'status', 'readout', 'actions', 'budget', 'clock', 'pause', 'newCity',
   'levels', 'modes', 'tools', 'flow', 'vCaught', 'vWaiting', 'vIncome',
-  'linepanel', 'lineList', 'patternList', 'stops', 'trainCount', 'trainMinus',
+  'linepanel', 'lineList', 'dropLine', 'patternList', 'stops', 'trainCount', 'trainMinus',
   'trainPlus', 'plan', 'crowd', 'addPattern', 'undo', 'cancel', 'remove', 'confirm',
   'help', 'helpOpen', 'helpClose', 'toggleBgm', 'toggleSfx']) {
   el[id] = document.getElementById(id.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`));
@@ -93,7 +93,7 @@ let sel = { line: 0, pattern: 0 };
 
 // 시뮬레이션
 let clock = 6 * 3600;    // 게임 초. 아침 여섯 시에 시작한다
-let paused = false;
+let speed = 1;   // SPEEDS의 자리
 let demands = [];
 let services = [];       // 수요가 보는 운행 목록
 let runs = [];           // 화면이 보는 열차 목록 { line, table, trains, headway }
@@ -310,7 +310,7 @@ function evaluateDemands() {
   // 다른 수요의 이용률을 바꾼다. 그래서 전부 한꺼번에 배정한다.
   Demand.assign(demands, services);
   income = 0;
-  for (const od of demands) income += Demand.income(od, 1);
+  for (const od of demands) income += Demand.income(od, 1, city.fare);
   renderDemands();
 }
 
@@ -344,7 +344,7 @@ function tick(dt) {
   const centers = [];
   for (const od of demands) {
     if (!od.usage || !od.via) continue;
-    budget += Demand.income(od, minutes);
+    budget += Demand.income(od, minutes, city.fare);
     work += od.people * od.usage * minutes;
     for (const s of od.via.stations) centers.push(s);
   }
@@ -359,7 +359,7 @@ function tick(dt) {
 }
 
 function running() {
-  return !paused && !draft && !ghost && !marked && lines.length > 0;
+  return SPEEDS[speed] > 0 && !draft && !ghost && !marked && lines.length > 0;
 }
 
 function frame(now) {
@@ -371,7 +371,7 @@ function frame(now) {
   if (fade) { grown = grown.filter((g) => now - g.at <= GROW_FLASH * 1000); renderGrown(); }
 
   if (!running() || dt <= 0) return;
-  tick(dt * SPEED);
+  tick(dt * SPEEDS[speed]);
   renderTrains();
   renderMeters();
 }
@@ -454,10 +454,15 @@ function renderLines() {
 function renderTrains() {
   clear(layer.trains);
   for (const run of runs) {
-    const group = svg('g', { fill: 'var(--station-fill)', stroke: lineColor(run.line), 'stroke-width': 10 });
+    const group = svg('g', { stroke: lineColor(run.line), 'stroke-width': 10 });
     for (let k = 0; k < run.trains; k++) {
       const at = Lines.at(run.line, run.table, clock + k * run.headway);
-      group.appendChild(svg('circle', { cx: r1(at.x), cy: r1(at.y), r: ART.train }));
+      group.appendChild(svg('circle', {
+        cx: r1(at.x), cy: r1(at.y), r: ART.train,
+        // 서 있는 열차는 속을 채운다. 이것이 없으면 정차 시간도 가감속도 숫자로만
+        // 남고, 화면에서는 그냥 점이 미끄러지는 것으로 보인다.
+        fill: at.halted ? lineColor(run.line) : 'var(--station-fill)',
+      }));
     }
     layer.trains.appendChild(group);
   }
@@ -486,11 +491,13 @@ function renderDemands() {
       opacity: 0.45 + od.usage * 0.45,
     }));
     for (const end of [od.a, od.b]) {
+      // 2는 걸어갈 수 있는 거리, 1은 버스로 닿는 거리, 0은 멀다.
       const near = Demand.reach(end, city.stations);
       layer.demand.appendChild(svg('circle', {
         cx: r1(end.x), cy: r1(end.y), r: 34,
-        fill: near ? 'var(--demand)' : 'var(--ground)',
-        stroke: 'var(--demand)', 'stroke-width': 12,
+        fill: near === 2 ? 'var(--demand)' : 'var(--ground)',
+        stroke: 'var(--demand)', 'stroke-width': near === 0 ? 8 : 12,
+        'stroke-dasharray': near === 1 ? '22 16' : '',
       }));
     }
   }
@@ -753,6 +760,8 @@ function renderMeters() {
   const mm = Math.floor(clock / 60) % 60;
   el.clock.textContent = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
   el.clock.classList.toggle('held', !running());
+  el.pause.textContent = t(['metro.speedStop', 'metro.speedSlow', 'metro.speedFast'][speed]);
+  el.pause.setAttribute('aria-pressed', String(speed > 0));
   el.vCaught.textContent = String(demands.length - waitingCount());
   el.vWaiting.textContent = String(waitingCount());
   el.vIncome.textContent = income.toFixed(1);
@@ -815,6 +824,7 @@ function renderLinePanel() {
     id: i, label: l.loop ? `${lineName(l)} ${t('metro.loop')}` : lineName(l), on: i === sel.line,
   })), (item) => { sel.line = item.id; sel.pattern = 0; Sound.play('select'); refresh(); });
 
+  el.dropLine.disabled = !line;
   if (!line) {
     clear(el.patternList);
     clear(el.stops);
@@ -1124,17 +1134,19 @@ function confirm() {
   }
   if (!draftOk() || draft.cost.cost > budget) return;
 
+  const cost = draft.cost.cost;
   if (draft.kind === 'new') {
     const line = Lines.create(draft.from, draft.to, draft.mids);
     line.color = lines.length % LINE_COLORS;
+    line.spent = cost;
     rebuildLine(line);
     lines.push(line);
   } else {
     const next = Lines.withExtension(draft.line, draft.to, draft.mids);
     Object.assign(draft.line, next);
+    draft.line.spent = (draft.line.spent || 0) + cost;
     rebuildLine(draft.line);
   }
-  const cost = draft.cost.cost;
   draft = null;
   pending = null;
   history = [];
@@ -1168,6 +1180,22 @@ el.undo.addEventListener('click', () => {
   refresh();
 });
 
+// 노선을 통째로 없앤다. 역과 같은 규율이다 — 고르고, 무엇을 고른 건지 보고, 단추를
+// 눌러야 사라진다. 들인 값과 열차값의 절반을 돌려준다.
+el.dropLine.addEventListener('click', () => {
+  const line = lines[sel.line];
+  if (!line) return;
+  const back = ((line.spent || 0) + Lines.trainsOf(line) * Lines.TRAIN_COST) * REFUND;
+  lines.splice(sel.line, 1);
+  lines.forEach((l, i) => { l.color = i % LINE_COLORS; });
+  budget += back;
+  sel = { line: 0, pattern: 0 };
+  Sound.play('erase');
+  syncNetwork();
+  refresh();
+  renderStatus('metro.lineGone');
+});
+
 el.addPattern.addEventListener('click', () => {
   const line = lines[sel.line];
   if (!line || line.patterns.length >= Lines.MAX_PATTERNS) return;
@@ -1199,9 +1227,10 @@ el.trainMinus.addEventListener('click', () => setTrains(-1));
 
 el.remove.addEventListener('click', removeStation);
 
+// 배속은 단추 하나를 돌려 쓴다. 멈춤·보통·빠름 셋뿐이라 고르개를 따로 두면
+// 머리줄이 그만큼 좁아지는데, 얻는 것이 없다.
 el.pause.addEventListener('click', () => {
-  paused = !paused;
-  el.pause.setAttribute('aria-pressed', String(!paused));
+  speed = (speed + 1) % SPEEDS.length;
   Sound.play('select');
   renderMeters();
 });

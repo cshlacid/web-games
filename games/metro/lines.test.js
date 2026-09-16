@@ -86,11 +86,16 @@ const ground = () => 'empty';
 
   ok('왕복은 한쪽 시간의 두 배보다 길다', p.cycle > p.oneWay * 2, `${p.cycle} vs ${p.oneWay}`);
   near('정차 시간이 역 수만큼 두 번 든다', p.cycle - p.oneWay * 2, 2 * 2 * L.DWELL, 0.01);
+  ok('막히지 않으면 hold는 1', p.hold === 1);
   near('길이도 왕복이다', p.length, 3000, 2);
   near('열차 한 대면 배차간격이 곧 주기', p.headway, p.cycle, 1e-9);
 
-  line.patterns[0].trains = 3;
-  near('열차를 늘리면 배차간격이 그만큼 준다', L.plan(line, line.patterns[0]).headway, p.cycle / 3, 1e-9);
+  line.patterns[0].trains = 2;
+  near('열차를 늘리면 배차간격이 그만큼 준다', L.plan(line, line.patterns[0]).headway, p.cycle / 2, 1e-9);
+
+  // 더 늘리면 선로가 감당하지 못해 바닥에 걸린다.
+  line.patterns[0].trains = 4;
+  near('배차간격은 최소 간격 아래로 안 내려간다', L.plan(line, line.patterns[0]).headway, L.MIN_GAP, 0.5);
 
   line.patterns[0].trains = 0;
   ok('열차가 없으면 배차간격이 없다', L.plan(line, line.patterns[0]).headway === Infinity);
@@ -191,6 +196,106 @@ const ground = () => 'empty';
   const behind = L.rideTime(table, 1, 0);
   ok('순환선은 방향에 따라 시간이 다르다', behind > ahead, `${ahead} vs ${behind}`);
   near('앞뒤를 합치면 한 바퀴', ahead + behind, table.cycle - L.DWELL * 2, 0.5);
+}
+
+// --- 선로가 하나뿐이다 ---
+{
+  // 1km 간격 역 여섯.
+  let line = L.create(st(0, 0), st(1000, 0));
+  for (const x of [2000, 3000, 4000, 5000]) line = L.withExtension(line, st(x, 0));
+  L.rebuild(line, ground);
+  const local = line.patterns[0];
+
+  local.trains = 1;
+  ok('한 대뿐이면 막을 것이 없다', L.trackFactor(line) === 1);
+  local.trains = 4;
+  ok('여유가 있으면 그대로', L.trackFactor(line) === 1);
+
+  // 열차를 계속 늘리면 어느 지점부터 서로를 막는다.
+  local.trains = 14;
+  const packed = L.trackFactor(line);
+  ok('너무 촘촘하면 다 같이 느려진다', packed > 1, String(packed));
+
+  // **그래서 배차간격은 최소 간격 아래로 내려가지 않는다.** 열차를 더 사도
+  // 소용없어지는 지점이 있다는 것이 이 규칙의 값이다.
+  const tight = L.plan(line, local).headway;
+  local.trains = 24;
+  const tighter = L.plan(line, local).headway;
+  ok('배차간격에 바닥이 있다', tighter >= L.MIN_GAP * 0.99, `${tighter.toFixed(0)}초`);
+  ok('더 사도 거의 안 좁아진다', tighter > tight * 0.9, `${tight.toFixed(0)} → ${tighter.toFixed(0)}`);
+}
+
+// --- 급행은 역에서만 완행을 추월한다 ---
+{
+  let line = L.create(st(0, 0), st(1000, 0));
+  for (const x of [2000, 3000, 4000, 5000]) line = L.withExtension(line, st(x, 0));
+  L.rebuild(line, ground);
+  const local = line.patterns[0];
+  const express = L.expressPattern(line);
+  line.patterns.push(express);
+
+  local.trains = 0;
+  ok('완행이 안 다니면 막을 것이 없다', L.overtakeFactor(line, express) === 1);
+
+  // 완행이 잦아질수록 지나칠 틈이 줄어든다. 통과역 수만큼만 지나칠 수 있으므로
+  // 아낄 수 있는 시간에 상한이 생긴다.
+  const at = (n) => { local.trains = n; return L.overtakeFactor(line, express); };
+  ok('완행이 잦을수록 급행이 더 막힌다', at(60) >= at(30) && at(30) >= at(4),
+    `${at(4).toFixed(2)} ≤ ${at(30).toFixed(2)} ≤ ${at(60).toFixed(2)}`);
+  ok('막혀도 완행보다 빠르거나 같다',
+    L.runTime(line, express) * at(60) <= L.runTime(line, local) + 1e-6);
+  ok('제약은 늦추기만 한다', at(4) >= 1 && at(60) >= 1);
+  local.trains = 4;
+  ok('완행 자신은 이 제약을 받지 않는다', L.overtakeFactor(line, local) === 1);
+
+  // 통과역이 많을수록 지나칠 기회가 많아 덜 막힌다.
+  const half = { ...express, stops: express.stops.slice(), trains: 1 };
+  half.stops[2] = true;
+  half.stops[3] = true;
+  line.patterns.push(half);
+  local.trains = 60;
+  // 비율이 아니라 실제 걸리는 시간으로 견준다 — 비율은 저마다 제 자유 주행시간을
+  // 기준으로 하므로 패턴끼리 견줄 수 없다.
+  const heldExpress = L.runTime(line, express) * L.overtakeFactor(line, express);
+  const heldHalf = L.runTime(line, half) * L.overtakeFactor(line, half);
+  ok('통과역이 많은 쪽이 더 빠르다', heldExpress < heldHalf,
+    `${heldExpress.toFixed(0)}초 vs ${heldHalf.toFixed(0)}초`);
+}
+
+// --- 막힌 만큼 시간표도 늘어난다 ---
+{
+  let line = L.create(st(0, 0), st(1000, 0));
+  for (const x of [2000, 3000, 4000]) line = L.withExtension(line, st(x, 0));
+  L.rebuild(line, ground);
+  const local = line.patterns[0];
+
+  local.trains = 2;
+  const free = L.plan(line, local);
+  local.trains = 20;
+  const held = L.plan(line, local);
+  ok('막히면 주기가 길어진다', held.cycle > free.cycle, `${free.cycle.toFixed(0)} → ${held.cycle.toFixed(0)}`);
+  ok('막힌 만큼이 plan에 적혀 나온다', held.hold > 1 && free.hold === 1);
+
+  // 화면의 열차가 계산과 다른 속도로 돌면 안 된다.
+  const table = L.timetable(line, local);
+  ok('시간표의 주기가 plan과 같다', Math.abs(table.cycle - held.cycle) < 0.01,
+    `${table.cycle.toFixed(1)} vs ${held.cycle.toFixed(1)}`);
+}
+
+// --- 열차가 역에 선다 ---
+{
+  let line = L.create(st(0, 0), st(1500, 0));
+  line = L.withExtension(line, st(3000, 0));
+  L.rebuild(line, ground);
+  const table = L.timetable(line, line.patterns[0]);
+
+  // 가운데 역에 서 있는 동안을 찾아본다.
+  const mid = table.stops.find((x) => x.station === 1);
+  const during = L.at(line, table, (mid.arrive + mid.depart) / 2);
+  const moving = L.at(line, table, mid.depart + 20);
+  ok('역에 선 동안은 멈춤으로 표시된다', during.halted === true);
+  ok('달릴 때는 아니다', moving.halted === false);
+  near('서 있는 자리는 그 역', during.x, 1500, 2);
 }
 
 // --- 정차역 토글의 경계 ---

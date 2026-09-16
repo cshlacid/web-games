@@ -23,6 +23,13 @@ const R_WALK = 800;         // 이보다 먼 역은 후보로도 보지 않는�
 // 타는 쪽에도 주차하고 걸어 나오고 신호에 걸리는 시간이 있고, 그것을 빼면 짧은
 // 거리에서는 지하철이 절대 이길 수 없다.
 const SURFACE_SPEED = 4.2;   // m/s (약 15km/h). 신호와 막힘을 포함한 문 앞에서 문 앞까지
+// 역까지 가는 길이 걷기만 있는 것은 아니다. **버스를 타고 역까지 갈 수 있고, 내려서
+// 목적지까지도 버스를 탈 수 있다.** 기다리는 몫이 붙어 가까운 거리는 걷는 편이 낫고,
+// 먼 거리는 버스가 낫다 — 그 갈림이 대략 사백 미터쯤이다.
+const BUS_SPEED = 4.2;       // 지상 교통과 같은 속도
+const BUS_WEIGHT = 1.2;      // 앉아 가니 걷는 것보다는 낫다
+const BUS_ACCESS = 330;      // 정류장까지 걷고 기다리는 몫(초)
+const R_ACCESS = 3000;       // 버스로도 이만큼까지만. 그보다 멀면 그냥 버스로 간다
 // 차를 타는 쪽에도 세워 두고 걸어 나오고 신호에 걸리는 시간이 있다. 이 값이
 // 작으면 짧은 거리에서 지하철이 절대 이길 수 없고, 그러면 게임이 성립하지 않는다.
 const SURFACE_ACCESS = 420;  // 초
@@ -39,7 +46,16 @@ const TRANSFER = 100;       // 갈아타는 데 드는 초. 계단과 통로와 
 const TRAIN_CAPACITY = 700; // 열차 한 대가 한 번에 실어 나르는 사람
 // 억 / (사람 × km × 게임분). 망이 어중간할 때도 돈이 조금은 들어와야 다음 한 수를
 // 둘 수 있다. 진짜 균형은 아직 잡지 않았다.
-const FARE = 0.00025;
+const FARE = 0.00012;
+
+const walkCost = (d) => d / WALK_SPEED * WALK_WEIGHT;
+const busCost = (d) => BUS_ACCESS + d / BUS_SPEED * BUS_WEIGHT;
+
+// 역까지 오가는 값. 걷는 것과 버스 중 싼 쪽을 고른다.
+function accessCost(d) {
+  if (d > R_ACCESS) return Infinity;
+  return Math.min(d <= R_WALK ? walkCost(d) : Infinity, busCost(d));
+}
 
 // 지상 교통과 견준 이용률. **경계에서 뚝 끊기면** 역을 조금 옮겼을 뿐인데 수입이
 // 0과 100을 오간다. 부드러운 계단으로 잇는다.
@@ -138,8 +154,9 @@ function evaluate(od, services) {
 
   for (let id = 0; id < nodes.length; id++) {
     const w = Geom.dist(od.a.x, od.a.y, nodes[id].station.x, nodes[id].station.y);
-    if (w > R_WALK) continue;
-    const cost = w / WALK_SPEED * WALK_WEIGHT + nodes[id].svc.headway / 2;
+    const access = accessCost(w);
+    if (!Number.isFinite(access)) continue;
+    const cost = access + nodes[id].svc.headway / 2;
     if (cost < dist[id]) { dist[id] = cost; walkIn[id] = w; }
   }
 
@@ -175,8 +192,9 @@ function evaluate(od, services) {
   for (let id = 0; id < nodes.length; id++) {
     if (!Number.isFinite(dist[id])) continue;
     const w = Geom.dist(od.b.x, od.b.y, nodes[id].station.x, nodes[id].station.y);
-    if (w > R_WALK) continue;
-    const cost = dist[id] + w / WALK_SPEED * WALK_WEIGHT;
+    const access = accessCost(w);
+    if (!Number.isFinite(access)) continue;
+    const cost = dist[id] + access;
     if (cost < best) { best = cost; end = id; walkOut = w; }
   }
 
@@ -200,6 +218,9 @@ function evaluate(od, services) {
   const via = {
     legs: legs.filter((leg) => leg.from !== leg.to),
     stations, walkA: walkIn[chain[0]], walkB: walkOut,
+    // 버스를 탔는지. 걸어서 갈 수 있는 거리를 넘었으면 버스를 탄 것이다.
+    busA: walkIn[chain[0]] > R_WALK,
+    busB: walkOut > R_WALK,
     transfers: Math.max(0, legs.length - 1),
   };
   return { cost: best, ref, usage: share(best, ref), via };
@@ -289,22 +310,28 @@ function loadOf(svc, demands) {
   return loads.reduce((a, b) => Math.max(a, b), 0);
 }
 
-// 한쪽 끝이라도 역 가까이 있는가. 못 잡은 수요를 그릴 때 **어느 쪽을 이으면 되는지**를
-// 끝마다 달리 그리려고 쓴다.
+// 한쪽 끝이 역에 얼마나 닿았는가. 못 잡은 수요를 그릴 때 **어느 쪽을 이으면 되는지**를
+// 끝마다 달리 그리려고 쓴다. 2는 걸어갈 수 있는 거리, 1은 버스로 닿는 거리, 0은 멀다.
 function reach(point, stations) {
-  for (const s of stations) if (Geom.dist(point.x, point.y, s.x, s.y) <= R_WALK) return true;
-  return false;
+  let best = 0;
+  for (const s of stations) {
+    const d = Geom.dist(point.x, point.y, s.x, s.y);
+    if (d <= R_WALK) return 2;
+    if (d <= R_ACCESS) best = 1;
+  }
+  return best;
 }
 
-function income(od, minutes) {
-  return od.people * od.km * FARE * od.usage * minutes;
+// 난이도가 요금을 탄다. 어려울수록 같은 승객이 덜 벌어 준다.
+function income(od, minutes, scale = 1) {
+  return od.people * od.km * FARE * od.usage * minutes * scale;
 }
 
 const Demand = {
   WALK_SPEED, WALK_WEIGHT, R_WALK, SURFACE_SPEED, SURFACE_ACCESS, MIN_DIST,
   MAX_WAITING, MAX_TOTAL, PATIENCE, SPAWN_EVERY, SERVED, FARE, ANCHOR_R, BOTH_ENDS,
-  TRANSFER, TRAIN_CAPACITY,
-  share, spawn, evaluate, assign, loadOf, surfaceCost, reach, income,
+  TRANSFER, TRAIN_CAPACITY, BUS_SPEED, BUS_WEIGHT, BUS_ACCESS, R_ACCESS,
+  share, spawn, evaluate, assign, loadOf, surfaceCost, accessCost, reach, income,
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = Demand;
