@@ -319,7 +319,10 @@ function peakOf(svc, demands) {
   }
   let at = 0;
   for (let k = 1; k < loads.length; k++) if (loads[k] > loads[at]) at = k;
-  return { load: loads[at], at, from: order[at], to: order[(at + 1) % order.length] };
+  // 구간마다의 부하를 통째로 돌려준다. 화면이 **열차가 지금 지나는 구간**의 부하로
+  // 그 열차를 채워 그린다 — 혼잡을 노선 하나의 숫자로만 두면 어느 열차가 터지는지가
+  // 안 보인다.
+  return { load: loads[at], at, loads, from: order[at], to: order[(at + 1) % order.length] };
 }
 
 // 역마다 타려다 못 탄 사람. **깎인 몫은 첫 승차역에 쌓인다** — 실제로 줄이 서는 곳이

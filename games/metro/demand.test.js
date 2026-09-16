@@ -265,6 +265,14 @@ function ok(name, cond, extra = '') {
   ok('막힌 구간의 부하가 정원을 넘는다', svc.peak.load > svc.capacity,
     `${svc.peak.load.toFixed(0)} vs ${svc.capacity}`);
 
+  // 구간마다의 부하를 통째로 돌려준다. 화면이 열차가 지금 지나는 구간의 부하로
+  // 그 열차를 채워 그린다 — 노선 하나의 숫자로만 두면 어느 열차가 터지는지가 안 보인다.
+  ok('구간마다의 부하가 다 있다', svc.peak.loads.length === 3,
+    JSON.stringify(svc.peak.loads.map((n) => Math.round(n))));
+  ok('가운데 구간이 가장 무겁다',
+    svc.peak.loads[1] > svc.peak.loads[0] && svc.peak.loads[1] > svc.peak.loads[2],
+    JSON.stringify(svc.peak.loads.map((n) => Math.round(n))));
+
   const wait = D.waitingAt(riders);
   ok('못 탄 사람이 첫 승차역에 쌓인다', wait.get(stations[0]) > 0 && wait.get(stations[1]) > 0,
     [...wait.values()].map((n) => Math.round(n)).join(','));
