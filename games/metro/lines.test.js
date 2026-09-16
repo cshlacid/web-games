@@ -127,6 +127,72 @@ const ground = () => 'empty';
     `${b.oneWay} < ${c.oneWay} < ${a.oneWay}`);
 }
 
+// --- 시간표와 열차 위치 ---
+{
+  let line = L.create(st(0, 0), st(1000, 0));
+  for (const x of [2000, 3000]) line = L.withExtension(line, st(x, 0));
+  L.rebuild(line, ground);
+  const pattern = line.patterns[0];
+  const table = L.timetable(line, pattern);
+  const p = L.plan(line, pattern);
+
+  near('시간표의 주기가 계산한 주기와 같다', table.cycle, p.cycle, 0.01);
+  ok('정차역마다 도착·출발이 있다', table.stops.length === 4
+    && table.stops.every((s) => s.depart - s.arrive === L.DWELL));
+  ok('정차역 번호가 붙어 있다',
+    JSON.stringify(table.stops.map((s) => s.station)) === '[0,1,2,3]');
+
+  // 열차는 시작에서 출발해 반쯤에 끝까지 갔다가 돌아온다.
+  const start = L.at(line, table, 0);
+  const middle = L.at(line, table, table.half);
+  const back = L.at(line, table, table.cycle - 0.001);
+  near('처음에는 첫 역에 있다', start.x, 0, 1);
+  near('반 바퀴에서는 끝 역에 있다', middle.x, 3000, 2);
+  near('한 바퀴를 돌면 첫 역으로 돌아온다', back.x, 0, 2);
+
+  // 어느 시각에도 노선 위를 벗어나지 않는다.
+  let off = 0;
+  for (let k = 0; k < 400; k++) {
+    const q = L.at(line, table, table.cycle * k / 400);
+    if (q.x < -2 || q.x > 3002 || Math.abs(q.y) > 2) off++;
+  }
+  ok('열차가 노선 위를 벗어나지 않는다', off === 0, `${off}번`);
+
+  // 역과 역 사이 시간. 멀수록 오래 걸린다.
+  const t01 = L.rideTime(table, 0, 1);
+  const t03 = L.rideTime(table, 0, 3);
+  ok('먼 역까지가 더 오래 걸린다', t03 > t01 * 2, `${t01} vs ${t03}`);
+  near('되돌아가는 방향도 같은 시간', L.rideTime(table, 3, 0), t03, 0.01);
+  ok('같은 역끼리는 없다', L.rideTime(table, 1, 1) === null);
+
+  // 급행은 같은 두 역 사이를 더 빨리 간다.
+  const ex = L.expressPattern(line);
+  const fast = L.timetable(line, ex);
+  ok('급행이 종점까지 더 빠르다', L.rideTime(fast, 0, 3) < t03,
+    `${L.rideTime(fast, 0, 3)} vs ${t03}`);
+  ok('급행이 안 서는 역은 탈 수 없다', L.rideTime(fast, 0, 1) === null);
+}
+
+// --- 순환선의 시간표 ---
+{
+  let line = L.create(st(0, 0), st(1400, 0));
+  line = L.withExtension(line, st(1400, 1400));
+  line = L.withExtension(line, st(0, 1400));
+  line = L.withExtension(line, line.stations[0]);
+  L.rebuild(line, ground);
+  const table = L.timetable(line, line.patterns[0]);
+
+  ok('순환선은 첫 역에서 한 번만 선다', table.stops.length === 4,
+    JSON.stringify(table.stops.map((s) => s.station)));
+  near('주기가 계산한 값과 같다', table.cycle, L.plan(line, line.patterns[0]).cycle, 0.01);
+
+  // 한 방향으로만 도니 지나친 역은 한 바퀴를 돌아야 한다.
+  const ahead = L.rideTime(table, 0, 1);
+  const behind = L.rideTime(table, 1, 0);
+  ok('순환선은 방향에 따라 시간이 다르다', behind > ahead, `${ahead} vs ${behind}`);
+  near('앞뒤를 합치면 한 바퀴', ahead + behind, table.cycle - L.DWELL * 2, 0.5);
+}
+
 // --- 정차역 토글의 경계 ---
 {
   let line = L.create(st(0, 0), st(1000, 0));
