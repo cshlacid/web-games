@@ -259,7 +259,9 @@ function assign(demands, services) {
   // 맞게 나와서, 얼마나 넘치는지가 화면에서 사라진다.
   apply();
   for (const svc of services) {
-    svc.pressure = svc.capacity > 0 ? loadOf(svc, demands) / svc.capacity : 0;
+    const peak = peakOf(svc, demands);
+    svc.pressure = svc.capacity > 0 ? peak.load / svc.capacity : 0;
+    svc.peak = peak;   // 화면이 이 구간을 굵게 덧그어 "여기가 막혔다"를 짚는다
   }
 
   // 넘치는 만큼 깎기를 되풀이한다. 깎으면 부하가 줄고, 한 운행이 줄면 그것을 함께
@@ -285,14 +287,22 @@ function assign(demands, services) {
   return demands;
 }
 
-// 한 운행에서 가장 붐비는 구간에 실린 사람. 정원을 넘는지는 평균이 아니라 **가장
-// 붐비는 한 구간**이 정한다 — 그 구간에서 못 타면 그 길은 성립하지 않는다.
-function loadOf(svc, demands) {
+function loadOf(svc, demands) { return peakOf(svc, demands).load; }
+
+// 한 운행에서 가장 붐비는 구간에 실린 사람과 **그 구간이 어디인지**. 정원을 넘는지는
+// 평균이 아니라 **가장 붐비는 한 구간**이 정한다 — 그 구간에서 못 타면 그 길은
+// 성립하지 않는다. 어디인지까지 돌려주는 것은, 혼잡률만 숫자로 띄우면 "970%"를 보고도
+// 무엇을 고쳐야 하는지 알 수가 없기 때문이다.
+function peakOf(svc, demands) {
   const order = [];
   for (let i = 0; i < svc.stations.length; i++) if (svc.stopAt[i]) order.push(i);
   const pos = new Map(order.map((i, k) => [i, k]));
-  if (order.length < 2) return 0;
-  const loads = new Array(order.length - 1).fill(0);
+  if (order.length < 2) return { load: 0, at: -1, from: -1, to: -1 };
+
+  // **순환선은 마지막 역에서 첫 역으로 돌아오는 구간도 센다.** 이웃한 쌍만 세던 때는
+  // 그 한 구간이 빠져, 한 바퀴 도는 노선에서 정작 가장 붐비는 자리를 놓칠 수 있었다.
+  const loop = !!(svc.line && svc.line.loop);
+  const loads = new Array(loop ? order.length : order.length - 1).fill(0);
 
   for (const od of demands) {
     if (!od.via || !od.usage) continue;
@@ -302,12 +312,31 @@ function loadOf(svc, demands) {
       const q = pos.get(leg.to);
       if (p == null || q == null) continue;
       const flow = od.people * od.usage;
-      const lo = Math.min(p, q);
-      const hi = Math.max(p, q);
-      for (let k = lo; k < hi; k++) loads[k] += flow;
+      // 순환선은 한 방향뿐이라 지나쳤으면 한 바퀴를 돌아 온다 — `rideTime`과 같은 셈이다.
+      if (loop) for (let k = p; k !== q; k = (k + 1) % loads.length) loads[k] += flow;
+      else for (let k = Math.min(p, q); k < Math.max(p, q); k++) loads[k] += flow;
     }
   }
-  return loads.reduce((a, b) => Math.max(a, b), 0);
+  let at = 0;
+  for (let k = 1; k < loads.length; k++) if (loads[k] > loads[at]) at = k;
+  return { load: loads[at], at, from: order[at], to: order[(at + 1) % order.length] };
+}
+
+// 역마다 타려다 못 탄 사람. **깎인 몫은 첫 승차역에 쌓인다** — 실제로 줄이 서는 곳이
+// 거기이고, 어느 구간이 막혔든 그 줄은 출발역에서 길어진다. 노선 패널의 혼잡률
+// 하나로는 어디가 막혔는지 알 수 없어, 그 숫자를 지도 위로 끌어내리는 것이 이 함수다.
+function waitingAt(demands) {
+  const out = new Map();
+  for (const od of demands) {
+    if (!od.via || !od.via.legs.length) continue;
+    const missed = od.people * Math.max(0, od.base - od.usage);
+    if (missed < 0.5) continue;
+    const leg = od.via.legs[0];
+    const station = leg.svc.stations[leg.from];
+    if (!station) continue;
+    out.set(station, (out.get(station) || 0) + missed);
+  }
+  return out;
 }
 
 // 한쪽 끝이 역에 얼마나 닿았는가. 못 잡은 수요를 그릴 때 **어느 쪽을 이으면 되는지**를
@@ -328,6 +357,7 @@ function income(od, minutes, scale = 1) {
 }
 
 const Demand = {
+  waitingAt, peakOf,
   WALK_SPEED, WALK_WEIGHT, R_WALK, SURFACE_SPEED, SURFACE_ACCESS, MIN_DIST,
   MAX_WAITING, MAX_TOTAL, PATIENCE, SPAWN_EVERY, SERVED, FARE, ANCHOR_R, BOTH_ENDS,
   TRANSFER, TRAIN_CAPACITY, BUS_SPEED, BUS_WEIGHT, BUS_ACCESS, R_ACCESS,

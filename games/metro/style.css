@@ -34,6 +34,10 @@
   --under: #d9534f;
   --slow: #c9862b;
   --demand: #d1892b;
+  /* 밀린 곳의 색. 못 짓는다는 뜻의 --under와 갈라 둔다 — 하나는 "안 된다"이고
+     이쪽은 "되는데 모자란다"라, 같은 붉은색이면 둘이 섞여 읽힌다. */
+  --jam: #e0553c;
+  --on-jam: #ffffff;
   --station-fill: #ffffff;
   --station-ring: #3c465a;
   /* 노선이 비싼 땅을 지나는 토막에 덧칠하는 색. 그 땅의 색을 진하게 한 것이라
@@ -77,6 +81,8 @@
     --under: #e4736f;
     --slow: #d8a13a;
     --demand: #e0a84a;
+    --jam: #ef6a4f;
+    --on-jam: #1a0f0c;
     --station-fill: #12161c;
     --station-ring: #c3cbd8;
     --cut-building: #e4736f;
@@ -189,6 +195,10 @@ h1 {
 .flow b { color: var(--fg); font-weight: 700; }
 .dot.caught { background: var(--metro); }
 .dot.waiting { background: var(--demand); }
+.dot.missed { background: var(--jam); }
+/* 못 탄 사람은 "잘 돌고 있다"의 반대라 색으로도 갈라 둔다. 이 줄에서 유일하게
+   눈에 띄어야 하는 숫자다. */
+.flow .jam b { color: var(--jam); }
 
 .btn.warn { background: var(--under); }
 

@@ -68,6 +68,7 @@
   <p class="flow" id="flow">
     <span><i class="dot caught"></i><span data-i18n="metro.caught">이용</span> <b id="v-caught">0</b></span>
     <span><i class="dot waiting"></i><span data-i18n="metro.waiting">대기</span> <b id="v-waiting">0</b></span>
+    <span class="jam" hidden id="missed-box"><i class="dot missed"></i><span data-i18n="metro.missed">못 탐</span> <b id="v-missed">0</b></span>
     <span><span data-i18n="metro.perMinute">분당 수입</span> <b id="v-income">0.0</b></span>
   </p>
 
@@ -145,6 +146,7 @@
       <li data-i18n-html="metro.ruleTransfer">두 노선이 <b>같은 역을 함께 쓰면 갈아탈 수 있습니다.</b> 갈아탈 때마다 번거로움과 기다리는 시간이 붙으므로, 직통으로 가는 운행이 있으면 승객은 그쪽을 고릅니다.</li>
       <li data-i18n-html="metro.ruleBus">역이 멀어도 <b>버스로 역까지 갈 수 있습니다.</b> 기다리는 몫이 붙어 사백 미터쯤부터는 걷는 것보다 버스가 낫고, 그보다 더 멀면 그냥 지상으로 갑니다. 수요 끝의 동그라미가 <b>점선이면 버스로만 닿는다</b>는 뜻입니다.</li>
       <li data-i18n-html="metro.ruleCrowd">열차에는 <b>실을 수 있는 양이 있습니다.</b> 가장 붐비는 구간이 정원을 넘으면 넘친 사람은 못 타고 지상으로 갑니다. 노선 모드의 <b>혼잡</b>이 100%를 넘으면 그만큼 놓치고 있다는 뜻이고, <b>열차를 늘리거나 급행으로 나누면</b> 내려갑니다.</li>
+      <li data-i18n-html="metro.ruleJam"><b>혼잡이 100%를 넘으면 지도가 어디인지 짚어 줍니다.</b> 노선 모드에서 가장 막힌 구간이 붉게 덧그려지고, 역마다 <b>타려다 못 탄 사람 수</b>가 붙습니다. 계기판의 <b>못 탐</b>이 그 합입니다. 배차 옆에 <b>선로 한계</b>가 뜨면 열차를 더 넣어도 소용없다는 뜻이라, 노선을 나누거나 급행으로 갈라야 합니다.</li>
       <li data-i18n-html="metro.ruleTrack"><b>선로는 하나뿐입니다.</b> 열차를 아무리 사도 서로 붙어 갈 수는 없어서, 배차간격이 최소 간격 아래로는 내려가지 않고 그 위로는 다 같이 느려집니다. 그리고 <b>급행은 통과하는 역에서만 완행을 추월</b>할 수 있어, 완행이 잦으면 급행도 제 속도를 못 냅니다.</li>
       <li data-i18n-html="metro.ruleGrow">수요를 <b>실어 나른 만큼 도시가 자랍니다.</b> 빈 터에 건물이 들어서고 있던 건물은 높아지며, 자란 동네는 다시 더 큰 수요를 부릅니다. <b>얼마나 높아질지는 건물의 종류가 정합니다.</b></li>
       <li data-i18n-html="metro.ruleDistrict"><b>구시가지</b>는 골목이 좁고 굽은 데다 막다른 길과 삼거리가 많아 길을 따라가기 어렵습니다. <b>계획도시</b>는 그 반대입니다. 난이도는 둘의 배합을 바꿉니다.</li>
