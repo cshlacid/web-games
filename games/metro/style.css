@@ -415,3 +415,19 @@ h1 {
   font-size: 14px;
   line-height: 1.55;
 }
+
+/* 열차 패널. 판 위의 열차를 눌렀을 때만 뜬다. */
+.trainhead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.trainhead b { font-size: 14px; }
+.trainhead span { font-size: 12px; color: var(--muted); }
+.trainhead .drop { margin-left: auto; }
+
+/* 재차 인원을 막대로도 보여 준다 — 숫자만으로는 "얼마나 찼나"가 안 잡힌다. */
+.fillbar {
+  height: 12px;
+  border-radius: 999px;
+  background: var(--reach);
+  overflow: hidden;
+}
+.fillbar i { display: block; height: 100%; background: var(--metro); transition: width 0.2s linear; }
+.fillbar.over i { background: var(--jam); }

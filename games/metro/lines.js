@@ -22,6 +22,25 @@ const MAX_TRAINS = 12;
 const MAX_PATTERNS = 3;
 const MIN_GAP = 110;     // 선로 위 두 열차 사이의 최소 간격(초). 복복선은 없다
 
+// **열차는 량으로 이루어진다.** 열차를 더 사면 배차가 좁아지지만 선로 간격에서 막히는데
+// (`MIN_GAP`), 그때 남는 길이 **한 대를 길게 만드는 것**이다. 값은 열차 한 대보다 싸고,
+// 대신 배차는 전혀 나아지지 않는다 — 기다리는 시간은 그대로고 실어 나르는 양만 는다.
+const CAR_CAPACITY = 240;   // 한 량이 싣는 사람
+const CARS = { min: 2, max: 5, base: 3 };
+// 한 량 값(억). 모든 열차에 한 량씩 붙으므로 대수만큼 든다. 열차를 한 대 더 사는 것보다
+// **수송력당으로는 싸게** 둔다 — 대신 배차는 전혀 나아지지 않으므로, 선로 간격에 막힌
+// 뒤에나 쓸 수가 있다.
+const CAR_COST = 6;
+
+const carsOf = (pattern) => (pattern && pattern.cars) || CARS.base;
+
+// 분당 수송력. 열차 한 대가 배차간격마다 한 번씩 지나가므로 대수는 배차간격 안에
+// 이미 들어 있고, 여기에 곱하는 것은 **한 대의 길이**다.
+function capacityOf(pattern, headway) {
+  if (!headway || !Number.isFinite(headway)) return 0;
+  return carsOf(pattern) * CAR_CAPACITY * 60 / headway;
+}
+
 let nextId = 1;
 
 // 노선의 제어점 전부. 역에는 stop 표시를 달아 경로가 그 점을 정확히 지나게 한다 —
@@ -48,7 +67,7 @@ function create(from, to, mids = []) {
     stations: [from, to],
     mids: [mids.map((m) => ({ x: m.x, y: m.y }))],
     loop: false,
-    patterns: [{ stops: [true, true], trains: 1, back: 0 }],
+    patterns: [{ stops: [true, true], trains: 1, back: 0, cars: CARS.base }],
   };
 }
 
@@ -207,7 +226,16 @@ function slowest(line) {
 function runTime(line, pattern) {
   if (!line.path) return 0;
   const stops = line.anchors.filter((a) => pattern.stops[a.station]).map((a) => a.at);
-  return Route.profile(line.path, Route.LIMITS, stops).time;
+  const prof = Route.profile(line.path, Route.LIMITS, stops);
+  // 다니는 구간만 센다. 종착역 밖으로는 아예 가지 않는다.
+  const span = spanOf(line, pattern);
+  if (span.from === 0 && span.to === line.path.pts.length - 1) return prof.time;
+  let time = 0;
+  for (let i = span.from; i < span.to; i++) {
+    const sum = prof.v[i] + prof.v[i + 1];
+    if (sum > 0) time += 2 * (line.path.s[i + 1] - line.path.s[i]) / sum;
+  }
+  return time;
 }
 
 // 한 운행 패턴이 한 바퀴 도는 데 걸리는 시간과 그때의 배차간격.
@@ -244,7 +272,8 @@ function timetable(line, pattern) {
   const marks = line.anchors.filter((a) => pattern.stops[a.station]);
   const halt = new Set(marks.map((a) => a.at));
   const prof = Route.profile(path, Route.LIMITS, [...halt]);
-  const n = path.pts.length;
+  // 다니는 구간 밖은 표에 넣지 않는다 — 그 밖으로는 열차가 가지 않는다.
+  const span = spanOf(line, pattern);
   // 앞차에 막혀 늦어지는 몫. 실제로는 따라잡는 지점에서 몰려 생기지만, 화면에서
   // 읽히는 차이가 없어 고르게 늘려 둔다.
   const hold = holdFactor(line, pattern);
@@ -252,8 +281,8 @@ function timetable(line, pattern) {
   const out = [];
   const stops = [];
   let t = 0;
-  for (let i = 0; i < n; i++) {
-    const last = i === n - 1;
+  for (let i = span.from; i <= span.to; i++) {
+    const last = i === span.to;
     if (halt.has(i) && !(line.loop && last)) {
       stops.push({ at: i, arrive: t, depart: t + DWELL * hold });
       out.push({ t, s: path.s[i] });
@@ -367,13 +396,27 @@ function rideTime(table, fromStation, toStation) {
 function expressPattern(line) {
   const stops = line.stations.map((_, i) => i === 0 || i === line.stations.length - 1);
   if (line.loop) stops[0] = true;
-  return { stops, trains: 1, back: 0 };
+  return { stops, trains: 1, back: 0, cars: CARS.base };
 }
 
-// 양 끝은 끌 수 없다. 종착역에 서지 않는 열차는 성립하지 않는다.
-function canToggle(line, index) {
-  if (line.loop) return index !== 0;
-  return index !== 0 && index !== line.stations.length - 1;
+// **어느 역이든 끌 수 있다. 둘만 남으면 된다.** 전에는 양 끝을 잠가 두었는데("종착역에
+// 서지 않는 열차는 성립하지 않는다"), 그러면 **바깥 몇 정거장만 빼고 도는 구간 운행**을
+// 만들 수가 없다. 지금은 켜 둔 역 중 **첫 역과 마지막 역이 그 운행의 종착역**이고,
+// 그 밖은 아예 가지 않는다.
+function canToggle(line, index, pattern = line.patterns[0]) {
+  if (!pattern) return false;
+  if (!pattern.stops[index]) return true;   // 꺼져 있는 것은 언제든 켤 수 있다
+  return pattern.stops.filter(Boolean).length > 2;
+}
+
+// 그 운행이 실제로 다니는 구간. 켜 둔 역 중 처음과 끝의 샘플 번호다. 순환선은 한 바퀴가
+// 곧 주기라 잘라 낼 자리가 없어 경로 전체를 쓴다.
+function spanOf(line, pattern) {
+  const last = line.path ? line.path.pts.length - 1 : 0;
+  if (!line.path || !line.anchors) return { from: 0, to: last };
+  const marks = line.anchors.filter((a) => pattern.stops[a.station] && a.at >= 0);
+  if (line.loop || marks.length < 2) return { from: 0, to: last };
+  return { from: marks[0].at, to: marks[marks.length - 1].at };
 }
 
 // **이 선로 위를 도는 열차**. 순환선의 역방향은 제 선로를 따로 쓰므로 여기 안 든다.
@@ -425,10 +468,11 @@ function reverse(line) {
 }
 
 const Lines = {
-  DWELL, TRAIN_COST, MAX_TRAINS, MAX_PATTERNS,
+  DWELL, TRAIN_COST, MAX_TRAINS, MAX_PATTERNS, CAR_CAPACITY, CARS, CAR_COST,
+  carsOf, capacityOf,
   controlPoints, create, withExtension, withInsertion, whyNot, rebuild, plan, timetable, at, pointAt, rideTime,
   holdFactor, trackFactor, overtakeFactor, runTime, MIN_GAP,
-  expressPattern, canToggle, trainsOf, trackTrains, reverse,
+  expressPattern, canToggle, spanOf, trainsOf, trackTrains, reverse,
   reset() { nextId = 1; },
 };
 
