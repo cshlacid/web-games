@@ -13,6 +13,8 @@ function ok(name, cond, extra = '') {
   else { failed++; console.log(`실패: ${name}${extra ? `\n  ${extra}` : ''}`); }
 }
 
+const sumOf = (arr) => arr.reduce((a, b) => a + b, 0);
+
 // --- 이용률 곡선 ---
 {
   const ref = 600;
@@ -273,10 +275,12 @@ function ok(name, cond, extra = '') {
     svc.peak.loads[1] > svc.peak.loads[0] && svc.peak.loads[1] > svc.peak.loads[2],
     JSON.stringify(svc.peak.loads.map((n) => Math.round(n))));
 
-  const wait = D.waitingAt(riders);
-  ok('못 탄 사람이 첫 승차역에 쌓인다', wait.get(stations[0]) > 0 && wait.get(stations[1]) > 0,
-    [...wait.values()].map((n) => Math.round(n)).join(','));
-  ok('타지 않은 역에는 줄이 없다', !wait.has(stations[2]) && !wait.has(stations[3]));
+  // 줄은 **타려다 못 탄 그 역에** 선다. 1번 역에서 타려는 사람은 0번에서 온 열차가
+  // 이미 차 있어 못 탄다.
+  const wait = D.waitingAt([svc]);
+  ok('못 탄 사람이 그 역에 남는다', wait.get(stations[1]) > 0,
+    [...wait].map(([st, n]) => `${stations.indexOf(st)}:${Math.round(n)}`).join(' '));
+  ok('아무도 안 타는 역에는 줄이 없다', !wait.has(stations[3]));
 
   // 넉넉하면 줄이 서지 않는다.
   const easy = { ...svc, capacity: 1e9 };
@@ -285,7 +289,50 @@ function ok(name, cond, extra = '') {
     { a: { x: 3100, y: 60 }, b: { x: 8900, y: 60 }, km: 5.8, people: 200 },
   ];
   D.assign(same, [easy]);
-  ok('넉넉하면 줄이 없다', D.waitingAt(same).size === 0);
+  ok('넉넉하면 줄이 없다', D.waitingAt([easy]).size === 0);
+}
+
+// --- 타고 내리는 대로 열차가 차고 빈다 ---
+// 여태는 구간 통행량을 그대로 재차 인원으로 썼는데, 그러면 정원을 넘는 값이 열차 안에
+// 그려지고 종점에 닿아도 열차가 비지 않았다.
+{
+  const stations = [{ x: 0, y: 0 }, { x: 3000, y: 0 }, { x: 6000, y: 0 }];
+  const make = (capacity) => ({
+    stations, stopAt: [true, true, true], headway: 300, capacity,
+    ride: (i, j) => Math.abs(i - j) * 420,
+  });
+  // 0→1 과 1→2 만 탄다. 1번 역에서 다 내리고 다시 다 탄다.
+  const hop = () => [
+    { a: { x: 80, y: 40 }, b: { x: 2900, y: 40 }, km: 2.8, people: 300 },
+    { a: { x: 3100, y: 40 }, b: { x: 5900, y: 40 }, km: 2.8, people: 300 },
+  ];
+
+  const roomy = make(1e9);
+  D.assign(hop(), [roomy]);
+  const f = roomy.flow;
+  ok('구간마다 재차 인원이 있다', f.occ.length === 2, JSON.stringify(f.occ));
+  // 1번 역에서 안 내렸다면 두 번째 구간이 두 배가 된다. 그렇지 않은 것이 요점이다.
+  ok('내린 만큼 비고 탄 만큼 찬다',
+    f.occ[0] > 0 && f.occ[1] < f.occ[0] * 1.2,
+    JSON.stringify(f.occ.map((n) => Math.round(n))));
+  ok('넉넉하면 아무도 안 남는다', f.left.every((n) => n < 0.001), JSON.stringify(f.left));
+
+  // 정원이 좁으면 **열차는 정원까지만 차고** 나머지는 그 역에 남는다.
+  const tight = make(100);
+  D.assign(hop(), [tight]);
+  ok('재차 인원이 정원을 넘지 않는다',
+    tight.flow.occ.every((n) => n <= tight.capacity + 0.001),
+    JSON.stringify(tight.flow.occ.map((n) => Math.round(n))));
+  ok('못 탄 사람이 남는다', sumOf(tight.flow.left) > 0,
+    JSON.stringify(tight.flow.left.map((n) => Math.round(n))));
+
+  // 종점까지 가는 손님만 있으면 **종점 앞 구간이 가득이고 돌아가는 쪽은 빈다.**
+  const thru = make(1e9);
+  D.assign([{ a: { x: 80, y: 40 }, b: { x: 5900, y: 40 }, km: 5.8, people: 300 }], [thru]);
+  ok('가는 쪽은 내내 실려 있다',
+    thru.flow.occ.every((n) => n > 0), JSON.stringify(thru.flow.occ.map((n) => Math.round(n))));
+  ok('돌아오는 쪽은 비어 있다',
+    thru.flow.back.every((n) => n === 0), JSON.stringify(thru.flow.back));
 }
 
 // 오는 쪽과 가는 쪽을 따로 센다. 한 배열에 합치면 A→B 가는 열차가 B→A 손님까지
@@ -342,6 +389,32 @@ function ok(name, cond, extra = '') {
   D.assign(riders, [svc]);
   ok('순환선의 닫는 구간도 센다', svc.peak.from === 3 && svc.peak.to === 0,
     `${svc.peak.from}→${svc.peak.to} 부하 ${svc.peak.load.toFixed(0)}`);
+}
+
+// 정원이 좁으면 열차는 정원까지만 싣고 나머지는 **그 역에 줄로 남는다**. 계기판의
+// `못 탐`과 역에 선 줄의 합이 어긋나면 화면이 스스로 모순된다.
+{
+  const stations = [{ x: 0, y: 0 }, { x: 3000, y: 0 }, { x: 6000, y: 0 }, { x: 9000, y: 0 }];
+  const svc = {
+    stations, stopAt: [true, true, true, true], headway: 300, capacity: 150,
+    ride: (i, j) => Math.abs(i - j) * 420,
+  };
+  const riders = [
+    { a: { x: 100, y: 60 }, b: { x: 5900, y: 60 }, km: 5.8, people: 200 },
+    { a: { x: 3100, y: 60 }, b: { x: 8900, y: 60 }, km: 5.8, people: 200 },
+  ];
+  D.assign(riders, [svc]);
+
+  ok('열차는 정원까지만 싣는다',
+    svc.flow.occ.every((n) => n <= svc.capacity + 0.001),
+    JSON.stringify(svc.flow.occ.map((n) => Math.round(n))));
+
+  const queue = [...D.waitingAt([svc]).values()];
+  ok('못 탄 사람이 그 역에 남는다', queue.length > 0 && sumOf(queue) > 0,
+    JSON.stringify(queue.map((n) => Math.round(n))));
+  ok('줄의 합이 계기판의 못 탐과 같다',
+    Math.abs(sumOf(queue) - D.tally(riders).missed) < 1,
+    `${Math.round(sumOf(queue))} vs ${Math.round(D.tally(riders).missed)}`);
 }
 
 // --- 계기판의 사람 수 ---

@@ -381,7 +381,7 @@ function evaluateDemands() {
   // **한 수요씩 따로 풀 수 없다.** 수송량 한도 때문에 한 운행에 누가 얼마나 탔는지가
   // 다른 수요의 이용률을 바꾼다. 그래서 전부 한꺼번에 배정한다.
   Demand.assign(demands, services);
-  waiting = Demand.waitingAt(demands);
+  waiting = Demand.waitingAt(services);
   income = 0;
   for (const od of demands) income += Demand.income(od, 1, city.fare);
   renderDemands();
@@ -551,15 +551,16 @@ function renderLines() {
 // 열차가 지금 지나는 구간에 실린 몫. 구간은 정차역과 정차역 사이이고, 그 경계는
 // 시간표가 쓰는 정차 자리(`marks`)와 같다.
 function loadAt(svc, s, dir) {
-  if (!svc || !svc.peak || !svc.peak.loads || !svc.capacity) return 0;
+  if (!svc || !svc.flow || !svc.capacity) return 0;
   const marks = svc.marks;
   let k = 0;
   for (let i = 0; i + 1 < marks.length; i++) {
     if (s >= svc.path.s[marks[i].at]) k = i;
   }
-  // 오는 쪽과 가는 쪽의 부하가 다르다. 그래서 **종점에 닿은 열차가 눈에 띄게 비고**,
-  // 돌아 나갈 때 그 방향의 몫으로 다시 찬다.
-  const side = dir < 0 && svc.peak.back ? svc.peak.back : svc.peak.loads;
+  // **실제로 타고 있는 사람이다.** 구간 통행량이 아니라 역마다 내리고 태우며 걸어서
+  // 나온 값이라(`Demand.flowOf`) 정원을 넘지 않고, 종점에서 다 내리면 0이 된다.
+  // 오는 쪽과 가는 쪽이 달라 방향까지 받는다.
+  const side = dir < 0 && svc.flow.back ? svc.flow.back : svc.flow.occ;
   const load = side[k];
   return load == null ? 0 : load / svc.capacity;
 }
@@ -577,9 +578,10 @@ function renderTrains() {
       const w = ART.carW * K();
       const h = ART.carH * K();
       const ring = ART.carRing * K();
-      // 넘치는 몫은 칸 밖으로 못 나가니 색으로 낸다. 100%까지는 노선 색이 차오르고,
-      // 넘으면 가득 찬 채로 밀린 색이 된다 — 같은 "꽉 참"이라도 둘은 다른 상태다.
-      const over = ratio > 1;
+      // **가득 찬 열차는 색이 바뀐다.** 재차 인원은 정원을 넘지 못하므로(넘칠 사람은
+      // 역에 줄로 남는다) 넘침을 길이로 낼 수가 없다. 색이 그 자리를 맡는다 —
+      // 붉은 칸은 "여기서 더 탈 수 없다"는 뜻이고, 그 옆 역에 줄이 서 있다.
+      const over = ratio >= 0.995;
       const fill = Math.max(0, Math.min(1, ratio));
       const car = svg('g', {
         transform: `translate(${r1(at.x)} ${r1(at.y)}) rotate(${r1(at.ang * 180 / Math.PI)})`,
@@ -800,10 +802,10 @@ function renderStations() {
     const text = short(count);
     // **동그라미가 아니라 알약이다.** 원에 네 글자를 넣으면 글자가 테를 뚫고 나간다 —
     // 글자 수에 따라 가로로 늘어나야 어떤 숫자든 안에 들어간다.
-    const h = ART.station * (wide ? 1.55 : 1.0);
+    const h = ART.station * (wide ? 2.1 : 1.55);
     const w = Math.max(h, h * 0.58 * text.length + h * 0.5);
-    const x = station.x + ART.station * (wide ? 1.9 : 1.25) + (w - h) / 2;
-    const y = station.y - ART.station * (wide ? 1.9 : 1.25);
+    const x = station.x + ART.station * (wide ? 2.1 : 1.5) + (w - h) / 2;
+    const y = station.y - ART.station * (wide ? 2.1 : 1.5);
     layer.stations.appendChild(svg('rect', {
       x: r1(x - w / 2), y: r1(y - h / 2), width: r1(w), height: r1(h), rx: h / 2,
       fill: 'var(--jam)', stroke: 'var(--ground)', 'stroke-width': r1(h * 0.16),
