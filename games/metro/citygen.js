@@ -155,17 +155,21 @@ function overlaps(a, b, gap) {
 
 // 꺾은선에서 막힌 구간을 잘라 내고 통과하는 토막만 남긴다. 길이 물이나 산을
 // 관통하지 않게 하는 데 쓴다.
+// `blocked`에 그 토막이 향하는 쪽도 함께 넘긴다. **물 위를 지나도 되는지가 자리가
+// 아니라 각도로 갈리기 때문이다** — 강을 가로지르는 다리는 되지만 강을 따라 흐르는
+// 도로는 안 된다.
 function clipPolyline(pts, blocked, step = 22) {
   const parts = [];
   let run = null;
   for (let i = 1; i < pts.length; i++) {
     const a = pts[i - 1];
     const b = pts[i];
+    const dir = Geom.normalize(b.x - a.x, b.y - a.y);
     const n = Math.max(1, Math.ceil(Geom.dist(a.x, a.y, b.x, b.y) / step));
     for (let k = 0; k <= n; k++) {
       if (i > 1 && k === 0) continue;   // 이음매를 두 번 세지 않는다
       const p = { x: a.x + (b.x - a.x) * (k / n), y: a.y + (b.y - a.y) * (k / n) };
-      if (blocked(p.x, p.y)) { run = null; continue; }
+      if (blocked(p.x, p.y, dir.x, dir.y)) { run = null; continue; }
       if (!run) { run = [p]; parts.push(run); } else run.push(p);
     }
   }
@@ -272,6 +276,30 @@ function isSea(city, x, y) {
   return city.sea ? isWaterLines([city.sea], x, y) : false;
 }
 
+// 그 자리 물줄기가 흐르는 쪽. 가장 가까운 물 선분의 방향이다.
+function waterDir(city, x, y) {
+  let best = Infinity;
+  let dir = null;
+  for (const id of query(city.waterIndex, x, y)) {
+    const s = city.waterSegments[id];
+    const near = Geom.nearestOnSegment(x, y, s.x1, s.y1, s.x2, s.y2);
+    if (near.d < best) { best = near.d; dir = Geom.normalize(s.x2 - s.x1, s.y2 - s.y1); }
+  }
+  return dir;
+}
+
+// **도로는 강과 나란히 놓이지 않는다. 건널 때는 언제나 가로지른다.** 물 위의 토막을
+// 자리로만 살려 두었더니 강줄기를 따라 물속을 한참 흐르는 간선이 나왔는데, 다리로도
+// 도로로도 보이지 않는다. 물길과 이룬 각이 이만큼은 되어야 다리로 친다.
+const CROSS_MIN = 55 * Math.PI / 180;
+const CROSS_DOT = Math.cos(CROSS_MIN);
+
+function crossesWater(city, x, y, dx, dy) {
+  const w = waterDir(city, x, y);
+  if (!w) return true;
+  return Math.abs(dx * w.x + dy * w.y) <= CROSS_DOT;
+}
+
 function isHill(city, x, y) {
   for (const hill of city.hills) {
     if ((x - hill.x) ** 2 + (y - hill.y) ** 2 <= hill.r * hill.r) return true;
@@ -298,6 +326,62 @@ function districtAt(city, x, y) {
 
 // --- 길 ---
 
+// 대각선 대로 한 줄. 격자만 있으면 노선이 전부 ㄱ자로 꺾여 휜 선로를 그릴 자리가 없다.
+//
+// **지도를 관통하는 직선으로 두면 안 된다.** 전에는 둘 다 한가운데를 지나서 거기서
+// 간선 둘과 겹쳐 한 점에 여덟 갈래가 났다 — 현실에 없는 교차로이고, 어느 판에서나
+// 도심에 같은 별 모양이 생겨 판마다 다른 도시라는 인상도 거기서 무너졌다.
+//
+// 그래서 **몇 블록만 가로지르는 토막**이고, **간선이 사거리로 만나는 자리를 비켜
+// 간다.** 그러면 대로가 지나는 곳은 간선 한 줄과 만나는 네거리이거나, 간선이 끊긴
+// 삼거리에 얹힌 **다섯 갈래가 최대**다. 관통하는 직선으로는 이 조건을 맞출 수 없다 —
+// 교차점이 백 개가 넘어 어디로 그어도 몇 개는 스친다.
+//
+// 값은 위에서 정해진다. 45°로 600 간격 격자를 지나면 교차점에서 가장 멀리 떨어져야
+// 212다 — 그보다 큰 값을 쓰면 **어떤 자리도 통과하지 못해 대로가 영영 안 나온다**
+// (230으로 두었다가 백이십 판 내리 하나도 안 나왔다). 110은 간선 폭(36)의 세 배쯤이라
+// 화면에서 교차로를 비켜 지나는 것으로 읽히고, 무작위 자리의 5%가 통과한다.
+const JUNCTION_CLEAR = 110;
+
+function boulevard(xs, ys, rng) {
+  for (let tries = 0; tries < 400; tries++) {
+    const ang = Math.PI / 4 + (rng() - 0.5) * 0.7 + (rng() < 0.5 ? 0 : Math.PI / 2);
+    const at = { x: WORLD.w * (0.15 + rng() * 0.7), y: WORLD.h * (0.15 + rng() * 0.7) };
+    const half = 1300 + rng() * 1500;
+    const dir = { x: Math.cos(ang), y: Math.sin(ang) };
+    const a = { x: at.x - dir.x * half, y: at.y - dir.y * half };
+    const b = { x: at.x + dir.x * half, y: at.y + dir.y * half };
+    if (!clearOfJunctions(a, b, xs, ys)) continue;
+    return { a, b, pts: [a, b] };
+  }
+  return null;
+}
+
+// 토막이 지나는 동안 간선 교차점에 바싹 붙지 않는가. 토막 밖의 교차점은 상관없다.
+function clearOfJunctions(a, b, xs, ys) {
+  for (const x of xs) {
+    for (const y of ys) {
+      if (Geom.nearestOnSegment(x, y, a.x, a.y, b.x, b.y).d < JUNCTION_CLEAR) return false;
+    }
+  }
+  return true;
+}
+
+// 대로 둘이 서로 만나는 자리도 간선 위여서는 안 된다 — 거기가 여섯 갈래가 된다.
+function crossClearOfLines(p, q, xs, ys) {
+  const r = { x: p.b.x - p.a.x, y: p.b.y - p.a.y };
+  const s2 = { x: q.b.x - q.a.x, y: q.b.y - q.a.y };
+  const det = r.x * s2.y - r.y * s2.x;
+  if (Math.abs(det) < 1e-6) return true;
+  const t = ((q.a.x - p.a.x) * s2.y - (q.a.y - p.a.y) * s2.x) / det;
+  const u = ((q.a.x - p.a.x) * r.y - (q.a.y - p.a.y) * r.x) / det;
+  if (t < 0 || t > 1 || u < 0 || u > 1) return true;   // 토막 안에서 만나지 않는다
+  const hit = { x: p.a.x + r.x * t, y: p.a.y + r.y * t };
+  for (const x of xs) if (Math.abs(hit.x - x) < JUNCTION_CLEAR) return false;
+  for (const y of ys) if (Math.abs(hit.y - y) < JUNCTION_CLEAR) return false;
+  return true;
+}
+
 function axisLines(center, span, gap, rng) {
   const lines = [center];
   for (const dir of [-1, 1]) {
@@ -314,7 +398,10 @@ function axisLines(center, span, gap, rng) {
 // 간선 한 줄. 곧게 관통하기만 하면 교차점이 전부 사거리라 어느 길로 가나 같다.
 // **어긋나게 하거나 중간에서 끊으면 삼거리가 생기고**, 그제야 "이쪽으로는 끝까지
 // 가는데 저쪽은 아니다"가 길마다 다른 성질이 된다.
-function arterial(fixed, span, cross, rng, vertical) {
+// 어긋난 간선이 옆 간선과 이만큼은 떨어져 있어야 한다.
+const SIBLING_CLEAR = 280;
+
+function arterial(fixed, span, cross, rng, vertical, siblings = []) {
   const at = (v, t) => (vertical ? { x: v, y: t } : { x: t, y: v });
   // 자를 수 있는 자리는 가장자리에서 한 칸씩 물린 교차선들이다. 끝에서 자르면
   // 그냥 짧은 길이고, 한가운데를 자르면 도시가 반으로 갈린다.
@@ -337,7 +424,11 @@ function arterial(fixed, span, cross, rng, vertical) {
     const bend = mids[Math.floor(rng() * mids.length)];
     const shift = (rng() < 0.5 ? -1 : 1) * (150 + rng() * 170);
     const other = clamp(fixed + shift, 120, span === WORLD.w ? WORLD.h - 120 : WORLD.w - 120);
-    return [at(fixed, from), at(fixed, bend), at(other, bend), at(other, to)];
+    // **어긋난 자리가 옆 간선에 붙으면 안 된다.** 두 줄이 이백도 안 되게 나란히
+    // 서면 그 둘이 교차선과 만나는 자리가 한 교차로로 뭉쳐 여섯 갈래가 된다.
+    // 붙을 자리면 어긋나지 않고 곧게 간다.
+    const near = siblings.some((v) => v !== fixed && Math.abs(v - other) < SIBLING_CLEAR);
+    if (!near) return [at(fixed, from), at(fixed, bend), at(other, bend), at(other, to)];
   }
   return [at(fixed, from), at(fixed, to)];
 }
@@ -465,20 +556,48 @@ function create(seed = 1, level = 1) {
   const xs = axisLines(cx, WORLD.w, 600, rng);
   const ys = axisLines(cy, WORLD.h, 600, rng);
   const arterials = [];
-  for (const x of xs) arterials.push(arterial(x, WORLD.h, ys, rng, true));
-  for (const y of ys) arterials.push(arterial(y, WORLD.w, xs, rng, false));
-  for (let k = 0; k < 2; k++) {
-    // 대로 둘. 격자만 있으면 노선이 전부 ㄱ자로 꺾여 휜 선로를 그릴 자리가 없다.
-    const ang = Math.PI / 4 + (rng() * 0.5 - 0.25) + k * Math.PI / 2;
-    const len = Math.hypot(WORLD.w, WORLD.h);
-    arterials.push([
-      { x: cx - Math.cos(ang) * len, y: cy - Math.sin(ang) * len },
-      { x: cx + Math.cos(ang) * len, y: cy + Math.sin(ang) * len },
-    ]);
+  // 어긋난 줄이 새로 차지한 자리도 그다음 줄에게는 이웃이다. 원래 자리만 보고 비키면
+  // **어긋난 것끼리 바싹 붙어** 다시 여섯 갈래가 난다.
+  const takenX = xs.slice();
+  for (const x of xs) {
+    const pts = arterial(x, WORLD.h, ys, rng, true, takenX);
+    if (pts.length === 4) takenX.push(pts[2].x);
+    arterials.push(pts);
   }
+  const takenY = ys.slice();
+  for (const y of ys) {
+    const pts = arterial(y, WORLD.w, xs, rng, false, takenY);
+    if (pts.length === 4) takenY.push(pts[2].y);
+    arterials.push(pts);
+  }
+  // **대로는 대부분의 판에 없다.** 늘 둘씩 깔았더니 어느 판에서나 도심에 같은 별
+  // 모양이 생겨, 판마다 다른 도시라는 인상이 거기서 무너졌다.
+  const want = rng() < 0.62 ? 0 : rng() < 0.78 ? 1 : 2;
+  const laid = [];
+  for (let k = 0; k < want; k++) {
+    // 어긋난 간선이 새로 차지한 자리(`takenX`/`takenY`)까지 넣어야 한다. 원래 격자만
+    // 보고 비켰더니 어긋난 줄의 사거리를 그대로 관통해 여섯 갈래가 났다.
+    const road = boulevard(takenX, takenY, rng);
+    if (!road) continue;
+    if (laid.some((other) => !crossClearOfLines(road, other, takenX, takenY))) continue;
+    laid.push(road);
+    arterials.push(road.pts);
+  }
+  city.boulevards = laid.length;
+
+  // **간선은 산을 뚫는다.** 터널이다 — 산 하나가 도시를 둘로 가르면 그 너머가 딴
+  // 세상이 되고, 어차피 지하철도 산 밑으로 간다(값만 비싸다). 막는 것은 바다와,
+  // **강과 나란히 놓이는 토막**뿐이다.
+  const stopsArterial = (x, y, dx, dy) =>
+    isSea(city, x, y) || (isWater(city, x, y) && !crossesWater(city, x, y, dx, dy));
+  // 산을 지나는 토막은 따로도 적어 둔다. 길은 그대로 이어지되 **화면에서 그 구간을
+  // 산 색으로 덧그어** 산 밑으로 지나는 것으로 보이게 한다 — 덧긋지 않으면 산마루를
+  // 타고 넘는 길로 읽힌다.
+  city.tunnels = [];
   for (const pts of arterials) {
-    for (const part of clipPolyline(pts, (x, y) => rocky(x, y) || isSea(city, x, y))) {
+    for (const part of clipPolyline(pts, stopsArterial)) {
       city.roads.push({ pts: part, w: ROAD_W.arterial, kind: 'arterial' });
+      for (const dug of clipPolyline(part, (x, y) => !rocky(x, y))) city.tunnels.push(dug);
     }
   }
 
@@ -729,6 +848,7 @@ function grow(city, centers, radius, budget) {
 
 const CityGen = {
   VIEW, WORLD, GRID, MAX_BUILDINGS, ROAD_W, DISTRICT, LEVELS, CAP, STATION_GAP, START_FILL,
+  waterDir, crossesWater, CROSS_MIN, JUNCTION_CLEAR, boulevard,
   create, classify, snapToRoad, districtAt, canPlaceStation, addStation, grow, buildingsNear,
   isWater, isSea, isHill, segRectDistance, clipPolyline, arterial, mulberry32,
 };
