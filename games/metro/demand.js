@@ -46,7 +46,9 @@ const TRANSFER = 100;       // 갈아타는 데 드는 초. 계단과 통로와 
 const TRAIN_CAPACITY = 700; // 열차 한 대가 한 번에 실어 나르는 사람
 // 억 / (사람 × km × 게임분). 망이 어중간할 때도 돈이 조금은 들어와야 다음 한 수를
 // 둘 수 있다. 진짜 균형은 아직 잡지 않았다.
-const FARE = 0.00012;
+// 인원을 6분의 1로 줄이면서 한 번 같은 배로 올렸다가 도로 내렸다. 정원이 더는 발목을
+// 잡지 않아 **이용률이 그만큼 올라갔기 때문**이다 — 인원 × 이용률이 도로 제자리다.
+const FARE = 0.00011;
 
 const walkCost = (d) => d / WALK_SPEED * WALK_WEIGHT;
 const busCost = (d) => BUS_ACCESS + d / BUS_SPEED * BUS_WEIGHT;
@@ -110,7 +112,11 @@ function spawn(city, rng, anchors = []) {
     if (span < MIN_DIST) continue;
     return {
       a: from, b: to, km: span / 1000,
-      people: Math.round(40 + (a.level + b.level) * 45 + rng() * 70),
+      // **수요 한 쌍이 노선 하나를 다 먹지 않을 만큼.** 전에는 한 쌍이 130~470명/분이라
+      // 열차 여덟 대짜리 노선(382명/분)을 **한 쌍이 혼자 채웠다** — 그래서 첫 열차부터
+      // 가득 찬 채였고, 열차를 사도 칸이 차 있는 것은 그대로였다. 지금은 22~76명/분이라
+      // 여덟 대면 열 쌍쯤을 실어 나른다.
+      people: Math.round(8 + (a.level + b.level) * 7 + rng() * 12),
       born: 0, usage: 0, via: null,
     };
   }
