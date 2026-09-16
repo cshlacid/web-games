@@ -151,6 +151,26 @@ const sumOf = (arr) => arr.reduce((a, b) => a + b, 0);
     String(D.loadOf(three, flows)));
 }
 
+// 수요 한 쌍이 노선 하나를 다 먹으면 안 된다. 전에는 한 쌍이 130~470명/분이라 열차
+// 여덟 대짜리 노선(382명/분)을 한 쌍이 혼자 채웠고, 그래서 **첫 열차부터 가득 찬 채**였다.
+{
+  const city = C.create(7, 1);
+  const rng = C.mulberry32(21);
+  let max = 0;
+  let n = 0;
+  let sum = 0;
+  for (let i = 0; i < 400; i++) {
+    const od = D.spawn(city, rng);
+    if (!od) continue;
+    n++;
+    sum += od.people;
+    if (od.people > max) max = od.people;
+  }
+  // 열차 여덟 대짜리 노선의 수송력이 380명/분 남짓이다.
+  ok('한 쌍이 노선 하나를 다 먹지 않는다', max < 100, `가장 큰 쌍 ${max}명/분`);
+  ok('그래도 쓸 만한 크기다', sum / n > 15, `평균 ${(sum / n).toFixed(0)}명/분`);
+}
+
 // --- 수요가 생기는 자리 ---
 {
   const city = C.create(5, 1);
