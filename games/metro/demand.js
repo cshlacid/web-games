@@ -416,6 +416,10 @@ function flowOf(svc, demands, useBase = false) {
   const walk = (side, seq, laps) => {
     const occ = new Array(seq.length - 1).fill(0);
     const left = new Array(stops).fill(0);
+    // 역마다 "타려는 사람"과 "내린 뒤 남은 빈자리". 줄이 쌓이고 빠지는 셈이 이 둘로
+    // 떨어진다 — 빈자리가 타려는 사람보다 많으면 그만큼 줄이 줄어든다.
+    const want = new Array(stops).fill(0);
+    const room = new Array(stops).fill(0);
     let carry = 0;
     for (let lap = 0; lap < laps; lap++) {
       left.fill(0);
@@ -423,15 +427,17 @@ function flowOf(svc, demands, useBase = false) {
         const i = seq[k];
         // 깎인 뒤에는 실제로 탄 사람보다 내릴 사람이 많게 잡힐 수 있다. 0에서 막는다.
         carry = Math.max(0, carry - side.alight[i]);
-        const want = side.board[i];
-        const got = Math.min(want, Math.max(0, cap - carry));
+        const free = Math.max(0, cap - carry);
+        const got = Math.min(side.board[i], free);
         carry += got;
-        left[i] = want - got;
+        want[i] = side.board[i];
+        room[i] = free;
+        left[i] = side.board[i] - got;
         occ[k] = carry;
       }
       if (!loop) carry = 0;   // 종점에서는 남김없이 내린다
     }
-    return { occ, left };
+    return { occ, left, want, room };
   };
 
   const upTo = (n) => Array.from({ length: n }, (_, k) => k);
@@ -443,6 +449,10 @@ function flowOf(svc, demands, useBase = false) {
   return {
     occ: ahead.occ, back: backOcc,
     left: ahead.left, leftBack: behind ? behind.left : null,
+    // 방향을 합쳐 역마다 하나로 본다. 승강장은 한 곳이고, 어느 쪽으로 가려는
+    // 사람이든 같은 자리에서 기다린다.
+    want: ahead.want.map((n, k) => n + (behind ? behind.want[k] : 0)),
+    room: ahead.room.map((n, k) => n + (behind ? behind.room[k] : 0)),
     order, cap,
   };
 }
@@ -467,26 +477,24 @@ function tally(demands) {
   return { riding, missed, away };
 }
 
-// 역마다 타려다 못 탄 사람. **빈자리가 없어 그 역에 남은 사람**이고, 태우고 내리며
-// 걸어서 나온 값이다(`flowOf`). 전에는 깎인 몫을 첫 승차역에 몰아 두었는데, 그러면
-// 정작 사람이 못 타는 역이 아니라 출발역에 줄이 섰다.
-function waitingAt(services) {
-  const out = new Map();
-  const add = (svc, left) => {
-    if (!left) return;
-    left.forEach((n, k) => {
-      if (n < 0.5) return;
-      const station = svc.stations[svc.press.order[k]];
-      if (!station) return;
-      out.set(station, (out.get(station) || 0) + n);
-    });
-  };
-  for (const svc of services) {
-    if (!svc.press) continue;
-    add(svc, svc.press.left);
-    add(svc, svc.press.leftBack);
+// 계기판에 올릴 사람 수. **셋으로 남김없이 갈린다** — 지금 타는 사람, 타려는데 자리가
+// 없는 사람, 길이 없거나 나빠서 지상으로 가는 사람. 건수로만 두면 "몇 건"과 "몇 명"이
+// 한 줄에 섞여 서로 견줄 수가 없었다.
+//
+//   people = people·usage  +  people·(base − usage)  +  people·(1 − base)
+//              탐               못 탐                    안 탐
+function tally(demands) {
+  let riding = 0;
+  let missed = 0;
+  let away = 0;
+  for (const od of demands) {
+    const base = od.base || 0;
+    const usage = od.usage || 0;
+    riding += od.people * usage;
+    missed += od.people * Math.max(0, base - usage);
+    away += od.people * Math.max(0, 1 - base);
   }
-  return out;
+  return { riding, missed, away };
 }
 
 // 한쪽 끝이 역에 얼마나 닿았는가. 못 잡은 수요를 그릴 때 **어느 쪽을 이으면 되는지**를
@@ -507,7 +515,7 @@ function income(od, minutes, scale = 1) {
 }
 
 const Demand = {
-  waitingAt, peakOf, tally, flowOf,
+  peakOf, tally, flowOf,
   WALK_SPEED, WALK_WEIGHT, R_WALK, SURFACE_SPEED, SURFACE_ACCESS, MIN_DIST,
   MAX_WAITING, MAX_TOTAL, PATIENCE, SPAWN_EVERY, SERVED, FARE, ANCHOR_R, BOTH_ENDS,
   TRANSFER, TRAIN_CAPACITY, BUS_SPEED, BUS_WEIGHT, BUS_ACCESS, R_ACCESS,

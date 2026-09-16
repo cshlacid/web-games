@@ -59,7 +59,7 @@ for (const id of ['map', 'status', 'readout', 'actions', 'budget', 'clock', 'pau
 }
 const layer = {};
 for (const name of ['water', 'hills', 'roads', 'buildings', 'grown', 'demand', 'lines',
-  'trains', 'draft', 'stations', 'handles']) {
+  'draft', 'stations', 'trains', 'handles']) {
   layer[name] = document.getElementById(`layer-${name}`);
 }
 const value = {
@@ -116,7 +116,13 @@ let clock = 6 * 3600;    // 게임 초. 아침 여섯 시에 시작한다
 let speed = 1;   // SPEEDS의 자리
 let demands = [];
 let services = [];       // 수요가 보는 운행 목록
-let waiting = new Map(); // 역 → 타려다 못 탄 사람
+// 역 → **지금 승강장에 서 있는 사람**. 비율이 아니라 쌓인 양이다 — 열차가 와서 태우면
+// 줄어들고, 못 태우면 늘어난다. 한 시점의 비율로 두었더니 열차가 서도 숫자가 꿈쩍하지
+// 않아 "태웠는데 안 줄어든다"로 보였다.
+let waiting = new Map();
+// 열차가 보여 주는 재차 인원은 **역을 지날 때만** 바뀐다. 수요는 몇 초마다 다시
+// 풀리므로 그때마다 값을 새로 읽으면, 달리는 중에 사람이 타고 내리는 것처럼 보인다.
+let cars = new Map();
 // 순환선마다 역 순서를 뒤집은 짝. 망이 바뀔 때 한 번만 짓는다 — 화면을 그릴 때마다
 // 다시 지으면 `Route.build`가 매번 도는데, 바뀐 것이 없으면 같은 답이 나온다.
 let mirrors = new Map();
@@ -157,6 +163,8 @@ function makeCity(nextSeed, nextLevel) {
   sel = { line: 0, pattern: 0 };
   clock = 6 * 3600;
   demands = [];
+  waiting = new Map();
+  cars = new Map();
   growWork = 0;
   nextSpawn = 0;
   income = 0;
@@ -355,12 +363,16 @@ function addService(line, track, pattern, dir, reversed) {
   };
   services.push(svc);
   // 열차를 그릴 때 그 운행의 부하를 봐야 하므로 같은 객체를 들려 보낸다.
-  runs.push({ line: track, table, trains: reversed.trains, headway: plan.headway, dir, svc });
+  runs.push({
+    line: track, table, trains: reversed.trains, headway: plan.headway, dir, svc,
+    key: `${lines.indexOf(line)}:${line.patterns.indexOf(pattern)}:${dir}`,
+  });
 }
 
 function syncNetwork() {
   services = [];
   runs = [];
+  cars = new Map();
   mirrors = new Map();
   for (const line of lines) {
     if (!line.path) continue;
@@ -381,15 +393,69 @@ function evaluateDemands() {
   // **한 수요씩 따로 풀 수 없다.** 수송량 한도 때문에 한 운행에 누가 얼마나 탔는지가
   // 다른 수요의 이용률을 바꾼다. 그래서 전부 한꺼번에 배정한다.
   Demand.assign(demands, services);
-  waiting = Demand.waitingAt(services);
   income = 0;
   for (const od of demands) income += Demand.income(od, 1, city.fare);
   renderDemands();
-  // 역에 붙는 대기 인원이 여기서 바뀐다. 다시 그리지 않으면 판 위의 숫자만 낡는다.
   renderStations();
 }
 
 function waitingCount() { return demands.filter((od) => !od.served).length; }
+
+// **승강장에는 사람이 계속 모인다.** 타려는 사람이 분당 얼마인지는 수요가 알려 주고,
+// 오래 기다린 사람은 포기하고 지상으로 가므로(`PATIENCE`) 줄이 끝없이 자라지는 않는다 —
+// 그 시간 상수가 사실상 줄의 천장이다. **빠지는 것은 열차가 설 때뿐이다**(`boardTrains`).
+function queue(minutes) {
+  if (minutes <= 0) return;
+  const want = new Map();
+  for (const svc of services) {
+    if (!svc.press) continue;
+    svc.press.order.forEach((si, k) => {
+      const station = svc.stations[si];
+      if (station) want.set(station, (want.get(station) || 0) + svc.press.want[k]);
+    });
+  }
+
+  const fade = minutes / (Demand.PATIENCE / 60);
+  const next = new Map();
+  for (const station of city.stations) {
+    const now = waiting.get(station) || 0;
+    const value = Math.max(0, now + (want.get(station) || 0) * minutes - now * fade);
+    if (value >= 1) next.set(station, value);
+  }
+  waiting = next;
+}
+
+// **열차가 역을 지날 때 줄이 빠진다.** 시간에 비례해 조금씩 빼면 승강장 숫자가 그저
+// 흐르기만 해서, 열차가 서는 것과 줄이 주는 것이 이어지지 않는다 — "태웠는데 왜 안
+// 줄지"가 여기서 났다. 지나온 역이 바뀌는 순간에만 태운다.
+//
+// 열차가 보여 줄 재차 인원도 같은 순간에 갈아 끼운다. 수요는 몇 초마다 다시 풀리므로
+// 매번 새로 읽으면 **달리는 중에 사람이 타고 내리는 것처럼** 보인다.
+function boardTrains() {
+  for (const run of runs) {
+    const svc = run.svc;
+    if (!svc || !svc.press || !svc.flow) continue;
+    for (let k = 0; k < run.trains; k++) {
+      const at = Lines.at(run.line, run.table, clock + k * run.headway);
+      const seg = segmentOf(svc, at.s);
+      const key = `${run.key}:${k}`;
+      const held = cars.get(key);
+      if (held && held.seg === seg && held.dir === at.dir) continue;
+      cars.set(key, { seg, dir: at.dir, ratio: loadAt(svc, at.s, at.dir) });
+      if (!held) continue;   // 첫 프레임에는 지나온 역이 없다
+
+      // 뒤로 가는 열차가 구간 seg에 들어섰다는 것은 seg+1번 역을 떠났다는 뜻이다.
+      const stop = at.dir < 0 ? seg + 1 : seg;
+      const station = svc.stations[svc.press.order[stop]];
+      if (!station) continue;
+      // 한 대가 그 역에서 내주는 자리. 분당 빈자리에 배차간격을 곱한 것이다.
+      const seats = (svc.press.room[stop] || 0) * run.headway / 60;
+      const now = waiting.get(station) || 0;
+      const rest = Math.max(0, now - seats);
+      if (rest < 1) waiting.delete(station); else waiting.set(station, rest);
+    }
+  }
+}
 
 function tick(dt) {
   clock += dt;
@@ -412,6 +478,9 @@ function tick(dt) {
   const before = demands.length;
   demands = demands.filter((od) => od.served || clock - od.born < Demand.PATIENCE);
   if (demands.length !== before) evaluateDemands();
+
+  boardTrains();
+  queue(minutes);
 
   // 실어 나른 만큼 도시가 자란다. **수요를 처리한 자리가 자란다**는 규칙이 이제
   // 대리물이 아니라 진짜다 — 실제로 탄 사람 수가 그대로 성장의 재료다.
@@ -448,6 +517,8 @@ function frame(now) {
   if (!running() || dt <= 0) return;
   tick(dt * SPEEDS[speed]);
   renderTrains();
+  // 승강장의 줄이 시계와 함께 오르내린다. 역이 수십 개라 매 프레임 다시 그려도 된다.
+  renderStations();
   renderMeters();
 }
 
@@ -552,17 +623,32 @@ function renderLines() {
 // 시간표가 쓰는 정차 자리(`marks`)와 같다.
 function loadAt(svc, s, dir) {
   if (!svc || !svc.flow || !svc.capacity) return 0;
-  const marks = svc.marks;
-  let k = 0;
-  for (let i = 0; i + 1 < marks.length; i++) {
-    if (s >= svc.path.s[marks[i].at]) k = i;
-  }
+  const k = segmentOf(svc, s);
   // **실제로 타고 있는 사람이다.** 구간 통행량이 아니라 역마다 내리고 태우며 걸어서
   // 나온 값이라(`Demand.flowOf`) 정원을 넘지 않고, 종점에서 다 내리면 0이 된다.
   // 오는 쪽과 가는 쪽이 달라 방향까지 받는다.
   const side = dir < 0 && svc.flow.back ? svc.flow.back : svc.flow.occ;
   const load = side[k];
   return load == null ? 0 : load / svc.capacity;
+}
+
+// **재차 인원은 역을 지날 때만 갈아 끼운다.** 수요는 몇 초마다 다시 풀려서 그때마다
+// 값을 새로 읽으면 달리는 중에 숫자가 슬금슬금 바뀌고, 그것이 **달리면서 사람이 타고
+// 내리는 것처럼** 보인다. 실제로 값이 바뀌는 자리는 역뿐이라(재 보니 달리는 동안 0번),
+// 마지막으로 지난 역이 같으면 들고 있던 값을 그대로 쓴다.
+function carLoad(run, k, at) {
+  const held = cars.get(`${run.key}:${k}`);
+  if (held) return held.ratio;
+  return loadAt(run.svc, at.s, at.dir);
+}
+
+function segmentOf(svc, s) {
+  if (!svc || !svc.marks) return 0;
+  let k = 0;
+  for (let i = 0; i + 1 < svc.marks.length; i++) {
+    if (s >= svc.path.s[svc.marks[i].at]) k = i;
+  }
+  return k;
 }
 
 // **열차를 네모로 그리고 안을 실은 만큼 채운다.** 점으로 두면 "몇 대가 도는가"밖에
@@ -574,7 +660,7 @@ function renderTrains() {
     const color = lineColor(run.line);
     for (let k = 0; k < run.trains; k++) {
       const at = Lines.at(run.line, run.table, clock + k * run.headway);
-      const ratio = loadAt(run.svc, at.s, at.dir);
+      const ratio = carLoad(run, k, at);
       const w = ART.carW * K();
       const h = ART.carH * K();
       const ring = ART.carRing * K();
