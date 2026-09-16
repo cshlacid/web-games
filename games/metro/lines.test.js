@@ -386,5 +386,61 @@ const ground = () => 'empty';
   ok('경로가 없으면 끼우지 않는다', L.withInsertion(line, st(1000, 0), 120) === null);
 }
 
+// --- 순환선의 역방향 ---
+// 한 방향으로만 돌면 반대편으로 가려는 승객이 한 바퀴를 다 돌아야 하고, 그 승객까지
+// 같은 선로에 실려 한쪽만 터진다. 마주 오는 열차가 한 선로에 있을 수 없으므로 두
+// 방향은 제 선로를 쓴다 — 자료로는 **역 순서를 뒤집은 또 하나의 순환선**이다.
+{
+  const a = st(0, 0);
+  const b = st(2400, 0);
+  const c = st(2400, 2400);
+  const d = st(0, 2400);
+  let line = L.create(a, b);
+  for (const s of [c, d, a]) line = L.withExtension(line, s);
+  L.rebuild(line, ground);
+  ok('순환선이 섰다', line.loop && line.stations.length === 4);
+
+  ok('왕복 노선에는 역방향이 없다', L.reverse(L.create(a, b)) === null);
+
+  line.patterns[0].trains = 4;
+  line.patterns[0].back = 2;
+  const back = L.reverse(line);
+  L.rebuild(back, ground);
+
+  ok('0번 역이 그대로 맨 앞이다', back.order[0] === 0 && back.stations[0] === a);
+  ok('나머지 역이 뒤집힌다', back.order.join(',') === '0,3,2,1');
+  ok('중간점 칸 수가 같다', back.mids.length === line.mids.length);
+  ok('길이가 같다', Math.abs(back.path.length - line.path.length) < 1);
+  ok('역방향 열차는 back에서 온다', back.patterns[0].trains === 2 && back.patterns[0].back === 0);
+
+  ok('산 열차는 양쪽을 다 센다', L.trainsOf(line) === 6, String(L.trainsOf(line)));
+  ok('선로 위 열차는 제 방향만 센다',
+    L.trackTrains(line) === 4 && L.trackTrains(back) === 2);
+
+  // 방향마다 제 선로이므로 배차도 따로 난다.
+  const pf = L.plan(line, line.patterns[0]);
+  const pr = L.plan(back, back.patterns[0]);
+  near('주기는 같다', pr.cycle, pf.cycle, 30);
+  near('배차는 대수만큼 갈린다', pr.headway, pf.headway * 2, 30);
+
+  // 반대편 역은 도는 쪽에 따라 걸리는 시간이 다르다. 한 정거장 옆은 한쪽으로는
+  // 금방이고 반대로는 한 바퀴다.
+  const tf = L.timetable(line, line.patterns[0]);
+  const tr = L.timetable(back, back.patterns[0]);
+  const at = (i) => back.order.indexOf(i);
+  ok('이웃 역은 정방향이 훨씬 빠르다', L.rideTime(tf, 0, 1) < L.rideTime(tr, 0, at(1)) / 2,
+    `${L.rideTime(tf, 0, 1).toFixed(0)}초 vs ${L.rideTime(tr, 0, at(1)).toFixed(0)}초`);
+  near('반대편 역은 어느 쪽으로 가나 비슷하다',
+    L.rideTime(tr, 0, at(2)), L.rideTime(tf, 0, 2), 40);
+
+  // 선로가 따로이므로 한쪽에 열차를 몰아도 반대쪽 간격은 그대로다.
+  line.patterns[0].trains = 12;
+  const many = L.reverse(line);
+  L.rebuild(many, ground);
+  ok('정방향만 선로 한계에 걸린다',
+    L.holdFactor(line, line.patterns[0]) > 1 && L.holdFactor(many, many.patterns[0]) === 1,
+    `${L.holdFactor(line, line.patterns[0]).toFixed(2)} / ${L.holdFactor(many, many.patterns[0]).toFixed(2)}`);
+}
+
 console.log(`${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);

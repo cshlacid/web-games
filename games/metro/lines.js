@@ -48,7 +48,7 @@ function create(from, to, mids = []) {
     stations: [from, to],
     mids: [mids.map((m) => ({ x: m.x, y: m.y }))],
     loop: false,
-    patterns: [{ stops: [true, true], trains: 1, dir: 1 }],
+    patterns: [{ stops: [true, true], trains: 1, back: 0 }],
   };
 }
 
@@ -162,7 +162,7 @@ function holdFactor(line, pattern) {
 }
 
 function trackFactor(line) {
-  const total = trainsOf(line);
+  const total = trackTrains(line);
   if (total <= 1) return 1;
   const slow = slowest(line);
   if (!slow) return 1;
@@ -346,7 +346,7 @@ function rideTime(table, fromStation, toStation) {
 function expressPattern(line) {
   const stops = line.stations.map((_, i) => i === 0 || i === line.stations.length - 1);
   if (line.loop) stops[0] = true;
-  return { stops, trains: 1, dir: 1 };
+  return { stops, trains: 1, back: 0 };
 }
 
 // 양 끝은 끌 수 없다. 종착역에 서지 않는 열차는 성립하지 않는다.
@@ -355,15 +355,59 @@ function canToggle(line, index) {
   return index !== 0 && index !== line.stations.length - 1;
 }
 
-function trainsOf(line) {
+// **이 선로 위를 도는 열차**. 순환선의 역방향은 제 선로를 따로 쓰므로 여기 안 든다.
+function trackTrains(line) {
   return line.patterns.reduce((sum, p) => sum + p.trains, 0);
+}
+
+// **산 열차 전부.** 값을 치르고 돌려받는 쪽은 방향을 가리지 않는다.
+function trainsOf(line) {
+  return line.patterns.reduce(
+    (sum, p) => sum + p.trains + (line.loop ? (p.back || 0) : 0), 0);
+}
+
+// 순환선을 반대로 도는 쪽. **마주 오는 열차가 한 선로에 있을 수 없으므로, 두 방향을
+// 함께 굴리는 순환선은 복선으로 본다** — 그래서 간격 제약(`MIN_GAP`)도 추월 제약도
+// 방향마다 따로 걸린다. 자료로는 **역 순서를 뒤집은 또 하나의 순환선**이라, 시간표도
+// 수요도 혼잡도 이미 있는 코드가 그대로 돈다.
+//
+// 뒤집어도 0번 역이 맨 앞이다. 순환선은 어디서 시작하든 같은 고리이고, 그래야 역
+// 번호가 양쪽에서 같은 것을 가리킨다.
+function reverse(line) {
+  if (!line.loop) return null;
+  const n = line.stations.length;
+  const order = [0];
+  for (let i = n - 1; i >= 1; i--) order.push(i);
+
+  // mids[i]는 i번 역과 그다음 역 사이다. 뒤집으면 k번 마디가 원래 (n-1-k)번 마디를
+  // 거꾸로 지나는 것이 된다.
+  const mids = [];
+  for (let k = 0; k < n; k++) {
+    const src = line.mids[n - 1 - k] || [];
+    mids.push(src.slice().reverse().map((m) => ({ x: m.x, y: m.y })));
+  }
+
+  return {
+    ...line,
+    stations: order.map((i) => line.stations[i]),
+    mids,
+    order,
+    path: null,
+    anchors: null,
+    patterns: line.patterns.map((p) => ({
+      ...p,
+      stops: order.map((i) => p.stops[i]),
+      trains: p.back || 0,
+      back: 0,
+    })),
+  };
 }
 
 const Lines = {
   DWELL, TRAIN_COST, MAX_TRAINS, MAX_PATTERNS,
   controlPoints, create, withExtension, withInsertion, whyNot, rebuild, plan, timetable, at, pointAt, rideTime,
   holdFactor, trackFactor, overtakeFactor, runTime, MIN_GAP,
-  expressPattern, canToggle, trainsOf,
+  expressPattern, canToggle, trainsOf, trackTrains, reverse,
   reset() { nextId = 1; },
 };
 
