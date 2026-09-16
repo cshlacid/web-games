@@ -318,5 +318,73 @@ const ground = () => 'empty';
   ok('노선의 열차는 패턴별 합이다', L.trainsOf(line) === 5);
 }
 
+// --- 노선 중간에 역 끼우기 ---
+{
+  const a = st(0, 0);
+  const b = st(2000, 0);
+  const c = st(4000, 0);
+  const line = L.withExtension(L.create(a, b), c);
+  L.rebuild(line, ground);
+
+  const mid = st(1000, 20);
+  const ins = L.withInsertion(line, mid, 120);
+  ok('선 밑의 역은 끼울 자리를 찾는다', !!ins && ins.seg === 0);
+  ok('원본은 그대로다', line.stations.length === 3);
+  ok('역이 순서대로 들어간다', ins.line.stations.map((s) => s.x).join(',') === '0,1000,2000,4000');
+  ok('정차역도 함께 늘어난다', ins.line.patterns[0].stops.length === 4
+    && ins.line.patterns[0].stops.every(Boolean));
+  ok('끼운 노선이 지어진다', L.rebuild(ins.line, ground).ok);
+
+  ok('선에서 먼 역은 끼우지 않는다', L.withInsertion(line, st(1000, 900), 120) === null);
+  ok('이미 노선에 있는 역은 끼우지 않는다', L.withInsertion(line, b, 120) === null);
+
+  const two = L.withInsertion(ins.line, st(3000, 0), 120);
+  ok('두 번째도 제자리에 들어간다',
+    !!two && two.line.stations.map((s) => s.x).join(',') === '0,1000,2000,3000,4000');
+}
+
+// 중간점이 있는 마디에 끼우면 중간점이 앞뒤로 갈린다. 한쪽에 몰면 선이 역을
+// 지나쳤다가 되돌아온다.
+{
+  const line = L.create(st(0, 0), st(2000, 0), [{ x: 600, y: 600 }, { x: 1400, y: 600 }]);
+  L.rebuild(line, ground);
+  const ins = L.withInsertion(line, st(1000, 610), 150);
+  ok('중간점이 앞뒤로 갈린다',
+    !!ins && ins.line.mids.map((m) => m.length).join(',') === '1,1',
+    ins ? ins.line.mids.map((m) => m.length).join(',') : '못 끼움');
+  ok('갈린 중간점의 순서가 유지된다',
+    ins.line.mids[0][0].x === 600 && ins.line.mids[1][0].x === 1400);
+}
+
+// 순환선은 마지막 마디가 0번 역으로 돌아온다. 거기에 끼우면 배열 끝에 붙는다.
+{
+  const a = st(0, 0);
+  let line = L.withExtension(L.create(a, st(2400, 0)), st(2400, 2400));
+  line = L.withExtension(line, a);
+  L.rebuild(line, ground);
+  ok('순환선이 섰다', line.loop && line.anchors.length === 4);
+  const ins = L.withInsertion(line, st(1200, 1200), 150);
+  ok('순환선의 닫는 마디에 끼운다', !!ins && ins.seg === 2);
+  ok('끝에 붙고 중간점 칸도 하나 는다',
+    ins.line.stations.length === 4 && ins.line.mids.length === 4);
+  ok('여전히 순환선이다', ins.line.loop);
+}
+
+// 급행이 통과하던 구간에 역이 생겨도 급행은 서지 않는다.
+{
+  const line = L.withExtension(L.create(st(0, 0), st(2000, 0)), st(4000, 0));
+  L.rebuild(line, ground);
+  line.patterns.push({ stops: [true, false, true], trains: 1, dir: 1 });
+  const ins = L.withInsertion(line, st(1000, 0), 120);
+  ok('완행은 새 역에 선다', ins.line.patterns[0].stops.join(',') === 'true,true,true,true');
+  ok('급행은 서지 않는다', ins.line.patterns[1].stops.join(',') === 'true,false,false,true');
+}
+
+// 끼울 곳을 못 찾는 경우
+{
+  const line = L.create(st(0, 0), st(2000, 0));
+  ok('경로가 없으면 끼우지 않는다', L.withInsertion(line, st(1000, 0), 120) === null);
+}
+
 console.log(`${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);

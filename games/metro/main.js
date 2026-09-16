@@ -40,6 +40,10 @@ const ART = {
   label: 78, train: 30,
 };
 
+// 이 거리 안에서 선 밑에 놓은 역은 그 노선에 끼어든다. 역 반지름의 두 배쯤이라
+// 역 동그라미가 선에 겹쳐 보이면 끼어든다고 보면 맞는다.
+const JOIN_SNAP = 120;
+
 const GROUND = ['road', 'empty', 'building', 'hill', 'water'];
 
 const el = {};
@@ -521,6 +525,16 @@ function renderDraft() {
   clear(layer.handles);
 
   if (ghost) {
+    // 끼어들 노선을 통째로 덧그린다. 어느 선에 붙는지가 문장으로만 있으면, 선이
+    // 여럿 지나는 자리에서 어느 것을 집은 건지 손으로 확인할 방법이 없다.
+    for (const line of ghost.joins) {
+      if (!line.path) continue;
+      layer.draft.appendChild(svg('path', {
+        d: Route.svgPath(line.path.pts), fill: 'none', stroke: lineColor(line),
+        'stroke-width': ART.built * 2.4, 'stroke-linecap': 'round',
+        'stroke-linejoin': 'round', opacity: 0.35,
+      }));
+    }
     layer.draft.appendChild(svg('circle', {
       cx: ghost.x, cy: ghost.y, r: ART.station * 1.9, fill: 'none',
       stroke: ghost.why ? 'var(--under)' : 'var(--metro)', 'stroke-width': 10,
@@ -883,7 +897,12 @@ function renderStatus(key, warn = false, n = null) {
   }
   let text = '';
   let bad = false;
-  if (ghost) { text = ghost.why ? t(`metro.bad.${ghost.why}`) : t('metro.ghostHint'); bad = !!ghost.why; }
+  if (ghost) {
+    text = ghost.why ? t(`metro.bad.${ghost.why}`)
+      : ghost.joins.length ? fill('metro.ghostJoin', ghost.joins.map((l) => lines.indexOf(l) + 1).join('·'))
+      : t('metro.ghostHint');
+    bad = !!ghost.why;
+  }
   else if (marked) {
     const used = lines.some((line) => line.stations.includes(marked));
     text = used ? t('metro.inUse') : t('metro.removeHint');
@@ -1038,8 +1057,22 @@ function onUp(event) {
 
 // --- 건설 모드 ---
 
+// 이미 지나가는 노선 아래에 놓은 역은 그 노선에 끼워 넣는다. 끼워 넣은 사본을 실제로
+// 지어 봐서 통과한 것만 센다 — 역이 끼면 양옆 곡선의 팔이 짧아져 반경이 모자랄 수 있고,
+// 그때는 끼우지 않고 그냥 역만 놓는다.
+function joinsFor(x, y) {
+  const out = [];
+  for (const line of lines) {
+    const ins = Lines.withInsertion(line, { x, y }, JOIN_SNAP);
+    if (!ins || !Lines.rebuild(ins.line, null).ok) continue;
+    out.push(line);
+  }
+  return out;
+}
+
 function moveGhost(x, y) {
-  ghost = { x, y, why: City.canPlaceStation(city, x, y) };
+  const why = City.canPlaceStation(city, x, y);
+  ghost = { x, y, why, joins: why ? [] : joinsFor(x, y) };
   renderDraft();
   renderStations();
   renderPanel();
@@ -1123,13 +1156,23 @@ function afterBuild(cost) {
 function confirm() {
   if (ghost) {
     if (ghost.why || budget < STATION_COST) return;
-    City.addStation(city, ghost.x, ghost.y);
+    const station = City.addStation(city, ghost.x, ghost.y);
     budget -= STATION_COST;
+    // **선로는 이미 그 위를 지나고 있으므로 다시 뚫을 것이 없다** — 역값만 받는다.
+    const joined = [];
+    for (const line of ghost.joins) {
+      const at = lines.indexOf(line);
+      const ins = Lines.withInsertion(line, station, JOIN_SNAP);
+      if (at < 0 || !ins || !rebuildLine(ins.line).ok) continue;
+      lines[at] = ins.line;
+      joined.push(at + 1);
+    }
     ghost = null;
     Sound.play('place');
     syncNetwork();
     refresh();
-    renderStatus('metro.stationBuilt');
+    if (joined.length) renderStatus('metro.stationJoined', false, joined.join('·'));
+    else renderStatus('metro.stationBuilt');
     return;
   }
   if (!draftOk() || draft.cost.cost > budget) return;
