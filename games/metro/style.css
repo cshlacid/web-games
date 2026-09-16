@@ -259,7 +259,16 @@ h1 {
 .stop:disabled { cursor: default; opacity: 0.85; }
 
 .trainrow { display: flex; align-items: center; gap: 7px; }
-.trainlabel { font-size: 12px; font-weight: 600; color: var(--muted); }
+/* 이름과 숫자는 접히면 안 된다 — "정방향"이 두 줄로 갈리면 줄이 세 줄이 되고,
+   "(선로 한계)"가 갈리면 그 말이 눈에 안 들어온다. 좁으면 접히는 것은 줄 전체다. */
+.trainrow { flex-wrap: wrap; row-gap: 2px; }
+.trainlabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.trainrow .plan, .trainrow .crowd { white-space: nowrap; }
 .trainrow b { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; min-width: 1.2em; text-align: center; }
 
 .step {

@@ -50,7 +50,8 @@ const el = {};
 for (const id of ['map', 'status', 'readout', 'actions', 'budget', 'clock', 'pause', 'newCity',
   'wide', 'levels', 'modes', 'tools', 'flow', 'vCaught', 'vWaiting', 'vMissed', 'missedBox', 'vIncome',
   'linepanel', 'lineList', 'dropLine', 'patternList', 'stops', 'trainCount', 'trainMinus',
-  'trainPlus', 'plan', 'crowd', 'addPattern', 'undo', 'cancel', 'remove', 'confirm',
+  'trainPlus', 'trainLabel', 'plan', 'crowd', 'backRow', 'backMinus', 'backCount',
+  'backPlus', 'backPlan', 'backCrowd', 'addPattern', 'undo', 'cancel', 'remove', 'confirm',
   'help', 'helpOpen', 'helpClose', 'toggleBgm', 'toggleSfx']) {
   el[id] = document.getElementById(id.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`));
 }
@@ -114,6 +115,9 @@ let speed = 1;   // SPEEDS의 자리
 let demands = [];
 let services = [];       // 수요가 보는 운행 목록
 let waiting = new Map(); // 역 → 타려다 못 탄 사람
+// 순환선마다 역 순서를 뒤집은 짝. 망이 바뀔 때 한 번만 짓는다 — 화면을 그릴 때마다
+// 다시 지으면 `Route.build`가 매번 도는데, 바뀐 것이 없으면 같은 답이 나온다.
+let mirrors = new Map();
 let runs = [];           // 화면이 보는 열차 목록 { line, table, trains, headway }
 let growWork = 0;
 let nextSpawn = 0;
@@ -323,29 +327,45 @@ function connectedStations() {
 // 노선이나 열차가 바뀔 때마다 **운행 목록을 다시 만든다.** 수요가 보는 것은 노선이
 // 아니라 운행(노선 × 패턴)이고, 화면이 보는 것도 그것이다. 매 프레임 다시 만들면
 // 시간표를 다시 푸는 꼴이라 바뀔 때만 만든다.
+// 한 방향치를 목록에 올린다. **순환선의 역방향은 역 순서를 뒤집은 또 하나의 노선**이라
+// (`Lines.reverse`), 시간표도 수요도 혼잡도 정방향과 똑같은 코드로 돈다. 여기서
+// 넘기는 `track`이 그 뒤집힌 노선이고, `line`은 화면이 가리키는 원래 노선이다.
+function addService(line, track, pattern, dir, reversed) {
+  if (reversed.trains <= 0) return;
+  const table = Lines.timetable(track, reversed);
+  if (!table) return;
+  const plan = Lines.plan(track, reversed);
+  runs.push({ line: track, table, trains: reversed.trains, headway: plan.headway, dir });
+  services.push({
+    line, pattern, dir,
+    stations: track.stations,
+    stopAt: reversed.stops,
+    headway: plan.headway,
+    // 분당 수송력. 열차 한 대가 배차간격마다 한 번씩 지나가므로 대수는 여기
+    // 배차간격 안에 이미 들어 있다.
+    capacity: Demand.TRAIN_CAPACITY * 60 / plan.headway,
+    ride: (i, j) => Lines.rideTime(table, i, j),
+    // 막힌 구간을 판 위에 짚으려면 그 방향의 경로와 정차 자리가 있어야 한다.
+    path: track.path,
+    marks: track.anchors.filter((a) => reversed.stops[a.station]),
+  });
+}
+
 function syncNetwork() {
   services = [];
   runs = [];
+  mirrors = new Map();
   for (const line of lines) {
     if (!line.path) continue;
-    for (const pattern of line.patterns) {
-      const table = Lines.timetable(line, pattern);
-      if (!table) continue;
-      const plan = Lines.plan(line, pattern);
-      if (pattern.trains > 0) {
-        runs.push({ line, table, trains: pattern.trains, headway: plan.headway });
-        services.push({
-          line, pattern,
-          stations: line.stations,
-          stopAt: pattern.stops,
-          headway: plan.headway,
-          // 분당 수송력. 열차 한 대가 배차간격마다 한 번씩 지나가므로 대수는 여기
-          // 배차간격 안에 이미 들어 있다.
-          capacity: Demand.TRAIN_CAPACITY * 60 / plan.headway,
-          ride: (i, j) => Lines.rideTime(table, i, j),
-        });
-      }
+    let back = null;
+    if (line.loop) {
+      back = Lines.reverse(line);
+      if (rebuildLine(back).ok) mirrors.set(line, back); else back = null;
     }
+    line.patterns.forEach((pattern, i) => {
+      addService(line, line, pattern, 1, pattern);
+      if (back) addService(line, back, pattern, -1, back.patterns[i]);
+    });
   }
   evaluateDemands();
 }
@@ -489,18 +509,19 @@ function renderJam() {
   const line = lines[sel.line];
   if (mode !== 'lines' || !line || !line.path) return;
   const pattern = line.patterns[sel.pattern];
-  const svc = services.find((x) => x.line === line && x.pattern === pattern);
-  if (!svc || !svc.peak || svc.peak.at < 0 || svc.crowd <= 1) return;
-
-  const marks = line.anchors.filter((a) => pattern.stops[a.station]);
-  const a = marks[svc.peak.at];
-  const b = marks[svc.peak.at + 1];
-  if (!a || !b || a.at < 0 || b.at < 0) return;
-  layer.lines.appendChild(svg('path', {
-    d: Route.svgPath(line.path.pts.slice(a.at, b.at + 1)), fill: 'none',
-    stroke: 'var(--jam)', 'stroke-width': ART.built * 2.2 * K(),
-    'stroke-linecap': 'round', 'stroke-linejoin': 'round', opacity: 0.55,
-  }));
+  // 순환선은 방향마다 제 선로라 막히는 자리도 따로다. 둘 다 짚는다.
+  for (const svc of services) {
+    if (svc.line !== line || svc.pattern !== pattern) continue;
+    if (!svc.peak || svc.peak.at < 0 || svc.crowd <= 1) continue;
+    const a = svc.marks[svc.peak.at];
+    const b = svc.marks[svc.peak.at + 1];
+    if (!a || !b || a.at < 0 || b.at < 0) continue;
+    layer.lines.appendChild(svg('path', {
+      d: Route.svgPath(svc.path.pts.slice(a.at, b.at + 1)), fill: 'none',
+      stroke: 'var(--jam)', 'stroke-width': ART.built * 2.2 * K(),
+      'stroke-linecap': 'round', 'stroke-linejoin': 'round', opacity: 0.55,
+    }));
+  }
 }
 
 function renderLines() {
@@ -941,7 +962,11 @@ function renderLinePanel() {
 
   sel.pattern = clamp(sel.pattern, 0, line.patterns.length - 1);
   const items = line.patterns.map((p, i) => ({
-    id: i, label: `${patternName(line, i)} ×${p.trains}`, on: i === sel.pattern,
+    id: i,
+    label: line.loop
+      ? `${patternName(line, i)} ×${p.trains}/${p.back || 0}`
+      : `${patternName(line, i)} ×${p.trains}`,
+    on: i === sel.pattern,
   }));
   picker(el.patternList, items, (item) => { sel.pattern = item.id; Sound.play('select'); refresh(); });
   el.addPattern.disabled = line.patterns.length >= Lines.MAX_PATTERNS || line.stations.length < 3;
@@ -964,24 +989,52 @@ function renderLinePanel() {
     el.stops.appendChild(button);
   });
 
-  el.trainCount.textContent = String(pattern.trains);
-  el.trainMinus.disabled = pattern.trains <= 0;
-  el.trainPlus.disabled = pattern.trains >= Lines.MAX_TRAINS || budget < Lines.TRAIN_COST;
+  // **순환선은 방향마다 열차를 따로 둔다.** 한 방향으로만 돌면 반대편으로 가려는
+  // 승객이 한 바퀴를 다 돌아야 하고, 그 승객까지 같은 선로에 실려 한쪽만 터진다.
+  // 마주 오는 열차가 한 선로에 있을 수 없으므로 두 방향은 제 선로를 쓴다 —
+  // 배차도 혼잡도 줄마다 따로 난다.
+  const back = mirrors.get(line) || null;
+  el.trainLabel.textContent = t(line.loop ? 'metro.forward' : 'metro.trains');
+  el.backRow.hidden = !line.loop;
 
-  const p = Lines.plan(line, pattern);
-  const svc = services.find((x) => x.line === line && x.pattern === pattern);
+  fillTrainRow({
+    line, track: line, pattern, dir: 1, count: pattern.trains,
+    els: { minus: el.trainMinus, value: el.trainCount, plus: el.trainPlus,
+      plan: el.plan, crowd: el.crowd },
+  });
+  if (line.loop) {
+    fillTrainRow({
+      line, track: back, pattern: back && back.patterns[sel.pattern], dir: -1,
+      count: pattern.back || 0,
+      els: { minus: el.backMinus, value: el.backCount, plus: el.backPlus,
+        plan: el.backPlan, crowd: el.backCrowd },
+    });
+  }
+}
+
+// 한 방향치 줄을 채운다. 정방향과 역방향이 같은 값을 같은 자리에서 읽게 하려고 하나로
+// 모았다 — 따로 쓰면 한쪽만 고치는 일이 난다.
+function fillTrainRow({ line, track, pattern, dir, count, els }) {
+  els.value.textContent = String(count);
+  els.minus.disabled = count <= 0;
+  els.plus.disabled = count >= Lines.MAX_TRAINS || budget < Lines.TRAIN_COST;
+
+  const ready = track && track.path && pattern;
+  const p = ready ? Lines.plan(track, pattern) : null;
+  const svc = services.find((x) => x.line === line
+    && x.pattern === line.patterns[sel.pattern] && x.dir === dir);
   const crowd = svc ? Math.round(svc.crowd * 100) : 0;
   // **선로 한계에 닿았으면 그렇게 적는다.** 열차를 더 넣어도 배차가 줄지 않는데,
   // 화면에 그 말이 없으면 혼잡을 보고 열차부터 더 사게 된다 — 돈만 나간다.
-  const held = Lines.holdFactor(line, pattern) > 1.001;
-  el.plan.textContent = p
+  const held = ready && Lines.holdFactor(track, pattern) > 1.001;
+  els.plan.textContent = p && count > 0
     ? `${t('metro.cycle')} ${mmss(p.cycle)} · ${t('metro.headway')} ${mmss(p.headway)}`
       + (held ? ` (${t('metro.tracked')})` : '')
     : '';
-  el.trainPlus.disabled = el.trainPlus.disabled || held;
+  els.plus.disabled = els.plus.disabled || held;
   // 혼잡률은 **깎기 전의 부하**다. 100%를 넘으면 그만큼이 못 타고 지상으로 간다.
-  el.crowd.textContent = svc ? `${t('metro.crowd')} ${crowd}%` : '';
-  el.crowd.classList.toggle('over', crowd > 100);
+  els.crowd.textContent = svc ? `${t('metro.crowd')} ${crowd}%` : '';
+  els.crowd.classList.toggle('over', crowd > 100);
 }
 
 // --- 상태줄 ---
@@ -1361,17 +1414,19 @@ el.addPattern.addEventListener('click', () => {
   refresh();
 });
 
-function setTrains(delta) {
+function setTrains(delta, dir = 1) {
   const line = lines[sel.line];
   if (!line) return;
   const pattern = line.patterns[sel.pattern];
-  const next = clamp(pattern.trains + delta, 0, Lines.MAX_TRAINS);
-  if (next === pattern.trains) return;
+  const key = dir < 0 ? 'back' : 'trains';
+  const now = pattern[key] || 0;
+  const next = clamp(now + delta, 0, Lines.MAX_TRAINS);
+  if (next === now) return;
   if (delta > 0) {
     if (budget < Lines.TRAIN_COST) { renderStatus('metro.noMoney', true); Sound.play('deny'); return; }
     budget -= Lines.TRAIN_COST;
   } else budget += Lines.TRAIN_COST * REFUND;
-  pattern.trains = next;
+  pattern[key] = next;
   Sound.play(delta > 0 ? 'place' : 'erase');
   syncNetwork();
   refresh();
@@ -1379,6 +1434,8 @@ function setTrains(delta) {
 
 el.trainPlus.addEventListener('click', () => setTrains(1));
 el.trainMinus.addEventListener('click', () => setTrains(-1));
+el.backPlus.addEventListener('click', () => setTrains(1, -1));
+el.backMinus.addEventListener('click', () => setTrains(-1, -1));
 
 el.remove.addEventListener('click', removeStation);
 
