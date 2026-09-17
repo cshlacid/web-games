@@ -108,6 +108,32 @@ let mapBox = { w: 1, h: 1 };
 function measureMap() {
   const r = el.map.getBoundingClientRect();
   if (r.width > 0 && r.height > 0) mapBox = { w: r.width, h: r.height };
+  measureHud();
+}
+
+// **겹이 덮는 만큼 지도 끝을 넘어 밀 수 있어야 한다.** 그러지 않으면 도시의 위아래
+// 가장자리 띠는 카메라를 끝까지 밀어도 카드 밑에 남아 **영영 두드릴 수 없다** — 거기에
+// 놓은 역도 그 위를 지나는 선도 손이 닿지 않는다.
+//
+// 넘기는 양을 **덮인 높이와 똑같이** 잡는 것이 요점이다. 그만큼 밀면 지도 밖이 드러나지만
+// 드러나는 자리가 정확히 카드에 가린 자리라, 화면에서는 아무것도 달라지지 않고 닿지 않던
+// 곳만 가운데로 나온다.
+//
+// 가려진 자리를 바다나 공터로 굳히는 길도 있지만 **덮이는 세계 좌표가 고정이 아니다** —
+// 지도가 밀리고 배율이 바뀌면 같이 움직인다. 배율까지 따지면 도시의 삼분의 일을
+// 버려야 하고, 그러고도 다른 배율에서는 여전히 가린다.
+let hudInset = { top: 0, bottom: 0 };   // 화면 픽셀
+function measureHud() {
+  const map = el.map.getBoundingClientRect();
+  const top = document.querySelector('.hud-top');
+  const bottom = document.querySelector('.hud-bottom');
+  if (!map.height || !top || !bottom) return;
+  const t = top.getBoundingClientRect();
+  const b = bottom.getBoundingClientRect();
+  hudInset = {
+    top: clamp(t.bottom - map.top, 0, map.height),
+    bottom: clamp(map.bottom - b.top, 0, map.height),
+  };
 }
 const span = () => {
   const w = VIEW.w / zoom;
@@ -394,9 +420,15 @@ function drawBuildings() {
 
 function setCam(x, y) {
   const v = span();
-  // 창이 도시보다 넓으면(전체 보기에서 세로가 남는다) 끝에 붙이지 않고 가운데에 둔다.
+  // 겹이 덮는 높이를 지도 좌표로 옮긴 것. 지도 끝을 이만큼 넘어 밀 수 있다.
+  const padT = hudInset.top / mapBox.h * v.h;
+  const padB = hudInset.bottom / mapBox.h * v.h;
+  // 도시가 창보다 작으면 끝에 붙이지 않고 가운데에 둔다. **화면 가운데가 아니라 카드
+  // 사이 빈 자리의 가운데**다 — 화면 가운데에 두면 도시의 아래쪽이 카드에 깔린다.
+  const midY = (hudInset.top + mapBox.h - hudInset.bottom) / 2 / mapBox.h;
   cam.x = v.w >= city.world.w ? (city.world.w - v.w) / 2 : clamp(x, 0, city.world.w - v.w);
-  cam.y = v.h >= city.world.h ? (city.world.h - v.h) / 2 : clamp(y, 0, city.world.h - v.h);
+  cam.y = v.h >= city.world.h ? city.world.h / 2 - midY * v.h
+    : clamp(y, -padT, city.world.h - v.h + padB);
   el.map.setAttribute('viewBox', `${r1(cam.x)} ${r1(cam.y)} ${v.w} ${v.h}`);
 }
 
@@ -805,6 +837,10 @@ function refresh() {
   renderTrainPanel();
   renderMeters();
   renderStatus();
+  // **맨 마지막에 잰다.** 패널이 뜨고 지면서, 상태줄이 비고 차면서 카드 높이가 바뀌고,
+  // 카메라가 지도 끝을 넘어갈 수 있는 양이 거기서 나온다 — 그리기 전에 재면 한 판 낡은
+  // 값을 쓰고, 그만큼 가장자리가 카드 밑에 남는다.
+  measureHud();
 }
 
 // 노선 패널의 혼잡률은 **한 구간**의 이야기인데, 숫자만 띄우면 970%를 보고도 어디를
@@ -1536,6 +1572,9 @@ function renderStatus(key, warn = false, n = null) {
   if (key) {
     el.status.textContent = n == null ? t(key) : fill(key, n);
     el.status.classList.toggle('warn', warn);
+    // 상태줄이 비었다 차면 아래 카드가 한 줄만큼 높아진다. 카메라가 넘어갈 수 있는
+    // 양이 거기서 나오므로 같이 다시 잰다.
+    measureHud();
     return;
   }
   let text = '';
