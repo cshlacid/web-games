@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title data-i18n="game.roadworks">도로공사</title>
-<meta name="description" content="이미 있는 도시에서 우회로·차로 확장·신호로 정체를 풀어 민원이 쌓이기 전에 버티는 게임" data-i18n-attr="content=meta.desc">
+<meta name="description" content="곡선과 직선이 섞인 도시의 도로 위로 자동차·택시·버스·트럭·오토바이가 실시간으로 오간다" data-i18n-attr="content=meta.desc">
 <meta name="color-scheme" content="light dark">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b7a8f' stroke-width='2.4' stroke-linecap='round'><path d='M6 2 V22'/><path d='M18 2 V22'/><path d='M12 4 V8'/><path d='M12 11 V13'/><path d='M12 16 V20'/></svg>">
 <link rel="manifest" href="../../manifest.json">
@@ -12,11 +12,10 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="도로공사" data-i18n-attr="content=game.roadworks">
-<meta name="theme-color" content="#f3f5f7" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#15181c" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#eff1f4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#131619" media="(prefers-color-scheme: dark)">
 <link rel="stylesheet" href="../../shared/base.css">
 <link rel="stylesheet" href="style.css">
-<link rel="stylesheet" href="../../shared/result.css">
 <link rel="stylesheet" href="../../shared/sheet.css">
 <script src="../../shared/analytics.js"></script>
 <script src="../../shared/i18n.js"></script>
@@ -38,68 +37,44 @@
       </div>
     </div>
     <div class="gauges">
-      <span class="gauge"><b id="week">1</b><i data-i18n="road.week">주차</i></span>
-      <span class="gauge"><b id="budget">0</b><i data-i18n="road.budget">예산</i></span>
-      <span class="gauge" id="load-gauge"><b id="complaint-count">0/5</b><i data-i18n="road.complaints">민원</i></span>
+      <span class="gauge"><b id="stat-count">0</b><i data-i18n="road.onRoad">주행</i></span>
+      <span class="gauge"><b id="stat-speed">0</b><i data-i18n="road.avgSpeed">평균 속도</i></span>
+      <span class="gauge"><b id="stat-gone">0</b><i data-i18n="road.left">시외로</i></span>
     </div>
   </header>
 
   <div class="board-wrap" id="board-wrap">
-    <svg class="board" id="board" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"></svg>
-    <div class="result" id="result" role="status" aria-live="polite" hidden>
-      <div class="result-card">
-        <p class="sheet-title" id="result-title"></p>
-        <p class="sheet-note" id="result-note"></p>
-        <div class="sheet-actions">
-          <button class="btn" id="again" type="button" data-i18n="ui.again">한 판 더</button>
-        </div>
-      </div>
-    </div>
+    <canvas class="board" id="board" aria-hidden="true"></canvas>
   </div>
 
-  <p class="toast" id="toast" role="status" aria-live="polite"></p>
-
-  <ul class="complaints" id="complaints"></ul>
-
   <div class="pad">
-    <div class="tools" id="tools">
-      <button class="tool" type="button" data-tool="road" aria-pressed="true">
-        <span class="tool-icon" data-road-icon="road"></span>
-        <span class="tool-label" data-i18n="road.toolRoad">신설</span>
-        <span class="tool-cost" data-cost="road"></span>
+    <div class="row">
+      <button class="btn" id="play" type="button" aria-pressed="true">
+        <span class="play-label" data-i18n="road.pause">멈춤</span>
       </button>
-      <button class="tool" type="button" data-tool="widen" aria-pressed="false">
-        <span class="tool-icon" data-road-icon="widen"></span>
-        <span class="tool-label" data-i18n="road.toolWiden">확장</span>
-        <span class="tool-cost" data-cost="widen"></span>
-      </button>
-      <button class="tool" type="button" data-tool="signal" aria-pressed="false">
-        <span class="tool-icon" data-road-icon="signal"></span>
-        <span class="tool-label" data-i18n="road.toolSignal">신호</span>
-        <span class="tool-cost" data-cost="signal"></span>
-      </button>
+      <div class="picker" id="rates" role="group" aria-label="빠르기" data-i18n-attr="aria-label=road.rate">
+        <button class="pick" type="button" data-rate="1" aria-pressed="true">1×</button>
+        <button class="pick" type="button" data-rate="2" aria-pressed="false">2×</button>
+        <button class="pick" type="button" data-rate="4" aria-pressed="false">4×</button>
+      </div>
+      <button class="btn ghost" id="fresh" type="button" data-i18n="road.newCity">새 도시</button>
     </div>
-    <button class="btn wide" id="next-week" type="button" data-i18n="road.next">다음 주</button>
   </div>
 
   <div class="sheet" id="help" hidden>
     <p class="sheet-title" data-i18n="ui.rules">규칙</p>
     <ul class="help-list">
-      <li data-i18n-html="road.rule1">도로공사 담당자가 되어 <b>막히는 길을 고칩니다</b>. 건물은 부술 수 없으니
-        <b>빈 땅과 지금 있는 도로</b>로만 풀어야 합니다.</li>
-      <li data-i18n-html="road.rule2">아래에서 도구를 고르고 판을 누릅니다. <b>신설</b>은 빈 땅에 새 길을,
-        <b>확장</b>은 도로를 2차로로, <b>신호</b>는 교차로에 신호를 세웁니다.
-        신호가 선 교차로를 다시 누르면 <b>녹색 배분</b>이 바뀝니다.</li>
-      <li data-i18n-html="road.rule3">도로 색이 그 칸의 혼잡도입니다. <b>빨간 칸</b>은 받을 수 있는 양을 넘긴 곳입니다.</li>
-      <li data-i18n-html="road.rule4"><b>길을 고치면 운전자가 경로를 바꿉니다.</b> 우회로를 뚫으면 일부가 그리로
-        옮겨 가고, 그래서 길을 늘려도 나아지지 않는 자리가 있습니다.</li>
-      <li data-i18n-html="road.rule5">신호는 <b>교차하는 두 흐름</b>을 갈라 줍니다. 대신 녹색을 나누는 만큼 용량이
-        줄어드니, 한 방향만 지나는 길에 세우면 오히려 느려집니다.</li>
-      <li data-i18n-html="road.rule6"><b>다음 주</b>를 누르면 통근량이 늘고 예산이 들어옵니다. 도시는 가만히 두면
-        반드시 막힙니다.</li>
-      <li data-i18n-html="road.rule7">민원은 <b>원인을 없애면 사라집니다</b>. 한 주에 공사를 너무 많이 하면
-        공사 민원이 따로 붙습니다.</li>
-      <li id="rule-limit" data-i18n-html="road.rule8">민원이 다섯 건 쌓이면 끝납니다.</li>
+      <li data-i18n-html="road.rule1">지금은 <b>도로 위를 차가 달리는 것</b>까지 만들어져 있습니다. 도로를 놓고
+        고치는 조작은 아직 없습니다.</li>
+      <li data-i18n-html="road.rule2">도시의 길은 <b>곧은 길과 굽은 길이 섞여</b> 있고, 길마다 <b>1~4차로</b>입니다.
+        가운데 노란 선이 마주 오는 방향을 가르고, 흰 점선이 같은 방향의 차로를 가릅니다.</li>
+      <li data-i18n-html="road.rule3"><b>우측 통행</b>입니다. 차는 제 진행 방향에서 오른쪽 차로를 씁니다.</li>
+      <li data-i18n-html="road.rule4">맵 가장자리의 점선은 <b>다른 도시로 이어지는 관문</b>입니다. 차는 거기서
+        들어와 다른 관문으로 빠져나갑니다.</li>
+      <li data-i18n-html="road.rule5">달리는 것은 <b>자동차·택시·버스·트럭·오토바이</b> 다섯입니다. 길이도 속도도
+        가속도 저마다 달라서, 트럭 뒤에 승용차가 물리면 줄이 길어집니다.</li>
+      <li data-i18n-html="road.rule6">앞차와의 거리에 따라 <b>알아서 서고 다시 나갑니다</b>. 신호가 아직 없어
+        교차로는 <b>먼저 닿은 차가 하나씩</b> 지납니다.</li>
     </ul>
     <div class="sheet-actions">
       <button class="btn" id="help-close" type="button" data-i18n="ui.close">닫기</button>
@@ -109,11 +84,10 @@
 
 <script>SharedI18n.apply();</script>
 <script src="../../shared/base.js"></script>
+<script src="geom.js"></script>
+<script src="network.js"></script>
+<script src="mapgen.js"></script>
 <script src="traffic.js"></script>
-<script src="levels.js"></script>
-<script src="game.js"></script>
-<script src="icons.js"></script>
-<script src="../../shared/icons.js"></script>
 <script src="../../shared/audio.js"></script>
 <script src="audio.js"></script>
 <script src="../../shared/snap.js"></script>

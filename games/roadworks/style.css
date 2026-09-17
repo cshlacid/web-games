@@ -1,5 +1,5 @@
 :root {
-  --bg: #f3f5f7;
+  --bg: #eff1f4;
   --fg: #2b323b;
   --muted: #78838f;
   --line: #d3dae1;
@@ -7,65 +7,19 @@
   --btn-bg: #4d5a68;
   --btn-fg: #f3f6f9;
 
-  --ground: #e8ece9;     /* 빈 땅 */
-  --ground-open: #cfe0cd;
-  --open-line: #4f8a5b;
-  --casing: #b9c2cb;     /* 도로 갓길 */
-
-  /* 혼잡도 네 단계. 초록에서 빨강으로 가되 가운데를 노랑이 아니라 호박색으로 둔
-     것은 밝은 화면에서 노랑이 바탕에 묻히기 때문이다. */
-  --q0: #93a1ae;
-  --q1: #58a06c;
-  --q2: #d2922b;
-  --q3: #cb4a3c;
-
-  --home: #d8c3ad;
-  --home-roof: #a98a6b;
-  --work: #aebdcd;
-  --work-win: #6d8098;
-  --block: #c3c8ce;
-
-  --sig: #2f3740;
-  --sig-bar: #ffd76a;
-  --badge: #cb4a3c;
-  --badge-mark: #fff2ef;
-  --focus: #3b6ea5;
-
   --pad-x: clamp(10px, 4vmin, 26px);
-  --app-max: 460px;
+  --app-max: 520px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #15181c;
+    --bg: #131619;
     --fg: #dde3ea;
     --muted: #8b95a1;
     --line: #2f373f;
     --sheet-bg: #1e2329;
     --btn-bg: #47535f;
     --btn-fg: #eef2f6;
-
-    --ground: #222a27;
-    --ground-open: #2f4232;
-    --open-line: #6fae79;
-    --casing: #3b444d;
-
-    --q0: #66727e;
-    --q1: #4e9564;
-    --q2: #c7912f;
-    --q3: #c9503f;
-
-    --home: #6a5a49;
-    --home-roof: #97795c;
-    --work: #4c5a6a;
-    --work-win: #93a6bc;
-    --block: #4a5057;
-
-    --sig: #cfd7de;
-    --sig-bar: #ffd76a;
-    --badge: #c9503f;
-    --badge-mark: #1e2329;
-    --focus: #79a7d8;
   }
 }
 
@@ -89,8 +43,7 @@ body {
   gap: clamp(7px, 1.8vmin, 12px);
 }
 
-/* 헤더 배치는 모든 게임이 같다 — 왼쪽 위에 목록과 도움말, 가운데에 이름, 오른쪽에
-   소리. 게임을 옮겨 다닐 때 돌아가는 길을 매번 다시 찾지 않도록. */
+/* 헤더 배치는 모든 게임이 같다 — 왼쪽 위에 목록과 도움말, 가운데에 이름, 오른쪽에 소리. */
 .title-row {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
@@ -128,174 +81,26 @@ h1 {
 
 /* --- 계기 --- */
 
-.gauges {
-  display: flex;
-  justify-content: center;
-  gap: 18px;
-}
-
-.gauge {
-  display: flex;
-  align-items: baseline;
-  gap: 4px;
-}
-
+.gauges { display: flex; justify-content: center; gap: 18px; }
+.gauge { display: flex; align-items: baseline; gap: 4px; }
 .gauge b { font-size: 17px; font-weight: 800; font-variant-numeric: tabular-nums; }
 .gauge i { font-style: normal; font-size: 12px; color: var(--muted); }
-.gauge.warn b { color: var(--q3); }
 
 /* --- 판 --- */
 
 .board-wrap {
-  position: relative;   /* 결과 안내가 판 위에 덮인다 */
+  position: relative;
   margin: 0 auto;
+  border-radius: 12px;
+  overflow: hidden;
 }
 
 .board { display: block; }
 
-.land {
-  fill: var(--ground);
-  stroke: none;
-}
-
-/* 지금 고른 도구가 닿는 자리. 무엇을 누를 수 있는지 판이 스스로 말해야 도구를
-   고른 뒤 아무 데나 두드려 보는 일이 없다. **점선을 진하게 그었더니 빈 땅이 판의
-   주인공이 되어 도로가 묻혔다** — 칠만 바꾸고 테두리는 흐리게 남긴다. */
-.land.open { fill: var(--ground-open); }
-
-.open-ring {
-  fill: none;
-  stroke: var(--open-line);
-  stroke-width: 0.045;
-  stroke-opacity: 0.55;
-  stroke-dasharray: 0.12 0.1;
-}
-
-.bld { fill: var(--block); }
-.bld.home { fill: var(--home); }
-.bld.work { fill: var(--work); }
-.roof { fill: var(--home-roof); }
-.door { fill: var(--home-roof); opacity: 0.75; }
-.win { fill: var(--work-win); }
-
-.casing {
-  fill: none;
-  stroke: var(--casing);
-  stroke-linecap: butt;
-}
-
-.casing-joint { fill: var(--casing); stroke: none; }
-
-.road {
-  fill: none;
-  stroke-linecap: butt;
-}
-
-.road-joint { stroke: none; }
-
-.road.q0 { stroke: var(--q0); }
-.road.q1 { stroke: var(--q1); }
-.road.q2 { stroke: var(--q2); }
-.road.q3 { stroke: var(--q3); }
-
-.road-joint.q0 { fill: var(--q0); }
-.road-joint.q1 { fill: var(--q1); }
-.road-joint.q2 { fill: var(--q2); }
-.road-joint.q3 { fill: var(--q3); }
-
-.sig-body { fill: var(--sig); }
-.sig-bar { fill: var(--sig-bar); }
-
-.badge { fill: var(--badge); }
-.badge-mark { fill: var(--badge-mark); }
-
-.focus {
-  fill: none;
-  stroke: var(--focus);
-  stroke-width: 0.07;
-  stroke-dasharray: 0.2 0.12;
-}
-
-/* 투명한 판이지만 눌려야 한다. fill을 none으로 두면 안쪽이 눌리지 않는다. */
-.hit { fill: transparent; cursor: pointer; }
-
-/* --- 민원 --- */
-
-.complaints {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-height: 34px;
-}
-
-.chip {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 5px 10px;
-  border-radius: 9px;
-  background: var(--sheet-bg);
-  border: 1px solid var(--line);
-  border-left-width: 4px;
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.chip.calm {
-  justify-content: center;
-  color: var(--muted);
-  border-left-width: 1px;
-  cursor: default;
-}
-
-/* 원인이 이미 사라진 민원. 다음 주에 정리된다는 것을 미리 알린다 — 고친 뒤 한 주를
-   기다리는 동안 아무 표시가 없으면 손댄 것이 통했는지 알 수 없다. */
-.chip.fixed {
-  border-left-color: var(--q1);
-  opacity: 0.6;
-}
-
-.chip.t-jam { border-left-color: var(--q3); }
-.chip.t-delay { border-left-color: var(--q2); }
-.chip.t-works { border-left-color: var(--q0); }
-
-.chip-title { font-weight: 700; }
-.chip-note { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
-
-/* --- 도구 --- */
+/* --- 조작 --- */
 
 .pad { display: flex; flex-direction: column; gap: 8px; }
-
-.tools { display: flex; gap: 6px; }
-
-.tool {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  padding: 7px 4px 6px;
-  border: 1px solid var(--line);
-  border-radius: 11px;
-  background: var(--sheet-bg);
-  color: inherit;
-  font-family: inherit;
-  cursor: pointer;
-}
-
-.tool[aria-pressed="true"] {
-  background: var(--btn-bg);
-  border-color: var(--btn-bg);
-  color: var(--btn-fg);
-}
-
-.tool .ico { width: 21px; height: 21px; display: block; }
-.tool-label { font-size: 12px; font-weight: 700; }
-.tool-cost { font-size: 11px; opacity: 0.65; font-variant-numeric: tabular-nums; }
+.row { display: flex; align-items: center; gap: 8px; }
 
 .btn {
   border: 0;
@@ -305,23 +110,36 @@ h1 {
   font-family: inherit;
   font-size: 14px;
   font-weight: 700;
-  padding: 10px 18px;
+  padding: 10px 16px;
   cursor: pointer;
 }
 
-.btn.wide { width: 100%; }
-.btn[disabled] { opacity: 0.45; cursor: default; }
-
-.toast {
-  margin: 0;
-  min-height: 16px;
-  text-align: center;
-  font-size: 12px;
-  color: var(--muted);
-  opacity: 0;
-  transition: opacity 0.15s;
+.btn.ghost {
+  background: none;
+  border: 1px solid var(--line);
+  color: inherit;
 }
-.toast.on { opacity: 1; }
+
+.picker { display: flex; gap: 4px; margin: 0 auto; }
+
+.pick {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 11px;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+
+.pick[aria-pressed="true"] {
+  background: var(--btn-bg);
+  border-color: var(--btn-bg);
+  color: var(--btn-fg);
+}
 
 /* --- 시트 --- */
 
@@ -337,8 +155,4 @@ h1 {
   gap: 8px;
   font-size: 13.5px;
   line-height: 1.55;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .toast { transition: none; }
 }
