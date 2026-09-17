@@ -643,12 +643,19 @@ function frame(now) {
 
 // --- 경로 편집 ---
 
-// **연장은 마지막 역에서 곧게 나가도록 중간점을 미리 놓고 시작한다.** 중간점 없이
-// 직선으로 두면 새 구간이 들어오던 방향과 무관한 방향으로 뻗어 그 역에서 꺾이는데,
-// 역은 다듬지 않으므로(`Route.stationTurn`) 그 꺾임이 모서리 그대로 보인다.
+// **연장은 잠긴 토막을 들고 시작한다.** 역에서 나가는 짧은 구간은 들어오던 방향
+// 그대로이고, 플레이어가 끌지도 지우지도 못한다 — 열차가 역에서 꺾을 수 없다는 사실이
+// 판에 그대로 나온다. 미리 놓아 주기만 하던 때는 두 번 두드려 지우면 직각이 도로
+// 돌아왔다. 순환선을 닫을 때는 반대쪽에도 하나 붙는다(`Lines.stubs`).
 function startDraft(kind, line, from, to) {
-  const mids = kind === 'extend' ? Lines.smoothMids(line, to, ground) : [];
-  draft = { kind, line, from, to, mids };
+  const mids = kind === 'extend' ? Lines.stubs(line, to) : [];
+  draft = {
+    kind, line, from, to, mids,
+    // 잠긴 것은 앞뒤에만 있다. 새 점은 그 사이에만 끼고, 몇 개까지 쓸 수 있는지도
+    // 잠긴 것을 빼고 센다 — 강제된 것이 플레이어 몫을 갉아먹으면 안 된다.
+    lockHead: mids.length ? 1 : 0,
+    lockTail: mids.length > 1 ? 1 : 0,
+  };
   pending = null;
   history = [];
   centerOn((from.x + to.x) / 2, (from.y + to.y) / 2);
@@ -980,6 +987,14 @@ function renderDraft() {
 function renderHandles() {
   if (!draft) return;
   for (const m of draft.mids) {
+    // 잠긴 토막은 **잡을 수 없다는 것이 보여야 한다.** 같은 손잡이로 그리면 끌리지
+    // 않는 것이 고장으로 읽힌다 — 작고 속이 찬 점은 "여기 점이 있다"까지만 말한다.
+    if (m.lock) {
+      layer.handles.appendChild(svg('circle', {
+        cx: m.x, cy: m.y, r: ART.handle * 0.5, fill: 'var(--metro)', opacity: 0.45,
+      }));
+      continue;
+    }
     if (m.snapped) {
       layer.handles.appendChild(svg('circle', {
         cx: m.x, cy: m.y, r: ART.handle * 1.7, fill: 'none',
@@ -1466,10 +1481,30 @@ function grabHandle(w) {
   let hit = -1;
   let best = HIT_PX * w.scale;
   draft.mids.forEach((m, i) => {
+    if (m.lock) return;
     const d = Geom.dist(w.x, w.y, m.x, m.y);
     if (d < best) { best = d; hit = i; }
   });
   return hit;
+}
+
+// 잠긴 점을 짚었는가. 그냥 지나치면 그 자리에서 **새 점이 생겨** 토막이 꺾인다 —
+// 잠근 점 위를 누르는 것은 십중팔구 그 점을 만지려는 것이다.
+function grabLocked(w) {
+  let hit = -1;
+  let best = HIT_PX * w.scale;
+  draft.mids.forEach((m, i) => {
+    if (!m.lock) return;
+    const d = Geom.dist(w.x, w.y, m.x, m.y);
+    if (d < best) { best = d; hit = i; }
+  });
+  return hit;
+}
+
+// 새 점을 끼울 수 있는 자리인가. 잠긴 토막 위에서 잡으면 그 토막을 꺾는 점이 생겨
+// 잠근 뜻이 없어진다.
+function freeSpan() {
+  return { lo: draft.lockHead || 0, hi: draft.mids.length - (draft.lockTail || 0) };
 }
 
 // **편집은 자기 것 위에서 시작한 끌기만 가져간다.** 손잡이와 그은 선, 그리고 임시
@@ -1515,18 +1550,31 @@ function onDown(event) {
       return;
     }
 
+    if (grabLocked(w) >= 0) {
+      renderStatus('metro.lockedLeg', true);
+      Sound.play('deny');
+      return;
+    }
+
     // 선을 잡는다. 판정은 다듬어진 곡선이 아니라 찍은 점들의 꺾은선으로 한다 —
     // 새 점을 몇 번째 자리에 끼울지가 그 꺾은선에서만 나온다.
     const ctrl = [draft.from, ...draft.mids, draft.to];
     const near = Geom.nearestOnPolyline(w.x, w.y, ctrl);
     if (near.d < GRAB_PX * w.scale) {
-      if (draft.mids.length >= MAX_MIDS) {
+      const free = freeSpan();
+      const index = near.index - 1;
+      // 잠긴 토막 위에서 잡으면 그 토막이 꺾여 잠근 뜻이 없어진다.
+      if (index < free.lo || index > free.hi) {
+        renderStatus('metro.lockedLeg', true);
+        Sound.play('deny');
+        return;
+      }
+      if (draft.mids.length - free.lo - (draft.lockTail || 0) >= MAX_MIDS) {
         renderStatus('metro.maxMids', true);
         Sound.play('deny');
         return;
       }
       pushHistory();
-      const index = near.index - 1;
       draft.mids.splice(index, 0, { x: near.x, y: near.y });
       drag = { kind: 'mid', index, snapped: false };
       lastTap = { index, at: performance.now() };

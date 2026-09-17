@@ -540,9 +540,9 @@ const ground = () => 'empty';
     L.carsAt(back.patterns[0], 1, 1) === 5 && back.patterns[0].trains === 2);
 }
 
-// --- 연장은 마지막 역에서 곧게 나간다 ---
-// 역은 다듬지 않으므로 마지막 역에서 꺾으면 모서리가 그대로 보인다. 들어오던 접선
-// 위에 중간점을 미리 놓아, 꺾는 일은 호로 다듬어지는 그다음 모서리가 맡게 한다.
+// --- 연장은 잠긴 토막으로 시작한다 ---
+// 역은 다듬지 않으므로 마지막 역에서 꺾으면 모서리가 그대로 보인다. 역에서 나가는 짧은
+// 구간을 들어오던 방향으로 잠가 두면, 꺾는 일은 호로 다듬어지는 그다음 모서리가 맡는다.
 {
   const line = L.withExtension(L.create(st(0, 0), st(1200, 0)), st(2400, 0));
   L.rebuild(line, ground);
@@ -550,54 +550,71 @@ const ground = () => 'empty';
   const dir = L.endHeading(line);
   near('들어오던 방향은 +x', dir.x, 1, 1e-9);
   near('들어오던 방향에 y는 없다', dir.y, 0, 1e-9);
+  const out = L.startHeading(line);
+  near('첫 역에서 나가는 방향도 +x', out.x, 1, 1e-9);
 
-  ok('곧게 이어 가면 점을 두지 않는다', L.smoothMids(line, st(3600, 0), ground).length === 0);
-  const back = st(600, -1400);   // 들어오던 방향에서 160° 넘게 돌아 나간다
-  ok('되짚어 가면 점을 두지 않는다', L.smoothMids(line, back, ground).length === 0,
-    JSON.stringify(L.smoothMids(line, back, ground)));
-  ok('90°는 아직 접선을 둔다', L.smoothMids(line, st(2400, -3000), ground).length === 1);
-  ok('순환선은 늘릴 수 없으니 점도 없다',
-    L.smoothMids({ ...line, loop: true }, st(3600, 1200), ground).length === 0);
+  ok('순환선은 늘릴 수 없으니 토막도 없다',
+    L.stubs({ ...line, loop: true }, st(3600, 1200)).length === 0);
 
-  // 90°에 가깝게 꺾는 자리. 접선 위에 점이 하나 놓이고, 그 덕에 역에서의 꺾임이 사라진다.
-  const away = st(3600, 2000);
-  const mids = L.smoothMids(line, away, ground);
-  ok('꺾어 가면 접선 위에 점을 하나 둔다', mids.length === 1, JSON.stringify(mids));
-  if (mids.length === 1) {
-    near('점은 들어오던 방향 위에 있다', mids[0].y, 0, 1e-9);
-    ok('점은 역보다 앞에 있다', mids[0].x > 2400);
-    const d = Math.hypot(away.x - 2400, away.y - 0);
-    const share = (mids[0].x - 2400) / d;
-    ok('접선 길이는 새 역까지 거리에 비례한다', share > 0.1 && share < 0.3, share.toFixed(3));
-
-    // 이 점이 있으면 마지막 역에서의 꺾임이 사라진다(통과 속도가 안 깎인다).
+  // **어디로 꺾든 토막은 늘 붙는다.** 미리 놓아 주기만 하던 때는 지울 수 있어 직각이
+  // 도로 돌아왔다 — 놓는 조건을 따지지 않고 언제나 잠근다.
+  for (const [name, away] of [
+    ['곧게 이어 갈 때', st(3600, 0)],
+    ['비스듬히 꺾을 때', st(3600, 2000)],
+    ['직각으로 꺾을 때', st(2400, -3000)],
+    ['되짚어 갈 때', st(600, -1400)],
+  ]) {
+    const mids = L.stubs(line, away);
+    ok(`${name}도 토막이 하나 붙는다`, mids.length === 1 && mids[0].lock === true,
+      JSON.stringify(mids));
+    if (!mids.length) continue;
+    near(`${name} 토막은 들어오던 방향 위에 있다`, mids[0].y, 0, 1e-9);
+    ok(`${name} 토막은 역보다 앞에 있다`, mids[0].x > 2400);
+    // 토막이 있으면 역에서의 꺾임이 사라진다 — 통과 속도가 안 깎인다.
     const kink = R.stationTurn(st(1200, 0), st(2400, 0), mids[0], R.LIMITS);
-    ok('역에서 더는 꺾이지 않는다', kink.ok && kink.vlim === R.LIMITS.V_MAX,
+    ok(`${name} 역에서 더는 꺾이지 않는다`, kink.ok && kink.vlim === R.LIMITS.V_MAX,
       JSON.stringify(kink));
-    const bare = R.stationTurn(st(1200, 0), st(2400, 0), away, R.LIMITS);
-    ok('중간점이 없으면 역에서 꺾인다', bare.ok && bare.vlim < R.LIMITS.V_MAX,
-      JSON.stringify(bare));
-
-    ok('놓고 지어도 경로가 선다', L.rebuild(L.withExtension(line, away, mids), ground).ok);
   }
 
-  // 많이 꺾일수록 접선이 짧아진다 — 같은 몫이면 되돌아오는 폭이 꺾임과 함께 커진다.
+  // 직선으로 두면 못 잇던 직각이 토막 덕에 지어진다.
   {
-    const near45 = L.smoothMids(line, st(2400 + 2000, 2000), ground);       // 45°
-    const near100 = L.smoothMids(line, st(2400 - 500, 2800), ground);       // 100°
-    ok('많이 꺾이면 접선이 짧다',
-      near45.length === 1 && near100.length === 1
-      && (near45[0].x - 2400) > (near100[0].x - 2400),
-      `${JSON.stringify(near45)} / ${JSON.stringify(near100)}`);
+    const away = st(2400, -3000);
+    const bare = R.stationTurn(st(1200, 0), st(2400, 0), away, R.LIMITS);
+    ok('토막이 없으면 역에서 꺾인다', bare.ok && bare.vlim < R.LIMITS.V_MAX,
+      JSON.stringify(bare));
+    ok('토막을 넣으면 지어진다',
+      L.rebuild(L.withExtension(line, away, L.stubs(line, away)), ground).ok);
   }
 
-  // 접선으로 나갔다가 되돌아오는 모서리가 최소 곡선반경에 못 미치면 직선으로 간다.
-  const tight = L.withExtension(L.create(st(0, 0), st(300, 0)), st(600, 0));
-  L.rebuild(tight, ground);
-  const tightMids = L.smoothMids(tight, st(700, 260), ground);
-  ok('못 지을 접선은 놓지 않는다',
-    tightMids.length === 0 || L.rebuild(L.withExtension(tight, st(700, 260), tightMids), ground).ok,
-    JSON.stringify(tightMids));
+  // 모서리 호는 짧은 팔의 45%까지만 쓰므로, 많이 꺾을수록 토막이 길어야 반경이 선다.
+  {
+    const gentle = L.stubs(line, st(2400 + 3000, 900));    // 17°
+    const sharp = L.stubs(line, st(2400 + 900, 3000));     // 73°
+    ok('많이 꺾을수록 토막이 길다',
+      (sharp[0].x - 2400) > (gentle[0].x - 2400),
+      `${(gentle[0].x - 2400).toFixed(0)} / ${(sharp[0].x - 2400).toFixed(0)}`);
+  }
+
+  // 순환선을 닫을 때는 반대쪽에도 붙는다 — 닫히는 역에서도 같은 꺾임이 난다.
+  {
+    const bent = L.withExtension(L.withExtension(
+      L.create(st(0, 0), st(0, 2400)), st(2400, 2400)), st(2400, 0));
+    L.rebuild(bent, ground);
+    const closing = L.stubs(bent, bent.stations[0]);
+    ok('닫을 때는 토막이 둘이다', closing.length === 2 && closing.every((m) => m.lock),
+      JSON.stringify(closing));
+    if (closing.length === 2) {
+      // 마지막 역(2400,0)에는 위(0,2400 쪽)에서 들어오므로 토막은 그 아래로 나간다
+      ok('앞 토막은 마지막 역에서 나간다', closing[0].x === 2400 && closing[0].y < 0,
+        JSON.stringify(closing[0]));
+      // 첫 역(0,0)으로 들어가는 쪽은 그 역에서 나가던 방향(+y)의 반대편
+      ok('뒤 토막은 첫 역 반대편에 선다', closing[1].x === 0 && closing[1].y < 0,
+        JSON.stringify(closing[1]));
+
+      const loop = L.withExtension(bent, bent.stations[0], closing);
+      ok('닫은 순환선이 지어진다', L.rebuild(loop, ground).ok && loop.loop);
+    }
+  }
 }
 
 console.log(`${passed}개 통과, ${failed}개 실패`);

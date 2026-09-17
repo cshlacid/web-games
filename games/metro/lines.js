@@ -128,41 +128,65 @@ function endHeading(line) {
   return u.len > 0 ? u : null;
 }
 
-// 연장을 시작할 때 미리 놓아 두는 중간점.
+// 연장할 때 **역에서 나가는 짧은 토막**. 고정이라 플레이어가 끌지도 지우지도 못한다.
 //
-// **중간점 없이 시작하면 새 구간이 직선이라 마지막 역에서 꺾인다.** 역은 다듬지
-// 않으므로 그 꺾임이 모서리 그대로 보이고(다른 모서리는 호가 감춰 준다), 급행이
-// 그 역을 지날 때의 통과 속도까지 거기서 깎인다. 들어오던 접선 위에 점을 하나 놓아
-// 두면 **역에서는 곧게 나가고 꺾는 일은 그다음 모서리가 맡는다** — 그쪽은 호로
-// 다듬어지므로 선이 부드럽게 휜다.
+// 역은 다듬지 않으므로(`Route.stationTurn`) 마지막 역에서 꺾으면 그 꺾임이 모서리
+// 그대로 보인다 — 다른 모서리는 호가 감춰 주는데 역만 그렇지 않고, 급행이 그 역을
+// 지날 때의 통과 속도까지 거기서 깎인다. 한때는 **접선 위에 중간점을 놓아 주기만**
+// 했는데, 두 번 두드리면 지워지는 보통 중간점이라 **직각을 만드는 길이 그대로 남아
+// 있었다.** 미리 놓는 것으로는 부족하고 잠가야 한다.
 //
-// 플레이어가 끌어 옮기거나 역 쪽으로 도로 당기면 예전처럼 직선이 된다. 미리 놓는
-// 것이지 강제하는 것이 아니다.
-const TANGENT_SHARE = 0.3;   // 새 역까지 거리의 이만큼을 접선에 쓴다(덜 꺾일 때)
-const TANGENT_MIN = 0.14;    // rad(8°). 이보다 덜 꺾이면 이미 곧다 — 점을 둘 이유가 없다
-const TANGENT_MAX = 2.1;     // rad(120°). 이보다 꺾이면 나갔다 되돌아오는 폭이 거리를 넘는다
+// 잠근 토막은 **이미 깔린 선의 연장**과 같다 — 열차가 역에서 꺾을 수 없다는 사실이
+// 판에 그대로 나온다. 꺾는 일은 그 뒤 모서리가 맡고, 그쪽은 호로 다듬어진다.
+//
+// **순환선을 닫을 때는 반대쪽에도 하나 붙는다.** 닫히는 역에서도 들어오는 방향과
+// 나가는 방향이 만나므로 같은 꺾임이 난다.
 
-function smoothMids(line, station, classify) {
-  if (line.loop) return [];
-  const dir = endHeading(line);
-  if (!dir) return [];
-  const end = line.stations[line.stations.length - 1];
-  const to = Geom.normalize(station.x - end.x, station.y - end.y);
-  if (to.len === 0) return [];
+// 잠근 토막의 길이. 모서리 호는 짧은 팔의 45%까지만 쓰므로(`Route.fillet`), 반경이
+// 최소 곡선반경을 넘으려면 팔이 `R_MIN / 0.45 × tan(꺾임/2)`은 되어야 한다. 거기에
+// 여유를 곱한 값이다 — **많이 꺾을수록 길어진다.**
+const STUB_ARM = 3.1;            // × R_MIN
+const STUB_MIN = 140;            // 곧게 나가도 역 동그라미 밖에 선다
+const STUB_SHARE = 0.42;         // 새 역까지 거리의 이만큼을 넘지 않는다
 
-  let cos = dir.x * to.x + dir.y * to.y;
+function stubAt(from, dir, toward, span, limits) {
+  const to = Geom.normalize(toward.x - from.x, toward.y - from.y);
+  let cos = to.len > 0 ? dir.x * to.x + dir.y * to.y : 1;
   if (cos > 1) cos = 1; else if (cos < -1) cos = -1;
-  const kink = Math.acos(cos);
-  if (kink < TANGENT_MIN || kink > TANGENT_MAX) return [];
+  const need = STUB_ARM * limits.R_MIN * Math.tan(Math.acos(cos) / 2);
+  const len = Math.min(Math.max(need, STUB_MIN), span * STUB_SHARE);
+  return { x: from.x + dir.x * len, y: from.y + dir.y * len, lock: true };
+}
 
-  // **많이 꺾일수록 접선을 짧게 잡는다.** 같은 몫으로 두면 되돌아오는 폭이 꺾임과 함께
-  // 커져, 새 역을 크게 지나쳤다가 돌아오는 모양이 된다. 바닥을 두는 것은 너무 짧으면
-  // 그다음 모서리의 반경이 최소 곡선반경 아래로 떨어지기 때문이다.
-  const t = to.len * TANGENT_SHARE * Math.max(0.4, 1 - kink / Math.PI);
-  const mids = [{ x: end.x + dir.x * t, y: end.y + dir.y * t }];
-  // **지어 보고 통과한 것만 쓴다.** 접선으로 나갔다가 되돌아오는 모서리가 최소
-  // 곡선반경에 못 미칠 수 있는데, 그때는 직선이 낫다(적어도 지어지기는 한다).
-  return rebuild(withExtension(line, station, mids), classify).ok ? mids : [];
+// 연장 초안이 들고 시작하는 잠긴 중간점들. 앞의 것이 마지막 역에서 나가는 토막이고,
+// 순환선을 닫는 경우에는 뒤의 것이 첫 역으로 들어가는 토막이다.
+function stubs(line, station, limits = Route.LIMITS) {
+  if (line.loop || line.stations.length < 2) return [];
+  const end = line.stations[line.stations.length - 1];
+  const span = Geom.dist(end.x, end.y, station.x, station.y);
+  if (span === 0) return [];
+
+  const out = [];
+  const head = endHeading(line);
+  if (head) out.push(stubAt(end, head, station, span, limits));
+
+  // 닫는 쪽. 첫 역에서 **나가던** 방향이 곧 그 역으로 들어와야 하는 방향이라,
+  // 토막은 그 반대편에 선다.
+  if (station === line.stations[0] && line.stations.length > 2) {
+    const tail = startHeading(line);
+    if (tail) out.push(stubAt(station, { x: -tail.x, y: -tail.y }, end, span, limits));
+  }
+  return out;
+}
+
+// 첫 역에서 나가는 방향. `endHeading`의 반대쪽이고, 순환선을 닫을 때만 쓴다.
+function startHeading(line) {
+  if (line.stations.length < 2) return null;
+  const first = line.stations[0];
+  const mids = line.mids[0] || [];
+  const next = mids.length ? mids[0] : line.stations[1];
+  const u = Geom.normalize(next.x - first.x, next.y - first.y);
+  return u.len > 0 ? u : null;
 }
 
 // 이미 깔린 선 밑에 역을 놓았을 때 **그 노선에 끼워 넣은 사본**. 없으면 null.
@@ -550,7 +574,7 @@ function reverse(line) {
 const Lines = {
   DWELL, TRAIN_COST, MAX_TRAINS, MAX_PATTERNS, CAR_CAPACITY, CARS, CAR_COST,
   carsAt, setCarAt, seatsOf, capacityOf, trainCount,
-  controlPoints, create, withExtension, withInsertion, endHeading, smoothMids, whyNot, rebuild, plan, timetable, at, pointAt, rideTime,
+  controlPoints, create, withExtension, withInsertion, endHeading, startHeading, stubs, whyNot, rebuild, plan, timetable, at, pointAt, rideTime,
   holdFactor, trackFactor, overtakeFactor, runTime, MIN_GAP,
   expressPattern, canToggle, spanOf, trainsOf, trackTrains, reverse,
   reset(next = 1) { nextId = next; },
