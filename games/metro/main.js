@@ -435,6 +435,9 @@ function evaluateDemands() {
 
 function waitingCount() { return demands.filter((od) => !od.served).length; }
 
+// 사람 수는 여기까지만 의미가 있다. 이보다 작은 값은 0으로 본다.
+const EPS_HEAD = 1e-6;
+
 // **승강장에는 사람이 계속 모인다.** 타려는 사람이 분당 얼마인지는 수요가 알려 주고,
 // 오래 기다린 사람은 포기하고 지상으로 가므로(`PATIENCE`) 줄이 끝없이 자라지는 않는다 —
 // 그 시간 상수가 사실상 줄의 천장이다. **빠지는 것은 열차가 설 때뿐이다**(`boardTrains`).
@@ -454,7 +457,12 @@ function queue(minutes) {
   for (const station of city.stations) {
     const now = waiting.get(station) || 0;
     const value = Math.max(0, now + (want.get(station) || 0) * minutes - now * fade);
-    if (value >= 1) next.set(station, value);
+    // **한 명이 안 되는 값도 들고 있는다.** 한때 `>= 1`인 것만 남겼는데, 한 프레임에
+    // 모이는 사람은 `분당 인원 × 한 프레임`이라 초당 60프레임에서는 1보다 작다.
+    // 그것을 버리면 다음 프레임이 다시 0에서 시작해 **줄이 영영 1을 못 넘는다** —
+    // 셈은 처음부터 맞았는데 화면에 아무 역도 안 뜨던 이유가 이것이었다.
+    // 몇 명부터 적을지는 그리는 쪽이 정한다.
+    if (value > EPS_HEAD) next.set(station, value);
   }
   waiting = next;
 }
@@ -486,7 +494,7 @@ function boardTrains() {
       const seats = (svc.press.room[stop] || 0) * run.headway / 60;
       const now = waiting.get(station) || 0;
       const rest = Math.max(0, now - seats);
-      if (rest < 1) waiting.delete(station); else waiting.set(station, rest);
+      if (rest <= EPS_HEAD) waiting.delete(station); else waiting.set(station, rest);
     }
   }
 }
@@ -904,12 +912,29 @@ function renderHandles() {
   }
 }
 
+// 타려다 못 탄 사람이 있는 역. 줄 배지의 색이 여기서 갈린다 — 줄이 서 있는 것과
+// 열차가 못 태우는 것은 다른 상태다. 깎기 전 값을 보는 것은 `press`를 쓰는 다른
+// 자리와 같은 이유다(깎고 나면 못 탄 사람이 지상으로 가 0이 된다).
+function jammedStations() {
+  const set = new Set();
+  for (const svc of services) {
+    const p = svc.press;
+    if (!p) continue;
+    p.order.forEach((si, k) => {
+      const over = (p.left[k] || 0) + (p.leftBack ? (p.leftBack[k] || 0) : 0);
+      if (over > 0.5 && svc.stations[si]) set.add(svc.stations[si]);
+    });
+  }
+  return set;
+}
+
 function renderStations() {
   clear(layer.stations);
   const active = new Set([
     pending && pending.from, draft && draft.from, draft && draft.to,
   ].filter(Boolean));
   const live = new Set(connectedStations());
+  const jammed = jammedStations();
 
   // 역 건설 중에만 자라는 범위를 보여 준다. 늘 켜 두면 원끼리 겹쳐 지도가 안
   // 보이고, 정작 필요한 순간은 다음 역을 어디 놓을지 고를 때뿐이다.
@@ -939,11 +964,17 @@ function renderStations() {
     }));
   }
 
-  // **역마다 타려다 못 탄 사람을 적는다.** 혼잡률은 노선 하나의 숫자라, 어느 역에
-  // 줄이 서 있는지가 화면에 없으면 고칠 데를 짚을 수가 없다. 0인 역은 적지 않는다 —
-  // 잘 도는 역까지 숫자를 달면 판이 숫자밭이 되고, 읽어야 하는 것은 밀린 곳뿐이다.
+  // **역마다 지금 열차를 기다리는 사람을 적는다.** 밀린 역만이 아니라 잘 도는 역에도
+  // 뜬다 — 열차가 오기 전까지는 어디서나 사람이 모이고, 그 오르내림이 곧 "이 역에
+  // 얼마 만에 열차가 오는가"다. 한 명이 안 되는 역만 비운다(0으로 적힐 숫자를 달면
+  // 판이 숫자밭이 된다).
+  //
+  // **색이 정상과 밀린 것을 가른다.** 전에는 밀린 역에만 떠서 전부 `--jam`이었는데,
+  // 모든 역에 뜨는 지금 그 색을 그대로 두면 판이 통째로 경고로 보인다. 타려다 못 탄
+  // 사람이 있는 역만 붉다.
   for (const [station, count] of waiting) {
     if (count < 1 || !inView(station, -ART.station * 3)) continue;
+    const jam = jammed.has(station);
     const text = short(count);
     // **동그라미가 아니라 알약이다.** 원에 네 글자를 넣으면 글자가 테를 뚫고 나간다 —
     // 글자 수에 따라 가로로 늘어나야 어떤 숫자든 안에 들어간다.
@@ -953,10 +984,12 @@ function renderStations() {
     const y = station.y - ART.station * (wide ? 2.1 : 1.5);
     layer.stations.appendChild(svg('rect', {
       x: r1(x - w / 2), y: r1(y - h / 2), width: r1(w), height: r1(h), rx: h / 2,
-      fill: 'var(--jam)', stroke: 'var(--ground)', 'stroke-width': r1(h * 0.16),
+      fill: jam ? 'var(--jam)' : 'var(--wait)', stroke: 'var(--ground)',
+      'stroke-width': r1(h * 0.16),
     }));
     const label = svg('text', {
-      x: r1(x), y: r1(y), fill: 'var(--on-jam)', 'font-size': r1(h * 0.64), 'font-weight': 800,
+      x: r1(x), y: r1(y), fill: jam ? 'var(--on-jam)' : 'var(--on-wait)',
+      'font-size': r1(h * 0.64), 'font-weight': 800,
       'text-anchor': 'middle', 'dominant-baseline': 'central',
     });
     label.textContent = text;

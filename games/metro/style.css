@@ -38,6 +38,10 @@
      이쪽은 "되는데 모자란다"라, 같은 붉은색이면 둘이 섞여 읽힌다. */
   --jam: #e0553c;
   --on-jam: #ffffff;
+  /* 승강장에서 기다리는 사람의 색. 열차를 기다리는 것은 정상이라 --jam으로 두면
+     모든 역이 경고로 보인다. 밀린 역만 --jam으로 갈린다. */
+  --wait: #5c667a;
+  --on-wait: #ffffff;
   --station-fill: #ffffff;
   --station-ring: #3c465a;
   /* 노선이 비싼 땅을 지나는 토막에 덧칠하는 색. 그 땅의 색을 진하게 한 것이라
@@ -83,6 +87,8 @@
     --demand: #e0a84a;
     --jam: #ef6a4f;
     --on-jam: #1a0f0c;
+    --wait: #8b95a8;
+    --on-wait: #12161c;
     --station-fill: #12161c;
     --station-ring: #c3cbd8;
     --cut-building: #e4736f;
