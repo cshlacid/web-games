@@ -540,5 +540,65 @@ const ground = () => 'empty';
     L.carsAt(back.patterns[0], 1, 1) === 5 && back.patterns[0].trains === 2);
 }
 
+// --- 연장은 마지막 역에서 곧게 나간다 ---
+// 역은 다듬지 않으므로 마지막 역에서 꺾으면 모서리가 그대로 보인다. 들어오던 접선
+// 위에 중간점을 미리 놓아, 꺾는 일은 호로 다듬어지는 그다음 모서리가 맡게 한다.
+{
+  const line = L.withExtension(L.create(st(0, 0), st(1200, 0)), st(2400, 0));
+  L.rebuild(line, ground);
+
+  const dir = L.endHeading(line);
+  near('들어오던 방향은 +x', dir.x, 1, 1e-9);
+  near('들어오던 방향에 y는 없다', dir.y, 0, 1e-9);
+
+  ok('곧게 이어 가면 점을 두지 않는다', L.smoothMids(line, st(3600, 0), ground).length === 0);
+  const back = st(600, -1400);   // 들어오던 방향에서 160° 넘게 돌아 나간다
+  ok('되짚어 가면 점을 두지 않는다', L.smoothMids(line, back, ground).length === 0,
+    JSON.stringify(L.smoothMids(line, back, ground)));
+  ok('90°는 아직 접선을 둔다', L.smoothMids(line, st(2400, -3000), ground).length === 1);
+  ok('순환선은 늘릴 수 없으니 점도 없다',
+    L.smoothMids({ ...line, loop: true }, st(3600, 1200), ground).length === 0);
+
+  // 90°에 가깝게 꺾는 자리. 접선 위에 점이 하나 놓이고, 그 덕에 역에서의 꺾임이 사라진다.
+  const away = st(3600, 2000);
+  const mids = L.smoothMids(line, away, ground);
+  ok('꺾어 가면 접선 위에 점을 하나 둔다', mids.length === 1, JSON.stringify(mids));
+  if (mids.length === 1) {
+    near('점은 들어오던 방향 위에 있다', mids[0].y, 0, 1e-9);
+    ok('점은 역보다 앞에 있다', mids[0].x > 2400);
+    const d = Math.hypot(away.x - 2400, away.y - 0);
+    const share = (mids[0].x - 2400) / d;
+    ok('접선 길이는 새 역까지 거리에 비례한다', share > 0.1 && share < 0.3, share.toFixed(3));
+
+    // 이 점이 있으면 마지막 역에서의 꺾임이 사라진다(통과 속도가 안 깎인다).
+    const kink = R.stationTurn(st(1200, 0), st(2400, 0), mids[0], R.LIMITS);
+    ok('역에서 더는 꺾이지 않는다', kink.ok && kink.vlim === R.LIMITS.V_MAX,
+      JSON.stringify(kink));
+    const bare = R.stationTurn(st(1200, 0), st(2400, 0), away, R.LIMITS);
+    ok('중간점이 없으면 역에서 꺾인다', bare.ok && bare.vlim < R.LIMITS.V_MAX,
+      JSON.stringify(bare));
+
+    ok('놓고 지어도 경로가 선다', L.rebuild(L.withExtension(line, away, mids), ground).ok);
+  }
+
+  // 많이 꺾일수록 접선이 짧아진다 — 같은 몫이면 되돌아오는 폭이 꺾임과 함께 커진다.
+  {
+    const near45 = L.smoothMids(line, st(2400 + 2000, 2000), ground);       // 45°
+    const near100 = L.smoothMids(line, st(2400 - 500, 2800), ground);       // 100°
+    ok('많이 꺾이면 접선이 짧다',
+      near45.length === 1 && near100.length === 1
+      && (near45[0].x - 2400) > (near100[0].x - 2400),
+      `${JSON.stringify(near45)} / ${JSON.stringify(near100)}`);
+  }
+
+  // 접선으로 나갔다가 되돌아오는 모서리가 최소 곡선반경에 못 미치면 직선으로 간다.
+  const tight = L.withExtension(L.create(st(0, 0), st(300, 0)), st(600, 0));
+  L.rebuild(tight, ground);
+  const tightMids = L.smoothMids(tight, st(700, 260), ground);
+  ok('못 지을 접선은 놓지 않는다',
+    tightMids.length === 0 || L.rebuild(L.withExtension(tight, st(700, 260), tightMids), ground).ok,
+    JSON.stringify(tightMids));
+}
+
 console.log(`${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);

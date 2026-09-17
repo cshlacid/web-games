@@ -113,6 +113,58 @@ function withExtension(line, station, mids = []) {
   return next;
 }
 
+// 연장할 때 **마지막 역에서 들어오던 방향**. 역은 다듬지 않으므로 경로가 그 점을
+// 정확히 지나고, 마지막 제어점에서 역으로 향하는 방향이 그대로 도착 접선이다 —
+// 모서리 호는 그 마디 위에서 끝나므로(`t2`가 그 선분 위에 있다) 호를 끼워도 방향이
+// 같다. 그래서 굳이 지어 둔 경로를 읽지 않는다: 연장 직전에 역 순서를 뒤집는 일이
+// 있어 `line.path`는 낡아 있을 수 있다.
+function endHeading(line) {
+  const n = line.stations.length;
+  if (n < 2) return null;
+  const end = line.stations[n - 1];
+  const mids = line.mids[n - 2] || [];
+  const prev = mids.length ? mids[mids.length - 1] : line.stations[n - 2];
+  const u = Geom.normalize(end.x - prev.x, end.y - prev.y);
+  return u.len > 0 ? u : null;
+}
+
+// 연장을 시작할 때 미리 놓아 두는 중간점.
+//
+// **중간점 없이 시작하면 새 구간이 직선이라 마지막 역에서 꺾인다.** 역은 다듬지
+// 않으므로 그 꺾임이 모서리 그대로 보이고(다른 모서리는 호가 감춰 준다), 급행이
+// 그 역을 지날 때의 통과 속도까지 거기서 깎인다. 들어오던 접선 위에 점을 하나 놓아
+// 두면 **역에서는 곧게 나가고 꺾는 일은 그다음 모서리가 맡는다** — 그쪽은 호로
+// 다듬어지므로 선이 부드럽게 휜다.
+//
+// 플레이어가 끌어 옮기거나 역 쪽으로 도로 당기면 예전처럼 직선이 된다. 미리 놓는
+// 것이지 강제하는 것이 아니다.
+const TANGENT_SHARE = 0.3;   // 새 역까지 거리의 이만큼을 접선에 쓴다(덜 꺾일 때)
+const TANGENT_MIN = 0.14;    // rad(8°). 이보다 덜 꺾이면 이미 곧다 — 점을 둘 이유가 없다
+const TANGENT_MAX = 2.1;     // rad(120°). 이보다 꺾이면 나갔다 되돌아오는 폭이 거리를 넘는다
+
+function smoothMids(line, station, classify) {
+  if (line.loop) return [];
+  const dir = endHeading(line);
+  if (!dir) return [];
+  const end = line.stations[line.stations.length - 1];
+  const to = Geom.normalize(station.x - end.x, station.y - end.y);
+  if (to.len === 0) return [];
+
+  let cos = dir.x * to.x + dir.y * to.y;
+  if (cos > 1) cos = 1; else if (cos < -1) cos = -1;
+  const kink = Math.acos(cos);
+  if (kink < TANGENT_MIN || kink > TANGENT_MAX) return [];
+
+  // **많이 꺾일수록 접선을 짧게 잡는다.** 같은 몫으로 두면 되돌아오는 폭이 꺾임과 함께
+  // 커져, 새 역을 크게 지나쳤다가 돌아오는 모양이 된다. 바닥을 두는 것은 너무 짧으면
+  // 그다음 모서리의 반경이 최소 곡선반경 아래로 떨어지기 때문이다.
+  const t = to.len * TANGENT_SHARE * Math.max(0.4, 1 - kink / Math.PI);
+  const mids = [{ x: end.x + dir.x * t, y: end.y + dir.y * t }];
+  // **지어 보고 통과한 것만 쓴다.** 접선으로 나갔다가 되돌아오는 모서리가 최소
+  // 곡선반경에 못 미칠 수 있는데, 그때는 직선이 낫다(적어도 지어지기는 한다).
+  return rebuild(withExtension(line, station, mids), classify).ok ? mids : [];
+}
+
 // 이미 깔린 선 밑에 역을 놓았을 때 **그 노선에 끼워 넣은 사본**. 없으면 null.
 //
 // 노선을 끝에서만 늘릴 수 있으면, 지나가는 선 아래에 놓은 역은 쓸 방법이 없다 —
@@ -498,7 +550,7 @@ function reverse(line) {
 const Lines = {
   DWELL, TRAIN_COST, MAX_TRAINS, MAX_PATTERNS, CAR_CAPACITY, CARS, CAR_COST,
   carsAt, setCarAt, seatsOf, capacityOf, trainCount,
-  controlPoints, create, withExtension, withInsertion, whyNot, rebuild, plan, timetable, at, pointAt, rideTime,
+  controlPoints, create, withExtension, withInsertion, endHeading, smoothMids, whyNot, rebuild, plan, timetable, at, pointAt, rideTime,
   holdFactor, trackFactor, overtakeFactor, runTime, MIN_GAP,
   expressPattern, canToggle, spanOf, trainsOf, trackTrains, reverse,
   reset() { nextId = 1; },

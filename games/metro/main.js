@@ -567,8 +567,12 @@ function frame(now) {
 
 // --- 경로 편집 ---
 
+// **연장은 마지막 역에서 곧게 나가도록 중간점을 미리 놓고 시작한다.** 중간점 없이
+// 직선으로 두면 새 구간이 들어오던 방향과 무관한 방향으로 뻗어 그 역에서 꺾이는데,
+// 역은 다듬지 않으므로(`Route.stationTurn`) 그 꺾임이 모서리 그대로 보인다.
 function startDraft(kind, line, from, to) {
-  draft = { kind, line, from, to, mids: [] };
+  const mids = kind === 'extend' ? Lines.smoothMids(line, to, ground) : [];
+  draft = { kind, line, from, to, mids };
   pending = null;
   history = [];
   centerOn((from.x + to.x) / 2, (from.y + to.y) / 2);
