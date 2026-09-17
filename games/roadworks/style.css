@@ -97,6 +97,21 @@ h1 {
 
 .board { display: block; }
 
+.toast {
+  margin: 0;
+  min-height: 16px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.toast.on { opacity: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .toast { transition: none; }
+}
+
 /* --- 조작 --- */
 
 .pad { display: flex; flex-direction: column; gap: 8px; }

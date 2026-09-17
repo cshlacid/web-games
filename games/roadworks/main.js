@@ -31,6 +31,7 @@ const el = {
   helpClose: document.getElementById('help-close'),
   toggleBgm: document.getElementById('toggle-bgm'),
   toggleSfx: document.getElementById('toggle-sfx'),
+  toast: document.getElementById('toast'),
 };
 
 const ctx = el.canvas.getContext('2d');
@@ -40,12 +41,16 @@ const SKIN = {
   light: {
     ground: '#e9ecef', asphalt: '#7d8794', kerb: '#69737f',
     dash: '#e8ecf1', middle: '#e7c94f', gate: '#59636f',
+    island: '#9fbf96', stop: '#eef1f4',
+    red: '#d4483b', amber: '#e0a52c', green: '#49a55f',
     body: ['#d05b4e', '#4a7fc1', '#e4e7ea', '#59636f', '#5aa06a', '#b8722e'],
     taxi: '#eeb92a', bus: '#3f8f86', truck: '#cfd4da', moto: '#3c4650',
   },
   dark: {
     ground: '#171a1e', asphalt: '#3b434c', kerb: '#2a3138',
     dash: '#7c8794', middle: '#a98f31', gate: '#8b96a2',
+    island: '#41603f', stop: '#aeb7c0',
+    red: '#c04336', amber: '#c9932a', green: '#3f9153',
     body: ['#b8544a', '#4a76ad', '#c9ced4', '#6b7682', '#4f8d60', '#a3672c'],
     taxi: '#d8a726', bus: '#3a807a', truck: '#9aa2ab', moto: '#2b3138',
   },
@@ -60,15 +65,17 @@ let running = true;
 let rate = 1;
 let last = 0;
 let seed = 1;
+let toastTimer = null;
 
 // --- 판 만들기 ---
 
 function fresh(nextSeed) {
   seed = nextSeed == null ? Math.floor(Math.random() * 1e9) : nextSeed;
   net = Gen.city({ seed });
-  world = Traffic.create(net, { spawnRate: 4.5 });
+  world = Traffic.create(net, { spawnRate: 1.7 });
   buildDeco();
   layout();
+  window.__net = net;
   // 빈 도시에서 시작하면 한참을 기다려야 차가 보인다. 몇 초치를 미리 돌려 둔다.
   for (let i = 0; i < 60 * 16; i++) Traffic.tick(world, 1 / 60);
 }
@@ -144,11 +151,11 @@ function drawRoads() {
     ctx.stroke();
   }
 
-  // 교차로. 맞닿은 길 중 가장 넓은 것에 맞춰 원으로 덮는다.
+  // 교차로. 맞닿은 길 중 가장 넓은 것에 맞춰 원으로 덮는다. 회전교차로는 섬을
+  // 두를 자리가 있어야 하므로 더 넓다.
   for (const node of net.nodes) {
     if (node.kind === 'gate') continue;
-    let radius = 0;
-    for (const id of node.segs) radius = Math.max(radius, Net.segment(net, id).width / 2);
+    const radius = node.control === 'circle' ? Net.reach(node) + 3 : node.radius;
     ctx.beginPath();
     ctx.arc(node.x, node.y, radius + 1.2, 0, Math.PI * 2);
     ctx.fillStyle = skin.kerb;
@@ -191,6 +198,66 @@ function strokeTrimmed(path, trim, style) {
   if (style.dash) ctx.setLineDash(style.dash);
   ctx.stroke();
   ctx.restore();
+}
+
+// 교차로에 놓인 것. 회전교차로는 섬으로, 신호등은 갈래마다의 등으로 보인다.
+function drawControls() {
+  for (const node of net.nodes) {
+    if (node.control === 'circle') drawIsland(node);
+    else if (node.control === 'signal') drawSignal(node);
+  }
+}
+
+function drawIsland(node) {
+  const r = Net.islandRadius(node);
+  ctx.beginPath();
+  ctx.arc(node.x, node.y, r + 1.4, 0, Math.PI * 2);
+  ctx.fillStyle = skin.kerb;
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(node.x, node.y, r, 0, Math.PI * 2);
+  ctx.fillStyle = skin.island;
+  ctx.fill();
+}
+
+function drawSignal(node) {
+  const sig = world.signals.get(node.id);
+  const phase = sig ? sig.phase : 0;
+  const amber = sig ? sig.amber : false;
+  const seen = new Set();
+  for (const lane of node.in) {
+    if (seen.has(lane.seg)) continue;
+    seen.add(lane.seg);
+    // 갈래마다 오른쪽 끝 차로 옆에 등을 하나 세운다. 실제로도 등은 오른쪽에 있다.
+    const edge = node.in.filter((l) => l.seg === lane.seg)
+      .reduce((best, l) => (l.rank < best.rank ? l : best));
+    const at = Geom.at(edge.path, Math.max(0, edge.path.total - Net.reach(node) - 2));
+    const side = Geom.right({ x: at.dx, y: at.dy });
+    const mine = Net.phaseOf(node, edge);
+    const lit = mine !== phase ? skin.red : (amber ? skin.amber : skin.green);
+
+    // 정지선은 **그 갈래의 차로들만** 가로지른다. 길 전체를 그으면 마주 오는 차로까지
+    // 덮어 어느 쪽이 서는 선인지 알 수 없다.
+    const seg = Net.segment(net, lane.seg);
+    const group = seg.lanes.filter((l) => l.to === node.id).length;
+    const half = Net.LANE_W / 2;
+    const span = group * Net.LANE_W - half;
+    ctx.beginPath();
+    ctx.moveTo(at.x + side.x * half, at.y + side.y * half);
+    ctx.lineTo(at.x - side.x * span, at.y - side.y * span);
+    ctx.strokeStyle = skin.stop;
+    ctx.lineWidth = 1.6;
+    ctx.globalAlpha = 0.8;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    // 등은 길 밖 갓길에 세운다. 오른쪽 끝 차로에서 길 가장자리까지의 거리에 조금 더.
+    const out = seg.width / 2 - Math.abs(edge.offset) + 4;
+    ctx.beginPath();
+    ctx.arc(at.x + side.x * out, at.y + side.y * out, 2.8, 0, Math.PI * 2);
+    ctx.fillStyle = lit;
+    ctx.fill();
+  }
 }
 
 // 관문. 도시 밖으로 이어지는 입구라 길을 가로지르는 턱으로 표시한다.
@@ -267,6 +334,7 @@ function draw() {
   ctx.fillRect(0, 0, el.canvas.width, el.canvas.height);
   ctx.setTransform(view.scale, 0, 0, view.scale, view.dx, view.dy);
   drawRoads();
+  drawControls();
   drawGates();
   drawVehicles();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -289,6 +357,45 @@ function paintStats() {
   el.count.textContent = String(s.total);
   el.speed.textContent = String(Math.round(s.speed));
   el.gone.textContent = String(s.arrived);
+}
+
+// --- 교차로 누르기 ---
+
+// 판 위의 자리를 맵 좌표로 옮긴다. 캔버스는 기기 픽셀로 그리지만 손가락은 CSS
+// 픽셀로 온다.
+function spotOf(event) {
+  const box = el.canvas.getBoundingClientRect();
+  const scale = box.width / net.world.w;
+  return { x: (event.clientX - box.left) / scale, y: (event.clientY - box.top) / scale };
+}
+
+function junctionAt(spot) {
+  let best = null;
+  for (const node of net.nodes) {
+    if (!Net.canControl(node)) continue;
+    const d = Math.hypot(node.x - spot.x, node.y - spot.y);
+    // 손가락이 두꺼우므로 교차로보다 넉넉히 잡는다.
+    if (d > node.radius + 16) continue;
+    if (!best || d < best.d) best = { node, d };
+  }
+  return best && best.node;
+}
+
+const CONTROL_KEY = { none: 'road.ctrlNone', signal: 'road.ctrlSignal', circle: 'road.ctrlCircle' };
+
+el.canvas.addEventListener('click', (event) => {
+  const node = junctionAt(spotOf(event));
+  if (!node) return;
+  Net.cycleControl(net, node.id);
+  Sound.play(node.control === 'none' ? 'clear' : 'place');
+  say(t(CONTROL_KEY[node.control]));
+});
+
+function say(message) {
+  el.toast.textContent = message;
+  el.toast.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.toast.classList.remove('on'), 1600);
 }
 
 // --- 배선 ---
@@ -333,6 +440,10 @@ bindSoundToggle(el.toggleSfx, 'sfx', (on) => Sound.setSfx(on));
 window.addEventListener('resize', layout);
 if (window.visualViewport) window.visualViewport.addEventListener('resize', layout);
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readSkin);
+
+// 화면 밖에서 판을 들여다볼 수 있게 한 줄 열어 둔다. 헤드리스 브라우저로 눌러 보고
+// 재 보는 데 쓴다.
+window.__net = null;
 
 readSkin();
 fresh();
