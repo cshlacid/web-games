@@ -132,7 +132,8 @@
       'metro.ruleTrack': '<b>선로는 하나뿐입니다.</b> 열차를 아무리 사도 서로 붙어 갈 수는 없어서, 배차간격이 최소 간격 아래로는 내려가지 않고 그 위로는 다 같이 느려집니다. 그리고 <b>급행은 통과하는 역에서만 완행을 추월</b>할 수 있어, 완행이 잦으면 급행도 제 속도를 못 냅니다.',
       'metro.ruleGrow': '수요를 <b>실어 나른 만큼 도시가 자랍니다.</b> 빈 터에 건물이 들어서고 있던 건물은 높아지며, 자란 동네는 다시 더 큰 수요를 부릅니다. <b>얼마나 높아질지는 건물의 종류가 정합니다.</b>',
       'metro.ruleDistrict': '<b>구시가지</b>는 골목이 좁고 굽은 데다 막다른 길과 삼거리가 많아 길을 따라가기 어렵습니다. <b>계획도시</b>는 그 반대입니다. 난이도는 둘의 배합을 바꿉니다.',
-      'metro.rule7': '<b>확정</b>을 누르기 전에는 아무것도 지어지지 않습니다. 마음껏 끌어 보세요.'
+      'metro.rule7': '<b>확정</b>을 누르기 전에는 아무것도 지어지지 않습니다. 마음껏 끌어 보세요.',
+      'metro.ruleSave': '<b>하던 판은 저절로 남습니다.</b> 새로고침하거나 앱을 닫았다 열어도 시계와 예산과 노선이 그대로 이어집니다. 다만 <b>새 도시</b>나 난이도를 누르면 하던 판은 버려집니다.',
     },
     en: {
       'meta.desc': 'Place stations and draw lines between them to grow the city. Tunnelling under buildings costs more, under water more still, and tight curves slow trains down.',
@@ -265,7 +266,8 @@
       'metro.ruleTrack': '<b>There is only one track.</b> However many trains you buy they cannot run nose to tail, so the headway never drops below a floor and past it everything just slows down. And an <b>express can only overtake a local at a station it skips</b>, so frequent locals hold the express back too.',
       'metro.ruleGrow': '<b>The city grows with the people you carry.</b> Empty plots get built on and buildings rise, and a grown neighbourhood then calls up bigger demand. <b>How high they go is set by what kind of building it is.</b>',
       'metro.ruleDistrict': 'The <b>old town</b> has narrow winding lanes full of dead ends and forks, so following the streets is hard. A <b>planned district</b> is the opposite. Difficulty changes the mix.',
-      'metro.rule7': 'Nothing is built until you press <b>Build</b>. Drag as much as you like.'
+      'metro.rule7': 'Nothing is built until you press <b>Build</b>. Drag as much as you like.',
+      'metro.ruleSave': '<b>Your game is kept for you.</b> Refresh, or close and reopen the app, and the clock, the budget and your lines carry on where they were. <b>New city</b> or a difficulty button throws that game away.',
     },
     ja: {
       'meta.desc': '駅を置き、その間に路線を引いて街を育てる。建物の下は高くつき、水の下はもっと高く、急な曲線は速度を落とす。',
@@ -398,7 +400,8 @@
       'metro.ruleTrack': '<b>線路は一本だけです。</b>列車をいくら買っても数珠つなぎには走れないので、運転間隔は最小間隔より下がらず、それを超えると全部いっしょに遅くなります。そして<b>急行は通過する駅でしか各駅を追い越せない</b>ので、各駅が多いと急行も速度を出せません。',
       'metro.ruleGrow': '<b>運んだぶんだけ街が育ちます。</b>空き地に建物が建ち、建っていた建物は高くなり、育った街はさらに大きな需要を呼びます。<b>どこまで高くなるかは建物の種類が決めます。</b>',
       'metro.ruleDistrict': '<b>旧市街</b>は路地が狭く曲がっていて行き止まりや三叉路が多く、道に沿って進むのが難しいです。<b>計画都市</b>はその逆です。難易度はその配分を変えます。',
-      'metro.rule7': '<b>確定</b>を押すまでは何も建ちません。思いきり動かしてみてください。'
+      'metro.rule7': '<b>確定</b>を押すまでは何も建ちません。思いきり動かしてみてください。',
+      'metro.ruleSave': '<b>途中の盤は自動で残ります。</b>再読み込みしても、アプリを閉じて開き直しても、時計も予算も路線もそのまま続きます。ただし<b>新しい街</b>や難易度を押すと、その盤は捨てられます。',
     },
     'zh-CN': {
       'meta.desc': '设站并在站间铺线，把城市养大。建筑下造价高，水下更高，急弯会让列车变慢。',
@@ -531,7 +534,8 @@
       'metro.ruleTrack': '<b>轨道只有一条。</b>再买列车也不能首尾相接，所以发车间隔降不到最小间隔以下，超过之后大家一起变慢。而且<b>快车只能在它通过的车站超越普通车</b>，普通车太密的话快车也快不起来。',
       'metro.ruleGrow': '<b>运了多少人，城市就长多少。</b>空地上会盖起房子，原有的房子会变高，长大的街区又会带来更大的需求。<b>能长多高由建筑的类型决定。</b>',
       'metro.ruleDistrict': '<b>老城区</b>的巷子又窄又弯，死胡同和三岔路很多，顺着路走很难。<b>新城区</b>正相反。难度改变两者的比例。',
-      'metro.rule7': '按下<b>确定</b>之前什么都不会建成，尽管拖动试试。'
+      'metro.rule7': '按下<b>确定</b>之前什么都不会建成，尽管拖动试试。',
+      'metro.ruleSave': '<b>玩到一半的局会自动保留。</b>刷新页面、关掉再打开应用，时钟、预算和线路都会接着原来的继续。但按下<b>新城市</b>或难度按钮，这一局就会被丢弃。',
     },
     'zh-TW': {
       'meta.desc': '設站並在站間鋪線，把城市養大。建築下造價高，水下更高，急彎會讓列車變慢。',
@@ -664,7 +668,8 @@
       'metro.ruleTrack': '<b>軌道只有一條。</b>再買列車也不能首尾相接，所以發車間隔降不到最小間隔以下，超過之後大家一起變慢。而且<b>快車只能在它通過的車站超越普通車</b>，普通車太密的話快車也快不起來。',
       'metro.ruleGrow': '<b>運了多少人，城市就長多少。</b>空地上會蓋起房子，原有的房子會變高，長大的街區又會帶來更大的需求。<b>能長多高由建築的類型決定。</b>',
       'metro.ruleDistrict': '<b>老城區</b>的巷子又窄又彎，死胡同和三岔路很多，順著路走很難。<b>新城區</b>正相反。難度改變兩者的比例。',
-      'metro.rule7': '按下<b>確定</b>之前什麼都不會建成，儘管拖動看看。'
+      'metro.rule7': '按下<b>確定</b>之前什麼都不會建成，儘管拖動看看。',
+      'metro.ruleSave': '<b>玩到一半的盤會自動保留。</b>重新整理、關掉再打開應用程式，時鐘、預算和路線都會接著原來的繼續。但按下<b>新城市</b>或難度按鈕，這一盤就會被丟棄。',
     },
     es: {
       'meta.desc': 'Pon estaciones y traza líneas entre ellas para hacer crecer la ciudad. Excavar bajo edificios cuesta más, bajo el agua aún más, y las curvas cerradas frenan los trenes.',
@@ -797,7 +802,8 @@
       'metro.ruleTrack': '<b>Solo hay una vía.</b> Por muchos trenes que compres no pueden ir pegados, así que el intervalo nunca baja de un mínimo y pasado ese punto todo se ralentiza. Y un <b>exprés solo adelanta al local en las estaciones que se salta</b>, así que muchos locales también frenan al exprés.',
       'metro.ruleGrow': '<b>La ciudad crece con la gente que transportas.</b> Los solares se edifican y los edificios suben, y un barrio crecido pide después más demanda. <b>Hasta dónde suben lo decide el tipo de edificio.</b>',
       'metro.ruleDistrict': 'El <b>casco antiguo</b> tiene callejones estrechos y sinuosos, llenos de fondos de saco y bifurcaciones, así que seguir las calles es difícil. Un <b>barrio planificado</b> es lo contrario. La dificultad cambia la mezcla.',
-      'metro.rule7': 'No se construye nada hasta pulsar <b>Construir</b>. Arrastra cuanto quieras.'
+      'metro.rule7': 'No se construye nada hasta pulsar <b>Construir</b>. Arrastra cuanto quieras.',
+      'metro.ruleSave': '<b>Tu partida se guarda sola.</b> Recarga, o cierra y vuelve a abrir la app: el reloj, el presupuesto y tus líneas siguen donde estaban. <b>Ciudad nueva</b> o un botón de dificultad descarta esa partida.',
     }
   });
 })();

@@ -553,7 +553,7 @@ const Lines = {
   controlPoints, create, withExtension, withInsertion, endHeading, smoothMids, whyNot, rebuild, plan, timetable, at, pointAt, rideTime,
   holdFactor, trackFactor, overtakeFactor, runTime, MIN_GAP,
   expressPattern, canToggle, spanOf, trainsOf, trackTrains, reverse,
-  reset() { nextId = 1; },
+  reset(next = 1) { nextId = next; },
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = Lines;

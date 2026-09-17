@@ -9,6 +9,7 @@ const Lines = window.MetroLines;
 const Demand = window.MetroDemand;
 const Geom = window.MetroGeom;
 const Sound = window.MetroSound;
+const Save = window.MetroSave;
 const NS = 'http://www.w3.org/2000/svg';
 const VIEW = City.VIEW;
 
@@ -183,6 +184,79 @@ function makeCity(nextSeed, nextLevel) {
   drawCity();
   renderGrown();
   refresh();
+  // **새 도시는 곧바로 덮어쓴다.** 두지 않으면 다음 담기 전에 새로고침했을 때 버린
+  // 판이 되살아난다.
+  saveGame(true);
+}
+
+// --- 이어 하기 ---
+//
+// **새로고침해도 하던 판이 그대로 이어진다.** 폰에서 주소창을 잘못 건드리거나 홈 화면
+// 앱이 뒤로 밀렸다가 돌아오면 페이지가 다시 뜨는데, 그때마다 몇십 분 굴린 판이 사라지면
+// 게임을 붙잡고 있을 수가 없다.
+//
+// **담는 것은 씨앗과 그 뒤에 달라진 것뿐이다**(`save.js`). 무엇을 담고 어떻게 되살리는지는
+// 거기에 있고, 여기서는 **언제 담고 언제 버리는지**만 정한다.
+let saveAt = 0;
+let dirty = false;
+const SAVE_EVERY = 2000;   // ms. 시계가 계속 가므로 주기로도 담는다
+
+// 바뀐 것이 있을 때만 담는다. 멈춰 둔 판에서도 2초마다 20KB를 쓰는 것은 얻는 것 없이
+// 저장소만 두드리는 일이다.
+const touch = () => { dirty = true; };
+
+function saveGame(force = false) {
+  if (!city) return;
+  const now = Date.now();
+  if (!force && (!dirty || now - saveAt < SAVE_EVERY)) return;
+  saveAt = now;
+  dirty = false;
+  try {
+    localStorage.setItem(Save.KEY, JSON.stringify(Save.snapshot({
+      city, level, lines, budget, clock, speed, growWork, nextSpawn, demands, waiting, cam,
+    })));
+  } catch { /* 사파리 비공개 모드 등: 담지 못해도 판은 굴러간다 */ }
+}
+
+// 되살린 판으로 갈아 끼운다. 되살리지 못하면 false — 부르는 쪽이 새 도시를 만든다.
+function loadGame() {
+  let data = null;
+  try { data = JSON.parse(localStorage.getItem(Save.KEY)); } catch { return false; }
+  let got = null;
+  try { got = Save.restore(data); } catch { got = null; }
+  if (!got) return false;
+
+  city = got.city;
+  seed = city.seed;
+  level = got.level;
+  lines = got.lines;
+  budget = got.budget;
+  clock = got.clock;
+  speed = clamp(got.speed, 0, SPEEDS.length - 1);
+  growWork = got.growWork;
+  nextSpawn = got.nextSpawn;
+  demands = got.demands;
+  waiting = got.waiting;
+  grown = [];
+  pending = null; draft = null; ghost = null; marked = null; picked = null;
+  history = []; drag = null;
+  mode = 'run';
+  wide = false;
+  sel = { line: 0, pattern: 0 };
+  carLoads = new Map();
+  // **난수만 씨앗에서 다시 시작한다.** mulberry32는 셈한 횟수를 밖으로 내주지 않는데,
+  // 다음 수요가 어디서 생기는지는 이어 하는 느낌과 아무 상관이 없다. 자라는 쪽은
+  // `city.growSeed`가 자료에 그대로 있어 담은 자리에서 이어진다.
+  simRng = City.mulberry32(seed * 7919 + 13);
+  income = 0;
+
+  syncNetwork();
+  if (got.cam) setCam(got.cam.x, got.cam.y);
+  else setCam(city.core.x - VIEW.w / 2, city.core.y - VIEW.h / 2);
+  drawCity();
+  renderGrown();
+  refresh();
+  return true;
 }
 
 function svg(name, attrs) {
@@ -556,8 +630,10 @@ function frame(now) {
   const fade = grown.length && grown.some((g) => now - g.at > GROW_FLASH * 1000);
   if (fade) { grown = grown.filter((g) => now - g.at <= GROW_FLASH * 1000); renderGrown(); }
 
+  saveGame();
   if (!running() || dt <= 0) return;
   tick(dt * SPEEDS[speed]);
+  touch();
   renderTrains();
   // 승강장의 줄이 시계와 함께 오르내린다. 역이 수십 개라 매 프레임 다시 그려도 된다.
   renderStations();
@@ -614,6 +690,7 @@ function pushHistory() {
 // --- 그리기 ---
 
 function refresh() {
+  touch();
   renderLines();
   renderTrains();
   renderDemands();
@@ -1803,7 +1880,14 @@ function bindSoundToggle(node, key, apply) {
 bindSoundToggle(el.toggleBgm, 'bgm', (on) => Sound.setBgm(on));
 bindSoundToggle(el.toggleSfx, 'sfx', (on) => Sound.setSfx(on));
 
-makeCity(seed, level);
+// **탭을 떠날 때는 주기를 기다리지 않는다.** 폰에서 앱을 바꾸거나 화면을 끄면 그대로
+// 회수될 수 있어, 마지막 몇 초가 아니라 판 전체가 날아간다. `pagehide`와 `visibilitychange`
+// 둘 다 듣는 것은 기기마다 나는 쪽이 다르기 때문이다.
+window.addEventListener('pagehide', () => saveGame(true));
+document.addEventListener('visibilitychange', () => { if (document.hidden) saveGame(true); });
+
+// 하던 판이 있으면 그것으로 시작한다.
+if (!loadGame()) makeCity(seed, level);
 requestAnimationFrame(frame);
 
 })();
