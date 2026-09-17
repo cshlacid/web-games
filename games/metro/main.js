@@ -126,13 +126,16 @@ let hudInset = { top: 0, bottom: 0 };   // 화면 픽셀
 function measureHud() {
   const map = el.map.getBoundingClientRect();
   const top = document.querySelector('.hud-top');
-  const bottom = document.querySelector('.hud-bottom');
-  if (!map.height || !top || !bottom) return;
+  const stack = document.querySelector('.hud-bottom');
+  const bar = document.querySelector('.hud-bar');
+  if (!map.height || !top || !stack || !bar) return;
   const t = top.getBoundingClientRect();
-  const b = bottom.getBoundingClientRect();
+  // 아래는 두 칸이다 — 스크롤하는 패널 더미와 바닥에 붙은 모드 줄. 위에 있는 쪽이
+  // 덮이는 자리의 경계다(패널이 하나도 없으면 둘이 같은 자리에 있다).
+  const b = Math.min(stack.getBoundingClientRect().top, bar.getBoundingClientRect().top);
   hudInset = {
     top: clamp(t.bottom - map.top, 0, map.height),
-    bottom: clamp(map.bottom - b.top, 0, map.height),
+    bottom: clamp(map.bottom - b, 0, map.height),
   };
 }
 const span = () => {
