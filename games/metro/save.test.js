@@ -41,7 +41,7 @@ function board() {
 
 const full = (b, extra = {}) => ({
   city: b.city, level: 1, lines: b.lines, budget: 123.5, clock: 30000, speed: 2,
-  growWork: 4.25, nextSpawn: 12, demands: [], waiting: new Map(), cam: { x: 100, y: 200 },
+  growWork: 4.25, nextSpawn: 12, demands: [], waiting: new Map(), cam: { x: 100, y: 200 }, zoom: 1.7,
   ...extra,
 });
 
@@ -80,6 +80,11 @@ const full = (b, extra = {}) => ({
     ok('줄이 남는다', got.waiting.get(got.city.stations[1]) === 413,
       String(got.waiting.get(got.city.stations[1])));
     ok('카메라 자리가 남는다', got.cam.x === 100 && got.cam.y === 200);
+    ok('배율도 남는다', got.zoom === 1.7, String(got.zoom));
+    // 배율 없이 담긴 예전 판도 열려야 한다.
+    const old = JSON.parse(JSON.stringify(raw));
+    delete old.zoom;
+    ok('배율이 없던 판은 보통 배율로 연다', Save.restore(old).zoom === 1);
 
     // 길과 이용률은 담지 않는다 — 되살린 뒤 한 번 풀면 같은 값이 나온다.
     ok('수요는 자리와 인원만 남는다', got.demands.length === 1

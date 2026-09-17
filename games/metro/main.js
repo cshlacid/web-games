@@ -89,18 +89,29 @@ try {
 
 const cam = { x: 0, y: 0 };
 
-// **전체 보기.** 지도가 창의 아홉 배라 한 화면씩 밀어서는 반대편까지 가는 데 여러 번
-// 끌어야 한다. 브라우저 확대는 `shared/base.js`가 문서 전체에서 막고 있어(손가락 둘의
-// `touchmove`를 취소한다) 핀치로는 길이 없지만, **viewBox를 우리가 바꾸는 것은 그
-// 규칙에 닿지 않는다.** 연속 확대가 아니라 두 단계뿐인 것은 그 이상이 필요 없어서다 —
-// 여기서 하는 일은 "어디로 갈지 고르는 것" 하나다.
-let wide = false;
-const span = () => (wide ? city.world : VIEW);
+// **배율은 우리가 viewBox로 낸다.** 브라우저 확대는 `shared/base.js`가 문서 전체에서
+// 막고 있고(손가락 둘의 `touchmove`와 웹킷 gesture를 취소한다) 그 규칙은 실기기 보고로
+// 정해진 자리라 건드리지 않는다. 대신 **손가락 둘의 자리를 우리가 읽어** 배율을 바꾼다 —
+// 브라우저는 여전히 확대하지 않으므로 그 규칙에 닿지 않는다.
+//
+// 한때는 "보통"과 "전체" 두 단계뿐이었다. 지도가 창의 아홉 배라 한 화면씩 밀어서는
+// 반대편까지 가는 데 여러 번 끌어야 해서 넣은 것인데, **그 사이가 없다는 것이 문제였다** —
+// 역 몇 개를 한눈에 놓고 선을 긋고 싶은 배율이 어디에도 없었다.
+const ZOOM_MIN = Math.min(VIEW.w / City.WORLD.w, VIEW.h / City.WORLD.h);   // 도시 전체
+const ZOOM_MAX = 3;
+let zoom = 1;
+let zoomBack = 1;        // 전체로 들어가기 전의 배율. 나올 때 그 자리로 돌아간다
+const span = () => ({ w: VIEW.w / zoom, h: VIEW.h / zoom });
 
-// 전체 보기에서는 판이 삼분의 일로 줄어 역과 선이 점이 된다. 도로와 건물은 줄어드는
-// 것이 맞지만 **우리가 놓은 것은 아니다** — 무엇이 어디 있는지 보려고 여는 화면이라
-// 역·선·열차는 화면에서 비슷한 굵기로 남아야 한다.
-const K = () => (wide ? 2.6 : 1);
+// **가장 멀리 나간 상태가 곧 전체 보기다.** 거기서는 판이 삼분의 일이라 몇 미터를
+// 다투는 조작이 정확할 수 없어 짓거나 끌 수 없고, 누른 자리로 내려간다.
+const atFit = () => zoom <= ZOOM_MIN * 1.001;
+
+// 역·선·열차는 **화면에서 같은 굵기로 남는다.** 도로와 건물은 지도의 일부라 배율을
+// 그대로 타는 것이 맞지만 우리가 놓은 것은 아니다 — 어디에 무엇이 있는지 보려고 배율을
+// 바꾸는 것이므로, 표시는 작아지지도 커지지도 않아야 한다. `1 / zoom`이 정확히 그 값이고,
+// 멀리 나갔을 때만 천장을 둔다(전체 보기에서 점이 너무 굵어진다).
+const K = () => Math.min(1 / zoom, 2.6);
 let mode = 'run';        // run | build | lines
 let budget = START_BUDGET;
 let lines = [];
@@ -168,7 +179,8 @@ function makeCity(nextSeed, nextLevel) {
   history = [];
   drag = null;
   mode = 'run';
-  wide = false;
+  zoom = 1;
+  zoomBack = 1;
   sel = { line: 0, pattern: 0 };
   clock = 6 * 3600;
   demands = [];
@@ -213,7 +225,7 @@ function saveGame(force = false) {
   dirty = false;
   try {
     localStorage.setItem(Save.KEY, JSON.stringify(Save.snapshot({
-      city, level, lines, budget, clock, speed, growWork, nextSpawn, demands, waiting, cam,
+      city, level, lines, budget, clock, speed, growWork, nextSpawn, demands, waiting, cam, zoom,
     })));
   } catch { /* 사파리 비공개 모드 등: 담지 못해도 판은 굴러간다 */ }
 }
@@ -241,7 +253,8 @@ function loadGame() {
   pending = null; draft = null; ghost = null; marked = null; picked = null;
   history = []; drag = null;
   mode = 'run';
-  wide = false;
+  zoom = clamp(got.zoom || 1, ZOOM_MIN, ZOOM_MAX);
+  zoomBack = Math.max(1, zoom);
   sel = { line: 0, pattern: 0 };
   carLoads = new Map();
   // **난수만 씨앗에서 다시 시작한다.** mulberry32는 셈한 횟수를 밖으로 내주지 않는데,
@@ -371,17 +384,57 @@ function inView(p, margin = 0) {
     && p.y > cam.y + margin && p.y < cam.y + v.h - margin;
 }
 
-// 전체 보기로 들고 날 때 보던 자리를 잃지 않는다. 들어갈 때는 중심을 기억해 두고,
-// 나올 때는 마지막으로 누른 자리로 간다.
-function setWide(on, at = null) {
-  if (wide === on) return;
+// 전체 보기로 들고 난다. **나올 때는 보던 자리가 아니라 지금 보는 자리로 간다** —
+// 들어갈 때 자리로 돌아오면 반대편을 보려고 연 것이 헛일이 된다. 배율만 되돌린다.
+function setFit(on, at = null) {
+  if (on === atFit()) return;
   const focus = at || { x: cam.x + span().w / 2, y: cam.y + span().h / 2 };
-  wide = on;
-  // 전체 보기는 판을 고르는 화면이라, 만들다 만 것을 들고 들어가지 않는다.
-  if (wide) { pending = null; draft = null; ghost = null; marked = null; history = []; }
+  if (on) {
+    zoomBack = Math.max(1, zoom);
+    // 전체 보기는 판을 고르는 화면이라, 만들다 만 것을 들고 들어가지 않는다.
+    pending = null; draft = null; ghost = null; marked = null; history = [];
+    zoom = ZOOM_MIN;
+  } else zoom = zoomBack;
   centerOn(focus.x, focus.y);
   Sound.play('select');
   refresh();
+}
+
+// 판 위의 한 점(화면 좌표)이 가리키는 지도 좌표.
+function worldAtClient(cx, cy) {
+  const rect = el.map.getBoundingClientRect();
+  const v = span();
+  return {
+    x: cam.x + (cx - rect.left) / rect.width * v.w,
+    y: cam.y + (cy - rect.top) / rect.height * v.h,
+  };
+}
+
+// **그 자리의 땅을 손가락(또는 화살표) 밑에 붙들어 둔 채 배율만 바꾼다.** 붙들지 않고
+// 중심을 기준으로 키우면 키울 때마다 보던 곳이 화면 밖으로 밀려나, 확대하고 다시 끌어
+// 찾는 일을 되풀이하게 된다.
+function zoomTo(next, cx, cy, hold = null) {
+  if (!city) return;
+  const want = clamp(next, ZOOM_MIN, ZOOM_MAX);
+  if (Math.abs(want - zoom) < 1e-5) return;
+  const at = hold || worldAtClient(cx, cy);
+  const was = atFit();
+  const rect = el.map.getBoundingClientRect();
+  zoom = want;
+  const v = span();
+  setCam(at.x - (cx - rect.left) / rect.width * v.w,
+    at.y - (cy - rect.top) / rect.height * v.h);
+  // **판만 다시 그린다.** `refresh()`는 패널의 단추를 새로 만드는데, 배율은 손가락이
+  // 움직이는 내내 바뀌므로 누르던 단추가 손 밑에서 사라진다(루트 규칙).
+  renderLines();
+  renderTrains();
+  renderDemands();
+  renderDraft();
+  renderStations();
+  // 전체 보기에 닿았는지는 계기판이 들고 있다(단추의 눌림 표시). 판을 새로 만들지
+  // 않는 함수라 배율이 바뀌는 내내 불러도 된다.
+  if (was !== atFit()) renderMeters();
+  touch();
 }
 
 // --- 노선 ---
@@ -1074,10 +1127,13 @@ function renderStations() {
     const text = short(count);
     // **동그라미가 아니라 알약이다.** 원에 네 글자를 넣으면 글자가 테를 뚫고 나간다 —
     // 글자 수에 따라 가로로 늘어나야 어떤 숫자든 안에 들어간다.
-    const h = ART.station * (wide ? 2.1 : 1.55);
+    // 배지도 화면에서 같은 크기로 남는다. 다만 표시만큼 굵어지지는 않게 천장을 낮췄다 —
+    // 전체 보기에서 숫자가 역보다 커 보이면 판이 숫자밭이 된다.
+    const bk = Math.min(K(), 1.35);
+    const h = ART.station * 1.55 * bk;
     const w = Math.max(h, h * 0.58 * text.length + h * 0.5);
-    const x = station.x + ART.station * (wide ? 2.1 : 1.5) + (w - h) / 2;
-    const y = station.y - ART.station * (wide ? 2.1 : 1.5);
+    const x = station.x + ART.station * 1.5 * bk + (w - h) / 2;
+    const y = station.y - ART.station * 1.5 * bk;
     layer.stations.appendChild(svg('rect', {
       x: r1(x - w / 2), y: r1(y - h / 2), width: r1(w), height: r1(h), rx: h / 2,
       fill: jam ? 'var(--jam)' : 'var(--wait)', stroke: 'var(--ground)',
@@ -1208,7 +1264,7 @@ function renderMeters() {
   el.clock.classList.toggle('held', !running());
   el.pause.textContent = t(['metro.speedStop', 'metro.speedSlow', 'metro.speedFast'][speed]);
   el.pause.setAttribute('aria-pressed', String(speed > 0));
-  el.wide.setAttribute('aria-pressed', String(wide));
+  el.wide.setAttribute('aria-pressed', String(atFit()));
   // **셋 다 사람 수이고, 남김없이 갈린다** — 타는 사람 + 못 타는 사람 + 안 타는 사람.
   // 건수로 두었더니 "몇 건"과 "몇 명"이 한 줄에 섞여 서로 견줄 수가 없었다. 단위는
   // 숫자에 붙여 쓰되 조각을 빈칸으로 잇지 않는다(루트 규칙) — 일본어·중국어는 사이를
@@ -1510,12 +1566,43 @@ function freeSpan() {
 // **편집은 자기 것 위에서 시작한 끌기만 가져간다.** 손잡이와 그은 선, 그리고 임시
 // 역이 편집의 것이고 나머지는 전부 팬이다. 이 경계가 없으면 지도를 옮기려다
 // 노선이 휘고, 노선을 휘려다 지도가 밀린다.
+// 판 위에 올라와 있는 손가락들. **둘이 되는 순간 집기로 넘어간다** — 한 손가락으로
+// 하던 끌기는 그 자리에서 놓아 준다. 손가락 좌표를 우리가 읽는 것이라 브라우저의 확대와는
+// 상관이 없고, `shared/base.js`가 막아 둔 것도 그대로다.
+const pointers = new Map();
+let pinch = null;
+
+function pinchPair() {
+  const [a, b] = [...pointers.values()];
+  if (!a || !b) return null;
+  const d = Math.hypot(a.x - b.x, a.y - b.y);
+  return d > 0 ? { d, x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } : null;
+}
+
+function startPinch() {
+  const at = pinchPair();
+  if (!at) return;
+  drag = null;   // 집는 중에는 끌지 않는다. 지금까지 끈 것은 그대로 둔다
+  pinch = { d0: at.d, zoom0: zoom, hold: worldAtClient(at.x, at.y) };
+}
+
+// 집는 동안에는 **처음 잡은 땅이 두 손가락 가운데에 붙어 다닌다.** 그래서 벌리고 오므리는
+// 것만이 아니라 두 손가락을 함께 옮기는 것으로 지도가 따라온다.
+function movePinch() {
+  const at = pinchPair();
+  if (!at || !pinch) return;
+  zoomTo(pinch.zoom0 * (at.d / pinch.d0), at.x, at.y, pinch.hold);
+}
+
 function onDown(event) {
+  pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+  if (pointers.size >= 2) { startPinch(); return; }
+  if (pinch) return;
   const w = toWorld(event);
 
   // 전체 보기에서는 편집이 없다. 판이 삼분의 일이라 몇 미터를 다투는 조작이
   // 정확할 수 없고, 여기서 하는 일은 어디로 갈지 고르는 것 하나다.
-  if (wide) {
+  if (atFit()) {
     drag = {
       kind: 'pan', station: null, moved: 0, at: { x: w.x, y: w.y },
       camX: cam.x, camY: cam.y, sx: event.clientX, sy: event.clientY,
@@ -1598,6 +1685,10 @@ function onDown(event) {
 }
 
 function onMove(event) {
+  if (pointers.has(event.pointerId)) {
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+  }
+  if (pinch) { movePinch(); return; }
   if (!drag) return;
   const w = toWorld(event);
 
@@ -1630,6 +1721,14 @@ function onMove(event) {
 }
 
 function onUp(event) {
+  pointers.delete(event.pointerId);
+  if (pinch) {
+    // 손가락이 하나 남아도 집기를 이어 가지 않는다. 남은 손가락으로 지도가 확 튀는 것보다
+    // 한 번 놓았다 다시 잡는 편이 예측된다.
+    if (pointers.size < 2) pinch = null;
+    drag = null;
+    return;
+  }
   if (!drag) return;
   if (el.map.hasPointerCapture(event.pointerId)) el.map.releasePointerCapture(event.pointerId);
   const done = drag;
@@ -1638,7 +1737,7 @@ function onUp(event) {
 
   // 전체 보기에서 누른 자리로 내려간다. 단추로 나오면 들어갈 때 보던 자리로
   // 돌아와, 반대편을 보려고 연 것이 헛일이 된다.
-  if (wide) { setWide(false, done.at); return; }
+  if (atFit()) { setFit(false, done.at); return; }
 
   // **열차가 역보다 먼저다.** 역에 선 열차를 누르면 그 열차를 보고 싶은 것이지
   // 노선을 잇고 싶은 것이 아니다 — 잇는 것은 열차가 없는 쪽 역에서 하면 된다.
@@ -1795,6 +1894,20 @@ function confirm() {
   afterBuild(cost);
 }
 
+// **마우스 휠(과 트랙패드)로도 배율을 바꾼다.** 폰에는 손가락 둘이 있지만 데스크톱에는
+// 없다. 화살표가 가리키는 땅을 붙들어 둔 채 키우고 줄인다.
+//
+// `deltaMode`가 기기마다 달라(픽셀·줄·쪽) 그대로 쓰면 어떤 기기에서는 한 번에 끝까지
+// 간다. 픽셀로 맞춘 뒤 지수로 먹이는 것은 **배율이 곱으로 움직여야** 같은 손짓이 어느
+// 배율에서나 같은 만큼 바꾸기 때문이다.
+const WHEEL_RATE = 0.0016;
+
+el.map.addEventListener('wheel', (event) => {
+  event.preventDefault();
+  const step = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 400 : 1;
+  zoomTo(zoom * Math.exp(-event.deltaY * step * WHEEL_RATE), event.clientX, event.clientY);
+}, { passive: false });
+
 el.map.addEventListener('pointerdown', onDown);
 el.map.addEventListener('pointermove', onMove);
 el.map.addEventListener('pointerup', onUp);
@@ -1887,7 +2000,7 @@ el.remove.addEventListener('click', removeStation);
 
 // 배속은 단추 하나를 돌려 쓴다. 멈춤·보통·빠름 셋뿐이라 고르개를 따로 두면
 // 머리줄이 그만큼 좁아지는데, 얻는 것이 없다.
-el.wide.addEventListener('click', () => setWide(!wide));
+el.wide.addEventListener('click', () => setFit(!atFit()));
 
 el.pause.addEventListener('click', () => {
   speed = (speed + 1) % SPEEDS.length;

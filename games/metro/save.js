@@ -72,6 +72,8 @@ function snapshot(g) {
       .map(([s, n]) => [at.get(s), Math.round(n)])
       .filter(([i]) => i != null),
     cam: g.cam ? pt(g.cam) : null,
+    // 보던 자리와 배율. 없으면 보통 배율로 시작한다 — 예전 판이 이 값 없이 담겼다.
+    zoom: g.zoom || 1,
   };
 }
 
@@ -136,6 +138,7 @@ function restore(data) {
     })),
     waiting,
     cam: data.cam || null,
+    zoom: Number.isFinite(data.zoom) && data.zoom > 0 ? data.zoom : 1,
   };
 }
 
