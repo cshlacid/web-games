@@ -31,7 +31,8 @@ const el = {
   helpClose: document.getElementById('help-close'),
   toggleBgm: document.getElementById('toggle-bgm'),
   toggleSfx: document.getElementById('toggle-sfx'),
-  toast: document.getElementById('toast'),
+  panel: document.getElementById('panel'),
+  panelBody: document.getElementById('panel-body'),
 };
 
 const ctx = el.canvas.getContext('2d');
@@ -43,6 +44,7 @@ const SKIN = {
     dash: '#e8ecf1', middle: '#e7c94f', gate: '#59636f',
     island: '#9fbf96', stop: '#eef1f4',
     red: '#d4483b', amber: '#e0a52c', green: '#49a55f',
+    mark: '#e8ecf1', zebra: '#eef1f4', walker: '#3c4650', pick: '#3b6ea5',
     body: ['#d05b4e', '#4a7fc1', '#e4e7ea', '#59636f', '#5aa06a', '#b8722e'],
     taxi: '#eeb92a', bus: '#3f8f86', truck: '#cfd4da', moto: '#3c4650',
   },
@@ -51,6 +53,7 @@ const SKIN = {
     dash: '#7c8794', middle: '#a98f31', gate: '#8b96a2',
     island: '#41603f', stop: '#aeb7c0',
     red: '#c04336', amber: '#c9932a', green: '#3f9153',
+    mark: '#8994a1', zebra: '#aeb7c0', walker: '#cfd7de', pick: '#79a7d8',
     body: ['#b8544a', '#4a76ad', '#c9ced4', '#6b7682', '#4f8d60', '#a3672c'],
     taxi: '#d8a726', bus: '#3a807a', truck: '#9aa2ab', moto: '#2b3138',
   },
@@ -65,7 +68,7 @@ let running = true;
 let rate = 1;
 let last = 0;
 let seed = 1;
-let toastTimer = null;
+let picked = null;   // 고른 교차로나 길
 
 // --- 판 만들기 ---
 
@@ -73,9 +76,12 @@ function fresh(nextSeed) {
   seed = nextSeed == null ? Math.floor(Math.random() * 1e9) : nextSeed;
   net = Gen.city({ seed });
   world = Traffic.create(net, { spawnRate: 1.7 });
+  picked = null;
   buildDeco();
   layout();
+  paintPanel();
   window.__net = net;
+  window.__world = world;
   // 빈 도시에서 시작하면 한참을 기다려야 차가 보인다. 몇 초치를 미리 돌려 둔다.
   for (let i = 0; i < 60 * 16; i++) Traffic.tick(world, 1 / 60);
 }
@@ -198,6 +204,137 @@ function strokeTrimmed(path, trim, style) {
   if (style.dash) ctx.setLineDash(style.dash);
   ctx.stroke();
   ctx.restore();
+}
+
+// 차로가 허락하는 이동을 도로 바닥에 그린다. 교차로에 닿기 조금 전, 차가 차로를
+// 고르고 나서 볼 자리에 둔다.
+function drawLaneMarks() {
+  for (const seg of net.segs) {
+    for (const lane of seg.lanes) {
+      const node = Net.node(net, lane.to);
+      if (!node || !Net.canControl(node)) continue;
+      const back = Net.reach(node) + 16;
+      if (lane.path.total < back + 22) continue;
+      const at = Geom.at(lane.path, lane.path.total - back);
+      const angle = Math.atan2(at.dy, at.dx);
+      drawLaneGlyph(at.x, at.y, Math.atan2(at.dy, at.dx), lane.allow);
+    }
+  }
+}
+
+// 바닥 화살표. **한 차로에 하나의 자루에서 갈래를 뻗는다** — 허락하는 이동마다 화살표를
+// 따로 그려 나란히 놓아 보았더니 폭 10짜리 차로에 셋이 겹쳐 긁힌 자국처럼 보였다.
+// 실제 노면 표시도 자루 하나에 촉을 여럿 단다. 진행 방향이 +x가 되도록 돌려 놓고 그린다.
+function drawLaneGlyph(x, y, angle, moves) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.strokeStyle = skin.mark;
+  ctx.fillStyle = skin.mark;
+  ctx.lineWidth = 1.9;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.globalAlpha = 0.9;
+
+  const tip = (tx, ty, dir) => {
+    const w = 2.6;
+    ctx.beginPath();
+    ctx.moveTo(tx + Math.cos(dir) * 4.2, ty + Math.sin(dir) * 4.2);
+    ctx.lineTo(tx + Math.cos(dir + 2.4) * w, ty + Math.sin(dir + 2.4) * w);
+    ctx.lineTo(tx + Math.cos(dir - 2.4) * w, ty + Math.sin(dir - 2.4) * w);
+    ctx.closePath();
+    ctx.fill();
+  };
+
+  // 자루. 갈래는 모두 이 끝에서 뻗는다.
+  ctx.beginPath();
+  ctx.moveTo(-9, 0);
+  ctx.lineTo(0, 0);
+  ctx.stroke();
+
+  for (const move of moves) {
+    if (move === 'through') {
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(4, 0);
+      ctx.stroke();
+      tip(4, 0, 0);
+    } else if (move === 'right' || move === 'left') {
+      const s = move === 'right' ? 1 : -1;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.quadraticCurveTo(3.4, 0, 3.4, s * 4.2);
+      ctx.stroke();
+      tip(3.4, s * 4.2, s * Math.PI / 2);
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.quadraticCurveTo(5, 0, 5, -3);
+      ctx.quadraticCurveTo(5, -5.6, 1.6, -5.6);
+      ctx.stroke();
+      tip(1.6, -5.6, Math.PI);
+    }
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+// 횡단보도. 길을 가로지르는 줄무늬다.
+function drawCrossings() {
+  for (const node of net.nodes) {
+    if (!node.crossing) continue;
+    for (const id of node.segs) {
+      const seg = Net.segment(net, id);
+      const line = Traffic.crossLine(net, node, seg);
+      const along = { x: line.at.dx, y: line.at.dy };
+      const side = Geom.right(along);
+      const half = seg.width / 2;
+      ctx.fillStyle = skin.zebra;
+      ctx.globalAlpha = 0.85;
+      for (let u = -half + 1.2; u < half - 1; u += 4.4) {
+        const cx = line.at.x + side.x * u;
+        const cy = line.at.y + side.y * u;
+        ctx.beginPath();
+        ctx.moveTo(cx - along.x * 3 - side.x * 1.1, cy - along.y * 3 - side.y * 1.1);
+        ctx.lineTo(cx + along.x * 3 - side.x * 1.1, cy + along.y * 3 - side.y * 1.1);
+        ctx.lineTo(cx + along.x * 3 + side.x * 1.1, cy + along.y * 3 + side.y * 1.1);
+        ctx.lineTo(cx - along.x * 3 + side.x * 1.1, cy - along.y * 3 + side.y * 1.1);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+  }
+}
+
+function drawWalkers() {
+  ctx.fillStyle = skin.walker;
+  for (const walker of world.walkers) {
+    const at = Traffic.walkerSpot(net, walker);
+    ctx.beginPath();
+    ctx.arc(at.x, at.y, 2.4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+// 고른 교차로나 길을 짚어 준다.
+function drawPick() {
+  if (!picked) return;
+  ctx.strokeStyle = skin.pick;
+  ctx.lineWidth = 2;
+  ctx.setLineDash([4, 3]);
+  if (picked.kind === 'node') {
+    ctx.beginPath();
+    ctx.arc(picked.node.x, picked.node.y, Net.reach(picked.node) + 7, 0, Math.PI * 2);
+    ctx.stroke();
+  } else {
+    // 길은 가운데를 따라 가늘게 짚는다. 길 전체를 굵게 덧그렸더니 줄무늬가 도로를
+    // 덮어 무엇이 그려져 있는지 보이지 않았다.
+    trace(picked.seg.center);
+    ctx.lineWidth = 2.2;
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
 }
 
 // 교차로에 놓인 것. 회전교차로는 섬으로, 신호등은 갈래마다의 등으로 보인다.
@@ -334,9 +471,13 @@ function draw() {
   ctx.fillRect(0, 0, el.canvas.width, el.canvas.height);
   ctx.setTransform(view.scale, 0, 0, view.scale, view.dx, view.dy);
   drawRoads();
+  drawLaneMarks();
+  drawCrossings();
   drawControls();
   drawGates();
+  drawPick();
   drawVehicles();
+  drawWalkers();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   void dpr;
 }
@@ -359,7 +500,7 @@ function paintStats() {
   el.gone.textContent = String(s.arrived);
 }
 
-// --- 교차로 누르기 ---
+// --- 고르기와 패널 ---
 
 // 판 위의 자리를 맵 좌표로 옮긴다. 캔버스는 기기 픽셀로 그리지만 손가락은 CSS
 // 픽셀로 온다.
@@ -375,28 +516,136 @@ function junctionAt(spot) {
     if (!Net.canControl(node)) continue;
     const d = Math.hypot(node.x - spot.x, node.y - spot.y);
     // 손가락이 두꺼우므로 교차로보다 넉넉히 잡는다.
-    if (d > node.radius + 16) continue;
+    if (d > Net.reach(node) + 16) continue;
     if (!best || d < best.d) best = { node, d };
   }
   return best && best.node;
 }
 
-const CONTROL_KEY = { none: 'road.ctrlNone', signal: 'road.ctrlSignal', circle: 'road.ctrlCircle' };
+// 꺾은선 위에서 점에 가장 가까운 거리. 길을 눌렀는지 보려면 이것이 필요하다.
+function distToPath(path, spot) {
+  let best = Infinity;
+  for (let i = 1; i < path.points.length; i++) {
+    const a = path.points[i - 1];
+    const b = path.points[i];
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const len2 = dx * dx + dy * dy;
+    let t = len2 ? ((spot.x - a.x) * dx + (spot.y - a.y) * dy) / len2 : 0;
+    t = Math.max(0, Math.min(1, t));
+    best = Math.min(best, Math.hypot(spot.x - (a.x + dx * t), spot.y - (a.y + dy * t)));
+  }
+  return best;
+}
+
+function roadAt(spot) {
+  let best = null;
+  for (const seg of net.segs) {
+    const d = distToPath(seg.center, spot);
+    if (d > seg.width / 2 + 6) continue;
+    if (!best || d < best.d) best = { seg, d };
+  }
+  return best && best.seg;
+}
+
+function pickAt(event) {
+  const spot = spotOf(event);
+  const node = junctionAt(spot);
+  if (node) return { kind: 'node', node };
+  const seg = roadAt(spot);
+  if (seg) return { kind: 'seg', seg, lane: 0 };
+  return null;
+}
 
 el.canvas.addEventListener('click', (event) => {
-  const node = junctionAt(spotOf(event));
-  if (!node) return;
-  Net.cycleControl(net, node.id);
-  Sound.play(node.control === 'none' ? 'clear' : 'place');
-  say(t(CONTROL_KEY[node.control]));
+  const hit = pickAt(event);
+  picked = hit;
+  Sound.play(hit ? 'pick' : 'clear');
+  paintPanel();
 });
 
-function say(message) {
-  el.toast.textContent = message;
-  el.toast.classList.add('on');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.toast.classList.remove('on'), 1600);
+// --- 패널 ---
+
+function chip(attr, value, label, on, extra) {
+  return `<button class="chip${extra || ''}" type="button" ${attr}="${value}"`
+    + ` aria-pressed="${on}">${label}</button>`;
 }
+
+function junctionPanel(node) {
+  const rows = [];
+  rows.push(`<p class="panel-title">${t('road.junction')}</p>`);
+  rows.push('<div class="chips">'
+    + Net.CONTROLS.map((mode) => chip('data-control', mode, t(CONTROL_KEY[mode]), node.control === mode)).join('')
+    + '</div>');
+
+  if (node.control === 'signal') {
+    rows.push('<div class="chips">'
+      + chip('data-plan', 'paired', t('road.phase2'), node.plan === 'paired')
+      + chip('data-plan', 'split', t('road.phaseN', { n: node.segs.length }), node.plan === 'split')
+      + '</div>');
+  }
+
+  rows.push(`<div class="chips">${chip('data-cross', 'toggle', t('road.crosswalk'), node.crossing)}</div>`);
+  return rows.join('');
+}
+
+function roadPanel(seg, index) {
+  const lane = seg.lanes[index] || seg.lanes[0];
+  const rows = [];
+  rows.push(`<p class="panel-title">${t('road.lanesOf', { n: seg.lanes.length })}</p>`);
+
+  // 차로 고르기. 길 위에 놓인 순서 그대로 늘어놓고, 거슬러 가는 차로는 화살표를
+  // 뒤집어 어느 쪽으로 가는 차로인지 보이게 한다.
+  rows.push('<div class="chips lanes">' + seg.lanes.map((l, i) => {
+    const arrows = l.allow.map((m) => `<span data-road-icon="${m}"></span>`).join('');
+    const flip = l.dir > 0 ? '' : ' flip';
+    return `<button class="chip lane${flip}" type="button" data-lane="${i}"`
+      + ` aria-pressed="${l === lane}"><span class="lane-arrows">${arrows}</span></button>`;
+  }).join('') + '</div>');
+
+  rows.push('<div class="chips">' + Net.MOVES.map((move) => chip(
+    'data-move', move, `<span data-road-icon="${move}"></span>`,
+    lane.allow.indexOf(move) >= 0, ' icon',
+  )).join('') + '</div>');
+  return rows.join('');
+}
+
+function paintPanel() {
+  if (!picked) {
+    el.panel.hidden = true;
+    return;
+  }
+  el.panel.hidden = false;
+  el.panelBody.innerHTML = picked.kind === 'node'
+    ? junctionPanel(picked.node)
+    : roadPanel(picked.seg, picked.lane);
+  window.RoadIcons.paint(el.panelBody);
+}
+
+const CONTROL_KEY = { none: 'road.ctrlNone', signal: 'road.ctrlSignal', circle: 'road.ctrlCircle' };
+
+el.panel.addEventListener('click', (event) => {
+  const button = event.target.closest('button');
+  if (!button || !picked) return;
+  const d = button.dataset;
+
+  if (d.control) Net.setControl(net, picked.node.id, d.control);
+  else if (d.plan) Net.setPlan(net, picked.node.id, d.plan);
+  else if (d.cross) Net.setCrossing(net, picked.node.id, !picked.node.crossing);
+  else if (d.lane) picked.lane = Number(d.lane);
+  else if (d.move) {
+    const lane = picked.seg.lanes[picked.lane];
+    const next = lane.allow.indexOf(d.move) >= 0
+      ? lane.allow.filter((m) => m !== d.move)
+      : lane.allow.concat([d.move]);
+    Net.setAllow(lane, next);
+  } else if (d.close != null) {
+    picked = null;
+  }
+
+  Sound.play('place');
+  paintPanel();
+});
 
 // --- 배선 ---
 

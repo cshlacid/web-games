@@ -47,7 +47,10 @@
     <canvas class="board" id="board" aria-hidden="true"></canvas>
   </div>
 
-  <p class="toast" id="toast" role="status" aria-live="polite"></p>
+  <div class="panel" id="panel" hidden>
+    <div class="panel-body" id="panel-body"></div>
+    <button class="panel-close" type="button" data-close="1" data-i18n="ui.close">닫기</button>
+  </div>
 
   <div class="pad">
     <div class="row">
@@ -66,8 +69,9 @@
   <div class="sheet" id="help" hidden>
     <p class="sheet-title" data-i18n="ui.rules">규칙</p>
     <ul class="help-list">
-      <li data-i18n-html="road.rule1"><b>교차로를 누르면</b> 신호 없음 → 신호등 → 회전교차로 순으로 바뀝니다.
-        도로를 놓고 고치는 조작은 아직 없습니다.</li>
+      <li data-i18n-html="road.rule1"><b>교차로를 누르면</b> 아래에서 신호 없음·신호등·회전교차로를 고르고,
+        신호등은 <b>현시 구성</b>과 <b>횡단보도</b>까지 정합니다. <b>도로를 누르면</b> 차로마다
+        좌회전·직진·우회전·유턴을 켜고 끕니다. 도로를 새로 놓는 조작은 아직 없습니다.</li>
       <li data-i18n-html="road.rule2">도시의 길은 <b>곧은 길과 굽은 길이 섞여</b> 있고, 길마다 <b>1~4차로</b>입니다.
         가운데 노란 선이 마주 오는 방향을 가르고, 흰 점선이 같은 방향의 차로를 가릅니다.
         <b>이어진 길은 굽이가 끊기지 않습니다.</b></li>
@@ -78,8 +82,13 @@
         가속도 저마다 달라서, 트럭 뒤에 승용차가 물리면 줄이 길어집니다.</li>
       <li data-i18n-html="road.rule6">앞차와의 거리에 따라 <b>알아서 서고 다시 나갑니다</b>.</li>
       <li data-i18n-html="road.rule7">아무것도 없는 교차로는 <b>먼저 닿은 차가 하나씩</b> 지납니다.
-        <b>신호등</b>은 마주 보는 두 갈래를 함께 열고, 기다리는 차가 없는 갈래는 건너뜁니다.
+        <b>신호등</b>은 2현시면 마주 보는 두 갈래를 함께 열고(좌회전만 틈을 기다립니다),
+        갈래 수만큼의 현시면 한 갈래씩 엽니다. 기다리는 차가 없는 갈래는 건너뜁니다.
         <b>회전교차로</b>는 도는 차가 먼저이고 들어가려는 차가 틈을 기다립니다.</li>
+      <li data-i18n-html="road.rule8"><b>차로 바닥의 화살표</b>가 그 차로에서 갈 수 있는 곳입니다. 좌회전 차로를
+        없애면 그 길로 가려던 차가 <b>다른 길로 돌아갑니다</b>.</li>
+      <li data-i18n-html="road.rule9"><b>횡단보도</b>를 놓으면 사람이 건넙니다. 신호가 있으면 빨간 불일 때,
+        없으면 차가 뜸할 때 건너고, 건너는 사람이 있으면 차가 섭니다.</li>
     </ul>
     <div class="sheet-actions">
       <button class="btn" id="help-close" type="button" data-i18n="ui.close">닫기</button>
@@ -93,6 +102,7 @@
 <script src="network.js"></script>
 <script src="mapgen.js"></script>
 <script src="traffic.js"></script>
+<script src="icons.js"></script>
 <script src="../../shared/audio.js"></script>
 <script src="audio.js"></script>
 <script src="../../shared/snap.js"></script>

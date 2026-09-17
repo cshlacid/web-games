@@ -58,6 +58,13 @@ const RING_GAP = 1.9;
 // 양보선에서 이만큼 앞에 선다. 도는 길이 그 선 위를 지나므로 코를 맞대면 겹친다.
 const RING_STANDOFF = 8;
 
+// 사람. 차가 34쯤으로 달리니 사람은 한참 느리다.
+const WALK_SPEED = 7.5;
+// 횡단보도 한 곳에 사람이 생기는 잦기(초당).
+const WALK_RATE = 0.16;
+// 신호가 없는 교차로에서는 이 거리 안에 오는 차가 없어야 건너기 시작한다.
+const WALK_LOOK = 55;
+
 function pickKind(rng) {
   const total = KINDS.reduce((sum, k) => sum + k.weight, 0);
   let roll = rng() * total;
@@ -79,6 +86,8 @@ function create(net, options) {
     signals: new Map(),  // 교차로 id → { phase, timer, amber }
     ring: new Map(),     // 회전교차로 id → 지금 돌고 있는 차들의 각
     demand: new Map(),   // 신호 교차로 id → 갈래마다 기다리는 차 수
+    walkers: [],         // 횡단보도를 건너는 사람들
+    walkDebt: 0,
     time: 0,
     nextId: 1,
     spawnRate: opts.spawnRate == null ? 2.6 : opts.spawnRate,  // 초당 진입 대수
@@ -148,7 +157,14 @@ function spawn(world, options) {
   const first = Net.segment(net, path[0].seg.id);
   const group = Net.lanesOf(first, path[0].dir);
   if (!group.length) return null;
-  const lane = group[Math.floor(rng() * group.length)];
+  // 첫 구간에서도 끝에서 할 이동을 허락하는 차로를 골라야 한다.
+  const after = path[1];
+  const need = after
+    ? Net.movement(net, first, path[0].dir, Net.segment(net, after.seg.id), after.dir)
+    : null;
+  const fit = need ? group.filter((l) => l.allow.indexOf(need) >= 0) : group;
+  const pool = fit.length ? fit : group;
+  const lane = pool[Math.floor(rng() * pool.length)];
 
   const kind = pickKind(rng);
   // 앞이 비어 있을 때만 넣는다. 관문에 차가 밀려 있으면 이번 몫은 버린다 — 겹쳐
@@ -206,6 +222,7 @@ function tick(world, dt) {
   }
 
   bucket(world);
+  stepWalkers(world, dt);
 
   for (const v of world.vehicles) {
     const front = ahead(world, v);
@@ -219,6 +236,112 @@ function tick(world, dt) {
   // 앞으로 민 뒤에 구간을 넘긴다. 미는 도중에 차로를 갈아 끼우면 같은 프레임에서
   // 남들이 보는 차로 목록과 어긋난다.
   for (const v of world.vehicles.slice()) advance(world, v);
+}
+
+// --- 사람 ---
+
+// 횡단보도의 가로선. 교차로 바깥을 가로지르고, 양 끝은 길 밖 인도까지 조금 넘어간다.
+function crossLine(net, node, seg) {
+  const from = Net.crossingAt(node);
+  const along = seg.a === node.id ? from : seg.center.total - from;
+  const at = Geom.at(seg.center, Math.max(1, Math.min(seg.center.total - 1, along)));
+  return { at, span: seg.width / 2 + 5 };
+}
+
+function spawnWalker(world) {
+  const { net, rng } = world;
+  const spots = [];
+  for (const node of net.nodes) {
+    if (!node.crossing) continue;
+    for (const id of node.segs) spots.push({ node, seg: Net.segment(net, id) });
+  }
+  if (!spots.length) return null;
+  const pick = spots[Math.floor(rng() * spots.length)];
+  const dir = rng() < 0.5 ? 1 : -1;
+  const { span } = crossLine(net, pick.node, pick.seg);
+  const walker = {
+    id: world.nextId++,
+    node: pick.node.id,
+    seg: pick.seg.id,
+    u: -dir * span,
+    dir,
+    span,
+    walking: false,
+  };
+  world.walkers.push(walker);
+  return walker;
+}
+
+// 건너기 시작해도 되는가. **한번 발을 들이면 차가 서 준다** — 서로 기다리다 아무도
+// 못 가는 자리가 생기지 않게, 사람은 들어서기 전에만 살핀다.
+function walkerClear(world, walker) {
+  const node = Net.node(world.net, walker.node);
+  const seg = Net.segment(world.net, walker.seg);
+  if (!node || !seg) return false;
+
+  if (node.control === 'signal') {
+    // 그 갈래에 빨간 불이 들어와 있을 때 건넌다.
+    const sig = signalOf(world, node);
+    const arriving = seg.lanes.filter((l) => l.to === node.id);
+    if (!arriving.length) return true;
+    return arriving.every((l) => Net.phaseOf(node, l) !== sig.phase) || sig.amber;
+  }
+
+  // 신호가 없으면 차가 뜸할 때 건넌다.
+  const from = Net.crossingAt(node);
+  for (const v of world.vehicles) {
+    if (v.lane.isLink) continue;
+    if (v.lane.seg !== seg.id) continue;
+    const toCross = v.lane.to === node.id
+      ? (v.lane.path.total - from) - v.s      // 교차로 쪽으로 오는 차
+      : from - v.s;                           // 교차로에서 나가는 차
+    if (toCross > -6 && toCross < WALK_LOOK) return false;
+  }
+  return true;
+}
+
+function stepWalkers(world, dt) {
+  world.walkDebt += crossings(world) * WALK_RATE * dt;
+  while (world.walkDebt >= 1) {
+    world.walkDebt -= 1;
+    spawnWalker(world);
+  }
+
+  for (const walker of world.walkers.slice()) {
+    if (!walker.walking) {
+      if (!walkerClear(world, walker)) continue;
+      walker.walking = true;
+    }
+    walker.u += walker.dir * WALK_SPEED * dt;
+    if (Math.abs(walker.u) > walker.span) {
+      const at = world.walkers.indexOf(walker);
+      if (at >= 0) world.walkers.splice(at, 1);
+    }
+  }
+}
+
+function crossings(world) {
+  let count = 0;
+  for (const node of world.net.nodes) if (node.crossing) count += node.segs.length;
+  return count;
+}
+
+// 그 갈래의 횡단보도를 지금 사람이 밟고 있는가.
+function walkerOn(world, nodeId, segId, width) {
+  for (const walker of world.walkers) {
+    if (!walker.walking || walker.node !== nodeId || walker.seg !== segId) continue;
+    if (Math.abs(walker.u) < width / 2 + 2) return true;
+  }
+  return false;
+}
+
+// 사람의 화면 위 자리. 렌더러가 프레임마다 부른다.
+function walkerSpot(net, walker) {
+  const node = Net.node(net, walker.node);
+  const seg = Net.segment(net, walker.seg);
+  const { at } = crossLine(net, node, seg);
+  const side = Geom.right({ x: at.dx, y: at.dy });
+  return { x: at.x + side.x * walker.u, y: at.y + side.y * walker.u };
 }
 
 function idm(v, gap, dv) {
@@ -279,8 +402,32 @@ function ahead(world, v) {
 
   // **회전교차로 안에서는 도는 차끼리도 앞뒤가 있다.** 들어온 갈래가 달라 차로
   // 목록이 갈리므로, 같은 원 위에 있는 차는 각으로 찾아야 서로를 본다.
-  const round = ringAhead(world, v);
-  return round && round.gap < onward.gap ? round : onward;
+  let best = onward;
+  for (const other of [ringAhead(world, v), crossAhead(world, v, node, gap)]) {
+    if (other && other.gap < best.gap) best = other;
+  }
+  return best;
+}
+
+// 횡단보도를 밟고 있는 사람. **들어가는 쪽과 나가는 쪽 둘 다 본다** — 교차로를 돌아
+// 나가는 차도 그 갈래의 횡단보도를 지난다.
+function crossAhead(world, v, node, gap) {
+  if (v.lane.isLink) {
+    const at = Net.node(world.net, v.lane.node);
+    if (!at || !at.crossing) return null;
+    const lane = v.lane.next;
+    const seg = Net.segment(world.net, lane.seg);
+    if (!walkerOn(world, at.id, seg.id, seg.width)) return null;
+    // 잇는 곡선이 끝나는 자리에서 횡단보도까지는 조금 더 간다.
+    const left = v.lane.path.total - v.s + (Net.crossingAt(at) - Net.reach(at));
+    return { gap: Math.max(left - 2, 0.5), dv: v.v, stop: left < 4 };
+  }
+  if (!node || !node.crossing) return null;
+  const seg = Net.segment(world.net, v.lane.seg);
+  if (!walkerOn(world, node.id, seg.id, seg.width)) return null;
+  const left = (v.lane.path.total - Net.crossingAt(node)) - v.s;
+  if (left < -2) return null;   // 이미 지난 차는 그냥 간다
+  return { gap: Math.max(left - 2, 0.5), dv: v.v, stop: left < 4 };
 }
 
 function ringAhead(world, v) {
@@ -464,7 +611,14 @@ function nextHolder(world, v) {
   if (v.lane.isLink) return v.lane.next;
   const next = v.route[v.step + 1];
   if (!next) return null;
-  const lane = Net.pickLane(Net.segment(world.net, next.seg.id), next.dir, v.rank);
+  const seg = Net.segment(world.net, next.seg.id);
+  // **들어설 때 차로를 정한다.** 차로 변경이 없으므로, 그 구간 끝에서 할 이동을
+  // 허락하는 차로로 들어가야 좌회전 차로를 따로 둔 뜻이 산다.
+  const after = v.route[v.step + 2];
+  const need = after
+    ? Net.movement(world.net, seg, next.dir, Net.segment(world.net, after.seg.id), after.dir)
+    : null;
+  const lane = Net.pickLane(seg, next.dir, v.rank, need);
   if (!lane) return undefined;
   return Net.link(v.lane, lane, Net.node(world.net, v.lane.to)) || lane;
 }
@@ -523,7 +677,9 @@ function stats(world) {
 
 const api = {
   create, step, tick, spawn, despawn, place, stats, idm, ahead, advance, nextHolder,
-  signalOf, stepSignals, blocked, ringAhead,
+  signalOf, stepSignals, blocked, ringAhead, crossAhead,
+  spawnWalker, stepWalkers, walkerSpot, walkerOn, crossLine,
+  WALK_SPEED, WALK_RATE,
   KINDS, S0, HEADWAY, STEP, CLAIM_AHEAD, GREEN, AMBER, RING_GAP,
 };
 

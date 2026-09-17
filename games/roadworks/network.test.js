@@ -108,6 +108,83 @@ function straight(lanes) {
   check('거슬러 오는 길은 없다', Net.route(net, 'D', 'A'), null);
 }
 
+// --- 차로가 허락하는 이동 ---
+
+{
+  const seg = straight([-1, -1, 1, 1]).segs[0];
+  const fwd = Net.lanesOf(seg, 1);
+  // 오른쪽 끝은 직진과 우회전, 왼쪽 끝은 직진과 좌회전, 가운데는 직진만.
+  check('기본 허용', fwd.map((l) => [l.rank, l.allow.join('+')]).sort(),
+    [[0, 'through+right'], [1, 'through+left']]);
+
+  const one = straight([1]).segs[0];
+  check('한 차로뿐이면 다 할 수 있다', one.lanes[0].allow, ['left', 'through', 'right']);
+
+  const three = straight([-1, 1, 1, 1]).segs[0];
+  check('가운데 차로는 직진만',
+    Net.lanesOf(three, 1).find((l) => l.rank === 1).allow, ['through']);
+
+  const lane = one.lanes[0];
+  Net.setAllow(lane, ['left', 'uturn', 'nonsense']);
+  check('모르는 이동은 버린다', lane.allow, ['left', 'uturn']);
+  Net.setAllow(lane, []);
+  check('아무것도 못 가는 차로는 두지 않는다', lane.allow, ['through']);
+}
+
+{
+  //     N
+  //     |
+  // W --X-- E
+  //     |
+  //     S
+  const net = Net.build(
+    [{ id: 'X', kind: 'junction', x: 200, y: 200 },
+      { id: 'W', kind: 'gate', x: 0, y: 200 }, { id: 'E', kind: 'gate', x: 400, y: 200 },
+      { id: 'N', kind: 'gate', x: 200, y: 0 }, { id: 'S', kind: 'gate', x: 200, y: 400 }],
+    [{ a: 'W', b: 'X', lanes: [-1, 1] }, { a: 'X', b: 'E', lanes: [-1, 1] },
+      { a: 'N', b: 'X', lanes: [-1, 1] }, { a: 'X', b: 'S', lanes: [-1, 1] }],
+  );
+  const west = net.segs[0];
+  const east = net.segs[1];
+  const north = net.segs[2];
+  const south = net.segs[3];
+
+  // 서쪽에서 들어와 동쪽으로 나가면 직진, 남쪽으로 나가면 우회전(우측 통행이라
+  // 화면에서는 아래쪽), 북쪽으로 나가면 좌회전이다.
+  check('직진', Net.movement(net, west, 1, east, 1), 'through');
+  check('우회전', Net.movement(net, west, 1, south, 1), 'right');
+  check('좌회전', Net.movement(net, west, 1, north, -1), 'left');
+  check('같은 구간으로 되돌아가면 유턴', Net.movement(net, west, 1, west, -1), 'uturn');
+
+  check('좌회전 차로가 있으면 좌회전할 수 있다',
+    Net.movementAllowed(net, west, 1, north, -1), true);
+  // 한 차로뿐인 길에서 좌회전을 빼면 그 이동이 막힌다.
+  Net.setAllow(Net.lanesOf(west, 1)[0], ['through', 'right']);
+  check('빼면 막힌다', Net.movementAllowed(net, west, 1, north, -1), false);
+  check('유턴도 기본으로는 막혀 있다', Net.movementAllowed(net, west, 1, west, -1), false);
+}
+
+{
+  // 좌회전을 막으면 **길 찾기가 돌아간다**. 십자 옆에 우회로를 하나 둔다.
+  //
+  //  N --- P
+  //  |     |
+  //  X --- Q      X에서 N으로 가는 길은 곧장(좌회전)이거나 P를 돌아가는 길이다.
+  const net = Net.build(
+    [{ id: 'X', kind: 'junction', x: 200, y: 200 }, { id: 'N', kind: 'gate', x: 200, y: 40 },
+      { id: 'W', kind: 'gate', x: 0, y: 200 }, { id: 'Q', kind: 'junction', x: 340, y: 200 },
+      { id: 'P', kind: 'junction', x: 340, y: 40 }],
+    [{ a: 'W', b: 'X', lanes: [-1, 1] }, { a: 'X', b: 'N', lanes: [-1, 1] },
+      { a: 'X', b: 'Q', lanes: [-1, 1] }, { a: 'Q', b: 'P', lanes: [-1, 1] },
+      { a: 'P', b: 'N', lanes: [-1, 1] }],
+  );
+  check('곧장 간다', Net.route(net, 'W', 'N').length, 2);
+  Net.setAllow(Net.lanesOf(net.segs[0], 1)[0], ['through', 'right']);
+  const around = Net.route(net, 'W', 'N');
+  check('좌회전을 막으면 돌아간다', around.length, 4);
+  check('그래도 닿는다', around[around.length - 1].seg.id, 4);
+}
+
 // --- 이어진 길의 굽이 ---
 
 {
@@ -154,6 +231,22 @@ function straight(lanes) {
   check('또 누르면 회전교차로', Net.node(net, 'X').control, 'circle');
   Net.cycleControl(net, 'X');
   check('또 누르면 없음으로 돌아온다', Net.node(net, 'X').control, 'none');
+
+  // 현시 구성. 마주 보는 쪽끼리 묶으면 2현시, 한 갈래씩 열면 갈래 수만큼이다.
+  Net.setControl(net, 'X', 'signal');
+  check('기본은 2현시', [Net.node(net, 'X').plan, Net.phaseCount(Net.node(net, 'X'))], ['paired', 2]);
+  Net.setPlan(net, 'X', 'split');
+  check('한 갈래씩이면 갈래 수만큼', Net.phaseCount(Net.node(net, 'X')), 3);
+  check('모르는 구성은 받지 않는다', Net.setPlan(net, 'X', 'zigzag'), null);
+  Net.setPlan(net, 'X', 'paired');
+
+  // 횡단보도는 교차로 단위다.
+  check('횡단보도는 기본으로 없다', Net.node(net, 'X').crossing, false);
+  Net.setCrossing(net, 'X', true);
+  check('놓을 수 있다', Net.node(net, 'X').crossing, true);
+  check('교차로 바깥을 가로지른다', Net.crossingAt(Net.node(net, 'X')) > Net.node(net, 'X').radius, true);
+  Net.setCrossing(net, 'X', false);
+  Net.setControl(net, 'X', 'none');
 
   check('길이 꺾이기만 하는 자리에는 못 놓는다', Net.setControl(net, 'B', 'signal'), null);
   check('관문에도 못 놓는다', Net.setControl(net, 'W', 'signal'), null);
