@@ -97,15 +97,32 @@ const cam = { x: 0, y: 0 };
 // 한때는 "보통"과 "전체" 두 단계뿐이었다. 지도가 창의 아홉 배라 한 화면씩 밀어서는
 // 반대편까지 가는 데 여러 번 끌어야 해서 넣은 것인데, **그 사이가 없다는 것이 문제였다** —
 // 역 몇 개를 한눈에 놓고 선을 긋고 싶은 배율이 어디에도 없었다.
-const ZOOM_MIN = Math.min(VIEW.w / City.WORLD.w, VIEW.h / City.WORLD.h);   // 도시 전체
 const ZOOM_MAX = 3;
 let zoom = 1;
 let zoomBack = 1;        // 전체로 들어가기 전의 배율. 나올 때 그 자리로 돌아간다
-const span = () => ({ w: VIEW.w / zoom, h: VIEW.h / zoom });
+
+// **판이 화면 전체라 비율은 창이 정한다.** viewBox는 요소 상자와 정확히 맞아야 하고
+// (어긋나면 SVG가 레터박스를 넣어 손가락 좌표를 옮기는 계산이 통째로 틀어진다),
+// 배율은 **가로로 몇 미터가 들어오는가**로 잡는다 — 세로는 창이 길면 그만큼 더 보인다.
+let mapBox = { w: 1, h: 1 };
+function measureMap() {
+  const r = el.map.getBoundingClientRect();
+  if (r.width > 0 && r.height > 0) mapBox = { w: r.width, h: r.height };
+}
+const span = () => {
+  const w = VIEW.w / zoom;
+  return { w, h: w * (mapBox.h / mapBox.w) };
+};
+
+// 도시 전체가 들어오는 배율. 창 비율이 바뀌면 같이 바뀌므로 상수로 둘 수 없다.
+const fitZoom = () => Math.min(
+  VIEW.w / City.WORLD.w,
+  VIEW.w * (mapBox.h / mapBox.w) / City.WORLD.h,
+);
 
 // **가장 멀리 나간 상태가 곧 전체 보기다.** 거기서는 판이 삼분의 일이라 몇 미터를
 // 다투는 조작이 정확할 수 없어 짓거나 끌 수 없고, 누른 자리로 내려간다.
-const atFit = () => zoom <= ZOOM_MIN * 1.001;
+const atFit = () => zoom <= fitZoom() * 1.001;
 
 // 역·선·열차는 **화면에서 같은 굵기로 남는다.** 도로와 건물은 지도의 일부라 배율을
 // 그대로 타는 것이 맞지만 우리가 놓은 것은 아니다 — 어디에 무엇이 있는지 보려고 배율을
@@ -192,7 +209,7 @@ function makeCity(nextSeed, nextLevel) {
   income = 0;
   simRng = City.mulberry32(seed * 7919 + 13);
   syncNetwork();
-  setCam(city.core.x - VIEW.w / 2, city.core.y - VIEW.h / 2);
+  centerOn(city.core.x, city.core.y);
   drawCity();
   renderGrown();
   refresh();
@@ -253,7 +270,7 @@ function loadGame() {
   pending = null; draft = null; ghost = null; marked = null; picked = null;
   history = []; drag = null;
   mode = 'run';
-  zoom = clamp(got.zoom || 1, ZOOM_MIN, ZOOM_MAX);
+  zoom = clamp(got.zoom || 1, fitZoom(), ZOOM_MAX);
   zoomBack = Math.max(1, zoom);
   sel = { line: 0, pattern: 0 };
   carLoads = new Map();
@@ -265,7 +282,7 @@ function loadGame() {
 
   syncNetwork();
   if (got.cam) setCam(got.cam.x, got.cam.y);
-  else setCam(city.core.x - VIEW.w / 2, city.core.y - VIEW.h / 2);
+  else centerOn(city.core.x, city.core.y);
   drawCity();
   renderGrown();
   refresh();
@@ -294,6 +311,12 @@ function drawCity() {
   clear(layer.water);
   clear(layer.hills);
   clear(layer.roads);
+
+  // 땅. 도시 크기만큼만 칠한다 — 판이 화면 전체라 배율을 낮추면 도시 바깥이 보이는데,
+  // 그 자리가 땅과 같은 색이면 도시가 어디서 끝나는지 알 수 없다.
+  layer.water.appendChild(svg('rect', {
+    x: 0, y: 0, width: city.world.w, height: city.world.h, fill: 'var(--ground)',
+  }));
 
   for (const body of city.water) {
     layer.water.appendChild(svg('path', {
@@ -371,8 +394,9 @@ function drawBuildings() {
 
 function setCam(x, y) {
   const v = span();
-  cam.x = clamp(x, 0, city.world.w - v.w);
-  cam.y = clamp(y, 0, city.world.h - v.h);
+  // 창이 도시보다 넓으면(전체 보기에서 세로가 남는다) 끝에 붙이지 않고 가운데에 둔다.
+  cam.x = v.w >= city.world.w ? (city.world.w - v.w) / 2 : clamp(x, 0, city.world.w - v.w);
+  cam.y = v.h >= city.world.h ? (city.world.h - v.h) / 2 : clamp(y, 0, city.world.h - v.h);
   el.map.setAttribute('viewBox', `${r1(cam.x)} ${r1(cam.y)} ${v.w} ${v.h}`);
 }
 
@@ -393,7 +417,7 @@ function setFit(on, at = null) {
     zoomBack = Math.max(1, zoom);
     // 전체 보기는 판을 고르는 화면이라, 만들다 만 것을 들고 들어가지 않는다.
     pending = null; draft = null; ghost = null; marked = null; history = [];
-    zoom = ZOOM_MIN;
+    zoom = fitZoom();
   } else zoom = zoomBack;
   centerOn(focus.x, focus.y);
   Sound.play('select');
@@ -415,7 +439,7 @@ function worldAtClient(cx, cy) {
 // 찾는 일을 되풀이하게 된다.
 function zoomTo(next, cx, cy, hold = null) {
   if (!city) return;
-  const want = clamp(next, ZOOM_MIN, ZOOM_MAX);
+  const want = clamp(next, fitZoom(), ZOOM_MAX);
   if (Math.abs(want - zoom) < 1e-5) return;
   const at = hold || worldAtClient(cx, cy);
   const was = atFit();
@@ -426,15 +450,32 @@ function zoomTo(next, cx, cy, hold = null) {
     at.y - (cy - rect.top) / rect.height * v.h);
   // **판만 다시 그린다.** `refresh()`는 패널의 단추를 새로 만드는데, 배율은 손가락이
   // 움직이는 내내 바뀌므로 누르던 단추가 손 밑에서 사라진다(루트 규칙).
+  redraw();
+  // 전체 보기에 닿았는지는 계기판이 들고 있다(단추의 눌림 표시). 판을 새로 만들지
+  // 않는 함수라 배율이 바뀌는 내내 불러도 된다.
+  if (was !== atFit()) renderMeters();
+  touch();
+}
+
+// 판 위에 그리는 것 전부. 패널은 건드리지 않는다.
+function redraw() {
   renderLines();
   renderTrains();
   renderDemands();
   renderDraft();
   renderStations();
-  // 전체 보기에 닿았는지는 계기판이 들고 있다(단추의 눌림 표시). 판을 새로 만들지
-  // 않는 함수라 배율이 바뀌는 내내 불러도 된다.
-  if (was !== atFit()) renderMeters();
-  touch();
+}
+
+// **창이 바뀌면 판의 비율이 바뀐다.** viewBox의 높이도 배율의 바닥도 거기서 나오므로
+// 다시 잰다 — 폰을 돌리거나 브라우저 주소창이 접히는 것만으로도 비율이 달라진다.
+function onResize() {
+  measureMap();
+  if (!city) return;
+  const floor = fitZoom();
+  if (zoom < floor) zoom = floor;
+  setCam(cam.x, cam.y);
+  redraw();
+  renderMeters();
 }
 
 // --- 노선 ---
@@ -2047,7 +2088,11 @@ bindSoundToggle(el.toggleSfx, 'sfx', (on) => Sound.setSfx(on));
 window.addEventListener('pagehide', () => saveGame(true));
 document.addEventListener('visibilitychange', () => { if (document.hidden) saveGame(true); });
 
-// 하던 판이 있으면 그것으로 시작한다.
+window.addEventListener('resize', onResize);
+
+// 하던 판이 있으면 그것으로 시작한다. **재는 것이 먼저다** — viewBox의 높이가
+// 판의 비율에서 나오므로, 재기 전에 그리면 첫 화면이 어긋난 채로 선다.
+measureMap();
 if (!loadGame()) makeCity(seed, level);
 requestAnimationFrame(frame);
 

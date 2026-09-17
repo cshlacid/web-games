@@ -24,28 +24,6 @@
 </head>
 <body>
 <main class="app">
-  <header class="head">
-    <div class="title-row">
-      <div class="head-nav">
-        <a class="back" href="../../" data-i18n="ui.back">← 목록</a>
-        <button class="toggle" id="help-open" type="button" aria-pressed="false" data-i18n="ui.help">도움말</button>
-      </div>
-      <h1 data-i18n="game.metro">지하철 노선</h1>
-      <div class="head-actions">
-        <button class="toggle sound" id="toggle-bgm" type="button" aria-pressed="true" data-i18n="ui.bgm">BGM</button>
-        <button class="toggle sound" id="toggle-sfx" type="button" aria-pressed="true" data-i18n="ui.sfx">효과음</button>
-      </div>
-    </div>
-    <div class="picker-row">
-      <div class="picker" id="levels" role="group" aria-label="난이도" data-i18n-attr="aria-label=metro.difficulty"></div>
-      <span class="budget"><span data-i18n="metro.budget">예산</span> <b id="budget">0</b></span>
-      <span class="clock" id="clock">06:00</span>
-      <button class="toggle" id="pause" type="button" aria-pressed="true" data-i18n="metro.speedSlow">보통</button>
-      <button class="toggle" id="wide" type="button" aria-pressed="false" data-i18n="metro.wide" data-i18n-attr="title=metro.wideHint" title="지도 전체를 한 화면에 봅니다. 누른 자리로 내려갑니다">전체</button>
-      <button class="toggle" id="new-city" type="button" data-i18n="metro.newCity">새 도시</button>
-    </div>
-  </header>
-
   <div class="map-wrap">
     <svg class="map" id="map" xmlns="http://www.w3.org/2000/svg" aria-label="도시" data-i18n-attr="aria-label=metro.mapLabel">
       <g id="layer-water"></g>
@@ -64,100 +42,126 @@
     </svg>
   </div>
 
-  <div class="picker modes" id="modes" role="group" aria-label="모드" data-i18n-attr="aria-label=metro.mode"></div>
-  <div class="picker tools" id="tools" role="group" aria-label="도구" data-i18n-attr="aria-label=metro.tool" hidden></div>
+  <!-- **판이 화면 전체다.** 조작과 숫자는 그 위에 떠 있다 — 폰에서 판 아래로 늘어놓으면
+       판이 화면의 절반도 못 쓰고 아래쪽은 늘 빈 채로 남았다. 겹은 손가락을 통과시키고
+       (`pointer-events: none`) 카드만 받는다. 카드가 판 밖(형제)이라 click으로 도는
+       단추를 그대로 둘 수 있다 — 판 안은 `touch-action: none`이라 click이 나지 않는다. -->
+  <div class="hud">
+    <div class="hud-top">
+      <header class="head">
+        <div class="title-row">
+          <div class="head-nav">
+            <a class="back" href="../../" data-i18n="ui.back">← 목록</a>
+            <button class="toggle" id="help-open" type="button" aria-pressed="false" data-i18n="ui.help">도움말</button>
+          </div>
+          <h1 data-i18n="game.metro">지하철 노선</h1>
+          <div class="head-actions">
+            <button class="toggle sound" id="toggle-bgm" type="button" aria-pressed="true" data-i18n="ui.bgm">BGM</button>
+            <button class="toggle sound" id="toggle-sfx" type="button" aria-pressed="true" data-i18n="ui.sfx">효과음</button>
+          </div>
+        </div>
+        <div class="picker-row">
+          <div class="picker" id="levels" role="group" aria-label="난이도" data-i18n-attr="aria-label=metro.difficulty"></div>
+          <span class="budget"><span data-i18n="metro.budget">예산</span> <b id="budget">0</b></span>
+          <span class="clock" id="clock">06:00</span>
+          <button class="toggle" id="pause" type="button" aria-pressed="true" data-i18n="metro.speedSlow">보통</button>
+          <button class="toggle" id="wide" type="button" aria-pressed="false" data-i18n="metro.wide" data-i18n-attr="title=metro.wideHint" title="지도 전체를 한 화면에 봅니다. 누른 자리로 내려갑니다">전체</button>
+          <button class="toggle" id="new-city" type="button" data-i18n="metro.newCity">새 도시</button>
+        </div>
+      </header>
+    </div>
 
-  <!-- 셋이 남김없이 갈린 사람 수다: 타는 사람 + 못 타는 사람 + 안 타는 사람. 건수로
-       두었더니 "몇 건"과 "몇 명"이 한 줄에 섞여 서로 견줄 수가 없었다. -->
-  <p class="flow" id="flow">
-    <span data-i18n-attr="title=metro.tipCaught" title="지금 우리 노선을 타고 있는 사람입니다(분당)"><i class="dot caught"></i><span data-i18n="metro.caught">탐</span> <b id="v-caught">0</b></span>
-    <span class="jam" hidden id="missed-box" data-i18n-attr="title=metro.tipMissed" title="길은 있는데 열차가 꽉 차 못 타는 사람입니다(분당). 역 옆의 숫자는 지금 그 승강장에 서 있는 사람입니다"><i class="dot missed"></i><span data-i18n="metro.missed">못 탐</span> <b id="v-missed">0</b></span>
-    <span data-i18n-attr="title=metro.tipWaiting" title="길이 없거나 너무 돌아가서 지상으로 가는 사람입니다(분당). 지도의 호가 그 수요입니다"><i class="dot waiting"></i><span data-i18n="metro.waiting">안 탐</span> <b id="v-waiting">0</b></span>
-    <span><span data-i18n="metro.perMinute">수입</span> <b id="v-income">0.0</b></span>
-  </p>
-
-  <p class="status" id="status" role="status" aria-live="polite"></p>
-
-  <div class="readout" id="readout" hidden>
-    <dl class="stats">
-      <div><dt data-i18n="metro.cost">건설비</dt><dd id="v-cost">–</dd></div>
-      <div><dt data-i18n="metro.time">소요시간</dt><dd id="v-time">–</dd></div>
-      <div><dt data-i18n="metro.length">길이</dt><dd id="v-length">–</dd></div>
-      <div><dt data-i18n="metro.curveLimit">곡선 제한</dt><dd id="v-speed">–</dd></div>
-    </dl>
-    <div class="mix" id="mix" aria-hidden="true">
-      <span class="mix-road" id="mix-road"></span>
-      <span class="mix-empty" id="mix-empty"></span>
-      <span class="mix-building" id="mix-building"></span>
-      <span class="mix-hill" id="mix-hill"></span>
-      <span class="mix-water" id="mix-water"></span>
+    <div class="hud-bottom">
+      <div class="picker modes" id="modes" role="group" aria-label="모드" data-i18n-attr="aria-label=metro.mode"></div>
+      <div class="picker tools" id="tools" role="group" aria-label="도구" data-i18n-attr="aria-label=metro.tool" hidden></div>
+      <!-- 셋이 남김없이 갈린 사람 수다: 타는 사람 + 못 타는 사람 + 안 타는 사람. 건수로
+           두었더니 "몇 건"과 "몇 명"이 한 줄에 섞여 서로 견줄 수가 없었다. -->
+      <p class="flow" id="flow">
+        <span data-i18n-attr="title=metro.tipCaught" title="지금 우리 노선을 타고 있는 사람입니다(분당)"><i class="dot caught"></i><span data-i18n="metro.caught">탐</span> <b id="v-caught">0</b></span>
+        <span class="jam" hidden id="missed-box" data-i18n-attr="title=metro.tipMissed" title="길은 있는데 열차가 꽉 차 못 타는 사람입니다(분당). 역 옆의 숫자는 지금 그 승강장에 서 있는 사람입니다"><i class="dot missed"></i><span data-i18n="metro.missed">못 탐</span> <b id="v-missed">0</b></span>
+        <span data-i18n-attr="title=metro.tipWaiting" title="길이 없거나 너무 돌아가서 지상으로 가는 사람입니다(분당). 지도의 호가 그 수요입니다"><i class="dot waiting"></i><span data-i18n="metro.waiting">안 탐</span> <b id="v-waiting">0</b></span>
+        <span><span data-i18n="metro.perMinute">수입</span> <b id="v-income">0.0</b></span>
+      </p>
+      <p class="status" id="status" role="status" aria-live="polite"></p>
+      <div class="readout" id="readout" hidden>
+        <dl class="stats">
+          <div><dt data-i18n="metro.cost">건설비</dt><dd id="v-cost">–</dd></div>
+          <div><dt data-i18n="metro.time">소요시간</dt><dd id="v-time">–</dd></div>
+          <div><dt data-i18n="metro.length">길이</dt><dd id="v-length">–</dd></div>
+          <div><dt data-i18n="metro.curveLimit">곡선 제한</dt><dd id="v-speed">–</dd></div>
+        </dl>
+        <div class="mix" id="mix" aria-hidden="true">
+          <span class="mix-road" id="mix-road"></span>
+          <span class="mix-empty" id="mix-empty"></span>
+          <span class="mix-building" id="mix-building"></span>
+          <span class="mix-hill" id="mix-hill"></span>
+          <span class="mix-water" id="mix-water"></span>
+        </div>
+        <p class="mix-legend">
+          <span><i class="dot road"></i><span data-i18n="metro.underRoad">도로 밑</span> <b id="len-road">0</b></span>
+          <span><i class="dot empty"></i><span data-i18n="metro.underEmpty">빈 땅</span> <b id="len-empty">0</b></span>
+          <span><i class="dot building"></i><span data-i18n="metro.underBuilding">건물 밑</span> <b id="len-building">0</b></span>
+          <span><i class="dot hill"></i><span data-i18n="metro.underHill">산 밑</span> <b id="len-hill">0</b></span>
+          <span><i class="dot water"></i><span data-i18n="metro.underWater">물 밑</span> <b id="len-water">0</b></span>
+        </p>
+      </div>
+      <!-- 판 위의 열차를 누르면 뜬다. 모드를 가리지 않는다 — 열차는 늘 판 위에 있고,
+           "저건 왜 저렇게 찼나"는 아무 때나 묻게 된다. -->
+      <div class="linepanel trainpanel" id="trainpanel" hidden>
+        <div class="trainhead">
+          <b id="tp-name"></b>
+          <span id="tp-where"></span>
+          <button class="pick drop" id="tp-close" type="button" data-i18n="ui.close">닫기</button>
+        </div>
+        <div class="fillbar" id="tp-bar"><i id="tp-fill"></i></div>
+        <div class="trainrow">
+          <span class="trainlabel" data-i18n="metro.load">재차</span>
+          <b id="tp-load">0</b>
+          <span class="plan" id="tp-cap"></span>
+        </div>
+        <div class="trainrow">
+          <span class="trainlabel" data-i18n="metro.cars">편성</span>
+          <button class="step" id="tp-minus" type="button" aria-label="한 량 줄이기" data-i18n-attr="aria-label=metro.carMinus"><span data-icon="minus"></span></button>
+          <b id="tp-cars">0</b>
+          <button class="step" id="tp-plus" type="button" aria-label="한 량 늘리기" data-i18n-attr="aria-label=metro.carPlus"><span data-icon="plus"></span></button>
+          <span class="plan" id="tp-carnote"></span>
+        </div>
+      </div>
+      <div class="linepanel" id="linepanel" hidden>
+        <div class="linerow">
+          <div class="picker" id="line-list" role="group" aria-label="노선" data-i18n-attr="aria-label=metro.line"></div>
+          <button class="pick drop" id="drop-line" type="button" data-i18n="metro.dropLine">노선 삭제</button>
+        </div>
+        <div class="patternrow">
+          <div class="picker" id="pattern-list" role="group" aria-label="운행 패턴" data-i18n-attr="aria-label=metro.pattern"></div>
+          <button class="pick add" id="add-pattern" type="button" data-i18n="metro.addExpress">급행 추가</button>
+        </div>
+        <div class="stops" id="stops" role="group" aria-label="정차역" data-i18n-attr="aria-label=metro.stops"></div>
+        <div class="trainrow">
+          <span class="trainlabel" id="train-label" data-i18n="metro.trains">열차</span>
+          <button class="step" id="train-minus" type="button" aria-label="한 대 줄이기" data-i18n-attr="aria-label=metro.trainMinus"><span data-icon="minus"></span></button>
+          <b id="train-count">0</b>
+          <button class="step" id="train-plus" type="button" aria-label="한 대 늘리기" data-i18n-attr="aria-label=metro.trainPlus"><span data-icon="plus"></span></button>
+          <span class="plan" id="plan"></span>
+          <span class="crowd" id="crowd"></span>
+        </div>
+        <!-- 순환선에서만 뜬다. 역방향은 제 선로를 쓰므로 배차도 혼잡도 따로 난다. -->
+        <div class="trainrow" id="back-row" hidden>
+          <span class="trainlabel" data-i18n="metro.backward">역방향</span>
+          <button class="step" id="back-minus" type="button" aria-label="한 대 줄이기" data-i18n-attr="aria-label=metro.trainMinus"><span data-icon="minus"></span></button>
+          <b id="back-count">0</b>
+          <button class="step" id="back-plus" type="button" aria-label="한 대 늘리기" data-i18n-attr="aria-label=metro.trainPlus"><span data-icon="plus"></span></button>
+          <span class="plan" id="back-plan"></span>
+          <span class="crowd" id="back-crowd"></span>
+        </div>
+      </div>
+      <div class="actions" id="actions" hidden>
+        <button class="btn ghost" id="undo" type="button" data-i18n="ui.undo">되돌리기</button>
+        <button class="btn ghost" id="cancel" type="button" data-i18n="metro.cancel">취소</button>
+        <button class="btn warn" id="remove" type="button" data-i18n="metro.remove" hidden>철거</button>
+        <button class="btn" id="confirm" type="button" data-i18n="metro.confirm">확정</button>
+      </div>
     </div>
-    <p class="mix-legend">
-      <span><i class="dot road"></i><span data-i18n="metro.underRoad">도로 밑</span> <b id="len-road">0</b></span>
-      <span><i class="dot empty"></i><span data-i18n="metro.underEmpty">빈 땅</span> <b id="len-empty">0</b></span>
-      <span><i class="dot building"></i><span data-i18n="metro.underBuilding">건물 밑</span> <b id="len-building">0</b></span>
-      <span><i class="dot hill"></i><span data-i18n="metro.underHill">산 밑</span> <b id="len-hill">0</b></span>
-      <span><i class="dot water"></i><span data-i18n="metro.underWater">물 밑</span> <b id="len-water">0</b></span>
-    </p>
-  </div>
-
-  <!-- 판 위의 열차를 누르면 뜬다. 모드를 가리지 않는다 — 열차는 늘 판 위에 있고,
-       "저건 왜 저렇게 찼나"는 아무 때나 묻게 된다. -->
-  <div class="linepanel trainpanel" id="trainpanel" hidden>
-    <div class="trainhead">
-      <b id="tp-name"></b>
-      <span id="tp-where"></span>
-      <button class="pick drop" id="tp-close" type="button" data-i18n="ui.close">닫기</button>
-    </div>
-    <div class="fillbar" id="tp-bar"><i id="tp-fill"></i></div>
-    <div class="trainrow">
-      <span class="trainlabel" data-i18n="metro.load">재차</span>
-      <b id="tp-load">0</b>
-      <span class="plan" id="tp-cap"></span>
-    </div>
-    <div class="trainrow">
-      <span class="trainlabel" data-i18n="metro.cars">편성</span>
-      <button class="step" id="tp-minus" type="button" aria-label="한 량 줄이기" data-i18n-attr="aria-label=metro.carMinus"><span data-icon="minus"></span></button>
-      <b id="tp-cars">0</b>
-      <button class="step" id="tp-plus" type="button" aria-label="한 량 늘리기" data-i18n-attr="aria-label=metro.carPlus"><span data-icon="plus"></span></button>
-      <span class="plan" id="tp-carnote"></span>
-    </div>
-  </div>
-
-  <div class="linepanel" id="linepanel" hidden>
-    <div class="linerow">
-      <div class="picker" id="line-list" role="group" aria-label="노선" data-i18n-attr="aria-label=metro.line"></div>
-      <button class="pick drop" id="drop-line" type="button" data-i18n="metro.dropLine">노선 삭제</button>
-    </div>
-    <div class="patternrow">
-      <div class="picker" id="pattern-list" role="group" aria-label="운행 패턴" data-i18n-attr="aria-label=metro.pattern"></div>
-      <button class="pick add" id="add-pattern" type="button" data-i18n="metro.addExpress">급행 추가</button>
-    </div>
-    <div class="stops" id="stops" role="group" aria-label="정차역" data-i18n-attr="aria-label=metro.stops"></div>
-    <div class="trainrow">
-      <span class="trainlabel" id="train-label" data-i18n="metro.trains">열차</span>
-      <button class="step" id="train-minus" type="button" aria-label="한 대 줄이기" data-i18n-attr="aria-label=metro.trainMinus"><span data-icon="minus"></span></button>
-      <b id="train-count">0</b>
-      <button class="step" id="train-plus" type="button" aria-label="한 대 늘리기" data-i18n-attr="aria-label=metro.trainPlus"><span data-icon="plus"></span></button>
-      <span class="plan" id="plan"></span>
-      <span class="crowd" id="crowd"></span>
-    </div>
-    <!-- 순환선에서만 뜬다. 역방향은 제 선로를 쓰므로 배차도 혼잡도 따로 난다. -->
-    <div class="trainrow" id="back-row" hidden>
-      <span class="trainlabel" data-i18n="metro.backward">역방향</span>
-      <button class="step" id="back-minus" type="button" aria-label="한 대 줄이기" data-i18n-attr="aria-label=metro.trainMinus"><span data-icon="minus"></span></button>
-      <b id="back-count">0</b>
-      <button class="step" id="back-plus" type="button" aria-label="한 대 늘리기" data-i18n-attr="aria-label=metro.trainPlus"><span data-icon="plus"></span></button>
-      <span class="plan" id="back-plan"></span>
-      <span class="crowd" id="back-crowd"></span>
-    </div>
-  </div>
-
-  <div class="actions" id="actions" hidden>
-    <button class="btn ghost" id="undo" type="button" data-i18n="ui.undo">되돌리기</button>
-    <button class="btn ghost" id="cancel" type="button" data-i18n="metro.cancel">취소</button>
-    <button class="btn warn" id="remove" type="button" data-i18n="metro.remove" hidden>철거</button>
-    <button class="btn" id="confirm" type="button" data-i18n="metro.confirm">확정</button>
   </div>
 
   <div class="sheet" id="help" hidden>

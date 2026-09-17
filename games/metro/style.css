@@ -6,6 +6,10 @@
   --btn-bg: #55637a;
   --btn-fg: #f2f5f9;
   --sheet-bg: #ffffff;
+  /* 판 위에 뜨는 카드. 바탕을 그대로 쓰면 지도가 비쳐 글자가 안 읽히고, 불투명하게
+     두면 카드가 판을 통째로 덮은 것처럼 보인다. */
+  --hud-bg: rgba(244, 246, 249, 0.88);
+  --hud-line: rgba(44, 53, 66, 0.10);
 
   /* 지도. 땅 → 길 → 건물 순으로 밝기를 낮춰, 색을 보지 않고 명암만으로도 층이
      갈리게 했다. 노선과 경고색만 채도를 가진다. */
@@ -62,6 +66,8 @@
     --line: #333c49;
     --btn-bg: #4a5568;
     --sheet-bg: #212832;
+    --hud-bg: rgba(23, 27, 33, 0.88);
+    --hud-line: rgba(223, 229, 238, 0.12);
 
     --ground: #171c24;
     --road: #3f4a59;
@@ -109,17 +115,57 @@ body {
   color: var(--fg);
   font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     "Helvetica Neue", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
-  display: flex;
-  justify-content: center;
-  padding: clamp(10px, 3vmin, 24px) var(--pad-x);
+  margin: 0;
+  overflow: hidden;
 }
 
+/* **판이 화면 전체다.** 폰에서 판 아래로 늘어놓으면 판이 화면의 절반도 못 쓰고
+   아래쪽은 늘 빈 채로 남았다. 지금은 판이 바닥이고 조작과 숫자가 그 위에 뜬다. */
 .app {
-  width: min(100%, var(--app-max));
+  position: fixed;
+  inset: 0;
+}
+
+/* 겹은 손가락을 통과시키고 카드만 받는다 — 그래야 카드 사이의 빈 곳에서도 지도를
+   끌 수 있다. 카드가 판 밖(형제)이라 click으로 도는 단추를 그대로 둘 수 있다. */
+.hud {
+  position: absolute;
+  inset: 0;
   display: flex;
   flex-direction: column;
-  gap: clamp(8px, 2vmin, 14px);
+  justify-content: space-between;
+  gap: 8px;
+  padding: calc(env(safe-area-inset-top) + 8px) var(--pad-x)
+    calc(env(safe-area-inset-bottom) + 8px);
+  pointer-events: none;
 }
+
+.hud-top, .hud-bottom {
+  width: min(100%, var(--app-max));
+  margin-inline: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* 아래쪽은 패널이 겹쳐 길어질 수 있다. 화면을 넘기지 않고 그 안에서 스크롤한다. */
+.hud-bottom {
+  max-height: 72%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* 판 위에 뜨는 것은 전부 카드다. 카드만 손가락을 받는다. */
+.head, .modes, .tools, .flow, .status, .readout, .linepanel, .actions {
+  pointer-events: auto;
+  background: var(--hud-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 12px;
+  padding: 7px 10px;
+}
+.actions { background: none; backdrop-filter: none; -webkit-backdrop-filter: none; padding: 0; }
+.status:empty { display: none; }
 
 /* 헤더 배치는 모든 게임이 같다 — 왼쪽 위에 목록과 도움말, 가운데 이름, 오른쪽에 소리. */
 .title-row {
@@ -132,6 +178,8 @@ body {
 .title-row h1 { text-align: center; }
 .title-row .head-nav { justify-self: start; }
 .head-nav { display: flex; align-items: center; gap: 14px; }
+/* 좁은 화면에서 "목 록"으로 끊기지 않게 한다. 겹으로 띄우면서 머리줄이 더 좁아졌다. */
+.head-nav > *, .head-actions > *, .title-row h1 { white-space: nowrap; }
 .title-row .head-actions { justify-self: end; }
 
 h1 {
@@ -158,6 +206,7 @@ h1 {
 }
 .back:hover { opacity: 1; }
 
+.head { display: flex; flex-direction: column; gap: 6px; }
 .picker-row { display: flex; align-items: center; gap: 10px; }
 .picker { display: flex; gap: 4px; }
 
@@ -188,6 +237,7 @@ h1 {
 .picker-row { flex-wrap: wrap; }
 .picker-row .toggle { margin-inline-start: 0; }
 
+.flow, .status { margin: 0; }
 .flow {
   margin: 0;
   display: flex;
@@ -310,25 +360,25 @@ h1 {
 }
 
 .pick .ico { width: 13px; height: 13px; vertical-align: -2px; }
-.picker-row .toggle { margin-inline-start: auto; }
 
 /* 지도는 화면 한 장에 다 들어온다. 확대·팬이 없는 것은 게으름이 아니라 결정이다 —
    shared/base.js가 손가락 둘 이상의 touchmove를 문서 전체에서 취소하므로, 자체
    핀치 줌을 짜도 이벤트가 오지 않는다. 자세한 사정은 CLAUDE.md에 있다. */
+/* 도시 **바깥**은 바탕색이다. 땅과 같은 색으로 두면 전체 보기에서 도시가 어디서
+   끝나는지 안 보인다 — 땅은 `drawCity`가 도시 크기만큼 칠한다. */
 .map-wrap {
-  position: relative;
-  border-radius: 12px;
-  overflow: hidden;
-  background: var(--ground);
+  position: absolute;
+  inset: 0;
+  background: var(--bg);
 }
 
 .map {
   display: block;
   width: 100%;
-  /* 한 화면에 보이는 창(citygen.js의 VIEW)과 같은 비율로 못 박아 여백(레터박스)이
-     생기지 않게 한다. 도시 전체가 아니라 창의 비율이다. 여백이 생기면
-     손가락 좌표를 지도 좌표로 옮기는 계산이 한 겹 더 필요해진다. */
-  aspect-ratio: 2400 / 2700;
+  height: 100%;
+  /* **비율을 못 박지 않는다.** 판이 화면 전체이므로 창 크기가 정하고, 대신 viewBox의
+     높이를 요소의 비율에 맞춰 우리가 계산한다(main.js의 `span`). 둘이 어긋나면 SVG가
+     레터박스를 넣어 손가락 좌표를 지도 좌표로 옮기는 계산이 통째로 틀어진다. */
   /* 끌어서 조작하는 판이라 none. 그래서 이 안에는 click으로 도는 조작을 두지 않는다 —
      확정·취소 단추가 판 밖에 있는 이유가 이것이다. */
   touch-action: none;
