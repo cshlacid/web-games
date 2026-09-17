@@ -327,6 +327,154 @@ function laneOf(net, v) {
   check('바뀐 교차로로도 빠져나간다', world.arrived > 10, true);
 }
 
+// --- 차로가 허락하는 이동 ---
+
+{
+  //     N
+  //     |
+  // W --X-- E      서에서 들어와 북으로 나가려면 좌회전이다.
+  //     |
+  //     S
+  const net = crossing();
+  const west = net.segs[0];
+  const world = T.create(net, { rng: seeded(21), spawnRate: 0 });
+
+  const v = T.spawn(world, { from: 'W', to: 'N' });
+  check('좌회전 길을 잡는다', v.route.length, 2);
+  // 들어선 차로가 좌회전을 허락해야 한다.
+  check('좌회전할 수 있는 차로에 탄다', v.lane.allow.indexOf('left') >= 0, true);
+
+  // 좌회전을 막으면 그 길로는 가지 못한다.
+  Net.setAllow(Net.lanesOf(west, 1)[0], ['through', 'right']);
+  check('막으면 길이 없다', Net.route(net, 'W', 'N'), null);
+}
+
+{
+  // 네 차로짜리 길에서는 **끝에서 할 이동에 맞는 차로로 들어선다**. 차로 변경이
+  // 없으므로 들어설 때 고르지 않으면 좌회전 차로를 따로 둔 뜻이 없다.
+  const net = Net.build(
+    [{ id: 'X', kind: 'junction', x: 300, y: 300 }, { id: 'Y', kind: 'junction', x: 300, y: 120 },
+      { id: 'W', kind: 'gate', x: 0, y: 300 }, { id: 'E', kind: 'gate', x: 600, y: 300 },
+      { id: 'N', kind: 'gate', x: 300, y: 0 }, { id: 'L', kind: 'gate', x: 60, y: 120 },
+      { id: 'S', kind: 'gate', x: 300, y: 600 }],
+    [{ a: 'W', b: 'X', lanes: [-1, 1] }, { a: 'X', b: 'E', lanes: [-1, 1] },
+      { a: 'X', b: 'Y', lanes: [-1, -1, 1, 1] }, { a: 'Y', b: 'N', lanes: [-1, 1] },
+      { a: 'Y', b: 'L', lanes: [-1, 1] }, { a: 'X', b: 'S', lanes: [-1, 1] }],
+  );
+  const world = T.create(net, { rng: seeded(22), spawnRate: 0 });
+
+  const left = T.spawn(world, { from: 'W', to: 'L' });     // Y에서 좌회전
+  const ahead = T.spawn(world, { from: 'S', to: 'N' });    // Y에서 직진
+  for (let i = 0; i < 60 * 20 && (left.step < 2 || ahead.step < 2); i++) T.tick(world, 1 / 60);
+  check('좌회전할 차는 좌회전 차로로', left.lane.allow.indexOf('left') >= 0, true);
+  check('직진할 차는 직진 차로로', ahead.lane.allow.indexOf('through') >= 0, true);
+}
+
+// --- 횡단보도와 사람 ---
+
+// 그 갈래를 건너는 사람 하나를 손으로 세운다.
+function walkerOn(world, net, nodeId, segId, dir) {
+  const node = Net.node(net, nodeId);
+  const seg = Net.segment(net, segId);
+  const line = T.crossLine(net, node, seg);
+  const walker = {
+    id: 9000, node: nodeId, seg: segId, u: -dir * line.span, dir, span: line.span, walking: false,
+  };
+  world.walkers.push(walker);
+  return walker;
+}
+
+{
+  const net = crossing();
+  Net.setControl(net, 'X', 'signal');
+  Net.setCrossing(net, 'X', true);
+  const world = T.create(net, { rng: seeded(31), spawnRate: 0 });
+  const node = Net.node(net, 'X');
+  const seg = net.segs[0];                       // 서쪽 갈래
+  const lane = seg.lanes.find((l) => l.to === 'X');
+  const walker = walkerOn(world, net, 'X', seg.id, 1);
+
+  // 그 갈래에 녹색이 들어와 있으면 기다린다.
+  const sig = T.signalOf(world, node);
+  sig.phase = Net.phaseOf(node, lane);
+  sig.amber = false;
+  for (let i = 0; i < 60 * 3; i++) { sig.timer = 0; T.tick(world, 1 / 60); }
+  check('파란 불이면 기다린다', walker.walking, false);
+
+  // 빨간 불로 바꾸면 건넌다.
+  sig.phase = 1 - Net.phaseOf(node, lane);
+  for (let i = 0; i < 60 * 2; i++) { sig.timer = 0; T.tick(world, 1 / 60); }
+  check('빨간 불이면 건넌다', walker.walking, true);
+  check('앞으로 나아간다', walker.u > -walker.span, true);
+}
+
+{
+  // 사람이 횡단보도에 있으면 차가 선다.
+  const net = crossing();
+  Net.setCrossing(net, 'X', true);
+  const world = T.create(net, { rng: seeded(32), spawnRate: 0 });
+  const seg = net.segs[0];
+  const v = T.spawn(world, { from: 'W', to: 'E' });
+  const walker = walkerOn(world, net, 'X', seg.id, 1);
+  walker.walking = true;
+  walker.u = 0;                                   // 길 한가운데
+
+  let entered = false;
+  for (let i = 0; i < 60 * 20; i++) {
+    walker.u = 0;                                 // 그 자리에 붙들어 둔다
+    T.tick(world, 1 / 60);
+    if (v.lane.isLink) entered = true;
+  }
+  check('사람이 건너는 동안 교차로에 들지 않는다', entered, false);
+  check('멈춰 선다', v.v < 0.5, true);
+  check('횡단보도 앞에 선다',
+    (v.lane.path.total - Net.crossingAt(Net.node(net, 'X'))) - v.s > 0, true);
+
+  // 다 건너면 다시 간다.
+  world.walkers.length = 0;
+  for (let i = 0; i < 60 * 20; i++) T.tick(world, 1 / 60);
+  check('다 건너면 다시 나간다', world.arrived, 1);
+}
+
+{
+  // 신호가 없는 교차로에서는 차가 뜸할 때 건넌다.
+  const net = crossing();
+  Net.setCrossing(net, 'X', true);
+  const world = T.create(net, { rng: seeded(33), spawnRate: 0 });
+  const seg = net.segs[0];
+  const walker = walkerOn(world, net, 'X', seg.id, 1);
+  const v = T.spawn(world, { from: 'W', to: 'E' });
+  v.s = seg.lanes.find((l) => l.to === 'X').path.total - 60;   // 횡단보도 코앞
+
+  T.tick(world, 1 / 60);
+  check('차가 오면 기다린다', walker.walking, false);
+  for (let i = 0; i < 60 * 12; i++) T.tick(world, 1 / 60);
+  check('차가 지나가면 건넌다', walker.walking, true);
+}
+
+{
+  // 4현시에서는 한 갈래만 열린다.
+  const net = crossing();
+  Net.setControl(net, 'X', 'signal');
+  Net.setPlan(net, 'X', 'split');
+  const node = Net.node(net, 'X');
+  check('네 갈래면 4현시', Net.phaseCount(node), 4);
+
+  const world = T.create(net, { rng: seeded(34), spawnRate: 3 });
+  let together = false;
+  const seen = new Set();
+  for (let i = 0; i < 60 * 120; i++) {
+    T.tick(world, 1 / 60);
+    seen.add(T.signalOf(world, node).phase);
+    const groups = new Set(world.vehicles.filter((v) => v.lane.isLink)
+      .map((v) => Net.phaseOf(node, laneOf(net, v))));
+    if (groups.size > 1) together = true;
+  }
+  check('네 현시가 모두 돌아온다', seen.size, 4);
+  check('한 번에 한 갈래만 든다', together, false);
+  check('그래도 빠져나간다', world.arrived > 15, true);
+}
+
 // --- 만든 맵 위에서 ---
 
 {

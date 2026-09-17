@@ -21,11 +21,19 @@ const MAX_LANES = 4;
 // 하나씩 지난다. 플레이어가 신호등이나 회전교차로를 놓는다.
 const CONTROLS = ['none', 'signal', 'circle'];
 
+// 신호 현시를 어떻게 짤 것인가. **마주 보는 쪽끼리 묶으면 2현시**, 한 갈래씩 열면
+// 갈래 수만큼(세 갈래면 3현시, 네 갈래면 4현시)이다.
+const PLANS = ['paired', 'split'];
+
+// 차로가 허락하는 이동. 도로 바닥에 그려지는 화살표가 이 목록이다.
+const MOVES = ['left', 'through', 'right', 'uturn'];
+
 const TURN = 0.55;   // 이만큼 꺾이면 직진이 아니라 좌·우회전으로 본다
 
-function turnSide(head, tail) {
-  let d = Math.atan2(tail.dy, tail.dx) - Math.atan2(head.dy, head.dx);
+// 화면 좌표는 y가 아래로 가므로 각이 커지는 쪽이 오른쪽이다.
+function sideOf(fromDx, fromDy, toDx, toDy) {
   const TAU = Math.PI * 2;
+  let d = Math.atan2(toDy, toDx) - Math.atan2(fromDy, fromDx);
   d = ((d % TAU) + TAU) % TAU;
   if (d > Math.PI) d -= TAU;
   if (d > TURN) return 'right';
@@ -33,11 +41,15 @@ function turnSide(head, tail) {
   return 'through';
 }
 
+
+
 // segments: [{ a, b, c1?, c2?, lanes: [+1|-1, ...] }] — a·b는 노드 id.
 // 제어점이 없으면 곧은 길이다.
 function build(nodes, segments) {
   const net = {
-    nodes: nodes.map((n) => ({ control: 'none', ...n, out: [], in: [], segs: [] })),
+    nodes: nodes.map((n) => ({
+      control: 'none', plan: 'paired', crossing: false, ...n, out: [], in: [], segs: [],
+    })),
     segs: [],
     laneWidth: LANE_W,
   };
@@ -87,6 +99,7 @@ function setLanes(net, seg, dirs) {
       from: dir > 0 ? seg.a : seg.b,
       to: dir > 0 ? seg.b : seg.a,
       rank: 0,
+      allow: null,
     };
   });
   // 제 방향 무리 안에서 오른쪽부터 0, 1, 2… 바깥 차로로 갈아탈 때 이 순위를 맞춘다.
@@ -95,9 +108,50 @@ function setLanes(net, seg, dirs) {
     // A→B는 오프셋이 클수록 오른쪽, B→A는 작을수록 오른쪽이다.
     group.sort((p, q) => (dir > 0 ? q.offset - p.offset : p.offset - q.offset));
     group.forEach((lane, i) => { lane.rank = i; });
+    // 허락하는 이동의 기본값. **오른쪽 끝은 직진과 우회전, 왼쪽 끝은 직진과 좌회전**,
+    // 가운데는 직진만이다. 한 차로뿐이면 다 할 수 있어야 그 방향이 막히지 않는다.
+    group.forEach((lane) => {
+      if (lane.allow) return;
+      if (group.length === 1) lane.allow = ['left', 'through', 'right'];
+      else if (lane.rank === 0) lane.allow = ['through', 'right'];
+      else if (lane.rank === group.length - 1) lane.allow = ['through', 'left'];
+      else lane.allow = ['through'];
+    });
   }
   seg.width = count * LANE_W;
   return seg;
+}
+
+// 차로가 허락하는 이동을 갈아 끼운다. 판 위에서 화살표를 고치는 것이 이 함수다.
+function setAllow(lane, moves) {
+  const list = MOVES.filter((m) => moves.indexOf(m) >= 0);
+  // 아무것도 못 가는 차로는 둘 수 없다 — 그 차로에 들어온 차가 갇힌다.
+  lane.allow = list.length ? list : ['through'];
+  return lane;
+}
+
+// 한 구간에서 다른 구간으로 넘어가는 것이 어떤 이동인가. 같은 구간으로 되돌아가면
+// 유턴이고, 나머지는 교차로에 닿는 방향과 떠나는 방향의 각으로 가른다.
+function movement(net, from, fromDir, to, toDir) {
+  if (from.id === to.id) return 'uturn';
+  const arrive = headingAt(from, fromDir, true);
+  const leave = headingAt(to, toDir, false);
+  return sideOf(arrive.x, arrive.y, leave.x, leave.y);
+}
+
+// 구간을 그 방향으로 지날 때의 진행 방향. end가 참이면 교차로에 닿는 쪽, 거짓이면
+// 교차로를 떠나는 쪽이다.
+function headingAt(seg, dir, end) {
+  const path = seg.center;
+  const at = (dir > 0) === end ? path.dir.length - 1 : 0;
+  const d = path.dir[at];
+  return dir > 0 ? d : { x: -d.x, y: -d.y };
+}
+
+// 그 이동을 할 수 있는 차로가 하나라도 있는가.
+function movementAllowed(net, from, fromDir, to, toDir) {
+  const move = movement(net, from, fromDir, to, toDir);
+  return lanesOf(from, fromDir).some((l) => l.allow.indexOf(move) >= 0);
 }
 
 function relink(net) {
@@ -141,6 +195,23 @@ function assignPhases(node) {
   node.phase = new Map();
   node.phases = 0;
   if (!node.in.length) return;
+
+  // **한 갈래씩 여는 구성.** 갈래 수가 곧 현시 수다(세 갈래면 3현시). 교차로 안에서
+  // 엇갈릴 짝이 아예 없어 좌회전이 기다릴 일도 없지만, 한 바퀴가 길다.
+  if (node.plan === 'split') {
+    const order = [];
+    for (const lane of node.in) {
+      if (order.indexOf(lane.seg) < 0) order.push(lane.seg);
+      node.phase.set(`${lane.seg}:${lane.index}`, order.indexOf(lane.seg));
+    }
+    node.phases = order.length;
+    return;
+  }
+
+  // **마주 보는 쪽끼리 묶는 2현시.** 도착 방위를 180도로 접어 비교하면 마주 오는 두
+  // 갈래가 한 무리로 묶인다. 길이 굽어 있어도 교차로에 닿는 순간의 방향으로 재므로
+  // 격자가 아닌 곳에서도 갈린다. 엇갈리는 것은 좌회전 하나뿐이라 그것만 따로
+  // 틈을 기다리게 한다(traffic.js).
   const bearing = (lane) => {
     const d = lane.path.dir[lane.path.dir.length - 1];
     return Math.atan2(d.y, d.x);
@@ -194,6 +265,27 @@ function cycleControl(net, nodeId) {
   return setControl(net, nodeId, next);
 }
 
+function setPlan(net, nodeId, plan) {
+  const at = node(net, nodeId);
+  if (!at || !canControl(at) || PLANS.indexOf(plan) < 0) return null;
+  at.plan = plan;
+  assignPhases(at);
+  return at;
+}
+
+// 횡단보도는 교차로 단위로 놓는다. 갈래마다 하나씩, 교차로 바로 바깥을 가로지른다.
+function setCrossing(net, nodeId, on) {
+  const at = node(net, nodeId);
+  if (!at || at.kind === 'gate') return null;
+  at.crossing = !!on;
+  return at;
+}
+
+// 횡단보도가 놓이는 자리. 교차로 중심에서 이만큼 떨어진 곳을 가로지른다.
+function crossingAt(at) {
+  return reach(at) + 7;
+}
+
 function node(net, id) {
   return net.nodes.find((n) => n.id === id);
 }
@@ -206,24 +298,47 @@ function lanesOf(seg, dir) {
   return seg.lanes.filter((l) => l.dir === dir);
 }
 
-// 다음 구간에서 어느 차로로 들어갈지. **오른쪽에서 몇 번째였는지를 지킨다** — 늘
-// 오른쪽 끝으로 붙이면 4차로에서 합류할 때마다 모든 차가 한 줄로 몰린다.
-function pickLane(seg, dir, rank) {
+// 다음 구간에서 어느 차로로 들어갈지.
+//
+// **차로 변경이 없으므로 들어설 때 골라야 한다.** 이 구간 끝에서 할 이동(need)을
+// 허락하는 차로 중에서 고르고, 그중에서는 **오른쪽에서 몇 번째였는지를 지킨다** —
+// 늘 오른쪽 끝으로 붙이면 4차로에서 합류할 때마다 모든 차가 한 줄로 몰린다.
+function pickLane(seg, dir, rank, need) {
   const group = lanesOf(seg, dir);
   if (!group.length) return null;
-  const want = Math.min(rank || 0, group.length - 1);
-  return group.find((l) => l.rank === want) || group[0];
+  const fit = need ? group.filter((l) => l.allow.indexOf(need) >= 0) : group;
+  const pool = fit.length ? fit : group;
+  let best = pool[0];
+  for (const lane of pool) {
+    if (Math.abs(lane.rank - (rank || 0)) < Math.abs(best.rank - (rank || 0))) best = lane;
+  }
+  return best;
 }
 
 // 노드에서 노드까지 가장 짧은 길. 돌려주는 것은 [{ seg, dir }]다 — 차로는 달리면서
 // 고르고, 여기서는 어느 구간을 어느 쪽으로 지나는지만 정한다.
+//
+// **자리는 노드가 아니라 (구간, 방향)이다.** 노드로만 풀면 "이 교차로에서 좌회전할 수
+// 있는가"를 물을 수 없다 — 어느 구간에서 들어왔는지를 알아야 이동을 가릴 수 있기
+// 때문이다. 차로가 허락하지 않는 이동은 아예 건너지 않으므로, 좌회전 차로를 없애면
+// 그 길로 가려던 차가 **다른 길로 돌아간다**.
 function route(net, fromId, toId) {
   if (fromId === toId) return [];
+  const from = node(net, fromId);
+  if (!from) return null;
+
+  const key = (segId, dir) => `${segId}:${dir}`;
   const dist = new Map();
   const prev = new Map();
   const seen = new Set();
-  for (const n of net.nodes) dist.set(n.id, Infinity);
-  dist.set(fromId, 0);
+
+  for (const lane of from.out) {
+    const seg = segment(net, lane.seg);
+    const id = key(seg.id, lane.dir);
+    if (dist.has(id)) continue;
+    dist.set(id, seg.length);
+    prev.set(id, null);
+  }
 
   for (;;) {
     let at = null;
@@ -232,25 +347,35 @@ function route(net, fromId, toId) {
       if (!seen.has(id) && d < best) { best = d; at = id; }
     }
     if (at == null) return null;
-    if (at === toId) break;
+    const cut = at.lastIndexOf(':');
+    const seg = segment(net, isNaN(Number(at.slice(0, cut))) ? at.slice(0, cut) : Number(at.slice(0, cut)));
+    const dir = Number(at.slice(cut + 1));
+    const landing = dir > 0 ? seg.b : seg.a;
+    if (landing === toId) return unwindRoute(net, prev, at);
     seen.add(at);
-    for (const lane of node(net, at).out) {
-      const seg = segment(net, lane.seg);
-      const cost = best + seg.length;
-      if (cost < dist.get(lane.to)) {
-        dist.set(lane.to, cost);
-        prev.set(lane.to, { from: at, seg, dir: lane.dir });
+
+    for (const lane of node(net, landing).out) {
+      const next = segment(net, lane.seg);
+      if (!movementAllowed(net, seg, dir, next, lane.dir)) continue;
+      const id = key(next.id, lane.dir);
+      const cost = best + next.length;
+      if (cost < (dist.has(id) ? dist.get(id) : Infinity)) {
+        dist.set(id, cost);
+        prev.set(id, at);
       }
     }
   }
+}
 
+function unwindRoute(net, prev, last) {
   const out = [];
-  let at = toId;
-  while (at !== fromId) {
-    const step = prev.get(at);
-    if (!step) return null;
-    out.unshift({ seg: step.seg, dir: step.dir });
-    at = step.from;
+  let at = last;
+  while (at != null) {
+    const cut = at.lastIndexOf(':');
+    const raw = at.slice(0, cut);
+    const seg = segment(net, isNaN(Number(raw)) ? raw : Number(raw));
+    out.unshift({ seg, dir: Number(at.slice(cut + 1)) });
+    at = prev.get(at);
   }
   return out;
 }
@@ -324,7 +449,7 @@ function link(fromLane, toLane, at) {
     trimOut,
     // 어느 쪽으로 꺾는 길목인가. 화면 좌표에서 오른쪽은 각이 커지는 쪽이므로, 각이
     // 줄어드는 쪽이 좌회전이다. 마주 오는 차를 가로지르는 것은 좌회전뿐이다.
-    side: turnSide(head, tail),
+    side: sideOf(head.dx, head.dy, tail.dx, tail.dy),
     // 도는 길은 이 점을 중심으로 돈다. 프레임마다 점을 다시 찾지 않도록 적어 둔다.
     cx: at ? at.x : 0,
     cy: at ? at.y : 0,
@@ -371,7 +496,8 @@ function gates(net) {
 const api = {
   build, setLanes, relink, node, segment, lanesOf, pickLane, boundaries, link, route, gates,
   setControl, cycleControl, canControl, phaseOf, phaseCount, islandRadius, reach, ringPath,
-  LANE_W, MAX_LANES, CONTROLS,
+  setPlan, setCrossing, crossingAt, setAllow, movement, movementAllowed, sideOf,
+  LANE_W, MAX_LANES, CONTROLS, PLANS, MOVES,
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
