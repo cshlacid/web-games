@@ -39,7 +39,9 @@ const ART = {
   handle: 46, handleRing: 14,
   label: 78, train: 30,
   // 열차는 네모다. 선로를 따라 눕혀 그리고, 안을 채운 길이가 그 열차가 실은 몫이다.
-  carW: 156, carH: 66, carRing: 10,
+  // 네모 하나가 한 량이라 **붙은 네모의 수가 곧 편성 길이**다 — 길이를 셀 수 있으면
+  // 어느 열차에 량을 더 붙였는지 판 위에서 바로 읽힌다.
+  carL: 62, carH: 52, carRing: 8, carGap: 4,
 };
 
 // 이 거리 안에서 선 밑에 놓은 역은 그 노선에 끼어든다. 역 반지름의 두 배쯤이라
@@ -354,9 +356,12 @@ function trainAt(w) {
   let best = null;
   let near = reach;
   for (const run of runs) {
+    const pattern = run.svc && run.svc.pattern;
     for (let k = 0; k < run.trains; k++) {
       const at = Lines.at(run.line, run.table, clock + k * run.headway);
-      const d = Geom.dist(w.x, w.y, at.x, at.y);
+      // 중심까지의 거리에서 편성 반길이를 빼 둔다. 다섯 량은 한 량의 다섯 배로 길어서
+      // 중심만 재면 눈에 보이는 꼬리를 눌러도 안 잡힌다.
+      const d = Geom.dist(w.x, w.y, at.x, at.y) - consistLength(pattern, run.dir, k) / 2;
       if (d < near) { near = d; best = { key: run.key, k }; }
     }
   }
@@ -384,7 +389,7 @@ function addService(line, track, pattern, dir, reversed) {
     stations: track.stations,
     stopAt: reversed.stops,
     headway: plan.headway,
-    capacity: Lines.capacityOf(reversed, plan.headway),
+    capacity: Lines.capacityOf(reversed, plan.cycle),
     ride: (i, j) => Lines.rideTime(table, i, j),
     // 막힌 구간을 판 위에 짚으려면 그 방향의 경로와 정차 자리가 있어야 한다.
     path: track.path,
@@ -689,38 +694,61 @@ function renderTrains() {
   clear(layer.trains);
   for (const run of runs) {
     const color = lineColor(run.line);
+    const pattern = run.svc && run.svc.pattern;
     for (let k = 0; k < run.trains; k++) {
       const at = Lines.at(run.line, run.table, clock + k * run.headway);
       const ratio = carLoad(run, k, at);
-      const w = ART.carW * K();
+      const n = Lines.carsAt(pattern, run.dir, k);
+      const len = ART.carL * K();
       const h = ART.carH * K();
+      const gap = ART.carGap * K();
       const ring = ART.carRing * K();
       // **가득 찬 열차는 색이 바뀐다.** 재차 인원은 정원을 넘지 못하므로(넘칠 사람은
       // 역에 줄로 남는다) 넘침을 길이로 낼 수가 없다. 색이 그 자리를 맡는다 —
       // 붉은 칸은 "여기서 더 탈 수 없다"는 뜻이고, 그 옆 역에 줄이 서 있다.
       const over = ratio >= 0.995;
-      const fill = Math.max(0, Math.min(1, ratio));
+      const total = n * len + (n - 1) * gap;
       const car = svg('g', {
         transform: `translate(${r1(at.x)} ${r1(at.y)}) rotate(${r1(at.ang * 180 / Math.PI)})`,
       });
-      car.appendChild(svg('rect', {
-        x: -w / 2, y: -h / 2, width: w, height: h, rx: h * 0.32,
-        fill: 'var(--station-fill)', stroke: over ? 'var(--jam)' : color,
-        // 서 있는 열차는 테를 두껍게 한다. 안을 채우는 자리를 부하가 가져갔으므로
-        // 정차는 테로 낸다.
-        'stroke-width': at.halted ? ring * 1.9 : ring,
-      }));
-      if (fill > 0.02) {
-        const inner = w - ring * 2;
+      for (let i = 0; i < n; i++) {
+        // 0번이 맨 앞 칸이다. **채우기도 앞 칸부터**라 어디까지 찼는지가 진행 방향으로
+        // 읽히고, 량을 붙이면 뒤로 길어진다.
+        const x = total / 2 - len - i * (len + gap);
+        // 이음매. 칸 사이를 비워 두면 따로 노는 열차 여러 대로 보인다.
+        if (i > 0) {
+          car.appendChild(svg('rect', {
+            x: r1(x + len), y: -h * 0.12, width: r1(gap) + 1, height: h * 0.24,
+            fill: over ? 'var(--jam)' : color,
+          }));
+        }
         car.appendChild(svg('rect', {
-          x: -inner / 2, y: -(h - ring * 2) / 2,
-          width: r1(inner * fill), height: h - ring * 2, rx: (h - ring * 2) * 0.3,
-          fill: over ? 'var(--jam)' : color,
+          x: r1(x), y: -h / 2, width: r1(len), height: h, rx: h * 0.18,
+          fill: 'var(--station-fill)', stroke: over ? 'var(--jam)' : color,
+          // 서 있는 열차는 테를 두껍게 한다. 안을 채우는 자리를 부하가 가져갔으므로
+          // 정차는 테로 낸다.
+          'stroke-width': at.halted ? ring * 1.9 : ring,
         }));
+        const f = Math.max(0, Math.min(1, ratio * n - i));
+        if (f > 0.02) {
+          const inner = len - ring * 2;
+          car.appendChild(svg('rect', {
+            x: r1(x + ring), y: -(h - ring * 2) / 2,
+            width: r1(inner * f), height: h - ring * 2, rx: (h - ring * 2) * 0.22,
+            fill: over ? 'var(--jam)' : color,
+          }));
+        }
       }
       layer.trains.appendChild(car);
     }
   }
+}
+
+// 그 편성이 판 위에서 차지하는 길이. 그리는 쪽과 두드림을 재는 쪽이 같은 값을 써야
+// 보이는 대로 잡힌다.
+function consistLength(pattern, dir, k) {
+  const n = Lines.carsAt(pattern, dir, k);
+  return (n * ART.carL + (n - 1) * ART.carGap) * K();
 }
 
 // 못 잡은 수요만 그린다. 잡은 것까지 그리면 화면이 금세 실타래가 되고, 정작
@@ -1126,10 +1154,14 @@ function renderTrainPanel() {
   const pattern = svc.pattern;
   const at = Lines.at(run.line, run.table, clock + picked.k * run.headway);
   const ratio = carLoad(run, picked.k, at);
-  const seats = Lines.carsOf(pattern) * Lines.CAR_CAPACITY;
+  const count = Lines.carsAt(pattern, run.dir, picked.k);
+  const seats = count * Lines.CAR_CAPACITY;
 
   const way = line.loop ? ` · ${t(run.dir < 0 ? 'metro.backward' : 'metro.forward')}` : '';
-  el.tpName.textContent = `${lineName(line)} · ${patternName(line, line.patterns.indexOf(pattern))}${way}`;
+  // **몇 번째 열차인지 적는다.** 량은 이제 열차마다 따로 붙으므로, 어느 열차를 보고
+  // 있는지가 적혀 있지 않으면 어디에 량을 붙였는지 알 수 없다.
+  el.tpName.textContent = `${lineName(line)} · ${patternName(line, line.patterns.indexOf(pattern))}${way}`
+    + ` · ${fill('metro.trainNo', picked.k + 1)}`;
 
   // 지금 어디쯤인가. 선 자리는 그 역이고, 달리는 중이면 다음 역이다.
   const stop = at.dir < 0 ? segmentOf(svc, at.s) + 1 : segmentOf(svc, at.s);
@@ -1147,36 +1179,30 @@ function renderTrainPanel() {
   el.tpLoad.textContent = heads(ratio * seats);
   el.tpCap.textContent = `/ ${heads(seats)} · ${Math.round(ratio * 100)}%`;
 
-  const count = Lines.carsOf(pattern);
   el.tpCars.textContent = String(count);
   el.tpMinus.disabled = count <= Lines.CARS.min;
-  el.tpPlus.disabled = count >= Lines.CARS.max || budget < carPrice(pattern, line);
+  el.tpPlus.disabled = count >= Lines.CARS.max || budget < Lines.CAR_COST;
   el.tpCarnote.textContent = count >= Lines.CARS.max
     ? fill('metro.carMax', Lines.CARS.max)
-    : money(carPrice(pattern, line));
+    : money(Lines.CAR_COST);
 }
 
-// 한 량을 붙이는 값. **그 운행의 열차 전부에 한 량씩 붙는다** — 한 대만 긴 편성은
-// 배차가 고르지 않아 시간표가 성립하지 않는다.
-function carPrice(pattern, line) {
-  const fleet = Math.max(1, pattern.trains + (line.loop ? (pattern.back || 0) : 0));
-  return Lines.CAR_COST * fleet;
-}
-
+// **량은 고른 열차 하나에만 붙는다.** 운행 전체에 한 번에 붙이면 "이 열차가 터진다"를
+// 보고 눌러도 다른 열차까지 같이 길어져, 판 위에서 고른 것과 바뀌는 것이 어긋난다.
+// 편성이 길고 짧아도 시간표는 그대로다 — 배차는 대수와 주기가 정하고, 량수는 그
+// 주기에 실려 가는 자리 수만 바꾼다.
 function setCars(delta) {
   const run = pickedRun();
   if (!run) return;
-  const line = run.svc.line;
   const pattern = run.svc.pattern;
-  const now = Lines.carsOf(pattern);
+  const now = Lines.carsAt(pattern, run.dir, picked.k);
   const next = clamp(now + delta, Lines.CARS.min, Lines.CARS.max);
   if (next === now) return;
-  const price = carPrice(pattern, line);
   if (delta > 0) {
-    if (budget < price) { renderStatus('metro.noMoney', true); Sound.play('deny'); return; }
-    budget -= price;
-  } else budget += price * REFUND;
-  pattern.cars = next;
+    if (budget < Lines.CAR_COST) { renderStatus('metro.noMoney', true); Sound.play('deny'); return; }
+    budget -= Lines.CAR_COST;
+  } else budget += Lines.CAR_COST * REFUND;
+  Lines.setCarAt(pattern, run.dir, picked.k, next);
   Sound.play(delta > 0 ? 'place' : 'erase');
   syncNetwork();
   refresh();
@@ -1671,7 +1697,15 @@ function setTrains(delta, dir = 1) {
   if (delta > 0) {
     if (budget < Lines.TRAIN_COST) { renderStatus('metro.noMoney', true); Sound.play('deny'); return; }
     budget -= Lines.TRAIN_COST;
-  } else budget += Lines.TRAIN_COST * REFUND;
+  } else {
+    budget += Lines.TRAIN_COST * REFUND;
+    // 줄어든 자리의 량도 함께 판다. 남겨 두면 다시 열차를 넣었을 때 사지도 않은
+    // 긴 편성이 딸려 온다.
+    for (let k = next; k < now; k++) {
+      budget += (Lines.carsAt(pattern, dir, k) - Lines.CARS.base) * Lines.CAR_COST * REFUND;
+      Lines.setCarAt(pattern, dir, k, Lines.CARS.base);
+    }
+  }
   pattern[key] = next;
   Sound.play(delta > 0 ? 'place' : 'erase');
   syncNetwork();

@@ -479,30 +479,65 @@ const ground = () => 'empty';
 // --- 편성 량수 ---
 // 열차를 더 사면 배차가 좁아지지만 선로 간격(`MIN_GAP`)에서 막힌다. 그때 남는 길이
 // **한 대를 길게 만드는 것**이다 — 실어 나르는 양만 늘고 배차는 그대로다.
+// **량은 열차 한 대에만 붙는다.** 그래서 량수는 패턴의 숫자가 아니라 열차마다의 배열이다.
 {
   const line = L.withExtension(L.create(st(0, 0), st(2400, 0)), st(4800, 0));
   L.rebuild(line, ground);
   const p = line.patterns[0];
+  p.trains = 3;
 
-  ok('기본 편성이 붙어 있다', L.carsOf(p) === L.CARS.base, String(L.carsOf(p)));
-  ok('없으면 기본값으로 본다', L.carsOf({}) === L.CARS.base);
+  ok('기본 편성이 붙어 있다', L.carsAt(p, 1, 0) === L.CARS.base, String(L.carsAt(p, 1, 0)));
+  ok('없으면 기본값으로 본다', L.carsAt({}, 1, 0) === L.CARS.base);
   ok('한 량은 두 량보다 적을 수 없고 다섯 량을 넘지 않는다',
     L.CARS.min === 2 && L.CARS.max === 5);
 
-  const head = 300;
-  const base = L.capacityOf(p, head);
-  near('기본 편성의 수송력', base, L.CARS.base * L.CAR_CAPACITY * 60 / head, 0.001);
-  ok('량을 늘리면 그만큼 는다',
-    Math.abs(L.capacityOf({ cars: 5 }, head) / base - 5 / L.CARS.base) < 1e-9,
-    `${Math.round(L.capacityOf({ cars: 5 }, head))} vs ${Math.round(base)}`);
-  ok('배차가 좁아져도 량과는 따로다',
-    L.capacityOf(p, head / 2) === base * 2);
-  ok('배차가 없으면 0', L.capacityOf(p, Infinity) === 0);
+  L.setCarAt(p, 1, 1, 5);
+  ok('한 대에 붙인 량이 다른 대에 가지 않는다',
+    L.carsAt(p, 1, 0) === L.CARS.base && L.carsAt(p, 1, 1) === 5
+    && L.carsAt(p, 1, 2) === L.CARS.base,
+    `${L.carsAt(p, 1, 0)}·${L.carsAt(p, 1, 1)}·${L.carsAt(p, 1, 2)}`);
+  ok('정방향에 붙여도 역방향은 그대로다', L.carsAt(p, -1, 1) === L.CARS.base);
+  L.setCarAt(p, -1, 0, 4);
+  ok('역방향 량은 따로 쌓인다',
+    p.backCars[0] === 4 && L.carsAt(p, 1, 0) === L.CARS.base);
+
+  // 자리 수는 편성 전체의 합이다 — 대수만 세면 긴 편성이 짧은 편성과 같아진다.
+  ok('자리 수는 그 방향 열차의 량을 다 더한 것이다',
+    L.seatsOf(p, 1) === (L.CARS.base * 2 + 5) * L.CAR_CAPACITY,
+    String(L.seatsOf(p, 1)));
+  p.back = 1;
+  ok('역방향 자리 수는 역방향 대수만큼만 센다',
+    L.seatsOf(p, -1) === 4 * L.CAR_CAPACITY, String(L.seatsOf(p, -1)));
+
+  // 수송력은 "한 주기에 한 점을 지나는 자리 수"다. 편성이 제각각이면 대수 × 량수로는
+  // 나오지 않으므로 합을 주기로 나눈다.
+  const cycle = 900;
+  near('수송력은 자리 수를 주기로 나눈 것이다',
+    L.capacityOf(p, cycle, 1), L.seatsOf(p, 1) * 60 / cycle, 0.001);
+  ok('량을 늘리면 그만큼 는다', (() => {
+    const q = { trains: 1, back: 0, cars: [], backCars: [] };
+    const a = L.capacityOf(q, cycle, 1);
+    L.setCarAt(q, 1, 0, 5);
+    return Math.abs(L.capacityOf(q, cycle, 1) / a - 5 / L.CARS.base) < 1e-9;
+  })());
+  ok('주기가 반이면 수송력은 두 배다',
+    L.capacityOf(p, cycle / 2, 1) === L.capacityOf(p, cycle, 1) * 2);
+  ok('주기가 없으면 0', L.capacityOf(p, Infinity, 1) === 0);
 
   // 량은 배차를 바꾸지 않는다 — 기다리는 시간은 그대로다.
   const before = L.plan(line, p).headway;
-  p.cars = 5;
+  L.setCarAt(p, 1, 0, 5);
   ok('량을 늘려도 배차는 그대로다', L.plan(line, p).headway === before);
+
+  // 뒤집은 노선에서는 역방향 량이 그 노선의 량이 된다.
+  const loop = L.withExtension(L.withExtension(
+    L.create(st(0, 0), st(2400, 0)), st(2400, 2400)), st(0, 2400));
+  loop.loop = true;
+  loop.patterns[0].back = 2;
+  L.setCarAt(loop.patterns[0], -1, 1, 5);
+  const back = L.reverse(loop);
+  ok('뒤집으면 역방향 량이 그 노선의 량이다',
+    L.carsAt(back.patterns[0], 1, 1) === 5 && back.patterns[0].trains === 2);
 }
 
 console.log(`${passed}개 통과, ${failed}개 실패`);

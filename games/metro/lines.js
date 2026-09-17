@@ -27,18 +27,43 @@ const MIN_GAP = 110;     // 선로 위 두 열차 사이의 최소 간격(초). 
 // 대신 배차는 전혀 나아지지 않는다 — 기다리는 시간은 그대로고 실어 나르는 양만 는다.
 const CAR_CAPACITY = 240;   // 한 량이 싣는 사람
 const CARS = { min: 2, max: 5, base: 3 };
-// 한 량 값(억). 모든 열차에 한 량씩 붙으므로 대수만큼 든다. 열차를 한 대 더 사는 것보다
-// **수송력당으로는 싸게** 둔다 — 대신 배차는 전혀 나아지지 않으므로, 선로 간격에 막힌
-// 뒤에나 쓸 수가 있다.
+// 한 량 값(억). 열차 한 대 값(22억, 기본 세 량)보다 **수송력당으로는 싸게** 둔다 —
+// 대신 배차는 전혀 나아지지 않으므로, 선로 간격에 막힌 뒤에나 쓸 수가 있다.
 const CAR_COST = 6;
 
-const carsOf = (pattern) => (pattern && pattern.cars) || CARS.base;
+// **량은 열차마다 따로다.** 한 패턴에 한 값으로 두었더니 한 대를 늘리면 그 운행의
+// 열차가 전부 길어졌는데, 그러면 "이 열차가 터지니 이 열차를 늘린다"가 성립하지 않는다.
+// 패턴이 열차별 량수를 배열로 들고, 적히지 않은 자리는 기본값으로 본다.
+const carList = (pattern, dir) => (dir < 0 ? pattern.backCars : pattern.cars);
 
-// 분당 수송력. 열차 한 대가 배차간격마다 한 번씩 지나가므로 대수는 배차간격 안에
-// 이미 들어 있고, 여기에 곱하는 것은 **한 대의 길이**다.
-function capacityOf(pattern, headway) {
-  if (!headway || !Number.isFinite(headway)) return 0;
-  return carsOf(pattern) * CAR_CAPACITY * 60 / headway;
+function carsAt(pattern, dir, k) {
+  const arr = pattern && carList(pattern, dir);
+  const n = arr && arr[k];
+  return n || CARS.base;
+}
+
+function setCarAt(pattern, dir, k, cars) {
+  const key = dir < 0 ? 'backCars' : 'cars';
+  if (!Array.isArray(pattern[key])) pattern[key] = [];
+  pattern[key][k] = cars;
+}
+
+function trainCount(pattern, dir) {
+  return dir < 0 ? (pattern.back || 0) : pattern.trains;
+}
+
+// 그 방향 열차들이 함께 싣는 사람. 열차마다 길이가 다르므로 합으로 센다.
+function seatsOf(pattern, dir = 1) {
+  let sum = 0;
+  for (let k = 0; k < trainCount(pattern, dir); k++) sum += carsAt(pattern, dir, k);
+  return sum * CAR_CAPACITY;
+}
+
+// 분당 수송력. **주기 동안 그 자리를 지나가는 좌석 전부**다 — 열차마다 길이가 달라
+// "한 대 × 배차간격"으로는 셀 수가 없다. 대수가 같고 길이도 같으면 예전 식과 같은 값이다.
+function capacityOf(pattern, cycle, dir = 1) {
+  if (!cycle || !Number.isFinite(cycle)) return 0;
+  return seatsOf(pattern, dir) * 60 / cycle;
 }
 
 let nextId = 1;
@@ -67,7 +92,7 @@ function create(from, to, mids = []) {
     stations: [from, to],
     mids: [mids.map((m) => ({ x: m.x, y: m.y }))],
     loop: false,
-    patterns: [{ stops: [true, true], trains: 1, back: 0, cars: CARS.base }],
+    patterns: [{ stops: [true, true], trains: 1, back: 0, cars: [], backCars: [] }],
   };
 }
 
@@ -396,7 +421,7 @@ function rideTime(table, fromStation, toStation) {
 function expressPattern(line) {
   const stops = line.stations.map((_, i) => i === 0 || i === line.stations.length - 1);
   if (line.loop) stops[0] = true;
-  return { stops, trains: 1, back: 0, cars: CARS.base };
+  return { stops, trains: 1, back: 0, cars: [], backCars: [] };
 }
 
 // **어느 역이든 끌 수 있다. 둘만 남으면 된다.** 전에는 양 끝을 잠가 두었는데("종착역에
@@ -463,13 +488,16 @@ function reverse(line) {
       stops: order.map((i) => p.stops[i]),
       trains: p.back || 0,
       back: 0,
+      // 뒤집힌 노선에서는 역방향 열차가 곧 그 노선의 열차다. 량수도 같이 옮긴다.
+      cars: Array.isArray(p.backCars) ? p.backCars.slice() : [],
+      backCars: [],
     })),
   };
 }
 
 const Lines = {
   DWELL, TRAIN_COST, MAX_TRAINS, MAX_PATTERNS, CAR_CAPACITY, CARS, CAR_COST,
-  carsOf, capacityOf,
+  carsAt, setCarAt, seatsOf, capacityOf, trainCount,
   controlPoints, create, withExtension, withInsertion, whyNot, rebuild, plan, timetable, at, pointAt, rideTime,
   holdFactor, trackFactor, overtakeFactor, runTime, MIN_GAP,
   expressPattern, canToggle, spanOf, trainsOf, trackTrains, reverse,
