@@ -15,6 +15,7 @@
 (function (root) {
 
 const Net = (typeof require !== 'undefined') ? require('./network.js') : root.RoadNet;
+const Geom = (typeof require !== 'undefined') ? require('./geom.js') : root.RoadGeom;
 
 // 차종. len·w는 화면 단위(차로 폭이 10이다), v0는 바라는 속도, a·b는 가속과 감속.
 // weight는 뽑힐 확률이다.
@@ -33,10 +34,29 @@ const HEADWAY = 1.1;   // 앞차까지 두는 시간(초)
 const STEP = 1 / 60;   // 물리 한 걸음. 프레임이 길어도 이 크기로 쪼개 돈다
 const MAX_STEPS = 6;   // 탭이 잠들었다 깨어났을 때 한 프레임에 따라잡을 한도
 
-// 교차로를 하나씩 지나게 한다. 신호는 아직 없고, 먼저 닿은 차가 자리를 잡고
-// 빠져나갈 때까지 뒤차가 기다린다.
+// 아무것도 놓이지 않은 교차로는 하나씩 지난다. 먼저 닿은 차가 자리를 잡고 빠져나갈
+// 때까지 뒤차가 기다린다.
 const CLAIM_AHEAD = 26;   // 이만큼 남았을 때 교차로 자리를 잡는다
 const CLAIM_LIMIT = 7;    // 이만큼 기다렸으면 그냥 간다 — 서로 물려 멎는 것을 막는다
+
+// 신호등. 마주 보는 두 갈래에 함께 녹색을 주고, 황색을 거쳐 다른 짝으로 넘긴다.
+const GREEN = 7;
+const AMBER = 1.3;
+// **기다리는 차가 없으면 일찍 넘긴다.** 갈래가 넷이면 한 바퀴가 길어, 빈 길에 녹색을
+// 다 주면 신호가 없느니만 못해진다. 다만 열자마자 닫으면 막 출발한 차가 갇히므로
+// 이만큼은 준다.
+const MIN_GREEN = 1.6;
+// 정지선에서 이만큼 안쪽에 있는 차를 "기다리는 차"로 센다.
+const WAIT_ZONE = 70;
+// 좌회전이 마주 오는 차를 살피는 거리. 이 안에 오는 차가 있으면 틈을 기다린다.
+const ONCOMING = 72;
+
+// 회전교차로. 도는 차가 내 들어가는 자리에 이 시간 안에 닿을 것 같으면 기다린다.
+// **도는 차에게 양보한다**는 규칙이 이 값으로 나타난다 — 거리가 아니라 시간으로 재야
+// 빠르게 도는 차 앞으로 끼어들지 않는다.
+const RING_GAP = 1.9;
+// 양보선에서 이만큼 앞에 선다. 도는 길이 그 선 위를 지나므로 코를 맞대면 겹친다.
+const RING_STANDOFF = 8;
 
 function pickKind(rng) {
   const total = KINDS.reduce((sum, k) => sum + k.weight, 0);
@@ -56,6 +76,9 @@ function create(net, options) {
     vehicles: [],
     claims: new Map(),   // 교차로 id → 지금 지나는 차의 id
     lanes: new Map(),    // 차로 열쇠 → s 순으로 늘어놓은 차들
+    signals: new Map(),  // 교차로 id → { phase, timer, amber }
+    ring: new Map(),     // 회전교차로 id → 지금 돌고 있는 차들의 각
+    demand: new Map(),   // 신호 교차로 id → 갈래마다 기다리는 차 수
     time: 0,
     nextId: 1,
     spawnRate: opts.spawnRate == null ? 2.6 : opts.spawnRate,  // 초당 진입 대수
@@ -69,11 +92,33 @@ const laneKey = (lane) => `${lane.seg}:${lane.index}`;
 
 function bucket(world) {
   world.lanes.clear();
+  world.ring.clear();
+  world.demand.clear();
   for (const v of world.vehicles) {
     const key = laneKey(v.lane);
     let list = world.lanes.get(key);
     if (!list) { list = []; world.lanes.set(key, list); }
     list.push(v);
+
+    // 회전교차로를 돌고 있는 차는 각으로도 적어 둔다. 들어가려는 차가 양보할지를
+    // 이 목록으로 정한다.
+    if (v.lane.ring) {
+      const at = place(v);
+      let ring = world.ring.get(v.lane.node);
+      if (!ring) { ring = []; world.ring.set(v.lane.node, ring); }
+      ring.push({ v, angle: Math.atan2(at.y - v.lane.cy, at.x - v.lane.cx) });
+    }
+
+    // 신호 교차로로 다가가는 차를 갈래별로 센다. 비어 있는 갈래를 건너뛰는 데 쓴다.
+    if (!v.lane.isLink && v.lane.path.total - v.s < WAIT_ZONE) {
+      const node = Net.node(world.net, v.lane.to);
+      if (node && node.control === 'signal') {
+        let counts = world.demand.get(node.id);
+        if (!counts) { counts = []; world.demand.set(node.id, counts); }
+        const phase = Net.phaseOf(node, v.lane);
+        counts[phase] = (counts[phase] || 0) + 1;
+      }
+    }
   }
   for (const list of world.lanes.values()) list.sort((p, q) => p.s - q.s);
 }
@@ -152,6 +197,7 @@ function step(world, dt) {
 
 function tick(world, dt) {
   world.time += dt;
+  stepSignals(world, dt);
 
   world.spawnDebt += world.spawnRate * dt;
   while (world.spawnDebt >= 1) {
@@ -184,8 +230,15 @@ function idm(v, gap, dv) {
   return kind.a * (free - Math.pow(want / room, 2));
 }
 
-// 앞에 무엇이 있는가 — 같은 차로의 앞차, 없으면 다음 차로의 맨 뒤차, 그리고 아직
-// 못 들어간 교차로.
+// 지금 타고 있는 길에서 내려야 하는 자리. 연결 곡선이 교차로 앞뒤를 갈음하므로,
+// 교차로로 들어가는 차는 **차로 끝이 아니라 정지선에서** 내린다.
+function endOf(v, holder) {
+  if (v.lane.isLink || !holder || !holder.isLink) return v.lane.path.total;
+  return v.lane.path.total - holder.trimIn;
+}
+
+// 앞에 무엇이 있는가 — 같은 차로의 앞차, 없으면 다음 길의 맨 뒤차, 그리고 아직
+// 들어가면 안 되는 교차로.
 function ahead(world, v) {
   const list = listOn(world, v.lane);
   const at = list.indexOf(v);
@@ -194,24 +247,78 @@ function ahead(world, v) {
     return { gap: other.s - other.kind.len - v.s, dv: v.v - other.v, stop: false };
   }
 
-  let gap = v.lane.path.total - v.s;
+  const holder = nextHolder(world, v);
+  const gap = endOf(v, holder) - v.s;
   const node = Net.node(world.net, v.lane.to);
 
-  // 교차로를 아직 못 잡았으면 정지선 앞에서 선다.
-  if (blocked(world, v, node, gap)) return { gap: Math.max(gap - 2, 0.5), dv: v.v, stop: gap < 4 };
+  if (blocked(world, v, node, gap, holder)) {
+    // **회전교차로에서는 조금 더 물러나 선다.** 양보선이 도는 길 바로 위라, 거기에
+    // 코를 들이밀고 서면 지나가는 차와 겹친다.
+    const standoff = node.control === 'circle' ? RING_STANDOFF : 2;
+    return { gap: Math.max(gap - standoff, 0.5), dv: v.v, stop: gap < 4 };
+  }
 
-  const lane = nextHolder(world, v);
-  if (lane === undefined) return { gap, dv: v.v, stop: gap < 4 };
-  if (!lane) return { gap: Infinity, dv: 0, stop: false };
-  const first = listOn(world, lane)[0];
-  if (!first) return { gap: Infinity, dv: 0, stop: false };
-  return { gap: gap + first.s - first.kind.len, dv: v.v - first.v, stop: false };
+  const onward = (() => {
+    if (holder === undefined) return { gap, dv: v.v, stop: gap < 4 };
+    if (!holder) return { gap: Infinity, dv: 0, stop: false };
+
+    // **갈라져 나간 이웃 곡선의 차도 앞차다.** 같은 차로에서 나가는 길이 여럿이면
+    // 차로 목록이 갈려, 바로 앞에서 다른 쪽으로 꺾어 나간 차를 못 본 채 따라 들어간다.
+    let best = null;
+    const links = holder.isLink && v.lane.links ? [...v.lane.links.values()] : [holder];
+    for (const path of links) {
+      if (!path) continue;
+      const first = listOn(world, path)[0];
+      if (!first) continue;
+      const base = v.lane.isLink && !path.isLink ? v.lane.trimOut : 0;
+      const room = gap + (first.s - base) - first.kind.len;
+      if (!best || room < best.gap) best = { gap: room, dv: v.v - first.v, stop: false };
+    }
+    return best || { gap: Infinity, dv: 0, stop: false };
+  })();
+
+  // **회전교차로 안에서는 도는 차끼리도 앞뒤가 있다.** 들어온 갈래가 달라 차로
+  // 목록이 갈리므로, 같은 원 위에 있는 차는 각으로 찾아야 서로를 본다.
+  const round = ringAhead(world, v);
+  return round && round.gap < onward.gap ? round : onward;
 }
 
-// 교차로 자리 잡기. 갈림이 없는 이음매(지나는 길이 하나뿐인 점)에서는 기다릴
-// 이유가 없다.
-function blocked(world, v, node, gap) {
+function ringAhead(world, v) {
+  if (!v.lane.ring) return null;
+  const ring = world.ring.get(v.lane.node);
+  if (!ring || ring.length < 2) return null;
+  const me = place(v);
+  const mine = Math.atan2(me.y - v.lane.cy, me.x - v.lane.cx);
+  const radius = Math.hypot(me.x - v.lane.cx, me.y - v.lane.cy) || 1;
+  const TAU = Math.PI * 2;
+
+  let best = null;
+  for (const item of ring) {
+    if (item.v === v) continue;
+    // 도는 쪽이 각이 줄어드는 쪽이라, 앞차는 각이 나보다 작다.
+    let turn = (mine - item.angle) % TAU;
+    if (turn < 0) turn += TAU;
+    const gap = turn * radius - item.v.kind.len;
+    if (!best || gap < best.gap) best = { gap, dv: v.v - item.v.v, stop: false };
+  }
+  return best;
+}
+
+// 교차로 앞에서 서야 하는가. 갈림이 없는 이음매(지나는 길이 하나뿐인 점)에서는
+// 기다릴 이유가 없고, 이미 교차로 안에 든 차도 멈추지 않는다.
+//
+// 세 가지 다스림이 저마다 다른 방식으로 **교차로 안에서 엇갈릴 짝을 없앤다** —
+// 아무것도 없으면 한 대씩, 신호등은 한 갈래씩, 회전교차로는 한 방향으로만 돌게.
+function blocked(world, v, node, gap, holder) {
   if (!node || node.kind === 'gate' || node.segs.length < 3) return false;
+  if (v.lane.isLink) return false;
+  if (node.control === 'signal') return redLight(world, v, node, gap, holder);
+  if (node.control === 'circle') return mustYield(world, v, node, gap, holder);
+  return holdNode(world, v, node, gap);
+}
+
+// 아무것도 놓이지 않은 교차로: 한 대씩.
+function holdNode(world, v, node, gap) {
   if (v.claim === node.id) return false;
   if (gap > CLAIM_AHEAD) return false;
   const holder = world.claims.get(node.id);
@@ -220,13 +327,134 @@ function blocked(world, v, node, gap) {
     v.claim = node.id;
     return false;
   }
-  // 서로 물려 아무도 못 가는 자리를 풀어 준다. 신호가 생기기 전까지의 안전장치다.
+  // 서로 물려 아무도 못 가는 자리를 풀어 준다. 신호가 없을 때의 안전장치다.
   if (v.waiting > CLAIM_LIMIT) {
     world.claims.set(node.id, v.id);
     v.claim = node.id;
     return false;
   }
   return true;
+}
+
+function signalOf(world, node) {
+  let sig = world.signals.get(node.id);
+  if (!sig) {
+    sig = { phase: 0, timer: 0, amber: false };
+    world.signals.set(node.id, sig);
+  }
+  return sig;
+}
+
+function stepSignals(world, dt) {
+  for (const node of world.net.nodes) {
+    if (node.control !== 'signal') {
+      if (world.signals.has(node.id)) world.signals.delete(node.id);
+      continue;
+    }
+    const sig = signalOf(world, node);
+    const counts = world.demand.get(node.id) || [];
+    sig.timer += dt;
+    const done = sig.timer >= GREEN
+      || (sig.timer >= MIN_GREEN && !counts[sig.phase] && waitingElsewhere(counts, sig.phase));
+    if (!sig.amber && done) {
+      sig.amber = true;
+      sig.timer = 0;
+    } else if (sig.amber && sig.timer >= AMBER) {
+      sig.amber = false;
+      sig.phase = nextPhase(node, counts, sig.phase);
+      sig.timer = 0;
+    }
+  }
+}
+
+function waitingElsewhere(counts, phase) {
+  for (let i = 0; i < counts.length; i++) if (i !== phase && counts[i]) return true;
+  return false;
+}
+
+// 다음 녹색은 **기다리는 차가 있는 갈래**로 넘긴다. 아무도 없으면 그냥 다음 차례다.
+function nextPhase(node, counts, phase) {
+  const total = Net.phaseCount(node);
+  for (let step = 1; step <= total; step++) {
+    const next = (phase + step) % total;
+    if (counts[next]) return next;
+  }
+  return (phase + 1) % total;
+}
+
+function redLight(world, v, node, gap, holder) {
+  const sig = signalOf(world, node);
+  if (Net.phaseOf(node, v.lane) !== sig.phase) return true;
+  if (sig.amber) {
+    // 황색에는 **설 수 있는 차만** 선다. 코앞에서 급정거시키면 뒤차가 받는다.
+    return gap > v.v * 0.7 + 1;
+  }
+  // 녹색이라도 좌회전은 마주 오는 차 앞을 가로지른다. 틈이 날 때까지 기다린다.
+  if (holder && holder.side === 'left' && oncoming(world, v, node)) return true;
+  return false;
+}
+
+// 같은 신호에 열린 맞은편 차들이 오고 있는가.
+//
+// **마주 오는 좌회전끼리는 번호로 순서를 매긴다.** 서로를 기다리게 두면 둘 다 녹색이
+// 끝날 때까지 못 가고, 다음 녹색에도 같은 자리에서 다시 마주 본다. 그렇다고 서로를
+// 못 본 척하면 교차로 한가운데서 길이 엇갈린다.
+function oncoming(world, v, node) {
+  const mine = Net.phaseOf(node, v.lane);
+  for (const other of world.vehicles) {
+    if (other === v) continue;
+    const inside = other.lane.isLink && other.lane.node === node.id;
+    const nearing = !other.lane.isLink && other.lane.to === node.id
+      && other.lane.path.total - other.s < ONCOMING && other.v > 2;
+    if (!inside && !nearing) continue;
+
+    const lane = inside ? laneInto(world, other) : other.lane;
+    if (!lane || lane.seg === v.lane.seg) continue;
+    if (Net.phaseOf(node, lane) !== mine) continue;
+
+    if (!inside) {
+      const next = nextHolder(world, other);
+      // 아직 들어오지 않은 맞은편 좌회전은 번호가 앞선 쪽이 먼저 간다.
+      if (next && next.isLink && next.side === 'left' && other.id > v.id) continue;
+    }
+    return true;
+  }
+  return false;
+}
+
+// 교차로 안에 있는 차가 어느 갈래에서 들어왔는지. 지나온 차로는 경로에 남아 있다.
+function laneInto(world, v) {
+  const step = v.route[v.step];
+  if (!step) return null;
+  return Net.pickLane(Net.segment(world.net, step.seg.id), step.dir, v.rank);
+}
+
+// 회전교차로: 돌고 있는 차에게 양보한다. 내가 들어설 자리에 그 차가 몇 초 뒤에
+// 닿는지를 재고, 그 사이에 끼어들지 않는다 — 도는 쪽이 각이 줄어드는 쪽이라 내
+// 자리보다 각이 큰 차가 곧 내 앞을 지날 차다.
+function mustYield(world, v, node, gap, holder) {
+  if (gap > CLAIM_AHEAD) return false;
+  // 이미 양보선을 넘었으면 들어간다. 여기서 세우면 도는 길 한가운데에 선다.
+  if (gap < RING_STANDOFF - 2) return false;
+  const ring = world.ring.get(node.id);
+  if (!ring || !ring.length) return false;
+  if (!holder || !holder.path) return false;
+
+  const spot = holder.path.points[0];
+  const entry = Math.atan2(spot.y - node.y, spot.x - node.x);
+  const radius = Math.hypot(spot.x - node.x, spot.y - node.y) || 1;
+  const TAU = Math.PI * 2;
+  for (const item of ring) {
+    let turn = (item.angle - entry) % TAU;
+    if (turn < 0) turn += TAU;
+    // 곧 내 앞을 지날 차. 시간으로 재야 빠르게 도는 차 앞으로 끼어들지 않는다.
+    if (turn * radius / Math.max(item.v.v, 3) < RING_GAP) return true;
+    // **막 지나간 차의 뒤도 본다.** 앞이 비었는지만 보면 코앞을 지나간 차 뒤에
+    // 붙어 들어가 그 자리에서 급정거한다.
+    const lead = (TAU - turn) * radius;
+    if (lead < item.v.kind.len + S0 + 6) return true;
+  }
+  return false;
 }
 
 // 다음에 탈 길. 실제 차로 다음에는 **교차로를 도는 짧은 곡선**이 오고, 그 곡선
@@ -238,25 +466,29 @@ function nextHolder(world, v) {
   if (!next) return null;
   const lane = Net.pickLane(Net.segment(world.net, next.seg.id), next.dir, v.rank);
   if (!lane) return undefined;
-  return Net.link(v.lane, lane) || lane;
+  return Net.link(v.lane, lane, Net.node(world.net, v.lane.to)) || lane;
 }
 
 function advance(world, v) {
-  const total = v.lane.path.total;
-  if (v.s < total) {
+  const holder = nextHolder(world, v);
+  const limit = endOf(v, holder);
+  if (v.s < limit) {
     // 교차로를 빠져나왔으면 자리를 비운다.
     if (v.claim != null && !v.lane.isLink && v.s > v.kind.len) release(world, v);
     return;
   }
-
-  const holder = nextHolder(world, v);
   if (!holder) { despawn(world, v); return; }
 
-  v.s -= total;
-  // 잇는 곡선은 같은 발걸음 안에 있다. 실제 차로에 올라설 때만 경로를 한 칸 민다.
-  if (!holder.isLink) v.step += 1;
+  const over = v.s - limit;
+  if (holder.isLink) {
+    // 잇는 곡선은 같은 발걸음 안에 있다. 경로는 아직 밀지 않는다.
+    v.s = over;
+  } else {
+    v.s = over + (v.lane.isLink ? v.lane.trimOut : 0);
+    v.step += 1;
+    v.rank = holder.rank;
+  }
   v.lane = holder;
-  v.rank = holder.rank;
 }
 
 function release(world, v) {
@@ -271,7 +503,6 @@ function release(world, v) {
 // 나가는 대신 끝점으로 접히면서 **차 반 대 길이만큼 툭 튄다** — 버스에서 17단위였다.
 // 앞머리를 기준으로 두면 그럴 자리가 없다.
 function place(v) {
-  const Geom = (typeof require !== 'undefined') ? require('./geom.js') : root.RoadGeom;
   return Geom.at(v.lane.path, v.s);
 }
 
@@ -292,7 +523,8 @@ function stats(world) {
 
 const api = {
   create, step, tick, spawn, despawn, place, stats, idm, ahead, advance, nextHolder,
-  KINDS, S0, HEADWAY, STEP, CLAIM_AHEAD,
+  signalOf, stepSignals, blocked, ringAhead,
+  KINDS, S0, HEADWAY, STEP, CLAIM_AHEAD, GREEN, AMBER, RING_GAP,
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = api;

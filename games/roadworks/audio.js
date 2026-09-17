@@ -44,6 +44,16 @@
       click(now, tone) {
         tone({ freq: midi(74), at: now, dur: 0.08, type: 'sine', gain: 0.12, attack: 0.003 });
       },
+      // 교차로에 무언가를 놓을 때. 올라가는 두 음.
+      place(now, tone) {
+        tone({ freq: midi(69), at: now, dur: 0.1, type: 'triangle', gain: 0.13 });
+        tone({ freq: midi(76), at: now + 0.08, dur: 0.16, type: 'triangle', gain: 0.12 });
+      },
+      // 거둘 때. 내려가는 두 음.
+      clear(now, tone) {
+        tone({ freq: midi(74), at: now, dur: 0.1, type: 'triangle', gain: 0.12 });
+        tone({ freq: midi(67), at: now + 0.08, dur: 0.16, type: 'triangle', gain: 0.11 });
+      },
     },
   });
 })();

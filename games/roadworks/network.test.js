@@ -108,6 +108,100 @@ function straight(lanes) {
   check('거슬러 오는 길은 없다', Net.route(net, 'D', 'A'), null);
 }
 
+// --- 이어진 길의 굽이 ---
+
+{
+  // **한 줄기를 이루는 구간들은 지나는 점에서 접선을 나눠 쓴다.** 구간마다 따로
+  // 굽히면 같은 길인데도 교차로를 지날 때마다 꺾인다.
+  const chain = {
+    lanes: [-1, 1],
+    nodes: [{ id: 'a', x: 0, y: 0 }, { id: 'b', x: 100, y: 30 }, { id: 'c', x: 210, y: -20 }],
+  };
+  const segs = Gen.weave(chain);
+  check('점 셋이면 구간 둘', segs.length, 2);
+
+  const unit = (x, y) => { const len = Math.hypot(x, y) || 1; return [x / len, y / len]; };
+  const leaving = unit(chain.nodes[1].x - segs[0].c2.x, chain.nodes[1].y - segs[0].c2.y);
+  const entering = unit(segs[1].c1.x - chain.nodes[1].x, segs[1].c1.y - chain.nodes[1].y);
+  check('나가는 접선과 들어오는 접선이 같다',
+    [Math.round(leaving[0] * 1000), Math.round(leaving[1] * 1000)],
+    [Math.round(entering[0] * 1000), Math.round(entering[1] * 1000)]);
+
+  // 세 점이 한 줄 위에 있으면 굽을 이유가 없다.
+  const flat = Gen.weave({ lanes: [1], nodes: [{ id: 'a', x: 0, y: 0 }, { id: 'b', x: 100, y: 0 }, { id: 'c', x: 200, y: 0 }] });
+  check('곧은 줄기는 곧게 둔다', flat.every((g) => Math.abs(g.c1.y) < 0.001 && Math.abs(g.c2.y) < 0.001), true);
+}
+
+// --- 교차로 다스리기 ---
+
+{
+  // W --X-- E 와 X --- S. X만 갈림이 있다.
+  const net = Net.build(
+    [{ id: 'X', kind: 'junction', x: 200, y: 200 }, { id: 'B', kind: 'junction', x: 200, y: 320 },
+      { id: 'W', kind: 'gate', x: 0, y: 200 }, { id: 'E', kind: 'gate', x: 400, y: 200 },
+      { id: 'S', kind: 'gate', x: 200, y: 400 }],
+    [{ a: 'W', b: 'X', lanes: [-1, 1] }, { a: 'X', b: 'E', lanes: [-1, 1] },
+      { a: 'X', b: 'B', lanes: [-1, 1] }, { a: 'B', b: 'S', lanes: [-1, 1] }],
+  );
+
+  check('기본은 아무것도 없는 상태', Net.node(net, 'X').control, 'none');
+  check('갈림이 있는 자리에만 놓는다', [Net.canControl(Net.node(net, 'X')),
+    Net.canControl(Net.node(net, 'B')), Net.canControl(Net.node(net, 'W'))], [true, false, false]);
+
+  Net.cycleControl(net, 'X');
+  check('한 번 누르면 신호등', Net.node(net, 'X').control, 'signal');
+  Net.cycleControl(net, 'X');
+  check('또 누르면 회전교차로', Net.node(net, 'X').control, 'circle');
+  Net.cycleControl(net, 'X');
+  check('또 누르면 없음으로 돌아온다', Net.node(net, 'X').control, 'none');
+
+  check('길이 꺾이기만 하는 자리에는 못 놓는다', Net.setControl(net, 'B', 'signal'), null);
+  check('관문에도 못 놓는다', Net.setControl(net, 'W', 'signal'), null);
+  check('모르는 이름은 받지 않는다', Net.setControl(net, 'X', 'rotary'), null);
+
+  // 신호가 한 번에 열어 주는 무리: 마주 오는 둘은 한 무리, 옆에서 오는 것은 다른 무리.
+  const fromWest = Net.lanesOf(net.segs[0], 1)[0];     // 서 → X
+  const fromEast = Net.lanesOf(net.segs[1], -1)[0];    // 동 → X
+  const fromSouth = Net.lanesOf(net.segs[2], -1)[0];   // 남 → X
+  check('마주 오는 둘은 같은 무리',
+    Net.phaseOf(Net.node(net, 'X'), fromWest), Net.phaseOf(Net.node(net, 'X'), fromEast));
+  check('가로지르는 쪽은 다른 무리',
+    Net.phaseOf(Net.node(net, 'X'), fromWest) === Net.phaseOf(Net.node(net, 'X'), fromSouth), false);
+}
+
+{
+  // 회전교차로를 놓으면 교차로를 도는 길이 섬을 감고 돈다.
+  const net = Net.build(
+    [{ id: 'X', kind: 'junction', x: 200, y: 200 },
+      { id: 'W', kind: 'gate', x: 0, y: 200 }, { id: 'E', kind: 'gate', x: 400, y: 200 },
+      { id: 'N', kind: 'gate', x: 200, y: 0 }, { id: 'S', kind: 'gate', x: 200, y: 400 }],
+    [{ a: 'W', b: 'X', lanes: [-1, 1] }, { a: 'X', b: 'E', lanes: [-1, 1] },
+      { a: 'N', b: 'X', lanes: [-1, 1] }, { a: 'X', b: 'S', lanes: [-1, 1] }],
+  );
+  const at = Net.node(net, 'X');
+  const west = Net.lanesOf(net.segs[0], 1)[0];      // 서 → X
+  const east = Net.lanesOf(net.segs[1], 1)[0];      // X → 동
+  // 곧게 지나가는 길목에도 연결 곡선이 있다 — 교차로 안을 그 곡선이 갈음하기
+  // 때문이다. 다만 굽지 않는다.
+  const straightLink = Net.link(west, east, at);
+  check('곧게 지나는 길목은 곧게 잇는다',
+    straightLink.path.points.every((p) => Math.abs(p.y - 205) < 0.001), true);
+  check('교차로 앞뒤를 갈음한다', [straightLink.trimIn, straightLink.trimOut], [10, 10]);
+
+  Net.setControl(net, 'X', 'circle');
+  const around = Net.link(west, east, at);
+  check('회전교차로에서는 곧게 지나는 길목도 돈다', around != null && around.ring, true);
+  check('섬을 비켜 간다', around.path.total > 40, true);
+
+  // **도는 쪽이 맞는가.** 우측 통행은 섬을 왼쪽에 두고 돈다 — 화면 좌표에서는
+  // 각이 줄어드는 쪽이고, 서쪽에서 들어와 동쪽으로 나가면 섬의 남쪽을 지난다.
+  let below = false;
+  for (const p of around.path.points) if (p.y > at.y + 8) below = true;
+  check('서에서 동으로 갈 때 섬의 남쪽으로 돈다', below, true);
+  check('섬은 도는 길보다 안쪽에 있다', Net.islandRadius(at) < Net.reach(at), true);
+  check('회전교차로는 더 멀리서 시작한다', Net.reach(at) > at.radius, true);
+}
+
 // --- 차로 사이의 선 ---
 
 {
@@ -165,9 +259,11 @@ function straight(lanes) {
 
 {
   const net = Gen.city({ seed: 7 });
-  check('관문이 여덟', Net.gates(net).length, 8);
-  check('곧은 길과 굽은 길이 섞여 있다',
-    net.segs.some((s) => s.c1.x === s.a.x) || net.segs.length > 0, true);
+  check('관문이 넷', Net.gates(net).length, 4);
+  // **처음에는 길이 적다.** 큰길 둘과 골목 하나, 그리고 관문으로 나가는 길뿐이다.
+  check('시작 도로가 적다', net.segs.length <= 12, true);
+  check('네 갈래 교차로가 있다',
+    net.nodes.some((n) => n.kind !== 'gate' && n.segs.length === 4), true);
 
   const curved = net.segs.filter((s) => {
     const a = Net.node(net, s.a);
@@ -177,7 +273,6 @@ function straight(lanes) {
     return Math.abs(cross) > 1;
   });
   check('굽은 길이 있다', curved.length > 0, true);
-  check('곧은 길도 있다', curved.length < net.segs.length, true);
 
   // 어느 관문에서든 다른 모든 관문으로 갈 수 있어야 한다. 한 곳이라도 끊기면 그
   // 맵에서는 차가 갇힌다.

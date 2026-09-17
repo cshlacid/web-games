@@ -158,6 +158,175 @@ function corridor(lanes) {
   check('둘 다 지나간다', world.arrived, 2);
 }
 
+// --- 신호등 ---
+
+// 네 갈래 교차로. 서→동과 북→남이 한 점에서 만난다.
+function crossing() {
+  return Net.build(
+    [{ id: 'X', kind: 'junction', x: 300, y: 300 },
+      { id: 'W', kind: 'gate', x: 0, y: 300 }, { id: 'E', kind: 'gate', x: 600, y: 300 },
+      { id: 'N', kind: 'gate', x: 300, y: 0 }, { id: 'S', kind: 'gate', x: 300, y: 600 }],
+    [{ a: 'W', b: 'X', lanes: [-1, 1] }, { a: 'X', b: 'E', lanes: [-1, 1] },
+      { a: 'N', b: 'X', lanes: [-1, 1] }, { a: 'X', b: 'S', lanes: [-1, 1] }],
+  );
+}
+
+{
+  const net = crossing();
+  Net.setControl(net, 'X', 'signal');
+  const world = T.create(net, { rng: seeded(12), spawnRate: 0 });
+  const sig = T.signalOf(world, Net.node(net, 'X'));
+
+  const west = T.spawn(world, { from: 'W', to: 'E' });
+  const north = T.spawn(world, { from: 'N', to: 'S' });
+  check('두 대가 들어왔다', world.vehicles.length, 2);
+
+  const node = Net.node(net, 'X');
+  let crossed = false;
+  for (let i = 0; i < 60 * 90 && world.vehicles.length; i++) {
+    T.tick(world, 1 / 60);
+    const inside = world.vehicles.filter((v) => v.lane.isLink);
+    // 서로 다른 무리의 차가 같은 순간에 교차로 안에 있으면 안 된다.
+    const groups = new Set(inside.map((v) => Net.phaseOf(node, laneOf(net, v))));
+    if (groups.size > 1) crossed = true;
+  }
+  check('가로지르는 두 무리가 겹쳐 들지 않는다', crossed, false);
+  check('둘 다 지나간다', world.arrived, 2);
+  void west; void north; void sig;
+}
+
+// 교차로 안에 있는 차가 들어온 차로.
+function laneOf(net, v) {
+  const step = v.route[v.step];
+  return Net.pickLane(Net.segment(net, step.seg.id), step.dir, v.rank);
+}
+
+{
+  // 빨간 불에서는 정지선 앞에 선다.
+  const net = crossing();
+  Net.setControl(net, 'X', 'signal');
+  const world = T.create(net, { rng: seeded(16), spawnRate: 0 });
+  const node = Net.node(net, 'X');
+  const v = T.spawn(world, { from: 'W', to: 'E' });
+  const mine = Net.phaseOf(node, v.lane);
+
+  let entered = false;
+  for (let i = 0; i < 60 * 30; i++) {
+    // 이 차의 무리에는 계속 빨간 불을 준다.
+    const sig = T.signalOf(world, node);
+    sig.phase = 1 - mine;
+    sig.amber = false;
+    sig.timer = 0;
+    T.tick(world, 1 / 60);
+    if (v.lane.isLink) entered = true;
+  }
+  check('빨간 불에는 교차로에 들지 않는다', entered, false);
+  check('멈춰 선다', v.v < 0.3, true);
+  check('정지선 앞에 선다', v.lane.path.total - v.s > 4, true);
+}
+
+{
+  // 신호는 스스로 돈다 — 녹색, 황색, 그리고 다른 무리로.
+  const net = crossing();
+  Net.setControl(net, 'X', 'signal');
+  const world = T.create(net, { rng: seeded(13), spawnRate: 0 });
+  const node = Net.node(net, 'X');
+  const seenPhase = new Set();
+  let sawAmber = false;
+  for (let i = 0; i < 60 * (T.GREEN + T.AMBER) * 2.2; i++) {
+    T.tick(world, 1 / 60);
+    const sig = T.signalOf(world, node);
+    seenPhase.add(sig.phase);
+    if (sig.amber) sawAmber = true;
+  }
+  check('두 무리가 번갈아 열린다', seenPhase.size, 2);
+  check('황색을 거친다', sawAmber, true);
+
+  // 신호를 거두면 시계도 사라진다.
+  Net.setControl(net, 'X', 'none');
+  T.tick(world, 1 / 60);
+  check('신호를 거두면 시계도 지운다', world.signals.has('X'), false);
+}
+
+// --- 회전교차로 ---
+
+{
+  const net = crossing();
+  Net.setControl(net, 'X', 'circle');
+  const world = T.create(net, { rng: seeded(14), spawnRate: 0 });
+
+  // 서쪽 차가 먼저 교차로에 들고, 북쪽 차가 뒤따라 닿는다.
+  const west = T.spawn(world, { from: 'W', to: 'E' });
+  west.s = 250;
+  const north = T.spawn(world, { from: 'N', to: 'S' });
+  north.s = 205;
+
+  let yielded = false;
+  let ringStopped = false;
+  let closest = Infinity;
+  for (let i = 0; i < 60 * 90 && world.vehicles.length; i++) {
+    T.tick(world, 1 / 60);
+    const inside = world.vehicles.filter((v) => v.lane.ring);
+    for (const v of inside) if (v.v < 0.3) ringStopped = true;
+    if (inside.length && world.vehicles.some((v) => !v.lane.isLink && v.v < 0.5)) yielded = true;
+    if (world.vehicles.length === 2) {
+      const [a, b] = world.vehicles.map((v) => T.place(v));
+      closest = Math.min(closest, Math.hypot(a.x - b.x, a.y - b.y));
+    }
+  }
+  check('돌고 있는 차에게 양보한다', yielded, true);
+  check('도는 차는 서지 않는다', ringStopped, false);
+  check('부딪히지 않는다', closest > 6, true);
+  check('둘 다 지나간다', world.arrived, 2);
+}
+
+{
+  // 줄지어 들어와도 회전교차로 안에서 부딪히지 않는다.
+  const net = crossing();
+  Net.setControl(net, 'X', 'circle');
+  const world = T.create(net, { rng: seeded(15), spawnRate: 2.4 });
+  let closest = Infinity;
+  for (let i = 0; i < 60 * 90; i++) {
+    T.tick(world, 1 / 60);
+    const near = world.vehicles.filter((v) => v.lane.isLink || v.lane.path.total - v.s < 40);
+    for (let a = 0; a < near.length; a++) {
+      for (let b = a + 1; b < near.length; b++) {
+        const p = T.place(near[a]);
+        const q = T.place(near[b]);
+        closest = Math.min(closest, Math.hypot(p.x - q.x, p.y - q.y));
+      }
+    }
+  }
+  check('붐벼도 교차로에서 부딪히지 않는다', closest > 4, true);
+  check('그래도 지나간다', world.arrived > 20, true);
+}
+
+{
+  // 돌아가는 도중에 다스림을 바꿔도 차가 사라지거나 튀지 않는다.
+  const net = Gen.city({ seed: 40 });
+  const world = T.create(net, { rng: seeded(40), spawnRate: 3 });
+  for (let i = 0; i < 60 * 20; i++) T.tick(world, 1 / 60);
+  const before = world.vehicles.length;
+  for (const node of net.nodes) if (Net.canControl(node)) Net.setControl(net, node.id, 'circle');
+  let jump = 0;
+  const seen = new Map();
+  for (let i = 0; i < 60 * 30; i++) {
+    T.tick(world, 1 / 60);
+    for (const v of world.vehicles) {
+      const at = T.place(v);
+      const was = seen.get(v.id);
+      if (was) jump = Math.max(jump, Math.hypot(at.x - was.x, at.y - was.y));
+      seen.set(v.id, at);
+    }
+    for (const id of [...seen.keys()]) {
+      if (!world.vehicles.some((v) => v.id === id)) seen.delete(id);
+    }
+  }
+  check('달리던 차가 그대로 있다', world.vehicles.length > before / 3, true);
+  check('바꾼 뒤에도 튀지 않는다', jump < 1.2, true);
+  check('바뀐 교차로로도 빠져나간다', world.arrived > 10, true);
+}
+
 // --- 만든 맵 위에서 ---
 
 {

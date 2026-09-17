@@ -10,12 +10,16 @@
       'road.play': '시작',
       'road.rate': '빠르기',
       'road.newCity': '새 도시',
-      'road.rule1': '지금은 <b>도로 위를 차가 달리는 것</b>까지 만들어져 있습니다. 도로를 놓고 고치는 조작은 아직 없습니다.',
-      'road.rule2': '도시의 길은 <b>곧은 길과 굽은 길이 섞여</b> 있고, 길마다 <b>1~4차로</b>입니다. 가운데 노란 선이 마주 오는 방향을 가르고, 흰 점선이 같은 방향의 차로를 가릅니다.',
+      'road.ctrlNone': '신호를 거뒀습니다',
+      'road.ctrlSignal': '신호등을 놓았습니다',
+      'road.ctrlCircle': '회전교차로를 놓았습니다',
+      'road.rule1': '<b>교차로를 누르면</b> 신호 없음 → 신호등 → 회전교차로 순으로 바뀝니다. 도로를 놓고 고치는 조작은 아직 없습니다.',
+      'road.rule2': '도시의 길은 <b>곧은 길과 굽은 길이 섞여</b> 있고, 길마다 <b>1~4차로</b>입니다. 가운데 노란 선이 마주 오는 방향을 가르고, 흰 점선이 같은 방향의 차로를 가릅니다. <b>이어진 길은 굽이가 끊기지 않습니다.</b>',
       'road.rule3': '<b>우측 통행</b>입니다. 차는 제 진행 방향에서 오른쪽 차로를 씁니다.',
       'road.rule4': '맵 가장자리의 점선은 <b>다른 도시로 이어지는 관문</b>입니다. 차는 거기서 들어와 다른 관문으로 빠져나갑니다.',
       'road.rule5': '달리는 것은 <b>자동차·택시·버스·트럭·오토바이</b> 다섯입니다. 길이도 속도도 가속도 저마다 달라서, 트럭 뒤에 승용차가 물리면 줄이 길어집니다.',
-      'road.rule6': '앞차와의 거리에 따라 <b>알아서 서고 다시 나갑니다</b>. 신호가 아직 없어 교차로는 <b>먼저 닿은 차가 하나씩</b> 지납니다.'
+      'road.rule6': '앞차와의 거리에 따라 <b>알아서 서고 다시 나갑니다</b>.',
+      'road.rule7': '아무것도 없는 교차로는 <b>먼저 닿은 차가 하나씩</b> 지납니다. <b>신호등</b>은 마주 보는 두 갈래를 함께 열고, 기다리는 차가 없는 갈래는 건너뜁니다. <b>회전교차로</b>는 도는 차가 먼저이고 들어가려는 차가 틈을 기다립니다.'
     },
     en: {
       'meta.desc': 'Cars, taxis, buses, trucks and motorcycles drive in real time across a city of straight and curved roads',
@@ -26,12 +30,16 @@
       'road.play': 'Play',
       'road.rate': 'Speed',
       'road.newCity': 'New city',
-      'road.rule1': 'So far this is <b>traffic driving on the roads</b>. Building and editing roads is not in yet.',
-      'road.rule2': 'The city mixes <b>straight and curved roads</b>, each with <b>one to four lanes</b>. The yellow line splits opposing directions; white dashes split lanes going the same way.',
+      'road.ctrlNone': 'Junction left uncontrolled',
+      'road.ctrlSignal': 'Traffic signal placed',
+      'road.ctrlCircle': 'Roundabout placed',
+      'road.rule1': '<b>Tap a junction</b> to cycle it: uncontrolled → traffic signal → roundabout. Building and editing roads is not in yet.',
+      'road.rule2': 'The city mixes <b>straight and curved roads</b>, each with <b>one to four lanes</b>. The yellow line splits opposing directions; white dashes split lanes going the same way. <b>A road that runs on keeps its curve unbroken.</b>',
       'road.rule3': 'Traffic <b>drives on the right</b>. Each vehicle uses the lanes on its own right-hand side.',
       'road.rule4': 'The dashed bars at the edge of the map are <b>gates to other cities</b>. Vehicles enter there and leave by another gate.',
       'road.rule5': 'Five kinds drive here: <b>car, taxi, bus, truck and motorcycle</b>. They differ in length, speed and acceleration, so a car stuck behind a truck makes a queue.',
-      'road.rule6': 'They <b>slow down and pull away on their own</b> from the gap ahead. There are no signals yet, so a junction lets <b>one vehicle through at a time</b>.'
+      'road.rule6': 'They <b>slow down and pull away on their own</b> from the gap ahead.',
+      'road.rule7': 'An uncontrolled junction lets <b>one vehicle through at a time</b>. A <b>signal</b> opens two facing approaches together and skips any approach with nobody waiting. At a <b>roundabout</b> the traffic already circling has priority and entering traffic waits for a gap.'
     },
     ja: {
       'meta.desc': '直線と曲線が混ざった街の道路を、乗用車・タクシー・バス・トラック・バイクがリアルタイムで走る',
@@ -42,12 +50,16 @@
       'road.play': '再生',
       'road.rate': '速さ',
       'road.newCity': '新しい街',
-      'road.rule1': '今は<b>道路の上を車が走るところ</b>までです。道路を引いたり直したりする操作はまだありません。',
-      'road.rule2': '街の道は<b>直線と曲線が混ざり</b>、道ごとに<b>1〜4車線</b>です。中央の黄色い線が対向方向を分け、白い破線が同じ方向の車線を分けます。',
+      'road.ctrlNone': '信号を外しました',
+      'road.ctrlSignal': '信号を置きました',
+      'road.ctrlCircle': 'ラウンドアバウトを置きました',
+      'road.rule1': '<b>交差点を押すと</b>信号なし → 信号 → ラウンドアバウトの順に変わります。道路を引いたり直したりする操作はまだありません。',
+      'road.rule2': '街の道は<b>直線と曲線が混ざり</b>、道ごとに<b>1〜4車線</b>です。中央の黄色い線が対向方向を分け、白い破線が同じ方向の車線を分けます。<b>つながった道は曲がり具合が途切れません。</b>',
       'road.rule3': '<b>右側通行</b>です。車は進行方向の右側の車線を使います。',
       'road.rule4': '地図の縁の破線は<b>別の街へつながる出入口</b>です。車はそこから入り、別の出入口から出ていきます。',
       'road.rule5': '走るのは<b>乗用車・タクシー・バス・トラック・バイク</b>の五種です。長さも速度も加速も違うので、トラックの後ろに乗用車がつくと列ができます。',
-      'road.rule6': '前の車との距離に応じて<b>自分で止まり、また走り出します</b>。信号はまだないので、交差点は<b>先に着いた車から一台ずつ</b>通ります。'
+      'road.rule6': '前の車との距離に応じて<b>自分で止まり、また走り出します</b>。',
+      'road.rule7': '何もない交差点は<b>先に着いた車から一台ずつ</b>通ります。<b>信号</b>は向かい合う二つの方向を一緒に開け、待つ車がいない方向は飛ばします。<b>ラウンドアバウト</b>は回っている車が優先で、入る車が切れ目を待ちます。'
     },
     'zh-CN': {
       'meta.desc': '轿车、出租车、公交车、卡车和摩托车在直路与弯路交错的城市里实时行驶',
@@ -58,12 +70,16 @@
       'road.play': '播放',
       'road.rate': '速度',
       'road.newCity': '新城市',
-      'road.rule1': '目前做到<b>车辆在道路上行驶</b>为止，修路和改路的操作还没有。',
-      'road.rule2': '城里的路<b>直路与弯路交错</b>，每条路<b>一到四条车道</b>。中间的黄线分开对向，白色虚线分开同向车道。',
+      'road.ctrlNone': '拆掉了信号灯',
+      'road.ctrlSignal': '装上了信号灯',
+      'road.ctrlCircle': '改成了环岛',
+      'road.rule1': '<b>点路口</b>可以在无控制 → 信号灯 → 环岛之间切换。修路和改路的操作还没有。',
+      'road.rule2': '城里的路<b>直路与弯路交错</b>，每条路<b>一到四条车道</b>。中间的黄线分开对向，白色虚线分开同向车道。<b>连起来的路，弯度是连续的。</b>',
       'road.rule3': '<b>靠右行驶</b>。车辆走自己前进方向右侧的车道。',
       'road.rule4': '地图边缘的虚线是<b>通往其他城市的出入口</b>。车从那里进来，再从别的出入口离开。',
       'road.rule5': '路上跑着<b>轿车、出租车、公交车、卡车和摩托车</b>五种。长度、速度、加速度各不相同，轿车堵在卡车后面就会排起长队。',
-      'road.rule6': '它们会按前车的距离<b>自己刹车、自己起步</b>。目前还没有信号灯，路口<b>先到的车一辆一辆</b>通过。'
+      'road.rule6': '它们会按前车的距离<b>自己刹车、自己起步</b>。',
+      'road.rule7': '没有控制的路口<b>先到的车一辆一辆</b>通过。<b>信号灯</b>把相对的两个方向一起放行，没人等的方向直接跳过。<b>环岛</b>里正在绕行的车优先，要进的车等空档。'
     },
     'zh-TW': {
       'meta.desc': '轎車、計程車、公車、卡車和機車在直路與彎路交錯的城市裡即時行駛',
@@ -74,12 +90,16 @@
       'road.play': '播放',
       'road.rate': '速度',
       'road.newCity': '新城市',
-      'road.rule1': '目前做到<b>車輛在道路上行駛</b>為止，鋪路和改路的操作還沒有。',
-      'road.rule2': '城裡的路<b>直路與彎路交錯</b>，每條路<b>一到四條車道</b>。中間的黃線分開對向，白色虛線分開同向車道。',
+      'road.ctrlNone': '拆掉了號誌',
+      'road.ctrlSignal': '裝上了號誌',
+      'road.ctrlCircle': '改成了圓環',
+      'road.rule1': '<b>點路口</b>可以在無號誌 → 號誌 → 圓環之間切換。鋪路和改路的操作還沒有。',
+      'road.rule2': '城裡的路<b>直路與彎路交錯</b>，每條路<b>一到四條車道</b>。中間的黃線分開對向，白色虛線分開同向車道。<b>連起來的路，彎度是連續的。</b>',
       'road.rule3': '<b>靠右行駛</b>。車輛走自己前進方向右側的車道。',
       'road.rule4': '地圖邊緣的虛線是<b>通往其他城市的出入口</b>。車從那裡進來，再從別的出入口離開。',
       'road.rule5': '路上跑著<b>轎車、計程車、公車、卡車和機車</b>五種。長度、速度、加速度各不相同，轎車卡在卡車後面就會排起長隊。',
-      'road.rule6': '它們會依前車的距離<b>自己煞車、自己起步</b>。目前還沒有號誌，路口<b>先到的車一輛一輛</b>通過。'
+      'road.rule6': '它們會依前車的距離<b>自己煞車、自己起步</b>。',
+      'road.rule7': '沒有號誌的路口<b>先到的車一輛一輛</b>通過。<b>號誌</b>把相對的兩個方向一起放行，沒人等的方向直接跳過。<b>圓環</b>裡正在繞行的車優先，要進的車等空檔。'
     },
     es: {
       'meta.desc': 'Coches, taxis, autobuses, camiones y motos circulan en tiempo real por una ciudad de calles rectas y curvas',
@@ -90,12 +110,16 @@
       'road.play': 'Seguir',
       'road.rate': 'Velocidad',
       'road.newCity': 'Nueva ciudad',
-      'road.rule1': 'Por ahora hay <b>tráfico circulando por las calles</b>. Construir y editar carreteras todavía no está.',
-      'road.rule2': 'La ciudad mezcla <b>calles rectas y curvas</b>, cada una con <b>de uno a cuatro carriles</b>. La línea amarilla separa los sentidos; las rayas blancas separan carriles del mismo sentido.',
+      'road.ctrlNone': 'Cruce sin regular',
+      'road.ctrlSignal': 'Semáforo colocado',
+      'road.ctrlCircle': 'Rotonda colocada',
+      'road.rule1': '<b>Toca un cruce</b> para cambiarlo: sin regular → semáforo → rotonda. Construir y editar carreteras todavía no está.',
+      'road.rule2': 'La ciudad mezcla <b>calles rectas y curvas</b>, cada una con <b>de uno a cuatro carriles</b>. La línea amarilla separa los sentidos; las rayas blancas separan carriles del mismo sentido. <b>Una calle que continúa mantiene su curva sin quiebros.</b>',
       'road.rule3': 'Se <b>circula por la derecha</b>. Cada vehículo usa los carriles de su propia derecha.',
       'road.rule4': 'Las barras discontinuas del borde del mapa son <b>accesos a otras ciudades</b>. Los vehículos entran por ahí y salen por otro acceso.',
       'road.rule5': 'Circulan cinco tipos: <b>coche, taxi, autobús, camión y moto</b>. Cambian en largo, velocidad y aceleración, así que un coche detrás de un camión forma cola.',
-      'road.rule6': 'Frenan y arrancan <b>solos</b> según el hueco que tienen delante. Todavía no hay semáforos, así que en un cruce pasa <b>un vehículo cada vez</b>.'
+      'road.rule6': 'Frenan y arrancan <b>solos</b> según el hueco que tienen delante.',
+      'road.rule7': 'Un cruce sin regular deja pasar <b>un vehículo cada vez</b>. El <b>semáforo</b> abre a la vez los dos accesos enfrentados y se salta el que no tiene a nadie esperando. En la <b>rotonda</b> manda quien ya está girando y quien entra espera un hueco.'
     }
   });
 })();
