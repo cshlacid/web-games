@@ -14,7 +14,7 @@
       'road.ctrlSignal': '신호등',
       'road.ctrlCircle': '회전교차로',
       'road.rule1': '<b>교차로를 누르면</b> 아래에서 신호 없음·신호등·회전교차로를 고르고, 신호등은 <b>현시 구성</b>과 <b>횡단보도</b>까지 정합니다. <b>도로를 누르면</b> 차로마다 좌회전·직진·우회전·유턴을 켜고 끄고, <b>방향을 바꾸거나 차로를 늘립니다</b>.',
-      'road.rule2': '도시의 길은 <b>곧은 길과 굽은 길이 섞여</b> 있고, 길마다 <b>1~4차로</b>입니다. 가운데 노란 선이 마주 오는 방향을 가르고, 흰 점선이 같은 방향의 차로를 가릅니다. <b>이어진 길은 굽이가 끊기지 않습니다.</b>',
+      'road.rule2': '도시의 길은 <b>곧은 길과 굽은 길이 섞여</b> 있고, 길마다 <b>1~8차로</b>입니다. 가운데 노란 선이 마주 오는 방향을 가르고, 흰 점선이 같은 방향의 차로를 가릅니다. <b>이어진 길은 굽이가 끊기지 않습니다.</b>',
       'road.rule3': '<b>우측 통행</b>입니다. 차는 제 진행 방향에서 오른쪽 차로를 씁니다.',
       'road.rule4': '맵 가장자리의 점선은 <b>다른 도시로 이어지는 관문</b>입니다. 차는 거기서 들어와 다른 관문으로 빠져나갑니다.',
       'road.rule5': '달리는 것은 <b>자동차·택시·버스·트럭·오토바이</b> 다섯입니다. 길이도 속도도 가속도 저마다 달라서, 트럭 뒤에 승용차가 물리면 줄이 길어집니다.',
@@ -37,7 +37,7 @@
       'road.draftHint': '<b>가운데 손잡이를 끌어</b> 굽이를 고칠 수 있습니다. 놓으면 1차로짜리 일방통행으로 생기고, 그 길을 눌러 차로를 늘릴 수 있습니다.',
       'road.tooShort': '너무 짧습니다. 손잡이를 끌어 길게 굽히거나 취소하세요.',
       'road.tooDear': '예산이 모자랍니다. 차가 시외로 빠져나가면 채워집니다.',
-      'road.laneFull': '이미 4차로입니다. 차로는 넷까지만 둘 수 있습니다.',
+      'road.laneFull': '이미 {n}차로입니다. 한 길에 둘 수 있는 가장 많은 차로입니다.',
       'road.rule11': '<b>길 위의 아무 데서나 다른 길까지 끌면</b> 새 길이 생깁니다. 끌기를 마치면 값이 나오고, 그때 <b>가운데 손잡이를 끌어 굽이를 고친 뒤</b> 놓거나 취소합니다. 끌기를 시작한 자리와 끝낸 자리에는 <b>교차로가 새로 납니다</b>.'
     },
     en: {
@@ -53,7 +53,7 @@
       'road.ctrlSignal': 'Signal',
       'road.ctrlCircle': 'Roundabout',
       'road.rule1': '<b>Tap a junction</b> to choose below between no signal, a traffic signal or a roundabout; a signal also takes a <b>phase plan</b> and a <b>crosswalk</b>. <b>Tap a road</b> to turn left, through, right and U-turn on or off per lane, to <b>send a lane the other way</b> or to <b>add a lane</b>.',
-      'road.rule2': 'The city mixes <b>straight and curved roads</b>, each with <b>one to four lanes</b>. The yellow line splits opposing directions; white dashes split lanes going the same way. <b>A road that runs on keeps its curve unbroken.</b>',
+      'road.rule2': 'The city mixes <b>straight and curved roads</b>, each with <b>one to eight lanes</b>. The yellow line splits opposing directions; white dashes split lanes going the same way. <b>A road that runs on keeps its curve unbroken.</b>',
       'road.rule3': 'Traffic <b>drives on the right</b>. Each vehicle uses the lanes on its own right-hand side.',
       'road.rule4': 'The dashed bars at the edge of the map are <b>gates to other cities</b>. Vehicles enter there and leave by another gate.',
       'road.rule5': 'Five kinds drive here: <b>car, taxi, bus, truck and motorcycle</b>. They differ in length, speed and acceleration, so a car stuck behind a truck makes a queue.',
@@ -76,7 +76,7 @@
       'road.draftHint': '<b>Drag the handle</b> in the middle to bend it. It goes down as a one-way single lane; select it afterwards to add lanes.',
       'road.tooShort': 'Too short. Bend it longer with the handle, or cancel.',
       'road.tooDear': 'Not enough budget. It fills up as vehicles leave town.',
-      'road.laneFull': 'Already four lanes. Four is the most a road can have.',
+      'road.laneFull': 'Already {n} lanes, the most a road can have.',
       'road.rule11': '<b>Drag from anywhere on a road to another road</b> to lay a new one. Let go and the price appears; <b>bend it with the handle in the middle</b>, then build or cancel. <b>New junctions appear</b> where the drag started and ended.'
     },
     ja: {
@@ -92,7 +92,7 @@
       'road.ctrlSignal': '信号',
       'road.ctrlCircle': 'ラウンドアバウト',
       'road.rule1': '<b>交差点を押すと</b>下で信号なし・信号・ラウンドアバウトを選べます。信号では<b>現示の組み方</b>と<b>横断歩道</b>も決めます。<b>道路を押すと</b>車線ごとに左折・直進・右折・Uターンを切り替え、<b>向きを変えたり車線を増やしたり</b>できます。',
-      'road.rule2': '街の道は<b>直線と曲線が混ざり</b>、道ごとに<b>1〜4車線</b>です。中央の黄色い線が対向方向を分け、白い破線が同じ方向の車線を分けます。<b>つながった道は曲がり具合が途切れません。</b>',
+      'road.rule2': '街の道は<b>直線と曲線が混ざり</b>、道ごとに<b>1〜8車線</b>です。中央の黄色い線が対向方向を分け、白い破線が同じ方向の車線を分けます。<b>つながった道は曲がり具合が途切れません。</b>',
       'road.rule3': '<b>右側通行</b>です。車は進行方向の右側の車線を使います。',
       'road.rule4': '地図の縁の破線は<b>別の街へつながる出入口</b>です。車はそこから入り、別の出入口から出ていきます。',
       'road.rule5': '走るのは<b>乗用車・タクシー・バス・トラック・バイク</b>の五種です。長さも速度も加速も違うので、トラックの後ろに乗用車がつくと列ができます。',
@@ -115,7 +115,7 @@
       'road.draftHint': '<b>真ん中のつまみを引いて</b>曲がりを直せます。敷くと1車線の一方通行になり、その道を押せば車線を増やせます。',
       'road.tooShort': '短すぎます。つまみを引いて長く曲げるか、取り消してください。',
       'road.tooDear': '予算が足りません。車が市外へ出れば貯まります。',
-      'road.laneFull': 'すでに4車線です。車線は4つまでです。',
+      'road.laneFull': 'すでに{n}車線です。1本の道に置ける最大です。',
       'road.rule11': '<b>道の上のどこからでも別の道まで引けば</b>新しい道ができます。引き終えると値段が出るので、<b>真ん中のつまみで曲がりを直してから</b>敷くか取り消します。引き始めた所と終えた所には<b>新しい交差点ができます</b>。'
     },
     'zh-CN': {
@@ -131,7 +131,7 @@
       'road.ctrlSignal': '信号灯',
       'road.ctrlCircle': '环岛',
       'road.rule1': '<b>点路口</b>可以在下面选无信号、信号灯或环岛；信号灯还能选<b>相位方案</b>和<b>人行横道</b>。<b>点道路</b>可以逐条车道开关左转、直行、右转和掉头，还能<b>改变车道方向或增加车道</b>。',
-      'road.rule2': '城里的路<b>直路与弯路交错</b>，每条路<b>一到四条车道</b>。中间的黄线分开对向，白色虚线分开同向车道。<b>连起来的路，弯度是连续的。</b>',
+      'road.rule2': '城里的路<b>直路与弯路交错</b>，每条路<b>一到八条车道</b>。中间的黄线分开对向，白色虚线分开同向车道。<b>连起来的路，弯度是连续的。</b>',
       'road.rule3': '<b>靠右行驶</b>。车辆走自己前进方向右侧的车道。',
       'road.rule4': '地图边缘的虚线是<b>通往其他城市的出入口</b>。车从那里进来，再从别的出入口离开。',
       'road.rule5': '路上跑着<b>轿车、出租车、公交车、卡车和摩托车</b>五种。长度、速度、加速度各不相同，轿车堵在卡车后面就会排起长队。',
@@ -154,7 +154,7 @@
       'road.draftHint': '<b>拖动中间的手柄</b>可以调整弯度。建成后是单车道单行线，点这条路就能加车道。',
       'road.tooShort': '太短了。用手柄拉长弯一点，或者取消。',
       'road.tooDear': '预算不够。车驶出城外就会进账。',
-      'road.laneFull': '已经是4车道了。一条路最多4条车道。',
+      'road.laneFull': '已经是{n}车道了，一条路最多就这么多。',
       'road.rule11': '<b>从路上任意一点拖到另一条路</b>就能修新路。松手后会显示造价，这时<b>用中间的手柄调整弯度</b>，再决定修建还是取消。起点和终点处会<b>新增路口</b>。'
     },
     'zh-TW': {
@@ -170,7 +170,7 @@
       'road.ctrlSignal': '號誌',
       'road.ctrlCircle': '圓環',
       'road.rule1': '<b>點路口</b>可以在下面選無號誌、號誌或圓環；號誌還能選<b>時相方案</b>和<b>行人穿越道</b>。<b>點道路</b>可以逐條車道開關左轉、直行、右轉和迴轉，還能<b>改變車道方向或增加車道</b>。',
-      'road.rule2': '城裡的路<b>直路與彎路交錯</b>，每條路<b>一到四條車道</b>。中間的黃線分開對向，白色虛線分開同向車道。<b>連起來的路，彎度是連續的。</b>',
+      'road.rule2': '城裡的路<b>直路與彎路交錯</b>，每條路<b>一到八條車道</b>。中間的黃線分開對向，白色虛線分開同向車道。<b>連起來的路，彎度是連續的。</b>',
       'road.rule3': '<b>靠右行駛</b>。車輛走自己前進方向右側的車道。',
       'road.rule4': '地圖邊緣的虛線是<b>通往其他城市的出入口</b>。車從那裡進來，再從別的出入口離開。',
       'road.rule5': '路上跑著<b>轎車、計程車、公車、卡車和機車</b>五種。長度、速度、加速度各不相同，轎車卡在卡車後面就會排起長隊。',
@@ -193,7 +193,7 @@
       'road.draftHint': '<b>拖曳中間的把手</b>可以調整彎度。建好後是單車道單行道，點這條路就能增加車道。',
       'road.tooShort': '太短了。用把手拉長彎一點，或者取消。',
       'road.tooDear': '預算不足。車駛出城外就會進帳。',
-      'road.laneFull': '已經是4車道了。一條路最多4條車道。',
+      'road.laneFull': '已經是{n}車道了，一條路最多就這麼多。',
       'road.rule11': '<b>從路上任意一點拖到另一條路</b>就能興建新路。放手後會顯示造價，這時<b>用中間的把手調整彎度</b>，再決定興建還是取消。起點與終點處會<b>新增路口</b>。'
     },
     es: {
@@ -209,7 +209,7 @@
       'road.ctrlSignal': 'Semáforo',
       'road.ctrlCircle': 'Rotonda',
       'road.rule1': '<b>Toca un cruce</b> y abajo eliges entre sin señal, semáforo o rotonda; el semáforo además lleva <b>plan de fases</b> y <b>paso de peatones</b>. <b>Toca una calle</b> para activar giro a la izquierda, recto, derecha y cambio de sentido en cada carril, <b>invertir el sentido de un carril</b> o <b>añadir uno</b>.',
-      'road.rule2': 'La ciudad mezcla <b>calles rectas y curvas</b>, cada una con <b>de uno a cuatro carriles</b>. La línea amarilla separa los sentidos; las rayas blancas separan carriles del mismo sentido. <b>Una calle que continúa mantiene su curva sin quiebros.</b>',
+      'road.rule2': 'La ciudad mezcla <b>calles rectas y curvas</b>, cada una con <b>de uno a ocho carriles</b>. La línea amarilla separa los sentidos; las rayas blancas separan carriles del mismo sentido. <b>Una calle que continúa mantiene su curva sin quiebros.</b>',
       'road.rule3': 'Se <b>circula por la derecha</b>. Cada vehículo usa los carriles de su propia derecha.',
       'road.rule4': 'Las barras discontinuas del borde del mapa son <b>accesos a otras ciudades</b>. Los vehículos entran por ahí y salen por otro acceso.',
       'road.rule5': 'Circulan cinco tipos: <b>coche, taxi, autobús, camión y moto</b>. Cambian en largo, velocidad y aceleración, así que un coche detrás de un camión forma cola.',
@@ -232,7 +232,7 @@
       'road.draftHint': '<b>Arrastra el tirador</b> del centro para curvarla. Se construye como un solo carril de sentido único; selecciónala después para añadir carriles.',
       'road.tooShort': 'Demasiado corta. Cúrvala con el tirador o cancela.',
       'road.tooDear': 'No hay presupuesto. Se repone cada vez que un vehículo sale de la ciudad.',
-      'road.laneFull': 'Ya tiene cuatro carriles, el máximo de una vía.',
+      'road.laneFull': 'Ya tiene {n} carriles, el máximo de una vía.',
       'road.rule11': '<b>Arrastra desde cualquier punto de una vía hasta otra</b> para trazar una nueva. Al soltar aparece el precio; <b>curva el trazado con el tirador del centro</b> y luego construye o cancela. <b>Se crean cruces nuevos</b> donde empieza y termina el arrastre.'
     }
   });

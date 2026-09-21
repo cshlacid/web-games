@@ -801,10 +801,21 @@ function roadPanel(seg, index) {
   // **왜 못 늘리는지 적는다.** 흐려진 단추만으로는 차로가 다 찬 것인지 돈이 모자란
   // 것인지 알 수 없어, 고장 난 것처럼 보인다.
   if (!canAdd(seg)) {
-    const why = seg.lanes.length >= Net.MAX_LANES ? 'road.laneFull' : 'road.tooDear';
-    rows.push(`<p class="panel-note dim">${t(why)}</p>`);
+    const full = seg.lanes.length >= Net.MAX_LANES;
+    const why = full ? t('road.laneFull', { n: Net.MAX_LANES }) : t('road.tooDear');
+    rows.push(`<p class="panel-note dim">${why}</p>`);
   }
   return rows.join('');
+}
+
+// 방금 늘어나거나 방금 넘어온 차로. **차로는 손볼 때마다 다시 정렬되므로 번호를
+// 그대로 두면 다음에 누를 때 엉뚱한 방향이 넓어진다** — 넷씩 마주 보던 길을 네 번
+// 넓혔더니 한쪽만 여섯이 되었다. 그 차로는 제 방향 무리에서 순위가 가장 높은
+// 것이다(`network.js`의 `reshape`에서 짝이 없어 기본값을 받는 자리가 거기다).
+function freshLane(seg, dir) {
+  const group = seg.lanes.filter((l) => l.dir === dir);
+  if (!group.length) return 0;
+  return seg.lanes.indexOf(group.reduce((best, l) => (l.rank > best.rank ? l : best)));
 }
 
 function canAdd(seg) {
@@ -874,13 +885,15 @@ el.panel.addEventListener('click', (event) => {
   else if (d.cross) Net.setCrossing(net, picked.node.id, !picked.node.crossing);
   else if (d.lane) picked.lane = Number(d.lane);
   else if (d.flip) {
+    const dir = picked.seg.lanes[picked.lane].dir;
     Traffic.flipLane(world, picked.seg, picked.lane);
     buildDeco();
-    picked.lane = Math.min(picked.lane, picked.seg.lanes.length - 1);
+    picked.lane = freshLane(picked.seg, -dir);
   } else if (d.add) {
     const dir = picked.seg.lanes[picked.lane].dir;
     if (!Traffic.buyLane(world, picked.seg, dir).ok) return;
     buildDeco();
+    picked.lane = freshLane(picked.seg, dir);
   }
   else if (d.move) {
     const lane = picked.seg.lanes[picked.lane];

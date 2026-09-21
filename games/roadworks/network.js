@@ -15,9 +15,19 @@
 const Geom = (typeof require !== 'undefined') ? require('./geom.js') : root.RoadGeom;
 
 const LANE_W = 10;      // 차로 하나의 폭
-const MAX_LANES = 4;
+// 한 길에 둘 수 있는 차로 수. **넓히는 것이 정체를 푸는 수단이라 여유를 둔다** —
+// 넷에서 멈추면 큰길은 처음부터 다 찬 상태로 시작해 손댈 데가 없다. 폭은 차로 수에
+// 그대로 비례하므로(여덟이면 80) 넓힌 길은 격자에서 눈에 띄게 굵다.
+const MAX_LANES = 8;
 // 이보다 짧은 토막은 내지 않는다. 차로를 깔아도 교차로 원 둘이 겹쳐 길이 사라진다.
 const MIN_STUB = 26;
+
+// 구간을 가를 때 끝에서 이만큼 안쪽이어야 정말로 가른다. **길 폭을 탄다** — 교차로
+// 원이 길 폭의 절반이라, 넓은 길에서 짧은 토막을 내면 양 끝의 원 둘이 그 토막을
+// 통째로 덮어 길이 사라진다. 여덟 차로면 폭이 80이고 원이 40씩이다.
+function stubOf(seg) {
+  return Math.max(MIN_STUB, seg.width * 1.2);
+}
 
 // 교차로를 어떻게 다스리는가. **기본은 아무것도 없는 상태다** — 먼저 닿은 차가
 // 하나씩 지난다. 플레이어가 신호등이나 회전교차로를 놓는다.
@@ -119,8 +129,9 @@ function splitSeg(net, seg, s) {
   const a = node(net, seg.a);
   const b = node(net, seg.b);
   const t = Geom.tOf(seg.center, s);
-  if (s < MIN_STUB) return { at: a, segs: [seg] };
-  if (seg.length - s < MIN_STUB) return { at: b, segs: [seg] };
+  const stub = stubOf(seg);
+  if (s < stub) return { at: a, segs: [seg] };
+  if (seg.length - s < stub) return { at: b, segs: [seg] };
 
   const cut = Geom.splitCubic(a, seg.c1, seg.c2, b, t);
   const at = {
@@ -501,7 +512,7 @@ function lanesOf(seg, dir) {
 //
 // **차로 변경이 없으므로 들어설 때 골라야 한다.** 이 구간 끝에서 할 이동(need)을
 // 허락하는 차로 중에서 고르고, 그중에서는 **오른쪽에서 몇 번째였는지를 지킨다** —
-// 늘 오른쪽 끝으로 붙이면 4차로에서 합류할 때마다 모든 차가 한 줄로 몰린다.
+// 늘 오른쪽 끝으로 붙이면 넓은 길에서 합류할 때마다 모든 차가 한 줄로 몰린다.
 function pickLane(seg, dir, rank, need) {
   const group = lanesOf(seg, dir);
   if (!group.length) return null;
@@ -697,6 +708,7 @@ const api = {
   setControl, cycleControl, canControl, phaseOf, phaseCount, islandRadius, reach, ringPath,
   setPlan, setCrossing, crossingAt, setAllow, movement, movementAllowed, sideOf,
   reshape, flipLane, addLane, clearLinks, addSeg, removeSeg, splitSeg, connect, bend, draftPath, spotOf,
+  stubOf,
   LANE_W, MAX_LANES, MIN_STUB, CONTROLS, PLANS, MOVES,
 };
 
