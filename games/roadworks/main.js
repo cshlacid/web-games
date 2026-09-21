@@ -649,10 +649,17 @@ function roadAt(spot) {
 // 누른 자리가 무엇인가. 고르는 것도 길을 뻗는 것도 이 하나를 쓴다 — 짚어 주는 자리와
 // 길이 붙는 자리가 갈리면 손가락이 짚은 곳과 다른 데서 길이 나간다.
 function anchorAt(spot) {
-  const node = junctionAt(spot);
-  if (node) return { kind: 'node', node, x: node.x, y: node.y };
   const hit = roadAt(spot);
-  if (!hit) return null;
+  const node = junctionAt(spot);
+
+  // **길의 가운데를 짚었으면 교차로가 아니라 길이다.** 교차로를 손가락 굵기만큼
+  // 넉넉히 잡다 보니 **짧은 구간은 통째로 교차로에 먹혀 고를 수가 없었다** — 길을
+  // 가르면 그런 토막이 생기고, 처음 판에도 길이 66짜리 구간이 그랬다. 교차로에 닿는
+  // 구간은 그 자리의 비율이 0이나 1 언저리이므로, **가운데 절반을 짚은 것은 언제나
+  // 길이다.** 반지름을 줄이는 길도 있지만 그러면 폰에서 교차로를 짚기 어려워진다.
+  const middle = hit && hit.s > hit.seg.length * 0.25 && hit.s < hit.seg.length * 0.75;
+  if (node && !middle) return { kind: 'node', node, x: node.x, y: node.y };
+  if (!hit) return node ? { kind: 'node', node, x: node.x, y: node.y } : null;
   const at = Geom.at(hit.seg.center, hit.s);
   return { kind: 'seg', seg: hit.seg, s: hit.s, lane: 0, x: at.x, y: at.y };
 }
@@ -790,6 +797,13 @@ function roadPanel(seg, index) {
     + `<button class="chip" type="button" data-add="1"${canAdd(seg) ? '' : ' disabled'}>`
     + `${t('road.addLane')}<b class="cost">${cost}</b></button>`
     + '</div>');
+
+  // **왜 못 늘리는지 적는다.** 흐려진 단추만으로는 차로가 다 찬 것인지 돈이 모자란
+  // 것인지 알 수 없어, 고장 난 것처럼 보인다.
+  if (!canAdd(seg)) {
+    const why = seg.lanes.length >= Net.MAX_LANES ? 'road.laneFull' : 'road.tooDear';
+    rows.push(`<p class="panel-note dim">${t(why)}</p>`);
+  }
   return rows.join('');
 }
 
@@ -931,6 +945,7 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', rea
 // 브라우저에서 확인할 때 판 안을 들여다보는 통로. node 테스트가 닿지 않는 것은
 // 손가락 조작뿐이라, 헤드리스 브라우저에서 이것으로 상태를 읽는다.
 window.__draft = () => draft;
+window.__picked = () => picked;
 window.__net = null;
 
 readSkin();

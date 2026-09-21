@@ -37,6 +37,7 @@
       'road.draftHint': '<b>가운데 손잡이를 끌어</b> 굽이를 고칠 수 있습니다. 놓으면 1차로짜리 일방통행으로 생기고, 그 길을 눌러 차로를 늘릴 수 있습니다.',
       'road.tooShort': '너무 짧습니다. 손잡이를 끌어 길게 굽히거나 취소하세요.',
       'road.tooDear': '예산이 모자랍니다. 차가 시외로 빠져나가면 채워집니다.',
+      'road.laneFull': '이미 4차로입니다. 차로는 넷까지만 둘 수 있습니다.',
       'road.rule11': '<b>길 위의 아무 데서나 다른 길까지 끌면</b> 새 길이 생깁니다. 끌기를 마치면 값이 나오고, 그때 <b>가운데 손잡이를 끌어 굽이를 고친 뒤</b> 놓거나 취소합니다. 끌기를 시작한 자리와 끝낸 자리에는 <b>교차로가 새로 납니다</b>.'
     },
     en: {
@@ -75,6 +76,7 @@
       'road.draftHint': '<b>Drag the handle</b> in the middle to bend it. It goes down as a one-way single lane; select it afterwards to add lanes.',
       'road.tooShort': 'Too short. Bend it longer with the handle, or cancel.',
       'road.tooDear': 'Not enough budget. It fills up as vehicles leave town.',
+      'road.laneFull': 'Already four lanes. Four is the most a road can have.',
       'road.rule11': '<b>Drag from anywhere on a road to another road</b> to lay a new one. Let go and the price appears; <b>bend it with the handle in the middle</b>, then build or cancel. <b>New junctions appear</b> where the drag started and ended.'
     },
     ja: {
@@ -113,6 +115,7 @@
       'road.draftHint': '<b>真ん中のつまみを引いて</b>曲がりを直せます。敷くと1車線の一方通行になり、その道を押せば車線を増やせます。',
       'road.tooShort': '短すぎます。つまみを引いて長く曲げるか、取り消してください。',
       'road.tooDear': '予算が足りません。車が市外へ出れば貯まります。',
+      'road.laneFull': 'すでに4車線です。車線は4つまでです。',
       'road.rule11': '<b>道の上のどこからでも別の道まで引けば</b>新しい道ができます。引き終えると値段が出るので、<b>真ん中のつまみで曲がりを直してから</b>敷くか取り消します。引き始めた所と終えた所には<b>新しい交差点ができます</b>。'
     },
     'zh-CN': {
@@ -151,6 +154,7 @@
       'road.draftHint': '<b>拖动中间的手柄</b>可以调整弯度。建成后是单车道单行线，点这条路就能加车道。',
       'road.tooShort': '太短了。用手柄拉长弯一点，或者取消。',
       'road.tooDear': '预算不够。车驶出城外就会进账。',
+      'road.laneFull': '已经是4车道了。一条路最多4条车道。',
       'road.rule11': '<b>从路上任意一点拖到另一条路</b>就能修新路。松手后会显示造价，这时<b>用中间的手柄调整弯度</b>，再决定修建还是取消。起点和终点处会<b>新增路口</b>。'
     },
     'zh-TW': {
@@ -189,6 +193,7 @@
       'road.draftHint': '<b>拖曳中間的把手</b>可以調整彎度。建好後是單車道單行道，點這條路就能增加車道。',
       'road.tooShort': '太短了。用把手拉長彎一點，或者取消。',
       'road.tooDear': '預算不足。車駛出城外就會進帳。',
+      'road.laneFull': '已經是4車道了。一條路最多4條車道。',
       'road.rule11': '<b>從路上任意一點拖到另一條路</b>就能興建新路。放手後會顯示造價，這時<b>用中間的把手調整彎度</b>，再決定興建還是取消。起點與終點處會<b>新增路口</b>。'
     },
     es: {
@@ -227,6 +232,7 @@
       'road.draftHint': '<b>Arrastra el tirador</b> del centro para curvarla. Se construye como un solo carril de sentido único; selecciónala después para añadir carriles.',
       'road.tooShort': 'Demasiado corta. Cúrvala con el tirador o cancela.',
       'road.tooDear': 'No hay presupuesto. Se repone cada vez que un vehículo sale de la ciudad.',
+      'road.laneFull': 'Ya tiene cuatro carriles, el máximo de una vía.',
       'road.rule11': '<b>Arrastra desde cualquier punto de una vía hasta otra</b> para trazar una nueva. Al soltar aparece el precio; <b>curva el trazado con el tirador del centro</b> y luego construye o cancela. <b>Se crean cruces nuevos</b> donde empieza y termina el arrastre.'
     }
   });
