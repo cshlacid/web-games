@@ -13,7 +13,7 @@
       'road.ctrlNone': '신호 없음',
       'road.ctrlSignal': '신호등',
       'road.ctrlCircle': '회전교차로',
-      'road.rule1': '<b>교차로를 누르면</b> 아래에서 신호 없음·신호등·회전교차로를 고르고, 신호등은 <b>현시 구성</b>과 <b>횡단보도</b>까지 정합니다. <b>도로를 누르면</b> 차로마다 좌회전·직진·우회전·유턴을 켜고 끕니다. 도로를 새로 놓는 조작은 아직 없습니다.',
+      'road.rule1': '<b>교차로를 누르면</b> 아래에서 신호 없음·신호등·회전교차로를 고르고, 신호등은 <b>현시 구성</b>과 <b>횡단보도</b>까지 정합니다. <b>도로를 누르면</b> 차로마다 좌회전·직진·우회전·유턴을 켜고 끄고, <b>방향을 바꾸거나 차로를 늘립니다</b>. 도로를 새로 놓는 조작은 아직 없습니다.',
       'road.rule2': '도시의 길은 <b>곧은 길과 굽은 길이 섞여</b> 있고, 길마다 <b>1~4차로</b>입니다. 가운데 노란 선이 마주 오는 방향을 가르고, 흰 점선이 같은 방향의 차로를 가릅니다. <b>이어진 길은 굽이가 끊기지 않습니다.</b>',
       'road.rule3': '<b>우측 통행</b>입니다. 차는 제 진행 방향에서 오른쪽 차로를 씁니다.',
       'road.rule4': '맵 가장자리의 점선은 <b>다른 도시로 이어지는 관문</b>입니다. 차는 거기서 들어와 다른 관문으로 빠져나갑니다.',
@@ -26,7 +26,11 @@
       'road.crosswalk': '횡단보도',
       'road.lanesOf': '{n}차로',
       'road.rule8': '<b>차로 바닥의 화살표</b>가 그 차로에서 갈 수 있는 곳입니다. 좌회전 차로를 없애면 그 길로 가려던 차가 <b>다른 길로 돌아갑니다</b>.',
-      'road.rule9': '<b>횡단보도</b>를 놓으면 사람이 건넙니다. 신호가 있으면 빨간 불일 때, 없으면 차가 뜸할 때 건너고, 건너는 사람이 있으면 차가 섭니다.'
+      'road.rule9': '<b>횡단보도</b>를 놓으면 사람이 건넙니다. 신호가 있으면 빨간 불일 때, 없으면 차가 뜸할 때 건너고, 건너는 사람이 있으면 차가 섭니다.',
+      'road.money': '예산',
+      'road.flip': '방향 바꾸기',
+      'road.addLane': '차로 늘리기',
+      'road.rule10': '<b>차로를 늘리는 데는 돈이 듭니다</b>(긴 길일수록 비쌉니다). 돈은 <b>차가 시외로 빠져나갈 때마다</b> 들어오니, 막힌 곳을 풀어야 다음 공사를 할 수 있습니다. 방향을 바꾸는 것은 선만 다시 긋는 일이라 값이 없습니다.'
     },
     en: {
       'meta.desc': 'Cars, taxis, buses, trucks and motorcycles drive in real time across a city of straight and curved roads',
@@ -40,7 +44,7 @@
       'road.ctrlNone': 'No signal',
       'road.ctrlSignal': 'Signal',
       'road.ctrlCircle': 'Roundabout',
-      'road.rule1': '<b>Tap a junction</b> to choose below between no signal, a traffic signal or a roundabout; a signal also takes a <b>phase plan</b> and a <b>crosswalk</b>. <b>Tap a road</b> to turn left, through, right and U-turn on or off per lane. Laying new roads is not in yet.',
+      'road.rule1': '<b>Tap a junction</b> to choose below between no signal, a traffic signal or a roundabout; a signal also takes a <b>phase plan</b> and a <b>crosswalk</b>. <b>Tap a road</b> to turn left, through, right and U-turn on or off per lane, to <b>send a lane the other way</b> or to <b>add a lane</b>. Laying new roads is not in yet.',
       'road.rule2': 'The city mixes <b>straight and curved roads</b>, each with <b>one to four lanes</b>. The yellow line splits opposing directions; white dashes split lanes going the same way. <b>A road that runs on keeps its curve unbroken.</b>',
       'road.rule3': 'Traffic <b>drives on the right</b>. Each vehicle uses the lanes on its own right-hand side.',
       'road.rule4': 'The dashed bars at the edge of the map are <b>gates to other cities</b>. Vehicles enter there and leave by another gate.',
@@ -53,7 +57,11 @@
       'road.crosswalk': 'Crosswalk',
       'road.lanesOf': '{n} lanes',
       'road.rule8': 'The <b>arrows painted on a lane</b> are where that lane may go. Take away the left-turn lane and the traffic that wanted it <b>goes round another way</b>.',
-      'road.rule9': 'Put down a <b>crosswalk</b> and people use it. They cross on red where there is a signal, and in a gap where there is not; vehicles stop for anyone already crossing.'
+      'road.rule9': 'Put down a <b>crosswalk</b> and people use it. They cross on red where there is a signal, and in a gap where there is not; vehicles stop for anyone already crossing.',
+      'road.money': 'Budget',
+      'road.flip': 'Flip way',
+      'road.addLane': 'Add lane',
+      'road.rule10': '<b>Adding a lane costs money</b> (a longer road costs more). Money comes in <b>every time a vehicle leaves town</b>, so you have to keep things moving to afford the next job. Flipping a lane is only repainting, so it is free.'
     },
     ja: {
       'meta.desc': '直線と曲線が混ざった街の道路を、乗用車・タクシー・バス・トラック・バイクがリアルタイムで走る',
@@ -67,7 +75,7 @@
       'road.ctrlNone': '信号なし',
       'road.ctrlSignal': '信号',
       'road.ctrlCircle': 'ラウンドアバウト',
-      'road.rule1': '<b>交差点を押すと</b>下で信号なし・信号・ラウンドアバウトを選べます。信号では<b>現示の組み方</b>と<b>横断歩道</b>も決めます。<b>道路を押すと</b>車線ごとに左折・直進・右折・Uターンを切り替えられます。道路を新しく引く操作はまだありません。',
+      'road.rule1': '<b>交差点を押すと</b>下で信号なし・信号・ラウンドアバウトを選べます。信号では<b>現示の組み方</b>と<b>横断歩道</b>も決めます。<b>道路を押すと</b>車線ごとに左折・直進・右折・Uターンを切り替え、<b>向きを変えたり車線を増やしたり</b>できます。道路を新しく引く操作はまだありません。',
       'road.rule2': '街の道は<b>直線と曲線が混ざり</b>、道ごとに<b>1〜4車線</b>です。中央の黄色い線が対向方向を分け、白い破線が同じ方向の車線を分けます。<b>つながった道は曲がり具合が途切れません。</b>',
       'road.rule3': '<b>右側通行</b>です。車は進行方向の右側の車線を使います。',
       'road.rule4': '地図の縁の破線は<b>別の街へつながる出入口</b>です。車はそこから入り、別の出入口から出ていきます。',
@@ -80,7 +88,11 @@
       'road.crosswalk': '横断歩道',
       'road.lanesOf': '{n}車線',
       'road.rule8': '<b>車線に描かれた矢印</b>がその車線から行ける先です。左折車線をなくすと、そこを通るはずだった車が<b>別の道へ回ります</b>。',
-      'road.rule9': '<b>横断歩道</b>を置くと人が渡ります。信号があれば赤のときに、なければ車の切れ目で渡り、渡っている人がいれば車が止まります。'
+      'road.rule9': '<b>横断歩道</b>を置くと人が渡ります。信号があれば赤のときに、なければ車の切れ目で渡り、渡っている人がいれば車が止まります。',
+      'road.money': '予算',
+      'road.flip': '向きを変える',
+      'road.addLane': '車線を増やす',
+      'road.rule10': '<b>車線を増やすにはお金がかかります</b>（長い道ほど高くなります）。お金は<b>車が市外へ出るたび</b>に入るので、詰まりを解かないと次の工事ができません。向きを変えるのは線を引き直すだけなので無料です。'
     },
     'zh-CN': {
       'meta.desc': '轿车、出租车、公交车、卡车和摩托车在直路与弯路交错的城市里实时行驶',
@@ -94,7 +106,7 @@
       'road.ctrlNone': '无信号',
       'road.ctrlSignal': '信号灯',
       'road.ctrlCircle': '环岛',
-      'road.rule1': '<b>点路口</b>可以在下面选无信号、信号灯或环岛；信号灯还能选<b>相位方案</b>和<b>人行横道</b>。<b>点道路</b>可以逐条车道开关左转、直行、右转和掉头。铺新路的操作还没有。',
+      'road.rule1': '<b>点路口</b>可以在下面选无信号、信号灯或环岛；信号灯还能选<b>相位方案</b>和<b>人行横道</b>。<b>点道路</b>可以逐条车道开关左转、直行、右转和掉头，还能<b>改变车道方向或增加车道</b>。铺新路的操作还没有。',
       'road.rule2': '城里的路<b>直路与弯路交错</b>，每条路<b>一到四条车道</b>。中间的黄线分开对向，白色虚线分开同向车道。<b>连起来的路，弯度是连续的。</b>',
       'road.rule3': '<b>靠右行驶</b>。车辆走自己前进方向右侧的车道。',
       'road.rule4': '地图边缘的虚线是<b>通往其他城市的出入口</b>。车从那里进来，再从别的出入口离开。',
@@ -107,7 +119,11 @@
       'road.crosswalk': '人行横道',
       'road.lanesOf': '{n}车道',
       'road.rule8': '<b>画在车道上的箭头</b>就是这条车道能去的方向。取消左转车道，本来要左转的车<b>会绕别的路</b>。',
-      'road.rule9': '放下<b>人行横道</b>就会有人过街。有信号时红灯过，没有信号时挑车少的空档过；有人在过，车就停。'
+      'road.rule9': '放下<b>人行横道</b>就会有人过街。有信号时红灯过，没有信号时挑车少的空档过；有人在过，车就停。',
+      'road.money': '预算',
+      'road.flip': '改变方向',
+      'road.addLane': '增加车道',
+      'road.rule10': '<b>增加车道要花钱</b>（路越长越贵）。钱在<b>每辆车驶出城外时</b>进账，所以得先把堵点疏通才做得起下一项工程。改变方向只是重划标线，不花钱。'
     },
     'zh-TW': {
       'meta.desc': '轎車、計程車、公車、卡車和機車在直路與彎路交錯的城市裡即時行駛',
@@ -121,7 +137,7 @@
       'road.ctrlNone': '無號誌',
       'road.ctrlSignal': '號誌',
       'road.ctrlCircle': '圓環',
-      'road.rule1': '<b>點路口</b>可以在下面選無號誌、號誌或圓環；號誌還能選<b>時相方案</b>和<b>行人穿越道</b>。<b>點道路</b>可以逐條車道開關左轉、直行、右轉和迴轉。鋪新路的操作還沒有。',
+      'road.rule1': '<b>點路口</b>可以在下面選無號誌、號誌或圓環；號誌還能選<b>時相方案</b>和<b>行人穿越道</b>。<b>點道路</b>可以逐條車道開關左轉、直行、右轉和迴轉，還能<b>改變車道方向或增加車道</b>。鋪新路的操作還沒有。',
       'road.rule2': '城裡的路<b>直路與彎路交錯</b>，每條路<b>一到四條車道</b>。中間的黃線分開對向，白色虛線分開同向車道。<b>連起來的路，彎度是連續的。</b>',
       'road.rule3': '<b>靠右行駛</b>。車輛走自己前進方向右側的車道。',
       'road.rule4': '地圖邊緣的虛線是<b>通往其他城市的出入口</b>。車從那裡進來，再從別的出入口離開。',
@@ -134,7 +150,11 @@
       'road.crosswalk': '行人穿越道',
       'road.lanesOf': '{n}車道',
       'road.rule8': '<b>畫在車道上的箭頭</b>就是這條車道能去的方向。取消左轉車道，本來要左轉的車<b>會繞別的路</b>。',
-      'road.rule9': '放下<b>行人穿越道</b>就會有人過街。有號誌時紅燈過，沒有號誌時挑車少的空檔過；有人在過，車就停。'
+      'road.rule9': '放下<b>行人穿越道</b>就會有人過街。有號誌時紅燈過，沒有號誌時挑車少的空檔過；有人在過，車就停。',
+      'road.money': '預算',
+      'road.flip': '改變方向',
+      'road.addLane': '增加車道',
+      'road.rule10': '<b>增加車道要花錢</b>（路越長越貴）。錢在<b>每輛車駛出城外時</b>進帳，所以得先把塞車處疏通才做得起下一項工程。改變方向只是重劃標線，不花錢。'
     },
     es: {
       'meta.desc': 'Coches, taxis, autobuses, camiones y motos circulan en tiempo real por una ciudad de calles rectas y curvas',
@@ -148,7 +168,7 @@
       'road.ctrlNone': 'Sin señal',
       'road.ctrlSignal': 'Semáforo',
       'road.ctrlCircle': 'Rotonda',
-      'road.rule1': '<b>Toca un cruce</b> y abajo eliges entre sin señal, semáforo o rotonda; el semáforo además lleva <b>plan de fases</b> y <b>paso de peatones</b>. <b>Toca una calle</b> para activar giro a la izquierda, recto, derecha y cambio de sentido en cada carril. Trazar calles nuevas todavía no está.',
+      'road.rule1': '<b>Toca un cruce</b> y abajo eliges entre sin señal, semáforo o rotonda; el semáforo además lleva <b>plan de fases</b> y <b>paso de peatones</b>. <b>Toca una calle</b> para activar giro a la izquierda, recto, derecha y cambio de sentido en cada carril, <b>invertir el sentido de un carril</b> o <b>añadir uno</b>. Trazar calles nuevas todavía no está.',
       'road.rule2': 'La ciudad mezcla <b>calles rectas y curvas</b>, cada una con <b>de uno a cuatro carriles</b>. La línea amarilla separa los sentidos; las rayas blancas separan carriles del mismo sentido. <b>Una calle que continúa mantiene su curva sin quiebros.</b>',
       'road.rule3': 'Se <b>circula por la derecha</b>. Cada vehículo usa los carriles de su propia derecha.',
       'road.rule4': 'Las barras discontinuas del borde del mapa son <b>accesos a otras ciudades</b>. Los vehículos entran por ahí y salen por otro acceso.',
@@ -161,7 +181,11 @@
       'road.crosswalk': 'Paso de peatones',
       'road.lanesOf': '{n} carriles',
       'road.rule8': 'Las <b>flechas pintadas en el carril</b> dicen adónde puede ir. Quita el carril de giro a la izquierda y ese tráfico <b>da la vuelta por otro lado</b>.',
-      'road.rule9': 'Pon un <b>paso de peatones</b> y la gente cruza. Con semáforo cruzan en rojo y sin él aprovechan un hueco; los vehículos paran por quien ya está cruzando.'
+      'road.rule9': 'Pon un <b>paso de peatones</b> y la gente cruza. Con semáforo cruzan en rojo y sin él aprovechan un hueco; los vehículos paran por quien ya está cruzando.',
+      'road.money': 'Presupuesto',
+      'road.flip': 'Cambiar sentido',
+      'road.addLane': 'Añadir carril',
+      'road.rule10': '<b>Añadir un carril cuesta dinero</b> (cuanto más larga la calle, más caro). El dinero entra <b>cada vez que un vehículo sale de la ciudad</b>, así que hay que mantener el tráfico fluyendo para pagar la siguiente obra. Invertir un carril es solo repintar: es gratis.'
     }
   });
 })();

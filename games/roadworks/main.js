@@ -23,6 +23,7 @@ const el = {
   count: document.getElementById('stat-count'),
   speed: document.getElementById('stat-speed'),
   gone: document.getElementById('stat-gone'),
+  money: document.getElementById('stat-money'),
   play: document.getElementById('play'),
   rates: document.getElementById('rates'),
   fresh: document.getElementById('fresh'),
@@ -498,6 +499,13 @@ function paintStats() {
   el.count.textContent = String(s.total);
   el.speed.textContent = String(Math.round(s.speed));
   el.gone.textContent = String(s.arrived);
+  el.money.textContent = String(s.money);
+  // 돈은 차가 빠져나갈 때마다 늘어난다. 패널을 열어 둔 채로 값이 찰 수 있으므로
+  // 공사 단추의 열고 닫힘만 프레임마다 맞춰 준다.
+  if (picked && picked.kind === 'seg') {
+    const add = el.panel.querySelector('[data-add]');
+    if (add) add.disabled = !canAdd(picked.seg);
+  }
 }
 
 // --- 고르기와 패널 ---
@@ -607,7 +615,19 @@ function roadPanel(seg, index) {
     'data-move', move, `<span data-road-icon="${move}"></span>`,
     lane.allow.indexOf(move) >= 0, ' icon',
   )).join('') + '</div>');
+
+  // 방향 바꾸기는 선만 다시 긋는 일이라 값이 없고, 차로를 늘리는 것은 공사라 값이 있다.
+  const cost = Traffic.laneCost(seg);
+  rows.push('<div class="chips">'
+    + `<button class="chip" type="button" data-flip="1">${t('road.flip')}</button>`
+    + `<button class="chip" type="button" data-add="1"${canAdd(seg) ? '' : ' disabled'}>`
+    + `${t('road.addLane')}<b class="cost">${cost}</b></button>`
+    + '</div>');
   return rows.join('');
+}
+
+function canAdd(seg) {
+  return seg.lanes.length < Net.MAX_LANES && world.money >= Traffic.laneCost(seg);
 }
 
 function paintPanel() {
@@ -633,6 +653,15 @@ el.panel.addEventListener('click', (event) => {
   else if (d.plan) Net.setPlan(net, picked.node.id, d.plan);
   else if (d.cross) Net.setCrossing(net, picked.node.id, !picked.node.crossing);
   else if (d.lane) picked.lane = Number(d.lane);
+  else if (d.flip) {
+    Traffic.flipLane(world, picked.seg, picked.lane);
+    buildDeco();
+    picked.lane = Math.min(picked.lane, picked.seg.lanes.length - 1);
+  } else if (d.add) {
+    const dir = picked.seg.lanes[picked.lane].dir;
+    if (!Traffic.buyLane(world, picked.seg, dir).ok) return;
+    buildDeco();
+  }
   else if (d.move) {
     const lane = picked.seg.lanes[picked.lane];
     const next = lane.allow.indexOf(d.move) >= 0
@@ -642,6 +671,7 @@ el.panel.addEventListener('click', (event) => {
   } else if (d.close != null) {
     picked = null;
   }
+
 
   Sound.play('place');
   paintPanel();

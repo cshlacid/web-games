@@ -58,6 +58,13 @@ const RING_GAP = 1.9;
 // 양보선에서 이만큼 앞에 선다. 도는 길이 그 선 위를 지나므로 코를 맞대면 겹친다.
 const RING_STANDOFF = 8;
 
+// 돈. **관문으로 빠져나간 차 한 대가 수입이고, 공사가 지출이다** — 길을 뚫어 차를
+// 흘려보내야 다음 공사를 할 수 있다는 고리가 여기서 생긴다.
+const FARE = 1;
+// 차로 하나를 늘리는 값. 긴 길일수록 비싸다.
+const LANE_COST = 0.55;
+const LANE_MIN = 30;
+
 // 사람. 차가 34쯤으로 달리니 사람은 한참 느리다.
 const WALK_SPEED = 7.5;
 // 횡단보도 한 곳에 사람이 생기는 잦기(초당).
@@ -94,6 +101,8 @@ function create(net, options) {
     spawnDebt: 0,
     maxVehicles: opts.maxVehicles == null ? 260 : opts.maxVehicles,
     arrived: 0,
+    money: opts.money == null ? 420 : opts.money,
+    spent: 0,
   };
 }
 
@@ -182,6 +191,7 @@ function spawn(world, options) {
     id: world.nextId++,
     kind,
     route: path,
+    goal: to.id,   // 길이 바뀌면 여기로 가는 길을 다시 찾는다
     step: 0,
     lane,
     rank: lane.rank,
@@ -194,13 +204,16 @@ function spawn(world, options) {
   return vehicle;
 }
 
-function despawn(world, vehicle) {
+// counted가 거짓이면 도착으로 세지 않는다 — 길이 바뀌어 갈 데가 없어진 차다.
+function despawn(world, vehicle, counted) {
   if (vehicle.claim != null && world.claims.get(vehicle.claim) === vehicle.id) {
     world.claims.delete(vehicle.claim);
   }
   const at = world.vehicles.indexOf(vehicle);
   if (at >= 0) world.vehicles.splice(at, 1);
+  if (counted === false) return;
   world.arrived++;
+  world.money += FARE;
 }
 
 // --- 한 걸음 ---
@@ -236,6 +249,57 @@ function tick(world, dt) {
   // 앞으로 민 뒤에 구간을 넘긴다. 미는 도중에 차로를 갈아 끼우면 같은 프레임에서
   // 남들이 보는 차로 목록과 어긋난다.
   for (const v of world.vehicles.slice()) advance(world, v);
+}
+
+// --- 공사 ---
+
+function laneCost(seg) {
+  return Math.max(LANE_MIN, Math.round(seg.length * LANE_COST));
+}
+
+// 차로 구성을 바꾸면서 **그 위를 달리던 차를 옮겨 준다.** 차로 배열이 통째로 새로
+// 만들어지므로, 그냥 두면 차가 없어진 차로를 붙들고 달린다.
+function reshape(world, seg, apply) {
+  const riders = [];
+  for (const v of world.vehicles) {
+    if (!v.lane.isLink && v.lane.seg === seg.id) {
+      riders.push({ v, dir: v.lane.dir, rank: v.lane.rank, frac: v.s / v.lane.path.total });
+    } else if (v.lane.isLink && v.lane.next.seg === seg.id) {
+      // 교차로를 돌아 이 구간으로 들어오려던 차. 그 곡선이 가리키는 차로만 갈아 끼운다.
+      riders.push({ v, link: true, dir: v.lane.next.dir, rank: v.lane.next.rank });
+    }
+  }
+
+  if (!apply()) return false;
+
+  for (const rider of riders) {
+    const lane = Net.pickLane(seg, rider.dir, rider.rank);
+    // 그 방향이 통째로 사라졌으면(일방통행이 되었으면) 그 차는 갈 데가 없다.
+    if (!lane) { despawn(world, rider.v, false); continue; }
+    if (rider.link) { rider.v.lane.next = lane; continue; }
+    rider.v.lane = lane;
+    rider.v.rank = lane.rank;
+    rider.v.s = Math.min(rider.frac * lane.path.total, lane.path.total);
+  }
+  return true;
+}
+
+// 차로 늘리기. 돈이 드는 유일한 조작이다.
+function buyLane(world, seg, dir) {
+  if (seg.lanes.length >= Net.MAX_LANES) return { ok: false, why: 'full', cost: laneCost(seg) };
+  const cost = laneCost(seg);
+  if (world.money < cost) return { ok: false, why: 'money', cost };
+  if (!reshape(world, seg, () => !!Net.addLane(world.net, seg, dir))) {
+    return { ok: false, why: 'full', cost };
+  }
+  world.money -= cost;
+  world.spent += cost;
+  return { ok: true, cost };
+}
+
+// 방향 바꾸기는 선만 다시 긋는 일이라 값을 받지 않는다.
+function flipLane(world, seg, index) {
+  return reshape(world, seg, () => !!Net.flipLane(world.net, seg, index));
 }
 
 // --- 사람 ---
@@ -607,7 +671,7 @@ function mustYield(world, v, node, gap, holder) {
 // 다음에 탈 길. 실제 차로 다음에는 **교차로를 도는 짧은 곡선**이 오고, 그 곡선
 // 다음에 비로소 다음 구간의 차로가 온다. 길이 끝났으면 null, 갈 차로가 없으면
 // undefined다 — 앞쪽이 비어 있는 것과 막다른 것을 갈라야 한다.
-function nextHolder(world, v) {
+function nextHolder(world, v, retried) {
   if (v.lane.isLink) return v.lane.next;
   const next = v.route[v.step + 1];
   if (!next) return null;
@@ -619,8 +683,24 @@ function nextHolder(world, v) {
     ? Net.movement(world.net, seg, next.dir, Net.segment(world.net, after.seg.id), after.dir)
     : null;
   const lane = Net.pickLane(seg, next.dir, v.rank, need);
-  if (!lane) return undefined;
+
+  // **길이 바뀌었으면 가던 길을 다시 찾는다.** 차로를 뒤집거나 좌회전을 막으면
+  // 이미 달리고 있던 차의 남은 길이 못 쓰는 길이 된다. 그대로 두면 그 차가 차로 끝에
+  // 서서 뒤를 통째로 막는다.
+  const broken = !lane || (need && lane.allow.indexOf(need) < 0);
+  if (broken && !retried && reroute(world, v)) return nextHolder(world, v, true);
+  if (!lane) return null;
+
   return Net.link(v.lane, lane, Net.node(world.net, v.lane.to)) || lane;
+}
+
+function reroute(world, v) {
+  if (v.lane.isLink) return false;
+  const path = Net.route(world.net, v.lane.to, v.goal);
+  if (!path || !path.length) return false;
+  v.route = [{ seg: Net.segment(world.net, v.lane.seg), dir: v.lane.dir }].concat(path);
+  v.step = 0;
+  return true;
 }
 
 function advance(world, v) {
@@ -631,7 +711,12 @@ function advance(world, v) {
     if (v.claim != null && !v.lane.isLink && v.s > v.kind.len) release(world, v);
     return;
   }
-  if (!holder) { despawn(world, v); return; }
+  if (!holder) {
+    // 관문까지 온 차는 도착이고, 갈 데가 없어진 차는 그냥 사라진다.
+    const done = Net.node(world.net, v.lane.to).kind === 'gate';
+    despawn(world, v, done);
+    return;
+  }
 
   const over = v.s - limit;
   if (holder.isLink) {
@@ -672,6 +757,7 @@ function stats(world) {
     counts,
     speed: world.vehicles.length ? speed / world.vehicles.length : 0,
     arrived: world.arrived,
+    money: world.money,
   };
 }
 
@@ -679,7 +765,8 @@ const api = {
   create, step, tick, spawn, despawn, place, stats, idm, ahead, advance, nextHolder,
   signalOf, stepSignals, blocked, ringAhead, crossAhead,
   spawnWalker, stepWalkers, walkerSpot, walkerOn, crossLine,
-  WALK_SPEED, WALK_RATE,
+  laneCost, buyLane, flipLane, reroute,
+  WALK_SPEED, WALK_RATE, FARE, LANE_COST, LANE_MIN,
   KINDS, S0, HEADWAY, STEP, CLAIM_AHEAD, GREEN, AMBER, RING_GAP,
 };
 

@@ -396,5 +396,58 @@ function straight(lanes) {
   check('같은 씨앗은 같은 맵', Gen.city({ seed: 7 }).segs.length, net.segs.length);
 }
 
+// --- 차로 바꾸기 ---
+
+{
+  const net = straight([-1, -1, 1]);
+  const seg = net.segs[0];
+  const back = Net.pickLane(seg, -1, 0);
+  Net.setAllow(back, ['left']);
+
+  Net.addLane(net, seg, 1);
+  check('차로가 늘었다', seg.lanes.length, 4);
+  check('늘린 차로는 그 방향에 붙는다', seg.lanes.filter((l) => l.dir > 0).length, 2);
+  // 방향이 뒤섞이면 차로가 중앙선을 넘나든다. 넣은 자리와 상관없이 정렬해 둔다.
+  check('역방향이 왼쪽에 모인다', seg.lanes.map((l) => l.dir), [-1, -1, 1, 1]);
+  check('건드리지 않은 차로의 허용 이동은 그대로', Net.pickLane(seg, -1, 0).allow, ['left']);
+
+  check('네 차로를 넘기지 않는다', Net.addLane(net, seg, 1), null);
+}
+
+{
+  // 한쪽 차로를 모두 뒤집으면 일방통행이 된다.
+  const net = straight([-1, 1]);
+  const seg = net.segs[0];
+  Net.flipLane(net, seg, 0);
+  check('뒤집은 뒤의 방향', seg.lanes.map((l) => l.dir), [1, 1]);
+  check('일방통행에는 중앙선이 없다',
+    Net.boundaries(seg).some((b) => b.kind === 'center'), false);
+
+  // **길목 캐시를 비워야 한다.** 그 곡선은 옛 차로를 들고 있어, 두면 사라진 차로로
+  // 갈아타게 된다.
+  const other = Net.build(
+    [{ id: 'A', kind: 'gate', x: 0, y: 100 }, { id: 'B', kind: 'joint', x: 200, y: 100 },
+      { id: 'C', kind: 'gate', x: 400, y: 100 }],
+    [{ a: 'A', b: 'B', lanes: [-1, 1] }, { a: 'B', b: 'C', lanes: [-1, 1] }],
+  );
+  const into = Net.pickLane(other.segs[0], 1, 0);
+  Net.link(into, Net.pickLane(other.segs[1], 1, 0), Net.node(other, 'B'));
+  check('길목을 만들어 두었다', into.links.size, 1);
+  Net.flipLane(other, other.segs[1], 0);
+  check('바뀐 구간으로 들어가는 길목은 버려진다', into.links, null);
+}
+
+{
+  // 일방통행이 된 길로는 길을 찾지 못하고 돌아가야 한다.
+  const net = Net.build(
+    [{ id: 'W', kind: 'gate', x: 0, y: 100 }, { id: 'M', kind: 'joint', x: 200, y: 100 },
+      { id: 'E', kind: 'gate', x: 400, y: 100 }],
+    [{ a: 'W', b: 'M', lanes: [-1, 1] }, { a: 'M', b: 'E', lanes: [-1, 1] }],
+  );
+  check('처음에는 돌아올 수 있다', !!Net.route(net, 'E', 'W'), true);
+  Net.flipLane(net, net.segs[1], 0);
+  check('일방통행이 되면 그 길로는 못 온다', Net.route(net, 'E', 'W'), null);
+}
+
 console.log(`${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);
