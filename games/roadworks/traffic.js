@@ -64,6 +64,12 @@ const FARE = 1;
 // 차로 하나를 늘리는 값. 긴 길일수록 비싸다.
 const LANE_COST = 0.55;
 const LANE_MIN = 30;
+// 새 길을 놓는 값. **차로 하나를 늘리는 것보다 비싸다** — 없던 자리에 길을 내는
+// 일이라 땅도 이음매도 새로 든다. 아래값은 아주 짧은 지름길이 공짜가 되지 않게 한다.
+const ROAD_COST = 1.1;
+const ROAD_MIN = 60;
+// 이보다 짧은 길은 놓지 않는다. 양 끝의 교차로 원이 겹쳐 길이 보이지도 않는다.
+const ROAD_SHORT = 44;
 
 // 사람. 차가 34쯤으로 달리니 사람은 한참 느리다.
 const WALK_SPEED = 7.5;
@@ -281,6 +287,153 @@ function reshape(world, seg, apply) {
     rider.v.rank = lane.rank;
     rider.v.s = Math.min(rider.frac * lane.path.total, lane.path.total);
   }
+  return true;
+}
+
+// --- 새 길 놓기 ---
+
+function roadCost(len) {
+  return Math.max(ROAD_MIN, Math.round(len * ROAD_COST));
+}
+
+// 놓을 수 있는가, 값은 얼마인가. **놓기 전에 묻는다** — 확정하기 전에 값을 보여
+// 주어야 하고, 같은 잣대로 두 번 재야 보여 준 값과 치르는 값이 같다.
+function canBuild(world, from, to, handle) {
+  const path = Net.draftPath(world.net, from, to, handle);
+  if (!path) return { ok: false, why: 'spot', cost: 0 };
+  const cost = roadCost(path.total);
+  if (path.total < ROAD_SHORT) return { ok: false, why: 'short', cost };
+  // 같은 구간의 두 자리를 이으면 가르는 순간 뒤쪽 자리가 사라진 구간을 가리킨다.
+  if (from.seg != null && to.seg != null && segIdOf(from) === segIdOf(to)) {
+    return { ok: false, why: 'same', cost };
+  }
+  if (from.node != null && to.node != null && from.node === to.node) {
+    return { ok: false, why: 'same', cost };
+  }
+  // **관문에는 붙이지 않는다.** 도시 밖으로 나가는 입구라 신호도 회전교차로도 놓을
+  // 수 없는 자리인데, 거기에 갈림을 만들면 아무도 가르지 않는 교차로가 생겨 차가
+  // 서로를 통과한다.
+  if (endsAtGate(world.net, from) || endsAtGate(world.net, to)) {
+    return { ok: false, why: 'gate', cost };
+  }
+  if (world.money < cost) return { ok: false, why: 'money', cost };
+  return { ok: true, cost, len: path.total };
+}
+
+function segIdOf(spot) {
+  return typeof spot.seg === 'object' ? spot.seg.id : spot.seg;
+}
+
+// 이 자리가 관문으로 접히는가. 구간 끝에 가까운 자리는 가르지 않고 그 끝 점을 쓰므로
+// (`Net.splitSeg`), 가르기 전에 같은 잣대로 미리 본다.
+function endsAtGate(net, spot) {
+  if (spot.node != null) {
+    const at = Net.node(net, spot.node);
+    return !!at && at.kind === 'gate';
+  }
+  const seg = typeof spot.seg === 'object' ? spot.seg : Net.segment(net, spot.seg);
+  if (!seg) return false;
+  if (spot.s < Net.MIN_STUB) return Net.node(net, seg.a).kind === 'gate';
+  if (seg.length - spot.s < Net.MIN_STUB) return Net.node(net, seg.b).kind === 'gate';
+  return false;
+}
+
+// **길을 놓는다.** 자리가 길 한복판이면 그 길이 갈리므로, 그 위를 달리던 차를 새
+// 토막으로 옮겨 태우고 모두에게 길을 다시 잡아 준다.
+function buildRoad(world, from, to, handle) {
+  const able = canBuild(world, from, to, handle);
+  if (!able.ok) return able;
+
+  const marks = world.vehicles.map((v) => mark(v));
+  const made = Net.connect(world.net, from, to, handle);
+  if (!made) return { ok: false, why: 'spot', cost: able.cost };
+
+  for (const it of marks) remap(it, made.splits);
+  for (const it of marks) {
+    if (!replan(world, it)) despawn(world, it.v, false);
+  }
+  world.money -= able.cost;
+  world.spent += able.cost;
+  return { ok: true, cost: able.cost, seg: made.seg, at: made.at };
+}
+
+// 차가 지금 어디에 있는지를 **갈라지기 전의 말로** 적어 둔다. 갈리고 나면 들고 있던
+// 차로도 경로에 적힌 구간도 없는 것이 된다.
+function mark(v) {
+  const lane = v.lane.isLink ? v.lane.next : v.lane;
+  const on = v.lane.isLink ? null : { frac: v.s / v.lane.path.total };
+  return {
+    v,
+    link: v.lane.isLink,
+    node: v.lane.isLink ? v.lane.node : null,
+    seg: lane.seg,
+    dir: lane.dir,
+    rank: lane.rank,
+    on,
+    // 교차로 안에 있는 차가 어느 갈래에서 들어왔는지. 이것이 없으면 신호가 그 차를
+    // 어느 현시로 셀지 알 수 없다.
+    origin: v.route[v.step] || null,
+  };
+}
+
+// 갈라진 구간 위의 차를 두 토막 중 맞는 쪽으로 옮긴다.
+function remap(it, splits) {
+  // **지나온 걸음은 차로와 따로 본다.** 갈라진 구간에서 나와 갈라지지 않은 구간으로
+  // 들어가던 차가 있어, 차로가 멀쩡하다고 지나온 걸음까지 멀쩡한 것은 아니다.
+  it.origin = remapEntry(it.origin, splits);
+
+  const cut = splits.find((c) => c.was.id === it.seg);
+  if (!cut) return;
+  const [head, tail] = cut.segs;
+
+  if (it.link) {
+    // 교차로를 돌아 들어오려던 차. 그 교차로에 닿아 있는 토막이 갈 곳이다.
+    const seg = it.node === cut.was.a ? head : tail;
+    const lane = Net.pickLane(seg, it.dir, it.rank);
+    if (lane) it.v.lane.next = lane;
+    return;
+  }
+
+  // A에서 잰 비율로 어느 토막인지 가른다. 차로는 밀려 있어 길이가 조금 다르지만,
+  // 비율로 옮기면 그 차이만큼만 어긋나고 앞뒤로 튀지 않는다.
+  const fromA = it.dir > 0 ? it.on.frac : 1 - it.on.frac;
+  const first = fromA <= cut.q;
+  const seg = first ? head : tail;
+  const local = first ? fromA / cut.q : (fromA - cut.q) / (1 - cut.q);
+  const lane = Net.pickLane(seg, it.dir, it.rank);
+  if (!lane) return;
+  it.v.lane = lane;
+  it.v.rank = lane.rank;
+  it.v.s = Math.max(0, Math.min(1, it.dir > 0 ? local : 1 - local)) * lane.path.total;
+}
+
+// 경로에 적힌 한 걸음을 갈라진 뒤의 말로 옮긴다. 어느 토막인지는 그 걸음이 향하던
+// 쪽으로 가른다 — 정방향이면 뒤 토막에서, 역방향이면 앞 토막에서 빠져나온다.
+function remapEntry(entry, splits) {
+  if (!entry) return null;
+  const cut = splits.find((c) => c.was.id === entry.seg.id);
+  if (!cut) return entry;
+  const [head, tail] = cut.segs;
+  return { seg: entry.dir > 0 ? tail : head, dir: entry.dir };
+}
+
+// 판이 바뀌었으니 남은 길을 다시 잡는다. **잇는 곡선 위의 차는 그 곡선이 가리키는
+// 차로에서부터 잡는다** — 곡선의 `to`는 지금 서 있는 교차로라 거기서 길을 찾으면
+// 제자리다. 지나온 걸음을 앞에 두는 것은 곡선에서 내려설 때 `step`이 하나 밀리기
+// 때문이고, 교차로 안의 차가 어느 갈래에서 왔는지도 그 걸음으로 읽는다.
+//
+// **남은 길이 비어 있어도 괜찮다.** 다음 교차로가 곧 목적지인 차가 그렇고, 이것을
+// 실패로 보면 다 와서 사라진다.
+function replan(world, it) {
+  const v = it.v;
+  const lane = v.lane.isLink ? v.lane.next : v.lane;
+  const seg = Net.segment(world.net, lane.seg);
+  if (!seg) return false;
+  const rest = Net.route(world.net, lane.to, v.goal);
+  if (!rest) return false;
+  const here = { seg, dir: lane.dir };
+  v.route = (v.lane.isLink ? [it.origin || here, here] : [here]).concat(rest);
+  v.step = 0;
   return true;
 }
 
@@ -765,8 +918,8 @@ const api = {
   create, step, tick, spawn, despawn, place, stats, idm, ahead, advance, nextHolder,
   signalOf, stepSignals, blocked, ringAhead, crossAhead,
   spawnWalker, stepWalkers, walkerSpot, walkerOn, crossLine,
-  laneCost, buyLane, flipLane, reroute,
-  WALK_SPEED, WALK_RATE, FARE, LANE_COST, LANE_MIN,
+  laneCost, buyLane, flipLane, reroute, roadCost, canBuild, buildRoad,
+  WALK_SPEED, WALK_RATE, FARE, LANE_COST, LANE_MIN, ROAD_COST, ROAD_MIN, ROAD_SHORT,
   KINDS, S0, HEADWAY, STEP, CLAIM_AHEAD, GREEN, AMBER, RING_GAP,
 };
 
