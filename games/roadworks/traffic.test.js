@@ -585,9 +585,9 @@ function walkerOn(world, net, nodeId, segId, dir) {
   world.money = 9000;
   check('사면 차로가 는다', T.buyLane(world, seg, 1).ok && seg.lanes.length, 3);
   check('쓴 만큼 줄었다', world.money, 9000 - world.spent);
-  T.buyLane(world, seg, 1);
+  while (seg.lanes.length < Net.MAX_LANES) T.buyLane(world, seg, 1);
   const full = T.buyLane(world, seg, 1);
-  check('네 차로가 끝이다', [full.ok, full.why, seg.lanes.length], [false, 'full', 4]);
+  check('한도가 끝이다', [full.ok, full.why, seg.lanes.length], [false, 'full', Net.MAX_LANES]);
 }
 
 {

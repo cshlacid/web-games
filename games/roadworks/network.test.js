@@ -396,7 +396,8 @@ function straight(lanes) {
   }
   check('관문끼리 모두 이어진다', reachable, true);
 
-  check('차로는 1~4', net.segs.every((s) => s.lanes.length >= 1 && s.lanes.length <= 4), true);
+  check('차로는 1부터 한도까지',
+    net.segs.every((s) => s.lanes.length >= 1 && s.lanes.length <= Net.MAX_LANES), true);
 
   // **우측 통행이 맵 전체에서 지켜진다.** 오프셋은 A→B의 오른쪽을 양으로 재므로,
   // 정방향 차로는 전부 역방향 차로보다 오른쪽에 있어야 한다. 가운데(0)를 기준으로
@@ -428,7 +429,10 @@ function straight(lanes) {
   check('역방향이 왼쪽에 모인다', seg.lanes.map((l) => l.dir), [-1, -1, 1, 1]);
   check('건드리지 않은 차로의 허용 이동은 그대로', Net.pickLane(seg, -1, 0).allow, ['left']);
 
-  check('네 차로를 넘기지 않는다', Net.addLane(net, seg, 1), null);
+  // 한도까지 채우면 더는 붙지 않는다. 숫자는 `MAX_LANES`가 정한다.
+  while (seg.lanes.length < Net.MAX_LANES) Net.addLane(net, seg, 1);
+  check('한도를 넘기지 않는다', Net.addLane(net, seg, 1), null);
+  check('한도까지는 는다', seg.lanes.length, Net.MAX_LANES);
 }
 
 {
@@ -544,6 +548,18 @@ function straight(lanes) {
   near('손잡이가 없으면 곧다', distTo(flat.seg.center, { x: 100, y: 0 }), 0, 0.01);
 
   check('같은 점끼리는 잇지 않는다', Net.connect(net, { node: 'A' }, { node: 'A' }), null);
+}
+
+{
+  // **가르는 자리는 길 폭을 탄다.** 교차로 원이 길 폭의 절반이라, 넓은 길에서 짧은
+  // 토막을 내면 양 끝의 원 둘이 그 토막을 통째로 덮어 길이 사라진다.
+  const wide = straight([-1, -1, -1, -1, 1, 1, 1, 1]);
+  check('여덟 차로', [wide.segs[0].lanes.length, wide.segs[0].width], [8, 80]);
+  check('넓은 길은 더 멀리서 가른다', Net.stubOf(wide.segs[0]) > Net.stubOf(straight([-1, 1]).segs[0]), true);
+  const cut = Net.splitSeg(wide, wide.segs[0], 40);
+  check('원에 덮일 자리는 가르지 않는다', [cut.at.id, wide.segs.length], ['A', 1]);
+  const ok = Net.splitSeg(wide, wide.segs[0], wide.segs[0].length / 2);
+  check('가운데는 가른다', ok.segs.length, 2);
 }
 
 console.log(`${passed}개 통과, ${failed}개 실패`);

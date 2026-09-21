@@ -333,8 +333,9 @@ function endsAtGate(net, spot) {
   }
   const seg = typeof spot.seg === 'object' ? spot.seg : Net.segment(net, spot.seg);
   if (!seg) return false;
-  if (spot.s < Net.MIN_STUB) return Net.node(net, seg.a).kind === 'gate';
-  if (seg.length - spot.s < Net.MIN_STUB) return Net.node(net, seg.b).kind === 'gate';
+  const stub = Net.stubOf(seg);
+  if (spot.s < stub) return Net.node(net, seg.a).kind === 'gate';
+  if (seg.length - spot.s < stub) return Net.node(net, seg.b).kind === 'gate';
   return false;
 }
 
