@@ -640,5 +640,123 @@ function walkerOn(world, net, nodeId, segId, dir) {
   check('돌아서라도 닿는다', world.arrived, 1);
 }
 
+// --- 새 길 놓기 ---
+
+// 나란한 두 길. 이어 붙이기 전에는 서로 오갈 수 없다.
+function ladder() {
+  return Net.build(
+    [{ id: 'W1', kind: 'gate', x: 0, y: 0 }, { id: 'E1', kind: 'gate', x: 400, y: 0 },
+      { id: 'W2', kind: 'gate', x: 0, y: 180 }, { id: 'E2', kind: 'gate', x: 400, y: 180 }],
+    [{ a: 'W1', b: 'E1', lanes: [-1, 1] }, { a: 'W2', b: 'E2', lanes: [-1, 1] }],
+  );
+}
+
+{
+  const world = T.create(ladder(), { rng: seeded(21), spawnRate: 0, money: 9000 });
+  const [top, bottom] = world.net.segs;
+  const from = { seg: top.id, s: 200 };
+  const to = { seg: bottom.id, s: 200 };
+
+  const able = T.canBuild(world, from, to);
+  check('놓을 수 있다', able.ok, true);
+  check('값은 길이에 비례한다', able.cost, Math.round(able.len * T.ROAD_COST));
+
+  const made = T.buildRoad(world, from, to);
+  check('놓였다', made.ok, true);
+  check('값을 치렀다', [world.money, world.spent], [9000 - made.cost, made.cost]);
+  check('새 길은 1차로', made.seg.lanes.length, 1);
+  check('두 길이 갈려 다섯이 된다', world.net.segs.length, 5);
+  check('새로 난 길로 오갈 수 있다', !!Net.route(world.net, 'W1', 'E2'), true);
+}
+
+{
+  const world = T.create(ladder(), { rng: seeded(22), spawnRate: 0, money: 40 });
+  const [top, bottom] = world.net.segs;
+  const poor = T.buildRoad(world, { seg: top.id, s: 200 }, { seg: bottom.id, s: 200 });
+  check('돈이 모자라면 못 놓는다', [poor.ok, poor.why], [false, 'money']);
+  check('판도 그대로', world.net.segs.length, 2);
+
+  world.money = 9000;
+  const same = T.buildRoad(world, { seg: top.id, s: 100 }, { seg: top.id, s: 300 });
+  check('같은 길의 두 자리는 잇지 않는다', [same.ok, same.why], [false, 'same']);
+
+  check('같은 점끼리도 잇지 않는다', T.buildRoad(world, { node: 'W1' }, { node: 'W1' }).ok, false);
+
+  // **관문에는 붙이지 않는다.** 신호도 회전교차로도 놓을 수 없는 자리라, 거기에
+  // 갈림을 만들면 아무도 가르지 않는 교차로가 생긴다. 구간 끝에 가까운 자리는
+  // 가르지 않고 그 끝 점을 쓰므로, 관문 코앞도 같이 막는다.
+  const atGate = T.buildRoad(world, { seg: top.id, s: 200 }, { node: 'W2' });
+  check('관문 자체', [atGate.ok, atGate.why], [false, 'gate']);
+  const nearGate = T.buildRoad(world, { seg: top.id, s: 200 }, { seg: bottom.id, s: 4 });
+  check('관문 코앞', [nearGate.ok, nearGate.why], [false, 'gate']);
+  check('막힌 뒤에도 판은 그대로', world.net.segs.length, 2);
+
+  // 너무 짧으면 양 끝의 교차로가 겹쳐 길이 보이지도 않는다.
+  const stub = T.buildRoad(world, { seg: top.id, s: 200 }, { seg: bottom.id, s: 210 });
+  void stub;
+}
+
+{
+  // 짧은 길은 거절한다. 나란한 두 길을 아주 가깝게 두고 재 본다.
+  const net = Net.build(
+    [{ id: 'W1', kind: 'gate', x: 0, y: 0 }, { id: 'E1', kind: 'gate', x: 400, y: 0 },
+      { id: 'W2', kind: 'gate', x: 0, y: 30 }, { id: 'E2', kind: 'gate', x: 400, y: 30 }],
+    [{ a: 'W1', b: 'E1', lanes: [-1, 1] }, { a: 'W2', b: 'E2', lanes: [-1, 1] }],
+  );
+  const world = T.create(net, { rng: seeded(24), spawnRate: 0, money: 9000 });
+  const from = { seg: net.segs[0].id, s: 200 };
+  const to = { seg: net.segs[1].id, s: 200 };
+  check('너무 짧으면 못 놓는다', T.canBuild(world, from, to).why, 'short');
+  // 손잡이로 굽히면 길어져 놓을 수 있다.
+  check('굽히면 놓을 수 있다', T.canBuild(world, from, to, { x: 200, y: 120 }).ok, true);
+}
+
+{
+  // **놓는 순간 그 위를 달리던 차가 튀지 않는다.** 길이 갈리면 차가 들고 있던 차로가
+  // 통째로 사라지므로, 두 토막 중 맞는 쪽의 같은 자리로 옮겨 태워야 한다.
+  const world = T.create(ladder(), { rng: seeded(23), spawnRate: 0, money: 9000 });
+  const [top, bottom] = world.net.segs;
+  for (const [from, to] of [['W1', 'E1'], ['E1', 'W1'], ['W2', 'E2']]) T.spawn(world, { from, to });
+  run(world, 8);
+  const was = new Map(world.vehicles.map((v) => [v.id, T.place(v)]));
+  const count = world.vehicles.length;
+
+  T.buildRoad(world, { seg: top.id, s: 200 }, { seg: bottom.id, s: 200 });
+  check('차가 사라지지 않는다', world.vehicles.length, count);
+  let jump = 0;
+  for (const v of world.vehicles) {
+    const at = T.place(v);
+    const before = was.get(v.id);
+    jump = Math.max(jump, Math.hypot(at.x - before.x, at.y - before.y));
+  }
+  near('제자리에 남는다', jump, 0, 2);
+  check('갈린 길 위에 탔다',
+    world.vehicles.every((v) => world.net.segs.indexOf(Net.segment(world.net, v.lane.seg)) >= 0), true);
+
+  // 갈라진 뒤에도 가던 데까지 간다.
+  run(world, 60);
+  check('모두 도착한다', world.arrived, count);
+}
+
+{
+  // 맵 위에서 길을 놓고 한참 돌려도 터지지 않아야 한다. 길이 갈리면 경로에 적힌
+  // 구간이 통째로 사라지므로, 남은 길을 모두 다시 잡아 주지 않으면 여기서 터진다.
+  const net = Gen.city({ seed: 5 });
+  const world = T.create(net, { rng: seeded(5), spawnRate: 2.5, money: 9000 });
+  run(world, 40);
+  const before = world.vehicles.length;
+  const a = net.segs[2];
+  const b = net.segs[8];
+  const made = T.buildRoad(world, { seg: a.id, s: a.length * 0.45 }, { seg: b.id, s: b.length * 0.55 });
+  check('맵 위에서도 놓인다', made.ok, true);
+  check('놓는다고 차가 사라지지 않는다', world.vehicles.length, before);
+
+  const goal = world.arrived;
+  run(world, 90);
+  check('놓은 뒤에도 차가 계속 빠져나간다', world.arrived > goal, true);
+  check('길 밖으로 나간 차가 없다',
+    world.vehicles.every((v) => v.s >= -1 && v.s <= v.lane.path.total + 1), true);
+}
+
 console.log(`${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);

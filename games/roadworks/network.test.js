@@ -3,6 +3,7 @@
 // 실행: node games/roadworks/network.test.js
 const Net = require('./network.js');
 const Gen = require('./mapgen.js');
+const Geom = require('./geom.js');
 
 let passed = 0;
 let failed = 0;
@@ -17,6 +18,22 @@ function check(name, actual, expected) {
 function near(name, actual, expected, slack = 0.5) {
   if (Math.abs(actual - expected) <= slack) passed++;
   else { failed++; console.log(`실패: ${name}\n  결과 ${actual}\n  기대 ${expected} ±${slack}`); }
+}
+
+// 꺾은선 위에서 점까지의 가장 가까운 거리.
+function distTo(path, spot) {
+  let best = Infinity;
+  for (let i = 1; i < path.points.length; i++) {
+    const a = path.points[i - 1];
+    const b = path.points[i];
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const len2 = dx * dx + dy * dy;
+    let t = len2 ? ((spot.x - a.x) * dx + (spot.y - a.y) * dy) / len2 : 0;
+    t = Math.max(0, Math.min(1, t));
+    best = Math.min(best, Math.hypot(spot.x - (a.x + dx * t), spot.y - (a.y + dy * t)));
+  }
+  return best;
 }
 
 // 동쪽으로 뻗은 곧은 길 하나.
@@ -447,6 +464,86 @@ function straight(lanes) {
   check('처음에는 돌아올 수 있다', !!Net.route(net, 'E', 'W'), true);
   Net.flipLane(net, net.segs[1], 0);
   check('일방통행이 되면 그 길로는 못 온다', Net.route(net, 'E', 'W'), null);
+}
+
+// --- 길 가르기와 새 길 ---
+
+{
+  const net = straight([-1, 1]);
+  const was = net.segs[0];
+  const spots = [];
+  for (let d = 10; d < was.length - 10; d += 10) spots.push(Geom.at(was.center, d));
+
+  const cut = Net.splitSeg(net, was, was.length * 0.4);
+  check('둘로 갈린다', [net.segs.length, cut.segs.length], [2, 2]);
+  check('가른 자리에 점이 난다', cut.at.kind, 'joint');
+  check('두 토막을 합치면 길이가 같다',
+    Math.abs(cut.segs[0].length + cut.segs[1].length - was.length) < 0.5, true);
+  check('차로 방향은 그대로', cut.segs[0].lanes.map((l) => l.dir), [-1, 1]);
+  check('양쪽 점에 붙는다',
+    [Net.node(net, 'A').segs.length, cut.at.segs.length, Net.node(net, 'B').segs.length],
+    [1, 2, 1]);
+
+  // **갈라도 길이 있던 자리를 그대로 지난다.** 점을 다시 꿰어 만들면 갈라진 자리에서
+  // 어긋나, 그 위를 달리던 차가 옆으로 튄다.
+  let off = 0;
+  for (const spot of spots) {
+    let best = Infinity;
+    for (const seg of cut.segs) best = Math.min(best, distTo(seg.center, spot));
+    off = Math.max(off, best);
+  }
+  near('가른 길이 원래 자리를 지난다', off, 0, 0.05);
+
+  // 갈라도 길은 이어져 있어야 한다.
+  check('갈라도 오갈 수 있다', [!!Net.route(net, 'A', 'B'), !!Net.route(net, 'B', 'A')], [true, true]);
+}
+
+{
+  // 끝에 너무 가까우면 가르지 않고 그 끝을 쓴다. 길이가 0에 가까운 토막에는 차로를
+  // 깔 수 없다.
+  const net = straight([-1, 1]);
+  const head = Net.splitSeg(net, net.segs[0], 2);
+  check('앞 끝에서는 그 점을 쓴다', [head.at.id, net.segs.length], ['A', 1]);
+  const tailNet = straight([-1, 1]);
+  const tail = Net.splitSeg(tailNet, tailNet.segs[0], tailNet.segs[0].length - 2);
+  check('뒤 끝에서도 그 점을 쓴다', [tail.at.id, tailNet.segs.length], ['B', 1]);
+}
+
+{
+  // 나란한 두 길을 이어 본다. 한복판에서 한복판으로.
+  const net = Net.build(
+    [{ id: 'W1', kind: 'gate', x: 0, y: 0 }, { id: 'E1', kind: 'gate', x: 300, y: 0 },
+      { id: 'W2', kind: 'gate', x: 0, y: 200 }, { id: 'E2', kind: 'gate', x: 300, y: 200 }],
+    [{ a: 'W1', b: 'E1', lanes: [-1, 1] }, { a: 'W2', b: 'E2', lanes: [-1, 1] }],
+  );
+  check('처음에는 갈 수 없다', Net.route(net, 'W1', 'W2'), null);
+
+  const made = Net.connect(net, { seg: net.segs[0], s: 150 }, { seg: net.segs[1], s: 150 });
+  check('길이 넷으로 갈리고 하나가 더 놓인다', net.segs.length, 5);
+  check('새 길은 1차로', made.seg.lanes.length, 1);
+  check('새 길의 양 끝이 교차로가 된다',
+    made.at.map((n) => Net.canControl(n)), [true, true]);
+  check('이어 놓으면 갈 수 있다', !!Net.route(net, 'W1', 'W2'), true);
+
+  // 1차로는 한 방향뿐이라 거꾸로는 못 간다. 늘려야 오간다.
+  check('1차로는 일방통행', Net.route(net, 'W2', 'W1'), null);
+  Net.addLane(net, made.seg, -1);
+  check('차로를 늘리면 오간다', !!Net.route(net, 'W2', 'W1'), true);
+}
+
+{
+  // 손잡이를 쥐고 굽힌 길은 그 자리를 지나야 한다.
+  const net = Net.build(
+    [{ id: 'A', kind: 'gate', x: 0, y: 0 }, { id: 'B', kind: 'gate', x: 200, y: 0 }],
+    [],
+  );
+  const handle = { x: 100, y: 80 };
+  const made = Net.connect(net, { node: 'A' }, { node: 'B' }, handle);
+  near('굽힌 길이 손잡이 가까이 지난다', distTo(made.seg.center, handle), 40, 2);
+  const flat = Net.connect(net, { node: 'A' }, { node: 'B' });
+  near('손잡이가 없으면 곧다', distTo(flat.seg.center, { x: 100, y: 0 }), 0, 0.01);
+
+  check('같은 점끼리는 잇지 않는다', Net.connect(net, { node: 'A' }, { node: 'A' }), null);
 }
 
 console.log(`${passed}개 통과, ${failed}개 실패`);

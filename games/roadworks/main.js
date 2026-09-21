@@ -70,6 +70,8 @@ let rate = 1;
 let last = 0;
 let seed = 1;
 let picked = null;   // 고른 교차로나 길
+let draft = null;    // 놓기를 기다리는 새 길
+let drag = null;     // 지금 끌고 있는 것
 
 // --- 판 만들기 ---
 
@@ -78,6 +80,8 @@ function fresh(nextSeed) {
   net = Gen.city({ seed });
   world = Traffic.create(net, { spawnRate: 1.7 });
   picked = null;
+  draft = null;
+  drag = null;
   buildDeco();
   layout();
   paintPanel();
@@ -160,8 +164,13 @@ function drawRoads() {
 
   // 교차로. 맞닿은 길 중 가장 넓은 것에 맞춰 원으로 덮는다. 회전교차로는 섬을
   // 두를 자리가 있어야 하므로 더 넓다.
+  //
+  // **갈림이 없는 이음매에는 그리지 않는다.** 길이 그저 꺾이기만 하는 자리까지
+  // 원으로 덮으면 없는 교차로가 길가에 불룩하게 튀어나와, 신호를 놓을 수 있는 자리와
+  // 그럴 수 없는 자리가 화면에서 구별되지 않는다. 거기는 두 구간의 접선이 이어져
+  // 있어 덮지 않아도 이음매가 보이지 않는다.
   for (const node of net.nodes) {
-    if (node.kind === 'gate') continue;
+    if (!Net.canControl(node)) continue;
     const radius = node.control === 'circle' ? Net.reach(node) + 3 : node.radius;
     ctx.beginPath();
     ctx.arc(node.x, node.y, radius + 1.2, 0, Math.PI * 2);
@@ -173,23 +182,26 @@ function drawRoads() {
     ctx.fill();
   }
 
-  // 차선과 중앙선. 교차로 안에서는 끊어야 하므로 양 끝을 조금 잘라 그린다.
+  // 차선과 중앙선. 교차로 안에서는 끊어야 하므로 그쪽 끝을 조금 잘라 그린다.
+  // **갈림이 없는 이음매에서는 자르지 않는다** — 덮을 교차로가 없어 선만 끊긴다.
   for (const seg of net.segs) {
     const item = deco.get(seg.id);
-    const trim = seg.width / 2 + 3;
+    const cut = seg.width / 2 + 3;
+    const head = Net.canControl(Net.node(net, seg.a)) ? cut : 0;
+    const tail = Net.canControl(Net.node(net, seg.b)) ? cut : 0;
     for (const path of item.dashes) {
-      strokeTrimmed(path, trim, { color: skin.dash, width: 0.9, dash: [7, 9], alpha: 0.75 });
+      strokeTrimmed(path, head, tail, { color: skin.dash, width: 0.9, dash: [7, 9], alpha: 0.75 });
     }
     for (const path of item.middles) {
-      strokeTrimmed(path, trim, { color: skin.middle, width: 1.4, alpha: 0.9 });
+      strokeTrimmed(path, head, tail, { color: skin.middle, width: 1.4, alpha: 0.9 });
     }
   }
 }
 
 // 양 끝을 잘라 그린다. 교차로 원 안까지 차선을 그으면 교차로가 격자무늬가 된다.
-function strokeTrimmed(path, trim, style) {
-  const from = Math.min(trim, path.total / 2 - 1);
-  const to = path.total - from;
+function strokeTrimmed(path, headTrim, tailTrim, style) {
+  const from = Math.min(headTrim, path.total / 2 - 1);
+  const to = path.total - Math.min(tailTrim, path.total / 2 - 1);
   if (to <= from) return;
   ctx.beginPath();
   const steps = Math.max(2, Math.ceil((to - from) / 4));
@@ -338,6 +350,76 @@ function drawPick() {
   ctx.setLineDash([]);
 }
 
+// 놓기를 기다리는 길과, 지금 끌고 있는 선. **차 위에 그린다** — 이것은 판 위의
+// 길이 아니라 손이 그리는 중인 선이라, 차에 가려지면 어디로 긋고 있는지 보이지 않는다.
+function drawDraft() {
+  if (drag && drag.kind === 'line' && drag.moved && drag.from) {
+    ctx.strokeStyle = skin.pick;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 5]);
+    ctx.beginPath();
+    ctx.moveTo(drag.from.x, drag.from.y);
+    ctx.lineTo(drag.cur.x, drag.cur.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    dot(drag.from.x, drag.from.y, 4);
+    if (drag.to) dot(drag.to.x, drag.to.y, 5);
+  }
+
+  if (!draft || !draft.path) return;
+  const ok = draft.able.ok;
+  // 놓이면 어떤 폭인지 그대로 보여 준다. 실선으로 그으면 이미 놓인 길처럼 보인다.
+  ctx.save();
+  ctx.globalAlpha = 0.35;
+  trace(draft.path);
+  ctx.strokeStyle = ok ? skin.asphalt : skin.red;
+  ctx.lineWidth = Net.LANE_W;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+  ctx.restore();
+
+  trace(draft.path);
+  ctx.strokeStyle = ok ? skin.pick : skin.red;
+  ctx.lineWidth = 1.8;
+  ctx.setLineDash([6, 5]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // 1차로는 한 방향뿐이다. 어느 쪽으로 가는 길인지 촉으로 보인다.
+  const tipAt = Geom.at(draft.path, draft.path.total - 6);
+  ctx.save();
+  ctx.translate(tipAt.x, tipAt.y);
+  ctx.rotate(Math.atan2(tipAt.dy, tipAt.dx));
+  ctx.fillStyle = ok ? skin.pick : skin.red;
+  ctx.beginPath();
+  ctx.moveTo(5, 0);
+  ctx.lineTo(-3, 3.4);
+  ctx.lineTo(-3, -3.4);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  ctx.fillStyle = ok ? skin.pick : skin.red;
+  dot(draft.from.x, draft.from.y, 4);
+  dot(draft.to.x, draft.to.y, 4);
+
+  // 손잡이. **잡을 것이 있다는 게 보여야 굽힐 생각을 한다.**
+  ctx.beginPath();
+  ctx.arc(draft.handle.x, draft.handle.y, 7, 0, Math.PI * 2);
+  ctx.fillStyle = skin.ground;
+  ctx.fill();
+  ctx.strokeStyle = ok ? skin.pick : skin.red;
+  ctx.lineWidth = 2.4;
+  ctx.stroke();
+}
+
+function dot(x, y, r) {
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fillStyle = skin.pick;
+  ctx.fill();
+}
+
 // 교차로에 놓인 것. 회전교차로는 섬으로, 신호등은 갈래마다의 등으로 보인다.
 function drawControls() {
   for (const node of net.nodes) {
@@ -479,6 +561,7 @@ function draw() {
   drawPick();
   drawVehicles();
   drawWalkers();
+  drawDraft();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   void dpr;
 }
@@ -506,6 +589,10 @@ function paintStats() {
     const add = el.panel.querySelector('[data-add]');
     if (add) add.disabled = !canAdd(picked.seg);
   }
+  if (draft) {
+    const able = Traffic.canBuild(world, spotArg(draft.from), spotArg(draft.to), draft.handle);
+    if (able.ok !== draft.able.ok) { draft.able = able; paintPanel(); }
+  }
 }
 
 // --- 고르기와 패널 ---
@@ -530,9 +617,11 @@ function junctionAt(spot) {
   return best && best.node;
 }
 
-// 꺾은선 위에서 점에 가장 가까운 거리. 길을 눌렀는지 보려면 이것이 필요하다.
-function distToPath(path, spot) {
-  let best = Infinity;
+// 꺾은선 위에서 점에 가장 가까운 자리. **거리만이 아니라 "그 길의 어디쯤"까지**
+// 돌려준다 — 새 길은 아무 데서나 뻗어 나가므로 누른 자리를 길 위의 거리로 알아야
+// 그 자리에서 길을 가를 수 있다.
+function nearestOn(path, spot) {
+  let best = { d: Infinity, s: 0 };
   for (let i = 1; i < path.points.length; i++) {
     const a = path.points[i - 1];
     const b = path.points[i];
@@ -541,7 +630,8 @@ function distToPath(path, spot) {
     const len2 = dx * dx + dy * dy;
     let t = len2 ? ((spot.x - a.x) * dx + (spot.y - a.y) * dy) / len2 : 0;
     t = Math.max(0, Math.min(1, t));
-    best = Math.min(best, Math.hypot(spot.x - (a.x + dx * t), spot.y - (a.y + dy * t)));
+    const d = Math.hypot(spot.x - (a.x + dx * t), spot.y - (a.y + dy * t));
+    if (d < best.d) best = { d, s: path.cum[i - 1] + Math.sqrt(len2) * t };
   }
   return best;
 }
@@ -549,28 +639,105 @@ function distToPath(path, spot) {
 function roadAt(spot) {
   let best = null;
   for (const seg of net.segs) {
-    const d = distToPath(seg.center, spot);
-    if (d > seg.width / 2 + 6) continue;
-    if (!best || d < best.d) best = { seg, d };
+    const hit = nearestOn(seg.center, spot);
+    if (hit.d > seg.width / 2 + 6) continue;
+    if (!best || hit.d < best.d) best = { seg, d: hit.d, s: hit.s };
   }
-  return best && best.seg;
+  return best;
 }
 
-function pickAt(event) {
-  const spot = spotOf(event);
+// 누른 자리가 무엇인가. 고르는 것도 길을 뻗는 것도 이 하나를 쓴다 — 짚어 주는 자리와
+// 길이 붙는 자리가 갈리면 손가락이 짚은 곳과 다른 데서 길이 나간다.
+function anchorAt(spot) {
   const node = junctionAt(spot);
-  if (node) return { kind: 'node', node };
-  const seg = roadAt(spot);
-  if (seg) return { kind: 'seg', seg, lane: 0 };
-  return null;
+  if (node) return { kind: 'node', node, x: node.x, y: node.y };
+  const hit = roadAt(spot);
+  if (!hit) return null;
+  const at = Geom.at(hit.seg.center, hit.s);
+  return { kind: 'seg', seg: hit.seg, s: hit.s, lane: 0, x: at.x, y: at.y };
 }
 
-el.canvas.addEventListener('click', (event) => {
-  const hit = pickAt(event);
-  picked = hit;
-  Sound.play(hit ? 'pick' : 'clear');
-  paintPanel();
+// traffic에 넘기는 말. 화면은 구간 객체를 들고 있지만 규칙 쪽은 id로 받는다.
+function spotArg(a) {
+  return a.kind === 'node' ? { node: a.node.id } : { seg: a.seg.id, s: a.s };
+}
+
+// --- 손가락 ---
+
+// **click을 쓰지 않는다.** 판은 끌어서 길을 놓는 자리라 `touch-action: none`이고,
+// 그 자리에서는 `shared/base.js`가 touchend를 취소해 click이 나지 않는다.
+// 고르기는 "거의 움직이지 않은 손가락"으로 가른다.
+const DRAG_SLOP = 7;
+
+el.canvas.addEventListener('pointerdown', (event) => {
+  const spot = spotOf(event);
+  el.canvas.setPointerCapture(event.pointerId);
+
+  // 놓기를 기다리는 길이 있으면 손잡이만 받는다. 그래야 굽히다가 딴 데를 눌러
+  // 하던 것이 날아가지 않는다.
+  if (draft) {
+    const grab = Math.hypot(draft.handle.x - spot.x, draft.handle.y - spot.y);
+    drag = grab < 18 ? { kind: 'handle' } : null;
+    return;
+  }
+  drag = { kind: 'line', from: anchorAt(spot), start: spot, cur: spot, moved: false };
 });
+
+el.canvas.addEventListener('pointermove', (event) => {
+  if (!drag) return;
+  const spot = spotOf(event);
+  if (drag.kind === 'handle') {
+    draft.handle = spot;
+    refreshDraft();
+    return;
+  }
+  drag.cur = spot;
+  if (Math.hypot(spot.x - drag.start.x, spot.y - drag.start.y) > DRAG_SLOP) drag.moved = true;
+  if (drag.moved) drag.to = anchorAt(spot);
+});
+
+el.canvas.addEventListener('pointerup', () => {
+  const it = drag;
+  drag = null;
+  if (!it) return;
+  if (it.kind === 'handle') { Sound.play('place'); return; }
+
+  // 거의 움직이지 않았으면 고르기다.
+  if (!it.moved) {
+    picked = it.from;
+    Sound.play(picked ? 'pick' : 'clear');
+    paintPanel();
+    return;
+  }
+  if (!it.from || !it.to) { Sound.play('clear'); return; }
+  startDraft(it.from, it.to);
+});
+
+el.canvas.addEventListener('pointercancel', () => { drag = null; });
+
+// --- 새 길 ---
+
+function startDraft(from, to) {
+  const handle = { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 };
+  const able = Traffic.canBuild(world, spotArg(from), spotArg(to), handle);
+  // 같은 길의 두 자리나 같은 점끼리는 굽혀도 놓을 수 없다. 값을 보여 줄 것도 없다.
+  if (!able.ok && (able.why === 'same' || able.why === 'spot' || able.why === 'gate')) {
+    Sound.play('clear');
+    return;
+  }
+  picked = null;
+  draft = { from, to, handle };
+  refreshDraft();
+  Sound.play('pick');
+}
+
+// 손잡이를 옮길 때마다 곡선과 값을 다시 잰다. **그리는 쪽과 값을 매기는 쪽이 같은
+// 곡선을 본다** — `Net.draftPath`가 그 하나다.
+function refreshDraft() {
+  draft.able = Traffic.canBuild(world, spotArg(draft.from), spotArg(draft.to), draft.handle);
+  draft.path = Net.draftPath(net, spotArg(draft.from), spotArg(draft.to), draft.handle);
+  paintPanel();
+}
 
 // --- 패널 ---
 
@@ -630,15 +797,34 @@ function canAdd(seg) {
   return seg.lanes.length < Net.MAX_LANES && world.money >= Traffic.laneCost(seg);
 }
 
+// 놓기를 기다리는 길. **값을 보여 주고 확정할지 물어본다** — 돈이 드는 일이라
+// 손가락을 떼는 순간 지어 버리면 잘못 그은 선을 되돌릴 길이 없다.
+function draftPanel() {
+  const able = draft.able;
+  const rows = [`<p class="panel-title">${t('road.newRoad')}</p>`];
+  const why = able.ok ? 'road.draftHint'
+    : (able.why === 'short' ? 'road.tooShort' : 'road.tooDear');
+  rows.push(`<p class="panel-note">${t(why)}</p>`);
+  rows.push('<div class="chips">'
+    + `<button class="chip go" type="button" data-build="1"${able.ok ? '' : ' disabled'}>`
+    + `${t('road.build')}<b class="cost">${able.cost}</b></button>`
+    + `<button class="chip" type="button" data-cancel="1">${t('road.cancel')}</button>`
+    + '</div>');
+  return rows.join('');
+}
+
 function paintPanel() {
-  if (!picked) {
+  if (!draft && !picked) {
     el.panel.hidden = true;
     return;
   }
   el.panel.hidden = false;
-  el.panelBody.innerHTML = picked.kind === 'node'
-    ? junctionPanel(picked.node)
-    : roadPanel(picked.seg, picked.lane);
+  if (draft) el.panelBody.innerHTML = draftPanel();
+  else {
+    el.panelBody.innerHTML = picked.kind === 'node'
+      ? junctionPanel(picked.node)
+      : roadPanel(picked.seg, picked.lane);
+  }
   window.RoadIcons.paint(el.panelBody);
 }
 
@@ -646,8 +832,28 @@ const CONTROL_KEY = { none: 'road.ctrlNone', signal: 'road.ctrlSignal', circle: 
 
 el.panel.addEventListener('click', (event) => {
   const button = event.target.closest('button');
-  if (!button || !picked) return;
+  if (!button) return;
   const d = button.dataset;
+
+  if (draft) {
+    if (d.build) {
+      const made = Traffic.buildRoad(world, spotArg(draft.from), spotArg(draft.to), draft.handle);
+      // 굽히다 보면 양 끝이 같은 점으로 접히는 자리가 있다. 그때는 아무것도 짓지
+      // 않고 그리던 것을 남겨 둔다 — 여기서 지우면 다시 그어야 한다.
+      if (!made.ok) { Sound.play('clear'); return; }
+      draft = null;
+      buildDeco();
+      // 놓자마자 그 길을 고른 상태로 둔다. 1차로라 차로부터 늘리게 되는 일이 많다.
+      picked = { kind: 'seg', seg: made.seg, lane: 0 };
+    } else if (d.cancel || d.close != null) {
+      draft = null;
+    } else return;
+    Sound.play(d.build ? 'place' : 'clear');
+    paintPanel();
+    return;
+  }
+
+  if (!picked) return;
 
   if (d.control) Net.setControl(net, picked.node.id, d.control);
   else if (d.plan) Net.setPlan(net, picked.node.id, d.plan);
@@ -722,6 +928,9 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', rea
 
 // 화면 밖에서 판을 들여다볼 수 있게 한 줄 열어 둔다. 헤드리스 브라우저로 눌러 보고
 // 재 보는 데 쓴다.
+// 브라우저에서 확인할 때 판 안을 들여다보는 통로. node 테스트가 닿지 않는 것은
+// 손가락 조작뿐이라, 헤드리스 브라우저에서 이것으로 상태를 읽는다.
+window.__draft = () => draft;
 window.__net = null;
 
 readSkin();

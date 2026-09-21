@@ -95,7 +95,10 @@ h1 {
   overflow: hidden;
 }
 
-.board { display: block; }
+/* **판은 `none`이다.** 손가락을 끌어 길을 놓는 자리라 페이지가 따라 스크롤되면
+   선을 그을 수 없다. 그래서 판 안의 조작은 click이 아니라 포인터 이벤트로 돈다
+   (`shared/base.js`가 이 자리의 touchend를 취소한다). */
+.board { display: block; touch-action: none; }
 
 /* --- 고른 것을 손보는 패널 --- */
 
@@ -113,6 +116,7 @@ h1 {
 
 .panel-body { display: flex; flex-direction: column; gap: 7px; }
 .panel-title { margin: 0; font-size: 12px; font-weight: 700; color: var(--muted); }
+.panel-note { margin: 0; font-size: 12.5px; line-height: 1.5; }
 
 .chips { display: flex; gap: 6px; flex-wrap: wrap; }
 
@@ -139,6 +143,12 @@ h1 {
   font-variant-numeric: tabular-nums;
   opacity: 0.7;
   font-size: 11.5px;
+}
+
+.chip.go {
+  background: var(--btn-bg);
+  border-color: var(--btn-bg);
+  color: var(--btn-fg);
 }
 
 .chip[aria-pressed="true"] {

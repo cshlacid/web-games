@@ -16,6 +16,8 @@ const Geom = (typeof require !== 'undefined') ? require('./geom.js') : root.Road
 
 const LANE_W = 10;      // 차로 하나의 폭
 const MAX_LANES = 4;
+// 이보다 짧은 토막은 내지 않는다. 차로를 깔아도 교차로 원 둘이 겹쳐 길이 사라진다.
+const MIN_STUB = 26;
 
 // 교차로를 어떻게 다스리는가. **기본은 아무것도 없는 상태다** — 먼저 닿은 차가
 // 하나씩 지난다. 플레이어가 신호등이나 회전교차로를 놓는다.
@@ -52,33 +54,172 @@ function build(nodes, segments) {
     })),
     segs: [],
     laneWidth: LANE_W,
+    nextSeg: 0,
+    nextNode: 0,
   };
-  const byId = new Map(net.nodes.map((n) => [n.id, n]));
-
   segments.forEach((raw, index) => {
-    const a = byId.get(raw.a);
-    const b = byId.get(raw.b);
-    const c1 = raw.c1 || { x: a.x + (b.x - a.x) / 3, y: a.y + (b.y - a.y) / 3 };
-    const c2 = raw.c2 || { x: a.x + (b.x - a.x) * 2 / 3, y: a.y + (b.y - a.y) * 2 / 3 };
-    const center = Geom.makePath(Geom.sampleCubic(a, c1, c2, b));
-    const seg = {
-      id: raw.id != null ? raw.id : index,
-      a: a.id,
-      b: b.id,
-      c1,
-      c2,
-      center,
-      length: center.total,
-      lanes: [],
-    };
-    setLanes(net, seg, raw.lanes);
-    net.segs.push(seg);
-    a.segs.push(seg.id);
-    b.segs.push(seg.id);
+    addSeg(net, { ...raw, id: raw.id != null ? raw.id : index });
   });
-
   relink(net);
   return net;
+}
+
+// 구간 하나를 만들어 붙인다. 판을 처음 세울 때도, 플레이어가 길을 놓을 때도 같은
+// 길을 지난다 — 새로 놓은 길만 다르게 만들어지면 그쪽에서만 나는 탈이 생긴다.
+//
+// **`relink`는 부르지 않는다.** 여러 구간을 잇달아 손보는 자리(길 가르기)가 있어,
+// 한 번에 몰아 부르는 편이 낫다.
+function addSeg(net, raw) {
+  const a = node(net, raw.a);
+  const b = node(net, raw.b);
+  if (!a || !b) return null;
+  const c1 = raw.c1 || { x: a.x + (b.x - a.x) / 3, y: a.y + (b.y - a.y) / 3 };
+  const c2 = raw.c2 || { x: a.x + (b.x - a.x) * 2 / 3, y: a.y + (b.y - a.y) * 2 / 3 };
+  const center = Geom.makePath(Geom.sampleCubic(a, c1, c2, b));
+  const seg = {
+    id: raw.id != null ? raw.id : `s${net.nextSeg++}`,
+    a: a.id,
+    b: b.id,
+    c1,
+    c2,
+    center,
+    length: center.total,
+    lanes: [],
+  };
+  setLanes(net, seg, raw.lanes);
+  net.segs.push(seg);
+  a.segs.push(seg.id);
+  b.segs.push(seg.id);
+  return seg;
+}
+
+function removeSeg(net, seg) {
+  const i = net.segs.indexOf(seg);
+  if (i < 0) return null;
+  net.segs.splice(i, 1);
+  for (const at of net.nodes) {
+    const k = at.segs.indexOf(seg.id);
+    if (k >= 0) at.segs.splice(k, 1);
+  }
+  clearLinks(net, seg.a);
+  clearLinks(net, seg.b);
+  return seg;
+}
+
+// **길 한복판에 점을 낸다.** 드래그로 놓는 길은 아무 데서나 뻗어 나가므로, 그 자리에
+// 교차로가 없으면 있던 길을 둘로 갈라야 한다.
+//
+// 가르는 자리는 **베지어를 t에서 정확히 쪼개** 얻는다(`Geom.splitCubic`). 두 토막이
+// 원래 곡선과 같은 자리를 지나므로 이미 그 위를 달리던 차가 옆으로 튀지 않고, 갈라진
+// 점에서 접선도 그대로 이어져 굽이가 끊기지 않는다.
+//
+// 돌려주는 것은 { at, segs: [앞토막, 뒤토막] }. 끝에 너무 가까우면 가르지 않고 그 끝
+// 점을 그대로 돌려준다 — 길이가 0에 가까운 토막은 차로를 깔 수도 없다.
+function splitSeg(net, seg, s) {
+  const a = node(net, seg.a);
+  const b = node(net, seg.b);
+  const t = Geom.tOf(seg.center, s);
+  if (s < MIN_STUB) return { at: a, segs: [seg] };
+  if (seg.length - s < MIN_STUB) return { at: b, segs: [seg] };
+
+  const cut = Geom.splitCubic(a, seg.c1, seg.c2, b, t);
+  const at = {
+    id: `j${net.nextNode++}`,
+    kind: 'joint',
+    x: cut.at.x,
+    y: cut.at.y,
+    control: 'none',
+    plan: 'paired',
+    crossing: false,
+    out: [],
+    in: [],
+    segs: [],
+  };
+  net.nodes.push(at);
+
+  const dirs = seg.lanes.map((l) => l.dir);
+  const allow = new Map();
+  for (const dir of [1, -1]) {
+    allow.set(dir, lanesOf(seg, dir).slice().sort((p, q) => p.rank - q.rank).map((l) => l.allow));
+  }
+  removeSeg(net, seg);
+  const head = addSeg(net, { a: a.id, b: at.id, c1: cut.left[1], c2: cut.left[2], lanes: dirs });
+  const tail = addSeg(net, { a: at.id, b: b.id, c1: cut.right[1], c2: cut.right[2], lanes: dirs });
+
+  // 갈라도 **바깥 끝에서의 허용 이동은 그대로 간다.** 새로 난 점 쪽은 갈림이 없어
+  // 어차피 직진뿐이라 기본값이 맞다.
+  for (const dir of [1, -1]) {
+    const was = allow.get(dir) || [];
+    const far = dir > 0 ? tail : head;
+    for (const lane of lanesOf(far, dir)) {
+      if (was[lane.rank]) lane.allow = was[lane.rank].slice();
+    }
+  }
+  relink(net);
+  // 그 위를 달리던 차를 옮겨 태우려면 **어느 구간이 어디서 갈렸는지**를 알아야 한다.
+  return { at, segs: [head, tail], was: seg, q: s / seg.length };
+}
+
+// **두 자리를 잇는 새 길.** 자리는 점이거나 "구간 위의 거리"다 — 구간 위라면 그 길을
+// 먼저 가른다. 굽이는 손잡이 하나로 정한다(2차 베지어를 3차로 옮겨 적는다): 잡아
+// 끄는 점이 하나뿐이라야 손가락으로 굽힐 수 있다.
+//
+// 돌려주는 것은 { seg, at: [시작점, 끝점], split: 가른 수 }.
+function connect(net, from, to, handle, lanes) {
+  const splits = [];
+  const a = anchor(net, from, splits);
+  if (!a) return null;
+  const b = anchor(net, to, splits);
+  if (!b) return null;
+  if (a.id === b.id) return null;
+  const seg = addSeg(net, { a: a.id, b: b.id, ...bend(a, b, handle), lanes: lanes || [1] });
+  if (!seg) return null;
+  relink(net);
+  return { seg, at: [a, b], splits };
+}
+
+// 자리를 점으로 바꾼다. { node: id }면 그 점, { seg, s }면 그 구간을 가른 자리.
+function anchor(net, spot, splits) {
+  if (spot.node != null) return node(net, spot.node);
+  const seg = typeof spot.seg === 'object' ? spot.seg : segment(net, spot.seg);
+  if (!seg) return null;
+  const cut = splitSeg(net, seg, spot.s);
+  if (cut.was && splits) splits.push(cut);
+  return cut.at;
+}
+
+// 손잡이 하나를 지나는 곡선의 제어점. **2차 베지어(a, 손잡이, b)를 3차로 옮겨
+// 적은 것이다** — 제어점 둘을 따로 잡게 하면 손가락으로는 다룰 수 없고, 손잡이
+// 하나면 끄는 대로 굽는다. 손잡이가 없으면 곧은 길이다.
+function bend(a, b, handle) {
+  const h = handle || { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+  return {
+    c1: { x: a.x + (h.x - a.x) * 2 / 3, y: a.y + (h.y - a.y) * 2 / 3 },
+    c2: { x: b.x + (h.x - b.x) * 2 / 3, y: b.y + (h.y - b.y) * 2 / 3 },
+  };
+}
+
+// **놓기 전의 길.** 그리는 쪽과 값을 매기는 쪽이 같은 곡선을 봐야 미리 보여 준 값과
+// 치르는 값이 어긋나지 않는다. 판은 건드리지 않는다.
+function draftPath(net, from, to, handle) {
+  const a = spotOf(net, from);
+  const b = spotOf(net, to);
+  if (!a || !b) return null;
+  const c = bend(a, b, handle);
+  return Geom.makePath(Geom.sampleCubic(a, c.c1, c.c2, b));
+}
+
+// 자리의 좌표. 판을 가르지 않고 어디인지만 본다.
+function spotOf(net, spot) {
+  if (!spot) return null;
+  if (spot.node != null) {
+    const at = node(net, spot.node);
+    return at && { x: at.x, y: at.y };
+  }
+  const seg = typeof spot.seg === 'object' ? spot.seg : segment(net, spot.seg);
+  if (!seg) return null;
+  const at = Geom.at(seg.center, spot.s);
+  return { x: at.x, y: at.y };
 }
 
 // 차로 배열을 갈아 끼운다. 판 위에서 차로를 늘리거나 방향을 바꾸는 것이 전부 이
@@ -555,8 +696,8 @@ const api = {
   build, setLanes, relink, node, segment, lanesOf, pickLane, boundaries, link, route, gates,
   setControl, cycleControl, canControl, phaseOf, phaseCount, islandRadius, reach, ringPath,
   setPlan, setCrossing, crossingAt, setAllow, movement, movementAllowed, sideOf,
-  reshape, flipLane, addLane, clearLinks,
-  LANE_W, MAX_LANES, CONTROLS, PLANS, MOVES,
+  reshape, flipLane, addLane, clearLinks, addSeg, removeSeg, splitSeg, connect, bend, draftPath, spotOf,
+  LANE_W, MAX_LANES, MIN_STUB, CONTROLS, PLANS, MOVES,
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = api;

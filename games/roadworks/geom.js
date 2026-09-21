@@ -106,7 +106,42 @@ function at(path, s) {
   };
 }
 
-const api = { cubic, sampleCubic, makePath, offsetPath, reversePath, right, at };
+// **베지어를 t에서 둘로 가른다**(드 카스텔조). 길 한복판에서 새 길이 뻗어 나갈 때
+// 그 자리에 점을 내야 하는데, 잘린 두 토막이 원래 곡선과 **정확히 같은 자리를 지나야**
+// 한다. 점 몇 개를 다시 꿰어 새 곡선을 만들면 갈라진 자리에서 길이 미세하게 어긋나
+// 이미 그 위를 달리던 차가 옆으로 튄다.
+function splitCubic(p0, p1, p2, p3, t) {
+  const mix = (u, v) => ({ x: u.x + (v.x - u.x) * t, y: u.y + (v.y - u.y) * t });
+  const a = mix(p0, p1);
+  const b = mix(p1, p2);
+  const c = mix(p2, p3);
+  const d = mix(a, b);
+  const e = mix(b, c);
+  const m = mix(d, e);
+  return { at: m, left: [p0, a, d, m], right: [m, e, c, p3] };
+}
+
+// 길 위의 거리 s가 베지어의 어느 t인가. **`sampleCubic`이 t를 고르게 떠 놓기 때문에**
+// 점 번호가 곧 t다 — 거리로는 고르지 않지만(굽은 데가 촘촘하다) 찾는 것은 t다.
+function tOf(path, s) {
+  const n = path.points.length - 1;
+  if (!(s > 0)) return 0;
+  if (s >= path.total) return 1;
+  const { cum } = path;
+  let lo = 0;
+  let hi = n;
+  while (lo + 1 < hi) {
+    const mid = (lo + hi) >> 1;
+    if (cum[mid] <= s) lo = mid;
+    else hi = mid;
+  }
+  const span = cum[hi] - cum[lo] || 1;
+  return (lo + (s - cum[lo]) / span) / n;
+}
+
+const api = {
+  cubic, sampleCubic, makePath, offsetPath, reversePath, right, at, splitCubic, tOf,
+};
 
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 root.RoadGeom = api;

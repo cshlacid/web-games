@@ -93,5 +93,44 @@ const P = (x, y) => ({ x, y });
   near('방향도 뒤집힌다', back.dir[0].x, -1);
 }
 
+// --- 가르기 ---
+
+{
+  const p0 = { x: 0, y: 0 };
+  const p1 = { x: 40, y: 120 };
+  const p2 = { x: 160, y: 120 };
+  const p3 = { x: 200, y: 0 };
+  const cut = G.splitCubic(p0, p1, p2, p3, 0.35);
+
+  check('가른 자리가 그 t의 점', [Math.round(cut.at.x), Math.round(cut.at.y)],
+    [Math.round(G.cubic(p0, p1, p2, p3, 0.35).x), Math.round(G.cubic(p0, p1, p2, p3, 0.35).y)]);
+  check('앞뒤가 맞닿는다', [cut.left[3], cut.right[0]], [cut.at, cut.at]);
+
+  // **두 토막을 이으면 원래 곡선과 같은 자리를 지난다.** 이것이 깨지면 갈라진 길
+  // 위를 달리던 차가 그 자리에서 옆으로 튄다.
+  let off = 0;
+  for (let i = 0; i <= 20; i++) {
+    const t = i / 20;
+    const want = G.cubic(p0, p1, p2, p3, t);
+    const got = t <= 0.35
+      ? G.cubic(cut.left[0], cut.left[1], cut.left[2], cut.left[3], t / 0.35)
+      : G.cubic(cut.right[0], cut.right[1], cut.right[2], cut.right[3], (t - 0.35) / 0.65);
+    off = Math.max(off, Math.hypot(want.x - got.x, want.y - got.y));
+  }
+  near('가른 곡선이 원래 곡선과 겹친다', off, 0, 1e-9);
+}
+
+{
+  // 거리에서 t로. `sampleCubic`이 t를 고르게 떠 놓아 점 번호가 곧 t다.
+  const path = G.makePath(G.sampleCubic(
+    { x: 0, y: 0 }, { x: 40, y: 120 }, { x: 160, y: 120 }, { x: 200, y: 0 },
+  ));
+  check('양 끝', [G.tOf(path, -5), G.tOf(path, path.total + 5)], [0, 1]);
+  const t = G.tOf(path, path.total / 2);
+  const want = G.at(path, path.total / 2);
+  const got = G.cubic({ x: 0, y: 0 }, { x: 40, y: 120 }, { x: 160, y: 120 }, { x: 200, y: 0 }, t);
+  near('가운데 거리의 t가 그 자리를 가리킨다', Math.hypot(want.x - got.x, want.y - got.y), 0, 0.2);
+}
+
 console.log(`${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);
