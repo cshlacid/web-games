@@ -20,6 +20,9 @@ function near(name, actual, expected, slack) {
   else { failed++; console.log(`실패: ${name}\n  결과 ${actual}\n  기대 ${expected} ±${slack}`); }
 }
 
+// 초 단위로 돌린다. `step`은 한 프레임치로 잘리므로 긴 시간은 나눠 넣어야 한다.
+const run = (world, secs) => { for (let i = 0; i < secs * 60; i++) T.tick(world, 1 / 60); };
+
 // 씨앗을 고정한 난수. 같은 판이 매번 같게 돌아야 무엇이 깨졌는지 알 수 있다.
 const seeded = (seed) => Gen.mulberry32(seed);
 
@@ -544,6 +547,97 @@ function walkerOn(world, net, nodeId, segId, dir) {
   const v = T.spawn(world, { from: 'W', to: 'E' });
   T.step(world, 5);
   check('한 프레임에 맵을 가로지르지 않는다', v.s < 60, true);
+}
+
+// --- 돈과 공사 ---
+
+{
+  const world = T.create(corridor(), { rng: seeded(11), spawnRate: 0, money: 100 });
+  const seg = world.net.segs[0];
+  check('값은 길이에 비례한다', T.laneCost(seg), Math.round(seg.length * 0.55));
+
+  // 시외로 빠져나간 차가 삯을 남긴다. 이것이 유일한 수입이라 판이 막히면 공사를
+  // 할 수 없다.
+  T.spawn(world, { from: 'W', to: 'E' });
+  const was = world.money;
+  run(world, 60);
+  check('빠져나간 차가 있다', world.arrived > 0, true);
+  check('빠져나간 만큼 벌었다', world.money - was, world.arrived);
+}
+
+{
+  const short = Net.build(
+    [{ id: 'W', kind: 'gate', x: 0, y: 100 }, { id: 'E', kind: 'gate', x: 40, y: 100 }],
+    [{ a: 'W', b: 'E', lanes: [-1, 1] }],
+  );
+  check('짧은 길에도 아래값이 있다', T.laneCost(short.segs[0]), T.LANE_MIN);
+}
+
+{
+  const world = T.create(corridor(), { rng: seeded(12), spawnRate: 0, money: 10 });
+  const seg = world.net.segs[0];
+  const poor = T.buyLane(world, seg, 1);
+  check('돈이 모자라면 못 산다', poor.ok, false);
+  check('모자란 까닭', poor.why, 'money');
+  check('값을 치르지 않았다', world.money, 10);
+  check('차로도 그대로', seg.lanes.length, 2);
+
+  world.money = 9000;
+  check('사면 차로가 는다', T.buyLane(world, seg, 1).ok && seg.lanes.length, 3);
+  check('쓴 만큼 줄었다', world.money, 9000 - world.spent);
+  T.buyLane(world, seg, 1);
+  const full = T.buyLane(world, seg, 1);
+  check('네 차로가 끝이다', [full.ok, full.why, seg.lanes.length], [false, 'full', 4]);
+}
+
+{
+  // **공사 중이던 차는 새 차로의 같은 자리로 옮겨 탄다.** 차로를 새로 만들므로
+  // 들고 있던 차로가 통째로 사라진다 — 옮기지 않으면 없는 길 위를 달린다.
+  const world = T.create(corridor([-1, 1]), { rng: seeded(13), spawnRate: 0, money: 9000 });
+  const seg = world.net.segs[0];
+  const v = T.spawn(world, { from: 'W', to: 'E' });
+  run(world, 6);
+  const at = T.place(v);
+  const s = v.s;
+  T.buyLane(world, seg, 1);
+  check('차가 남아 있다', world.vehicles.length, 1);
+  check('새 차로에 탔다', seg.lanes.indexOf(v.lane) >= 0, true);
+  near('자리를 지킨다', v.s, s, 1);
+  const moved = T.place(v);
+  // 차로가 늘면 길이 넓어져 옆으로는 밀리지만, 앞뒤로 튀면 안 된다.
+  near('앞뒤로 튀지 않는다', Math.hypot(moved.x - at.x, moved.y - at.y), 0, 12);
+}
+
+{
+  // 일방통행이 되면 거꾸로 가던 차는 갈 데가 없다. 그 차는 삯을 남기지 않는다.
+  const world = T.create(corridor([-1, 1]), { rng: seeded(14), spawnRate: 0 });
+  const seg = world.net.segs[0];
+  const back = T.spawn(world, { from: 'E', to: 'W' });
+  run(world, 4);
+  const was = world.money;
+  T.flipLane(world, seg, seg.lanes.indexOf(back.lane));
+  check('갈 데가 없어진 차는 사라진다', world.vehicles.indexOf(back), -1);
+  check('사라진 차는 삯을 남기지 않는다', [world.money, world.arrived], [was, 0]);
+}
+
+{
+  // **길이 막히면 돌아간다.** 좌회전 차로를 없애듯 구간을 일방통행으로 만들어도
+  // 이미 그 길로 가려던 차가 멈춰 서면 안 된다.
+  const net = Net.build(
+    [{ id: 'W', kind: 'gate', x: 0, y: 200 }, { id: 'M', kind: 'joint', x: 200, y: 200 },
+      { id: 'N', kind: 'joint', x: 200, y: 0 }, { id: 'E', kind: 'gate', x: 400, y: 200 },
+      { id: 'U', kind: 'joint', x: 400, y: 0 }],
+    [{ a: 'W', b: 'M', lanes: [-1, 1] }, { a: 'M', b: 'E', lanes: [-1, 1] },
+      { a: 'M', b: 'N', lanes: [-1, 1] }, { a: 'N', b: 'U', lanes: [-1, 1] },
+      { a: 'U', b: 'E', lanes: [-1, 1] }],
+  );
+  const world = T.create(net, { rng: seeded(15), spawnRate: 0 });
+  const v = T.spawn(world, { from: 'W', to: 'E' });
+  run(world, 3);
+  const mid = net.segs[1];
+  T.flipLane(world, mid, mid.lanes.findIndex((l) => l.dir > 0));
+  run(world, 90);
+  check('돌아서라도 닿는다', world.arrived, 1);
 }
 
 console.log(`${passed}개 통과, ${failed}개 실패`);

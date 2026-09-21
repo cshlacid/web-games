@@ -83,7 +83,7 @@ function build(nodes, segments) {
 
 // 차로 배열을 갈아 끼운다. 판 위에서 차로를 늘리거나 방향을 바꾸는 것이 전부 이
 // 함수 하나를 지난다.
-function setLanes(net, seg, dirs) {
+function setLanes(net, seg, dirs, quiet) {
   const count = Math.max(1, Math.min(MAX_LANES, dirs.length));
   const list = dirs.slice(0, count);
   seg.lanes = list.map((dir, i) => {
@@ -119,6 +119,64 @@ function setLanes(net, seg, dirs) {
     });
   }
   seg.width = count * LANE_W;
+  void quiet;
+  return seg;
+}
+
+// **차로 구성을 바꾼다.** 방향을 뒤집거나 차로를 늘리는 조작이 모두 이 함수를 지난다.
+//
+// 넘긴 방향 배열은 **왼쪽이 역방향, 오른쪽이 정방향이 되도록 다시 세운다.** 우측
+// 통행에서는 마주 오는 차로가 서로의 왼쪽에 있어야 하므로, 섞인 채로 두면 차가
+// 역주행하는 자리로 그려진다. 그래서 플레이어가 고르는 것은 차로의 자리가 아니라
+// **어느 방향이 몇 개인가**다.
+//
+// 허락하는 이동은 방향 무리 안의 순위를 따라 옮겨 준다 — 차로를 하나 늘렸다고 손으로
+// 켜 둔 좌회전이 사라지면 안 된다.
+function reshape(net, seg, dirs) {
+  const keep = new Map();
+  for (const dir of [1, -1]) {
+    keep.set(dir, lanesOf(seg, dir).slice().sort((p, q) => p.rank - q.rank).map((l) => l.allow));
+  }
+
+  const sorted = dirs.slice().sort((p, q) => p - q);
+  setLanes(net, seg, sorted, true);
+
+  for (const dir of [1, -1]) {
+    const was = keep.get(dir) || [];
+    for (const lane of lanesOf(seg, dir)) {
+      if (was[lane.rank]) lane.allow = was[lane.rank].slice();
+    }
+  }
+
+  // 이 구간으로 들어오는 길목은 새 차로를 가리켜야 한다. 만들어 둔 연결 곡선은 옛
+  // 차로를 들고 있으므로 양 끝에서 버린다.
+  clearLinks(net, seg.a);
+  clearLinks(net, seg.b);
+  relink(net);
+  return seg;
+}
+
+function clearLinks(net, nodeId) {
+  for (const other of net.segs) {
+    for (const lane of other.lanes) {
+      if (lane.to === nodeId) lane.links = null;
+    }
+  }
+}
+
+// 한 차로의 방향을 뒤집는다. 되돌려 준 것은 바뀌기 전의 차로 구성이다.
+function flipLane(net, seg, index) {
+  const lane = seg.lanes[index];
+  if (!lane) return null;
+  const dirs = seg.lanes.map((l, i) => (i === index ? -l.dir : l.dir));
+  reshape(net, seg, dirs);
+  return seg;
+}
+
+// 그 방향에 차로를 하나 더한다.
+function addLane(net, seg, dir) {
+  if (seg.lanes.length >= MAX_LANES) return null;
+  reshape(net, seg, seg.lanes.map((l) => l.dir).concat([dir > 0 ? 1 : -1]));
   return seg;
 }
 
@@ -497,6 +555,7 @@ const api = {
   build, setLanes, relink, node, segment, lanesOf, pickLane, boundaries, link, route, gates,
   setControl, cycleControl, canControl, phaseOf, phaseCount, islandRadius, reach, ringPath,
   setPlan, setCrossing, crossingAt, setAllow, movement, movementAllowed, sideOf,
+  reshape, flipLane, addLane, clearLinks,
   LANE_W, MAX_LANES, CONTROLS, PLANS, MOVES,
 };
 
