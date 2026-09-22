@@ -489,9 +489,18 @@ function drawPick() {
     ctx.arc(picked.node.x, picked.node.y, Net.reach(picked.node) + overlay(7), 0, Math.PI * 2);
     ctx.stroke();
   } else {
-    // 길은 가운데를 따라 가늘게 짚는다. 길 전체를 굵게 덧그렸더니 줄무늬가 도로를
-    // 덮어 무엇이 그려져 있는지 보이지 않았다.
-    trace(picked.seg.center);
+    // **고른 차로를 짚는다.** 가운데선에 그어 두었더니 "이 도로"만 말하고 어느
+    // 차로인지는 말하지 않아, 패널의 칩과 판이 이어지지 않았다. 차로 폭만큼 덮고
+    // 그 위에 점선을 그으면 칩을 누를 때마다 판에서 불이 옮겨 붙는다.
+    const lane = picked.seg.lanes[picked.lane] || picked.seg.lanes[0];
+    ctx.save();
+    ctx.globalAlpha = 0.28;
+    trace(lane.path);
+    ctx.lineWidth = Net.LANE_W;
+    ctx.lineCap = 'butt';
+    ctx.stroke();
+    ctx.restore();
+    trace(lane.path);
     ctx.lineWidth = overlay(2.2);
     ctx.stroke();
   }
@@ -1161,14 +1170,7 @@ function roadPanel(seg, index) {
   const rows = [];
   rows.push(`<p class="panel-title">${t('road.lanesOf', { n: seg.lanes.length })}</p>`);
 
-  // 차로 고르기. 길 위에 놓인 순서 그대로 늘어놓고, 거슬러 가는 차로는 화살표를
-  // 뒤집어 어느 쪽으로 가는 차로인지 보이게 한다.
-  rows.push('<div class="chips lanes">' + seg.lanes.map((l, i) => {
-    const arrows = l.allow.map((m) => `<span data-road-icon="${m}"></span>`).join('');
-    const flip = l.dir > 0 ? '' : ' flip';
-    return `<button class="chip lane${flip}" type="button" data-lane="${i}"`
-      + ` aria-pressed="${l === lane}"><span class="lane-arrows">${arrows}</span></button>`;
-  }).join('') + '</div>');
+  rows.push(laneStrip(seg, lane));
 
   rows.push('<div class="chips">' + Net.MOVES.map((move) => chip(
     'data-move', move, `<span data-road-icon="${move}"></span>`,
@@ -1201,6 +1203,52 @@ function freshLane(seg, dir) {
   const group = seg.lanes.filter((l) => l.dir === dir);
   if (!group.length) return 0;
   return seg.lanes.indexOf(group.reduce((best, l) => (l.rank > best.rank ? l : best)));
+}
+
+// **차로 고르개는 도로의 단면이다.** 버튼 넷을 나란히 늘어놓던 때는 어느 칩이 어느
+// 차로인지 알 길이 없었다 — 생김새가 같고, 판과 이어 주는 단서가 없고, 도로가 세로로
+// 뻗어 있으면 "왼쪽 칩이 왼쪽 차로"라는 짐작조차 통하지 않았다.
+//
+// 그래서 셋을 한꺼번에 고쳤다.
+// - **붙여서 한 덩어리로 두고 사이에 선을 긋는다.** 마주 보는 무리 사이에는 중앙선,
+//   같은 방향 사이에는 차선이다. 판에 그려진 것과 같은 그림이라 2:2인지 3:1인지가
+//   한눈에 읽힌다(선의 종류는 `Net.boundaries`가 정한다 — 화면이 정할 일이 아니다).
+// - **줄의 방향을 화면 속 도로에 맞춘다.** 단면은 길의 폭을 가로지르는 것이므로,
+//   세로로 뻗은 길은 칩이 가로로 눕고 가로로 뻗은 길은 세로로 쌓인다.
+// - **차례도 화면에 맞춘다.** 왼쪽 칩이 화면에서 왼쪽 차로여야 한다.
+function laneStrip(seg, picked) {
+  const a = Net.node(net, seg.a);
+  const b = Net.node(net, seg.b);
+  const d = { x: b.x - a.x, y: b.y - a.y };
+  // 길이 세로로 뻗으면 폭은 가로다 — 그때 칩이 가로로 눕는다.
+  const across = Math.abs(d.y) > Math.abs(d.x);
+  // 차로는 오프셋이 커질수록 진행 방향의 오른쪽에 있다. 그 오른쪽이 화면에서
+  // 어느 쪽인지가 차례를 정한다(화면 좌표에서 (dx,dy)의 오른쪽은 (-dy,dx)).
+  const step = across ? -d.y : d.x;
+  const flip = step < 0;
+
+  const cells = seg.lanes.map((lane, i) => {
+    // 화살표는 그 차로가 화면에서 가는 쪽을 가리킨다. 아이콘은 위를 향해 그려져
+    // 있으므로 진행 방향의 각에 90도를 더한다.
+    // **화살표 하나하나를 돌린다. 묶음째 돌리지 않는다.** 묶음을 돌리면 나란히 놓인
+    // 화살표 셋이 세로로 서서, 칸이 낮은 줄(가로로 뻗은 길)에서는 칸 밖으로 삐져
+    // 나간다. 하나씩 돌리면 놓인 자리는 그대로고 가리키는 쪽만 바뀐다.
+    const turn = Math.round((Math.atan2(d.y * lane.dir, d.x * lane.dir) * 180) / Math.PI + 90);
+    const arrows = lane.allow
+      .map((m) => `<span data-road-icon="${m}" style="transform:rotate(${turn}deg)"></span>`)
+      .join('');
+    return `<button class="lane-cell" type="button" data-lane="${i}"`
+      + ` aria-pressed="${lane === picked}"><span class="lane-arrows">${arrows}</span></button>`;
+  });
+  const lines = Net.boundaries(seg).map((line) => `<i class="lane-line ${line.kind}"></i>`);
+
+  const out = [];
+  for (let i = 0; i < cells.length; i++) {
+    if (i) out.push(lines[i - 1]);
+    out.push(cells[i]);
+  }
+  if (flip) out.reverse();
+  return `<div class="strip ${across ? 'across' : 'down'}">${out.join('')}</div>`;
 }
 
 function canAdd(seg) {
