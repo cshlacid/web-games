@@ -61,10 +61,9 @@ const RING_STANDOFF = 8;
 
 // 돈. **관문으로 빠져나간 차 한 대가 수입이고, 공사가 지출이다** — 길을 뚫어 차를
 // 흘려보내야 다음 공사를 할 수 있다는 고리가 여기서 생긴다.
-// 시외로 빠져나간 차가 남기는 삯. **도시가 넓어지면서 한 대가 남기는 값도 올렸다** —
-// 한 판을 가로지르는 데 걸리는 시간이 길어졌는데 삯이 그대로면, 넓어진 만큼 공사할
-// 자리는 늘고 그것을 할 돈은 그대로다.
-const FARE = 3;
+// 통행 한 번이 남기는 삯. **도시가 넓어지면서 올렸다가, 건물이 목적지가 되면서 다시
+// 조금 내렸다** — 도시 안을 짧게 도는 통행이 늘어 도착 수 자체가 많아졌다.
+const FARE = 2;
 // 차로 하나를 늘리는 값. 긴 길일수록 비싸다.
 const LANE_COST = 0.55;
 const LANE_MIN = 30;
@@ -170,25 +169,52 @@ function spawn(world, options) {
   const gates = Net.gates(net);
   if (gates.length < 2) return null;
 
-  const from = opts.from ? Net.node(net, opts.from) : gates[Math.floor(rng() * gates.length)];
-  let to = opts.to ? Net.node(net, opts.to) : gates[Math.floor(rng() * gates.length)];
-  if (!from || !to) return null;
-  if (to.id === from.id) to = gates[(gates.indexOf(to) + 1) % gates.length];
+  // **떠나는 자리는 관문이거나 건물이다.** 도시 밖에서 들어오는 차만 있으면 도시가
+  // 그저 지나가는 길목이고, 건물은 길을 막는 벽일 뿐이다.
+  const start = opts.door ? enter(world, opts.door) : null;
+  if (opts.door && !start) return null;
 
-  const path = Net.route(net, from.id, to.id);
-  if (!path || !path.length) return null;
+  const from = start ? null : (opts.from ? Net.node(net, opts.from) : gates[Math.floor(rng() * gates.length)]);
+  if (!start && !from) return null;
 
-  const first = Net.segment(net, path[0].seg.id);
-  const group = Net.lanesOf(first, path[0].dir);
-  if (!group.length) return null;
-  // 첫 구간에서도 끝에서 할 이동을 허락하는 차로를 골라야 한다.
-  const after = path[1];
-  const need = after
-    ? Net.movement(net, first, path[0].dir, Net.segment(net, after.seg.id), after.dir)
-    : null;
-  const fit = need ? group.filter((l) => l.allow.indexOf(need) >= 0) : group;
-  const pool = fit.length ? fit : group;
-  const lane = pool[Math.floor(rng() * pool.length)];
+  // 닿을 자리. 건물이면 그 건물이 붙은 구간 위의 한 점에서 멈춘다.
+  const stop = opts.stop ? aim(net, opts.stop, start ? start.from : from.id) : null;
+  if (opts.stop && !stop) return null;
+
+  let to = stop ? Net.node(net, stop.goal) : (opts.to ? Net.node(net, opts.to) : gates[Math.floor(rng() * gates.length)]);
+  if (!to) return null;
+  if (!start && to.id === from.id) to = gates[(gates.indexOf(to) + 1) % gates.length];
+
+  let path;
+  if (start) {
+    // 건물에서 나오는 차는 이미 길 위에 서 있다. 그 구간을 첫 걸음으로 두고, 그
+    // 구간이 닿는 점에서부터 길을 찾는다.
+    const rest = to.id === start.to ? [] : Net.route(net, start.to, to.id);
+    if (!rest) return null;
+    path = [{ seg: Net.segment(net, start.lane.seg), dir: start.lane.dir }].concat(rest);
+  } else {
+    path = Net.route(net, from.id, to.id);
+    if (!path || !path.length) return null;
+  }
+
+  let lane;
+  let at = 0;
+  if (start) {
+    lane = start.lane;
+    at = start.s;
+  } else {
+    const first = Net.segment(net, path[0].seg.id);
+    const group = Net.lanesOf(first, path[0].dir);
+    if (!group.length) return null;
+    // 첫 구간에서도 끝에서 할 이동을 허락하는 차로를 골라야 한다.
+    const after = path[1];
+    const need = after
+      ? Net.movement(net, first, path[0].dir, Net.segment(net, after.seg.id), after.dir)
+      : null;
+    const fit = need ? group.filter((l) => l.allow.indexOf(need) >= 0) : group;
+    const pool = fit.length ? fit : group;
+    lane = pool[Math.floor(rng() * pool.length)];
+  }
 
   const kind = pickKind(rng);
   // 앞이 비어 있을 때만 넣는다. 관문에 차가 밀려 있으면 이번 몫은 버린다 — 겹쳐
@@ -196,27 +222,97 @@ function spawn(world, options) {
   //
   // **차로별 목록이 아니라 차 전부를 훑는다.** 그 목록은 걸음마다 새로 짜는데,
   // 넣는 일은 그 사이에도 불릴 수 있어 한 걸음 묵은 자리를 보게 된다.
-  let room = Infinity;
-  for (const other of world.vehicles) {
-    if (other.lane === lane) room = Math.min(room, other.s);
-  }
-  if (room < kind.len + S0 + 8) return null;
+  if (!roomAt(world, lane, at, kind)) return null;
 
   const vehicle = {
     id: world.nextId++,
     kind,
     route: path,
     goal: to.id,   // 길이 바뀌면 여기로 가는 길을 다시 찾는다
+    stop,          // 건물로 드는 차는 구간 한가운데에서 멈춘다
     step: 0,
     lane,
     rank: lane.rank,
-    s: 0,
-    v: kind.v0 * 0.65,
+    s: at,
+    v: start ? kind.v0 * 0.3 : kind.v0 * 0.65,
     claim: null,
     waiting: 0,
   };
   world.vehicles.push(vehicle);
   return vehicle;
+}
+
+// 그 자리에 차 한 대가 들어갈 틈이 있는가. 앞뒤를 다 본다 — 길 한가운데로 끼어드는
+// 차는 뒤에서 오는 차와도 겹칠 수 있다.
+// 한 번의 통행이 어디서 나서 어디로 드는가. **관문만이 아니라 건물에서도 나고 든다**
+// — 도시 밖을 오가는 차만 있으면 도시는 그저 지나가는 길목이고, 건물은 길을 막는
+// 벽일 뿐이다. 절반쯤씩 섞으면 도시 안을 도는 통행이 생긴다.
+const DOOR_ODDS = 0.55;
+
+function randomTrip(world) {
+  const pool = world.net.land && world.net.land.buildings;
+  const opts = {};
+  if (!pool || !pool.length) return opts;
+  const pick = () => {
+    const item = pool[Math.floor(world.rng() * pool.length)];
+    const door = Land.doorOf(world.net, item);
+    return door && { seg: door.seg.id, s: door.s };
+  };
+  if (world.rng() < DOOR_ODDS) opts.door = pick();
+  if (world.rng() < DOOR_ODDS) opts.stop = pick();
+  if (!opts.door) delete opts.door;
+  if (!opts.stop) delete opts.stop;
+  // 같은 구간에서 나서 같은 구간으로 드는 것은 길을 돌아 제자리로 오는 일이다.
+  if (opts.door && opts.stop && opts.door.seg === opts.stop.seg) delete opts.stop;
+  return opts;
+}
+
+function roomAt(world, lane, at, kind) {
+  for (const other of world.vehicles) {
+    if (other.lane !== lane) continue;
+    const gap = other.s - at;
+    if (gap >= 0 && gap < kind.len + S0 + 8) return false;
+    if (gap < 0 && -gap < other.kind.len + S0 + 8) return false;
+  }
+  return true;
+}
+
+// 건물이 길에 닿는 자리에서 차 한 대를 길 위에 올린다. 방향은 그 구간에 있는 것 중
+// 하나를 고른다.
+function enter(world, door) {
+  const seg = Net.segment(world.net, door.seg);
+  if (!seg || !seg.lanes.length) return null;
+  const lanes = seg.lanes.slice();
+  for (let i = lanes.length - 1; i > 0; i--) {
+    const k = Math.floor(world.rng() * (i + 1));
+    const swap = lanes[i]; lanes[i] = lanes[k]; lanes[k] = swap;
+  }
+  for (const lane of lanes) {
+    const frac = Math.max(0, Math.min(1, door.s / seg.length));
+    const s = (lane.dir > 0 ? frac : 1 - frac) * lane.path.total;
+    // 구간 끝에 바로 붙여 넣으면 교차로 안에서 태어난다.
+    if (s < 8 || lane.path.total - s < 8) continue;
+    return { lane, s, from: lane.from, to: lane.to };
+  }
+  return null;
+}
+
+// 건물로 드는 차가 어느 점을 목적지로 삼는가. **그 구간을 실제로 달려 지나가는 쪽을
+// 고른다** — 반대쪽 끝을 목적지로 두면 그 구간에 들어서지 않고 돌아가는 길이 나온다.
+function aim(net, door, fromId) {
+  const seg = Net.segment(net, door.seg);
+  if (!seg) return null;
+  let best = null;
+  for (const goal of [seg.a, seg.b]) {
+    if (goal === fromId) continue;
+    const path = Net.route(net, fromId, goal);
+    if (!path || !path.length) continue;
+    if (path[path.length - 1].seg.id !== seg.id) continue;
+    let len = 0;
+    for (const step of path) len += step.seg.length;
+    if (!best || len < best.len) best = { goal, len, seg: seg.id, s: door.s };
+  }
+  return best && { goal: best.goal, seg: best.seg, s: best.s };
 }
 
 // counted가 거짓이면 도착으로 세지 않는다 — 길이 바뀌어 갈 데가 없어진 차다.
@@ -249,7 +345,7 @@ function tick(world, dt) {
   world.spawnDebt += world.spawnRate * dt;
   while (world.spawnDebt >= 1) {
     world.spawnDebt -= 1;
-    if (world.vehicles.length < world.maxVehicles) spawn(world);
+    if (world.vehicles.length < world.maxVehicles) spawn(world, randomTrip(world));
   }
 
   bucket(world);
@@ -887,7 +983,19 @@ function reroute(world, v) {
   return true;
 }
 
+// 건물 앞에 닿았는가. **구간 한가운데에서 멈추는 차는 이것 하나로 끝난다** — 도착을
+// 점에서만 가리면 건물은 목적지가 될 수 없다.
+function arrived(world, v) {
+  if (!v.stop || v.lane.isLink || v.lane.seg !== v.stop.seg) return false;
+  const seg = Net.segment(world.net, v.lane.seg);
+  if (!seg) return false;
+  const frac = v.s / v.lane.path.total;
+  const along = (v.lane.dir > 0 ? frac : 1 - frac) * seg.length;
+  return v.lane.dir > 0 ? along >= v.stop.s : along <= v.stop.s;
+}
+
 function advance(world, v) {
+  if (arrived(world, v)) { despawn(world, v, true); return; }
   const holder = nextHolder(world, v);
   const limit = endOf(v, holder);
   if (v.s < limit) {
@@ -896,8 +1004,10 @@ function advance(world, v) {
     return;
   }
   if (!holder) {
-    // 관문까지 온 차는 도착이고, 갈 데가 없어진 차는 그냥 사라진다.
-    const done = Net.node(world.net, v.lane.to).kind === 'gate';
+    // 관문까지 온 차는 도착이고, 갈 데가 없어진 차는 그냥 사라진다. **건물로 가던
+    // 차는 길 끝까지 왔으면 닿은 것으로 본다** — 길이 바뀌어 멈출 자리를 지나쳤을
+    // 뿐이고, 그것을 실패로 세면 공사할 때마다 도착 수가 깎인다.
+    const done = !!v.stop || Net.node(world.net, v.lane.to).kind === 'gate';
     despawn(world, v, done);
     return;
   }
@@ -947,6 +1057,7 @@ function stats(world) {
 
 const api = {
   create, step, tick, spawn, despawn, place, stats, idm, ahead, advance, nextHolder,
+  arrived, enter, aim, roomAt, randomTrip,
   signalOf, stepSignals, blocked, ringAhead, crossAhead,
   spawnWalker, stepWalkers, walkerSpot, walkerOn, crossLine,
   laneCost, buyLane, flipLane, reroute, roadCost, canBuild, buildRoad,

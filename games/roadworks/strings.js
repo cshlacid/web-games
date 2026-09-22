@@ -16,7 +16,7 @@
       'road.rule1': '<b>교차로를 누르면</b> 아래에서 신호 없음·신호등·회전교차로를 고르고, 신호등은 <b>현시 구성</b>과 <b>횡단보도</b>까지 정합니다. <b>도로를 누르면</b> 차로마다 좌회전·직진·우회전·유턴을 켜고 끄고, <b>방향을 바꾸거나 차로를 늘립니다</b>.',
       'road.rule2': '도시의 길은 <b>곧은 길과 굽은 길이 섞여</b> 있고, 길마다 <b>1~8차로</b>입니다. 가운데 노란 선이 마주 오는 방향을 가르고, 흰 점선이 같은 방향의 차로를 가릅니다. <b>이어진 길은 굽이가 끊기지 않습니다.</b>',
       'road.rule3': '<b>우측 통행</b>입니다. 차는 제 진행 방향에서 오른쪽 차로를 씁니다.',
-      'road.rule4': '맵 가장자리의 점선은 <b>다른 도시로 이어지는 관문</b>입니다. 차는 거기서 들어와 다른 관문으로 빠져나갑니다.',
+      'road.rule4': '맵 가장자리의 점선은 <b>다른 도시로 이어지는 관문</b>입니다. 차는 거기서 들어와 다른 관문으로 빠져나가고, <b>길가의 건물에서 나와 다른 건물로 들기도 합니다</b>.',
       'road.rule5': '달리는 것은 <b>자동차·택시·버스·트럭·오토바이</b> 다섯입니다. 길이도 속도도 가속도 저마다 달라서, 트럭 뒤에 승용차가 물리면 줄이 길어집니다.',
       'road.rule6': '앞차와의 거리에 따라 <b>알아서 서고 다시 나갑니다</b>.',
       'road.rule7': '<b>지나는 길이 서로 가로지르는 자리만 교차로입니다</b> — 중앙선을 넘는 이동이 하나도 없으면(이를테면 일방통행 곁길에 마주편 좌회전을 끄면) 교차로가 아니고 아무도 기다리지 않습니다. 아무것도 놓지 않은 교차로는 <b>먼저 닿은 차가 하나씩</b> 지납니다. <b>신호등</b>은 2현시면 마주 보는 두 갈래를 함께 열고(좌회전만 틈을 기다립니다), 갈래 수만큼의 현시면 한 갈래씩 엽니다. 기다리는 차가 없는 갈래는 건너뜁니다. <b>회전교차로</b>는 도는 차가 먼저이고 들어가려는 차가 틈을 기다립니다.',
@@ -52,6 +52,7 @@
       'road.overTitle': '늦었습니다',
       'road.overNote': '배달 {n}번 성공 · 남은 예산 {money}',
       'road.rule14': '<b>이따금 배달 미션이 붙습니다.</b> 관문 하나에서 다른 관문까지 <b>정해진 시간 안에</b> 그 차를 보내야 하고, 늦으면 <b>거기서 게임이 끝납니다</b>. 닿으면 <b>삯을 더 받습니다</b>. 미션 차는 판 위에 테두리로 표시되고, 화면 밖에 있으면 가장자리의 화살표가 가리킵니다.',
+      'road.rule15': '<b>도시는 자랍니다.</b> 처음에는 큰길 하나가 가로, 하나가 세로로 있을 뿐이지만 시간이 지날수록 <b>통행량이 늘고 길가에 건물이 들어섭니다</b>. 길을 놓으면 그 둘레가 도시가 되고, 가만히 두면 언젠가 반드시 막힙니다.',
     },
     en: {
       'meta.desc': 'Cars, taxis, buses, trucks and motorcycles drive in real time across a city of straight and curved roads',
@@ -68,7 +69,7 @@
       'road.rule1': '<b>Tap a junction</b> to choose below between no signal, a traffic signal or a roundabout; a signal also takes a <b>phase plan</b> and a <b>crosswalk</b>. <b>Tap a road</b> to turn left, through, right and U-turn on or off per lane, to <b>send a lane the other way</b> or to <b>add a lane</b>.',
       'road.rule2': 'The city mixes <b>straight and curved roads</b>, each with <b>one to eight lanes</b>. The yellow line splits opposing directions; white dashes split lanes going the same way. <b>A road that runs on keeps its curve unbroken.</b>',
       'road.rule3': 'Traffic <b>drives on the right</b>. Each vehicle uses the lanes on its own right-hand side.',
-      'road.rule4': 'The dashed bars at the edge of the map are <b>gates to other cities</b>. Vehicles enter there and leave by another gate.',
+      'road.rule4': 'The dashed bars at the edge of the map are <b>gates to other cities</b>. Vehicles come in and out through them, and they also <b>set off from a building on the street and pull up at another</b>.',
       'road.rule5': 'Five kinds drive here: <b>car, taxi, bus, truck and motorcycle</b>. They differ in length, speed and acceleration, so a car stuck behind a truck makes a queue.',
       'road.rule6': 'They <b>slow down and pull away on their own</b> from the gap ahead.',
       'road.rule7': '<b>Only places where paths actually cross are junctions</b> — if nothing has to cross the centre line (say a one-way side road with the opposing left turn switched off), it is not a junction and nobody waits. An uncontrolled junction lets <b>one vehicle through at a time</b>. A <b>signal</b> on two phases opens the two facing approaches together (only left turns wait for a gap); on one phase per approach it opens them one at a time. Either way it skips an approach with nobody waiting. At a <b>roundabout</b> the traffic already circling has priority.',
@@ -104,6 +105,7 @@
       'road.overTitle': 'Too late',
       'road.overNote': '{n} deliveries made · {money} left in the budget',
       'road.rule14': '<b>Now and then a delivery comes in.</b> That vehicle has to get from one gate to another <b>within the time given</b>; miss it and <b>the game ends there</b>. Make it and you <b>earn a bonus</b>. The vehicle carries a ring on the board, and an arrow at the edge points to it when it is off screen.',
+      'road.rule15': '<b>The city grows.</b> You start with one main road each way, and as time passes <b>traffic climbs and buildings fill in along the streets</b>. Lay a road and the city grows around it; leave it alone and it will jam sooner or later.',
     },
     ja: {
       'meta.desc': '直線と曲線が混ざった街の道路を、乗用車・タクシー・バス・トラック・バイクがリアルタイムで走る',
@@ -120,7 +122,7 @@
       'road.rule1': '<b>交差点を押すと</b>下で信号なし・信号・ラウンドアバウトを選べます。信号では<b>現示の組み方</b>と<b>横断歩道</b>も決めます。<b>道路を押すと</b>車線ごとに左折・直進・右折・Uターンを切り替え、<b>向きを変えたり車線を増やしたり</b>できます。',
       'road.rule2': '街の道は<b>直線と曲線が混ざり</b>、道ごとに<b>1〜8車線</b>です。中央の黄色い線が対向方向を分け、白い破線が同じ方向の車線を分けます。<b>つながった道は曲がり具合が途切れません。</b>',
       'road.rule3': '<b>右側通行</b>です。車は進行方向の右側の車線を使います。',
-      'road.rule4': '地図の縁の破線は<b>別の街へつながる出入口</b>です。車はそこから入り、別の出入口から出ていきます。',
+      'road.rule4': '地図の縁の破線は<b>別の街へつながる出入口</b>です。車はそこから出入りするほか、<b>道沿いの建物から出て別の建物に入る</b>車もあります。',
       'road.rule5': '走るのは<b>乗用車・タクシー・バス・トラック・バイク</b>の五種です。長さも速度も加速も違うので、トラックの後ろに乗用車がつくと列ができます。',
       'road.rule6': '前の車との距離に応じて<b>自分で止まり、また走り出します</b>。',
       'road.rule7': '<b>進む道どうしが交わる所だけが交差点です</b> — 中央線を越える動きが一つもなければ（たとえば一方通行の枝道で対向の右折を切れば）交差点ではなく、誰も待ちません。何も置いていない交差点は<b>先に着いた車から一台ずつ</b>通ります。<b>信号</b>は2現示なら向かい合う二つの方向を一緒に開け（左折だけが切れ目を待ちます）、方向の数だけの現示なら一方向ずつ開けます。どちらも待つ車がいない方向は飛ばします。<b>ラウンドアバウト</b>は回っている車が優先です。',
@@ -156,6 +158,7 @@
       'road.overTitle': '間に合いませんでした',
       'road.overNote': '配達{n}回成功・残り予算{money}',
       'road.rule14': '<b>ときどき配達の依頼が入ります。</b>その車を関門から関門まで<b>決められた時間内に</b>届けなければならず、遅れると<b>そこでゲームが終わります</b>。届けば<b>報酬が増えます</b>。配達の車は盤上で輪がつき、画面の外にいるときは端の矢印が指します。',
+      'road.rule15': '<b>街は育ちます。</b>はじめは大通りが縦横に一本ずつあるだけですが、時間がたつほど<b>交通量が増え、道沿いに建物が建ちます</b>。道を敷けばその周りが街になり、放っておけばいつか必ず詰まります。',
     },
     'zh-CN': {
       'meta.desc': '轿车、出租车、公交车、卡车和摩托车在直路与弯路交错的城市里实时行驶',
@@ -172,7 +175,7 @@
       'road.rule1': '<b>点路口</b>可以在下面选无信号、信号灯或环岛；信号灯还能选<b>相位方案</b>和<b>人行横道</b>。<b>点道路</b>可以逐条车道开关左转、直行、右转和掉头，还能<b>改变车道方向或增加车道</b>。',
       'road.rule2': '城里的路<b>直路与弯路交错</b>，每条路<b>一到八条车道</b>。中间的黄线分开对向，白色虚线分开同向车道。<b>连起来的路，弯度是连续的。</b>',
       'road.rule3': '<b>靠右行驶</b>。车辆走自己前进方向右侧的车道。',
-      'road.rule4': '地图边缘的虚线是<b>通往其他城市的出入口</b>。车从那里进来，再从别的出入口离开。',
+      'road.rule4': '地图边缘的虚线是<b>通往其他城市的出入口</b>。车从那里进出，也有车<b>从路边的建筑出来、开进另一栋建筑</b>。',
       'road.rule5': '路上跑着<b>轿车、出租车、公交车、卡车和摩托车</b>五种。长度、速度、加速度各不相同，轿车堵在卡车后面就会排起长队。',
       'road.rule6': '它们会按前车的距离<b>自己刹车、自己起步</b>。',
       'road.rule7': '<b>只有行车路线真正交叉的地方才算路口</b>——如果没有任何一个动作需要越过中线（比如单行支路上关掉对向左转），那里就不是路口，谁都不用等。没有控制的路口<b>先到的车一辆一辆</b>通过。<b>信号灯</b>两相位时把相对的两个方向一起放行（只有左转要等空档），按方向数的相位则一个方向一次。两种都会跳过没人等的方向。<b>环岛</b>里正在绕行的车优先。',
@@ -208,6 +211,7 @@
       'road.overTitle': '来不及了',
       'road.overNote': '成功配送{n}次 · 剩余预算{money}',
       'road.rule14': '<b>时不时会来一单配送。</b>那辆车得在<b>规定时间内</b>从一个关口跑到另一个关口，迟到就<b>到此为止</b>。送到则<b>另有奖励</b>。配送车在图上带一圈标记，跑出画面时边缘的箭头会指向它。',
+      'road.rule15': '<b>城市会生长。</b>开局只有横竖各一条主干道，随着时间推移<b>车流变多，路边也会盖起建筑</b>。修了路，周围就长成街区；放着不管，迟早会堵死。',
     },
     'zh-TW': {
       'meta.desc': '轎車、計程車、公車、卡車和機車在直路與彎路交錯的城市裡即時行駛',
@@ -224,7 +228,7 @@
       'road.rule1': '<b>點路口</b>可以在下面選無號誌、號誌或圓環；號誌還能選<b>時相方案</b>和<b>行人穿越道</b>。<b>點道路</b>可以逐條車道開關左轉、直行、右轉和迴轉，還能<b>改變車道方向或增加車道</b>。',
       'road.rule2': '城裡的路<b>直路與彎路交錯</b>，每條路<b>一到八條車道</b>。中間的黃線分開對向，白色虛線分開同向車道。<b>連起來的路，彎度是連續的。</b>',
       'road.rule3': '<b>靠右行駛</b>。車輛走自己前進方向右側的車道。',
-      'road.rule4': '地圖邊緣的虛線是<b>通往其他城市的出入口</b>。車從那裡進來，再從別的出入口離開。',
+      'road.rule4': '地圖邊緣的虛線是<b>通往其他城市的出入口</b>。車從那裡進出，也有車<b>從路邊的建築出來、開進另一棟建築</b>。',
       'road.rule5': '路上跑著<b>轎車、計程車、公車、卡車和機車</b>五種。長度、速度、加速度各不相同，轎車卡在卡車後面就會排起長隊。',
       'road.rule6': '它們會依前車的距離<b>自己煞車、自己起步</b>。',
       'road.rule7': '<b>只有行車路線真正交叉的地方才算路口</b>——如果沒有任何一個動作需要越過中線（比如單行支路上關掉對向左轉），那裡就不是路口，誰都不用等。沒有號誌的路口<b>先到的車一輛一輛</b>通過。<b>號誌</b>兩時相時把相對的兩個方向一起放行（只有左轉要等空檔），依方向數的時相則一個方向一次。兩種都會跳過沒人等的方向。<b>圓環</b>裡正在繞行的車優先。',
@@ -260,6 +264,7 @@
       'road.overTitle': '來不及了',
       'road.overNote': '成功配送{n}次 · 剩餘預算{money}',
       'road.rule14': '<b>不時會來一單配送。</b>那輛車得在<b>規定時間內</b>從一個關口跑到另一個關口，遲到就<b>到此為止</b>。送到則<b>另有獎勵</b>。配送車在圖上帶一圈標記，跑出畫面時邊緣的箭頭會指向它。',
+      'road.rule15': '<b>城市會成長。</b>開局只有橫豎各一條主幹道，隨著時間推移<b>車流變多，路邊也會蓋起建築</b>。修了路，周圍就長成街區；放著不管，遲早會塞死。',
     },
     es: {
       'meta.desc': 'Coches, taxis, autobuses, camiones y motos circulan en tiempo real por una ciudad de calles rectas y curvas',
@@ -276,7 +281,7 @@
       'road.rule1': '<b>Toca un cruce</b> y abajo eliges entre sin señal, semáforo o rotonda; el semáforo además lleva <b>plan de fases</b> y <b>paso de peatones</b>. <b>Toca una calle</b> para activar giro a la izquierda, recto, derecha y cambio de sentido en cada carril, <b>invertir el sentido de un carril</b> o <b>añadir uno</b>.',
       'road.rule2': 'La ciudad mezcla <b>calles rectas y curvas</b>, cada una con <b>de uno a ocho carriles</b>. La línea amarilla separa los sentidos; las rayas blancas separan carriles del mismo sentido. <b>Una calle que continúa mantiene su curva sin quiebros.</b>',
       'road.rule3': 'Se <b>circula por la derecha</b>. Cada vehículo usa los carriles de su propia derecha.',
-      'road.rule4': 'Las barras discontinuas del borde del mapa son <b>accesos a otras ciudades</b>. Los vehículos entran por ahí y salen por otro acceso.',
+      'road.rule4': 'Las barras discontinuas del borde del mapa son <b>accesos a otras ciudades</b>. Los vehículos entran y salen por ahí, y también <b>arrancan desde un edificio de la calle y aparcan en otro</b>.',
       'road.rule5': 'Circulan cinco tipos: <b>coche, taxi, autobús, camión y moto</b>. Cambian en largo, velocidad y aceleración, así que un coche detrás de un camión forma cola.',
       'road.rule6': 'Frenan y arrancan <b>solos</b> según el hueco que tienen delante.',
       'road.rule7': '<b>Solo son cruces los sitios donde las trayectorias se cortan de verdad</b>: si ningún movimiento tiene que pasar la línea central (por ejemplo, una vía lateral de sentido único con el giro a la izquierda contrario desactivado), no es un cruce y nadie espera. Un cruce sin regular deja pasar <b>un vehículo cada vez</b>. El <b>semáforo</b> con dos fases abre a la vez los dos accesos enfrentados (solo los giros a la izquierda esperan hueco); con una fase por acceso los abre de uno en uno. En ambos casos se salta el acceso sin nadie esperando. En la <b>rotonda</b> manda quien ya está girando.',
@@ -312,6 +317,7 @@
       'road.overTitle': 'Llegó tarde',
       'road.overNote': '{n} entregas hechas · quedan {money} de presupuesto',
       'road.rule14': '<b>De vez en cuando llega un reparto.</b> Ese vehículo tiene que ir de una puerta a otra <b>dentro del tiempo dado</b>; si no llega, <b>la partida termina ahí</b>. Si llega, <b>cobras una prima</b>. El vehículo lleva un aro en el tablero, y una flecha en el borde lo señala cuando queda fuera de pantalla.',
+      'road.rule15': '<b>La ciudad crece.</b> Empiezas con una vía principal en cada sentido y, con el tiempo, <b>el tráfico sube y los edificios se llenan a lo largo de las calles</b>. Traza una vía y la ciudad crece a su alrededor; déjala estar y acabará atascándose.',
     }
   });
 })();
