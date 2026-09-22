@@ -226,6 +226,9 @@ function despawn(world, vehicle, counted) {
   }
   const at = world.vehicles.indexOf(vehicle);
   if (at >= 0) world.vehicles.splice(at, 1);
+  // **어떻게 사라졌는지를 차에 남긴다.** 미션은 제가 고른 차를 들고 있는데, 목록에서
+  // 빠진 것만으로는 닿아서 나간 것인지 길이 없어져 지워진 것인지 가릴 수 없다.
+  vehicle.gone = { at: world.time, counted: counted !== false };
   if (counted === false) return;
   world.arrived++;
   world.money += FARE;
