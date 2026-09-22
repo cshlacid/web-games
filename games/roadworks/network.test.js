@@ -738,5 +738,53 @@ function meetsSomewhere(one, other) {
   near('만나는 자리(y)', marks[0].y, 200, 0.5);
 }
 
+// --- 판 가장자리로 빠지는 길 ---
+
+{
+  const net = Gen.city({ seed: 5 });
+  const { w, h } = net.world;
+
+  // 네 변 중 가장 가까운 쪽으로 붙인다.
+  check('왼쪽 변', Net.edgeSpot(net, 10, 800).x, Net.EDGE_IN);
+  check('오른쪽 변', Net.edgeSpot(net, w - 10, 800).x, w - Net.EDGE_IN);
+  check('위쪽 변', Net.edgeSpot(net, 800, 10).y, Net.EDGE_IN);
+  check('아래쪽 변', Net.edgeSpot(net, 800, h - 10).y, h - Net.EDGE_IN);
+  check('판 밖도 가장자리', !!Net.edgeSpot(net, -200, 800), true);
+  check('한가운데는 가장자리가 아니다', Net.edgeSpot(net, w / 2, h / 2), null);
+  // 붙이는 쪽만 옮기고 나머지 자리는 그대로 둔다.
+  near('세로 자리는 그대로', Net.edgeSpot(net, 10, 800).y, 800, 0.001);
+}
+
+{
+  const net = Gen.city({ seed: 5 });
+  const gates = Net.gates(net).length;
+  const seg = net.segs.find((x) => x.lanes.length === 4);
+  const made = Net.connect(net, { seg: seg.id, s: seg.length / 2 }, { edge: { x: -40, y: 900 } });
+  check('길이 놓인다', !!made, true);
+  check('관문이 하나 는다', Net.gates(net).length, gates + 1);
+
+  const born = made.at[1];
+  check('새 관문은 관문이다', born.kind, 'gate');
+  check('판 가장자리에 붙는다', born.x, Net.EDGE_IN);
+  check('닿는 길이 하나뿐', born.segs.length, 1);
+  // 갈림이 없으니 교차로가 아니다 — 신호를 놓을 자리도 아니다.
+  check('교차로가 아니다', Net.canControl(born), false);
+
+  // **도시에서 그리로 빠져나갈 수 있다.** 1차로 일방통행이라 나가는 쪽만 뚫린다.
+  check('도시에서 시외로', !!Net.route(net, 'gE0', born.id), true);
+  Net.addLane(net, made.seg, -1);
+  check('차로를 늘리면 들어오기도 한다', !!Net.route(net, born.id, 'gE0'), true);
+}
+
+{
+  // 놓지 못하면 낸 관문도 도로 거둔다. 아무것도 닿지 않은 관문이 남으면 차가 거기서
+  // 나서 그 자리에 갇힌다.
+  const net = Gen.city({ seed: 5 });
+  const gates = Net.gates(net).length;
+  check('같은 자리끼리는 잇지 않는다',
+    Net.connect(net, { edge: { x: -40, y: 900 } }, { node: 'nope' }), null);
+  check('낸 관문을 거둔다', Net.gates(net).length, gates);
+}
+
 console.log(`${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);
