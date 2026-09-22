@@ -773,5 +773,39 @@ function ladder() {
   check('막혀도 계속 빠져나간다', world.arrived - was > 20, true);
 }
 
+{
+  // **가로지르는 길을 놓아도 그 위의 차가 그대로 남는다.** 지나가며 가로지르는 길에도
+  // 점을 내므로 한 구간이 두 번 갈리는 일이 있고, 한 번 옮긴 토막이 또 갈려 있다.
+  const net = Net.build(
+    [{ id: 'W1', kind: 'gate', x: 0, y: 0 }, { id: 'E1', kind: 'gate', x: 600, y: 0 },
+      { id: 'W2', kind: 'gate', x: 0, y: 200 }, { id: 'E2', kind: 'gate', x: 600, y: 200 },
+      { id: 'W3', kind: 'gate', x: 0, y: 400 }, { id: 'E3', kind: 'gate', x: 600, y: 400 }],
+    [{ a: 'W1', b: 'E1', lanes: [-1, 1] }, { a: 'W2', b: 'E2', lanes: [-1, 1] },
+      { a: 'W3', b: 'E3', lanes: [-1, 1] }],
+  );
+  const world = T.create(net, { rng: seeded(31), spawnRate: 0, money: 9000 });
+  for (const [from, to] of [['W1', 'E1'], ['E2', 'W2'], ['W3', 'E3'], ['W2', 'E2']]) {
+    T.spawn(world, { from, to });
+  }
+  run(world, 8);
+  const count = world.vehicles.length;
+  const was = new Map(world.vehicles.map((v) => [v.id, T.place(v)]));
+
+  const made = T.buildRoad(world, { seg: net.segs[0].id, s: 300 }, { seg: net.segs[2].id, s: 300 });
+  check('가로지르는 길이 놓인다', made.ok, true);
+  check('차가 사라지지 않는다', world.vehicles.length, count);
+  let jump = 0;
+  for (const v of world.vehicles) {
+    const at = T.place(v);
+    jump = Math.max(jump, Math.hypot(at.x - was.get(v.id).x, at.y - was.get(v.id).y));
+  }
+  near('제자리에 남는다', jump, 0, 2);
+  check('살아 있는 차로에 탔다',
+    world.vehicles.every((v) => !!Net.segment(net, v.lane.seg)), true);
+
+  run(world, 120);
+  check('모두 도착한다', world.arrived, count);
+}
+
 console.log(`${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);

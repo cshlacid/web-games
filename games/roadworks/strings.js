@@ -38,7 +38,7 @@
       'road.tooShort': '너무 짧습니다. 손잡이를 끌어 길게 굽히거나 취소하세요.',
       'road.tooDear': '예산이 모자랍니다. 차가 시외로 빠져나가면 채워집니다.',
       'road.laneFull': '이미 {n}차로입니다. 한 길에 둘 수 있는 가장 많은 차로입니다.',
-      'road.rule11': '<b>길 위의 아무 데서나 다른 길까지 끌면</b> 새 길이 생깁니다. 끌기를 마치면 값이 나오고, 그때 <b>가운데 손잡이를 끌어 굽이를 고친 뒤</b> 놓거나 취소합니다. 끌기를 시작한 자리와 끝낸 자리에는 <b>교차로가 새로 납니다</b>.',
+      'road.rule11': '<b>길 위의 아무 데서나 다른 길까지 끌면</b> 새 길이 생깁니다. 끌기를 마치면 값이 나오고, 그때 <b>가운데 손잡이를 끌어 굽이를 고친 뒤</b> 놓거나 취소합니다. 끌기를 시작한 자리와 끝낸 자리, 그리고 <b>지나가며 가로지른 길마다 교차로가 새로 납니다</b>.',
       'road.rule12': '<b>판은 도시의 한 조각만 비춥니다.</b> 빈 땅을 끌면 둘러보고, 손가락 둘을 벌리거나 오므리면(마우스는 휠) 크기를 바꿉니다. 길 위에서 끄는 것은 새 길을 놓는 것이라, 옮겨 볼 때는 길이 없는 곳을 잡거나 손가락 둘을 함께 움직이세요.',
     },
     en: {
@@ -78,7 +78,7 @@
       'road.tooShort': 'Too short. Bend it longer with the handle, or cancel.',
       'road.tooDear': 'Not enough budget. It fills up as vehicles leave town.',
       'road.laneFull': 'Already {n} lanes, the most a road can have.',
-      'road.rule11': '<b>Drag from anywhere on a road to another road</b> to lay a new one. Let go and the price appears; <b>bend it with the handle in the middle</b>, then build or cancel. <b>New junctions appear</b> where the drag started and ended.',
+      'road.rule11': '<b>Drag from anywhere on a road to another road</b> to lay a new one. Let go and the price appears; <b>bend it with the handle in the middle</b>, then build or cancel. <b>New junctions appear</b> where the drag started and ended, and at every road it crosses along the way.',
       'road.rule12': '<b>The board shows one corner of the city.</b> Drag empty ground to look around, pinch (or use the wheel) to change the scale. Dragging <em>on</em> a road lays a new one, so grab open ground — or move two fingers together — when you just want to move the view.',
     },
     ja: {
@@ -118,7 +118,7 @@
       'road.tooShort': '短すぎます。つまみを引いて長く曲げるか、取り消してください。',
       'road.tooDear': '予算が足りません。車が市外へ出れば貯まります。',
       'road.laneFull': 'すでに{n}車線です。1本の道に置ける最大です。',
-      'road.rule11': '<b>道の上のどこからでも別の道まで引けば</b>新しい道ができます。引き終えると値段が出るので、<b>真ん中のつまみで曲がりを直してから</b>敷くか取り消します。引き始めた所と終えた所には<b>新しい交差点ができます</b>。',
+      'road.rule11': '<b>道の上のどこからでも別の道まで引けば</b>新しい道ができます。引き終えると値段が出るので、<b>真ん中のつまみで曲がりを直してから</b>敷くか取り消します。引き始めた所と終えた所、そして<b>途中で横切った道ごとに新しい交差点ができます</b>。',
       'road.rule12': '<b>盤は街の一部だけを映します。</b>何もない地面をドラッグすると見て回れ、指二本を広げたり狭めたり（マウスはホイール）すると縮尺が変わります。道の上でのドラッグは新しい道を敷く操作なので、動かすだけなら道のない所をつかむか指二本を一緒に動かしてください。',
     },
     'zh-CN': {
@@ -158,7 +158,7 @@
       'road.tooShort': '太短了。用手柄拉长弯一点，或者取消。',
       'road.tooDear': '预算不够。车驶出城外就会进账。',
       'road.laneFull': '已经是{n}车道了，一条路最多就这么多。',
-      'road.rule11': '<b>从路上任意一点拖到另一条路</b>就能修新路。松手后会显示造价，这时<b>用中间的手柄调整弯度</b>，再决定修建还是取消。起点和终点处会<b>新增路口</b>。',
+      'road.rule11': '<b>从路上任意一点拖到另一条路</b>就能修新路。松手后会显示造价，这时<b>用中间的手柄调整弯度</b>，再决定修建还是取消。起点、终点，以及<b>沿途横穿的每条路上都会新增路口</b>。',
       'road.rule12': '<b>画面只显示城市的一角。</b>拖空地可以四处看，双指捏合（鼠标用滚轮）改变缩放。在路上拖是修新路，所以只想移动视野时请拖空地，或者两指一起移动。',
     },
     'zh-TW': {
@@ -198,7 +198,7 @@
       'road.tooShort': '太短了。用把手拉長彎一點，或者取消。',
       'road.tooDear': '預算不足。車駛出城外就會進帳。',
       'road.laneFull': '已經是{n}車道了，一條路最多就這麼多。',
-      'road.rule11': '<b>從路上任意一點拖到另一條路</b>就能興建新路。放手後會顯示造價，這時<b>用中間的把手調整彎度</b>，再決定興建還是取消。起點與終點處會<b>新增路口</b>。',
+      'road.rule11': '<b>從路上任意一點拖到另一條路</b>就能興建新路。放手後會顯示造價，這時<b>用中間的把手調整彎度</b>，再決定興建還是取消。起點、終點，以及<b>沿途橫越的每條路上都會新增路口</b>。',
       'road.rule12': '<b>畫面只顯示城市的一角。</b>拖空地可以四處看，雙指捏合（滑鼠用滾輪）改變縮放。在路上拖是興建新路，所以只想移動視野時請拖空地，或者兩指一起移動。',
     },
     es: {
@@ -238,7 +238,7 @@
       'road.tooShort': 'Demasiado corta. Cúrvala con el tirador o cancela.',
       'road.tooDear': 'No hay presupuesto. Se repone cada vez que un vehículo sale de la ciudad.',
       'road.laneFull': 'Ya tiene {n} carriles, el máximo de una vía.',
-      'road.rule11': '<b>Arrastra desde cualquier punto de una vía hasta otra</b> para trazar una nueva. Al soltar aparece el precio; <b>curva el trazado con el tirador del centro</b> y luego construye o cancela. <b>Se crean cruces nuevos</b> donde empieza y termina el arrastre.',
+      'road.rule11': '<b>Arrastra desde cualquier punto de una vía hasta otra</b> para trazar una nueva. Al soltar aparece el precio; <b>curva el trazado con el tirador del centro</b> y luego construye o cancela. <b>Se crean cruces nuevos</b> donde empieza y termina el arrastre, y en cada vía que cruza por el camino.',
       'road.rule12': '<b>El tablero muestra solo un trozo de la ciudad.</b> Arrastra sobre terreno vacío para moverte y pellizca (o usa la rueda) para cambiar la escala. Arrastrar <em>sobre</em> una vía traza una nueva, así que agarra terreno libre —o mueve dos dedos a la vez— cuando solo quieras desplazar la vista.',
     }
   });
