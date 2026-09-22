@@ -19,6 +19,7 @@
 (function (root) {
 
 const Net = (typeof require !== 'undefined') ? require('./network.js') : root.RoadNet;
+const Land = (typeof require !== 'undefined') ? require('./terrain.js') : root.RoadTerrain;
 
 // **격자는 도시의 뼈대가 아니라 길을 놓을 자리다.** 대부분은 비어 있고, 플레이어가
 // 끌어서 채운다. 그래서 칸 수가 곧 놀 자리의 넓이다.
@@ -180,9 +181,14 @@ function weave(chain) {
 }
 
 function city(options) {
-  const plan = generate(options);
+  const opts = options || {};
+  const plan = generate(opts);
   const net = Net.build(plan.nodes, plan.segments);
   net.world = plan.world;
+  // **장애물은 길을 놓고 나서 채운다.** 빈 자리가 어디인지는 길이 정하기 때문이고,
+  // 건물은 길 위에 앉으면 안 되기 때문이다. 씨앗은 같이 쓴다 — 같은 씨앗이면 길도
+  // 장애물도 같은 판이 나와야 테스트가 같은 것을 다시 본다.
+  net.land = Land.generate(net, mulberry32((opts.seed == null ? 1 : opts.seed) + 7919), opts.land);
   return net;
 }
 

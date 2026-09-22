@@ -40,6 +40,11 @@
       'road.laneFull': '이미 {n}차로입니다. 한 길에 둘 수 있는 가장 많은 차로입니다.',
       'road.rule11': '<b>길 위의 아무 데서나 다른 길까지 끌면</b> 새 길이 생깁니다. 끌기를 마치면 값이 나오고, 그때 <b>가운데 손잡이를 끌어 굽이를 고친 뒤</b> 놓거나 취소합니다. 끌기를 시작한 자리와 끝낸 자리, 그리고 <b>지나가며 가로지른 길마다 교차로가 새로 납니다</b>.',
       'road.rule12': '<b>판은 도시의 한 조각만 비춥니다.</b> 빈 땅을 끌면 둘러보고, 손가락 둘을 벌리거나 오므리면(마우스는 휠) 크기를 바꿉니다. 길 위에서 끄는 것은 새 길을 놓는 것이라, 옮겨 볼 때는 길이 없는 곳을 잡거나 손가락 둘을 함께 움직이세요.',
+      'road.onBuilding': '건물 위로는 지나갈 수 없습니다. 손잡이를 끌어 비켜 가세요.',
+      'road.tunnelBit': '터널 {n}',
+      'road.bridgeBit': '다리 {n}',
+      'road.join': ' · ',
+      'road.rule13': '빈 땅에는 <b>건물·산·강·호수</b>가 있습니다. <b>건물 위로는 길을 낼 수 없고</b>, 산은 <b>터널</b>을, 강과 호수는 <b>다리</b>를 놓고 지나므로 그만큼 값이 더 듭니다.',
     },
     en: {
       'meta.desc': 'Cars, taxis, buses, trucks and motorcycles drive in real time across a city of straight and curved roads',
@@ -80,6 +85,11 @@
       'road.laneFull': 'Already {n} lanes, the most a road can have.',
       'road.rule11': '<b>Drag from anywhere on a road to another road</b> to lay a new one. Let go and the price appears; <b>bend it with the handle in the middle</b>, then build or cancel. <b>New junctions appear</b> where the drag started and ended, and at every road it crosses along the way.',
       'road.rule12': '<b>The board shows one corner of the city.</b> Drag empty ground to look around, pinch (or use the wheel) to change the scale. Dragging <em>on</em> a road lays a new one, so grab open ground — or move two fingers together — when you just want to move the view.',
+      'road.onBuilding': 'A road cannot run through a building. Bend it aside with the handle.',
+      'road.tunnelBit': 'tunnel {n}',
+      'road.bridgeBit': 'bridge {n}',
+      'road.join': ' · ',
+      'road.rule13': 'Open ground holds <b>buildings, hills, rivers and lakes</b>. <b>No road can cross a building</b>; hills are bored as a <b>tunnel</b> and water is spanned by a <b>bridge</b>, and both cost extra.',
     },
     ja: {
       'meta.desc': '直線と曲線が混ざった街の道路を、乗用車・タクシー・バス・トラック・バイクがリアルタイムで走る',
@@ -120,6 +130,11 @@
       'road.laneFull': 'すでに{n}車線です。1本の道に置ける最大です。',
       'road.rule11': '<b>道の上のどこからでも別の道まで引けば</b>新しい道ができます。引き終えると値段が出るので、<b>真ん中のつまみで曲がりを直してから</b>敷くか取り消します。引き始めた所と終えた所、そして<b>途中で横切った道ごとに新しい交差点ができます</b>。',
       'road.rule12': '<b>盤は街の一部だけを映します。</b>何もない地面をドラッグすると見て回れ、指二本を広げたり狭めたり（マウスはホイール）すると縮尺が変わります。道の上でのドラッグは新しい道を敷く操作なので、動かすだけなら道のない所をつかむか指二本を一緒に動かしてください。',
+      'road.onBuilding': '建物の上は通せません。つまみを引いて避けてください。',
+      'road.tunnelBit': 'トンネル{n}',
+      'road.bridgeBit': '橋{n}',
+      'road.join': '・',
+      'road.rule13': '空き地には<b>建物・山・川・湖</b>があります。<b>建物の上に道は通せません</b>。山は<b>トンネル</b>、川と湖は<b>橋</b>で越えるので、その分だけ高くつきます。',
     },
     'zh-CN': {
       'meta.desc': '轿车、出租车、公交车、卡车和摩托车在直路与弯路交错的城市里实时行驶',
@@ -160,6 +175,11 @@
       'road.laneFull': '已经是{n}车道了，一条路最多就这么多。',
       'road.rule11': '<b>从路上任意一点拖到另一条路</b>就能修新路。松手后会显示造价，这时<b>用中间的手柄调整弯度</b>，再决定修建还是取消。起点、终点，以及<b>沿途横穿的每条路上都会新增路口</b>。',
       'road.rule12': '<b>画面只显示城市的一角。</b>拖空地可以四处看，双指捏合（鼠标用滚轮）改变缩放。在路上拖是修新路，所以只想移动视野时请拖空地，或者两指一起移动。',
+      'road.onBuilding': '路不能从建筑上穿过。拖手柄绕开吧。',
+      'road.tunnelBit': '隧道{n}',
+      'road.bridgeBit': '桥{n}',
+      'road.join': '·',
+      'road.rule13': '空地上有<b>建筑、山、河和湖</b>。<b>路不能穿过建筑</b>；过山要打<b>隧道</b>，过水要架<b>桥</b>，都要多花钱。',
     },
     'zh-TW': {
       'meta.desc': '轎車、計程車、公車、卡車和機車在直路與彎路交錯的城市裡即時行駛',
@@ -200,6 +220,11 @@
       'road.laneFull': '已經是{n}車道了，一條路最多就這麼多。',
       'road.rule11': '<b>從路上任意一點拖到另一條路</b>就能興建新路。放手後會顯示造價，這時<b>用中間的把手調整彎度</b>，再決定興建還是取消。起點、終點，以及<b>沿途橫越的每條路上都會新增路口</b>。',
       'road.rule12': '<b>畫面只顯示城市的一角。</b>拖空地可以四處看，雙指捏合（滑鼠用滾輪）改變縮放。在路上拖是興建新路，所以只想移動視野時請拖空地，或者兩指一起移動。',
+      'road.onBuilding': '路不能從建築上穿過。拖把手繞開吧。',
+      'road.tunnelBit': '隧道{n}',
+      'road.bridgeBit': '橋{n}',
+      'road.join': '·',
+      'road.rule13': '空地上有<b>建築、山、河與湖</b>。<b>路不能穿過建築</b>；過山要開<b>隧道</b>，過水要架<b>橋</b>，都要多花錢。',
     },
     es: {
       'meta.desc': 'Coches, taxis, autobuses, camiones y motos circulan en tiempo real por una ciudad de calles rectas y curvas',
@@ -240,6 +265,11 @@
       'road.laneFull': 'Ya tiene {n} carriles, el máximo de una vía.',
       'road.rule11': '<b>Arrastra desde cualquier punto de una vía hasta otra</b> para trazar una nueva. Al soltar aparece el precio; <b>curva el trazado con el tirador del centro</b> y luego construye o cancela. <b>Se crean cruces nuevos</b> donde empieza y termina el arrastre, y en cada vía que cruza por el camino.',
       'road.rule12': '<b>El tablero muestra solo un trozo de la ciudad.</b> Arrastra sobre terreno vacío para moverte y pellizca (o usa la rueda) para cambiar la escala. Arrastrar <em>sobre</em> una vía traza una nueva, así que agarra terreno libre —o mueve dos dedos a la vez— cuando solo quieras desplazar la vista.',
+      'road.onBuilding': 'Una vía no puede atravesar un edificio. Desvíala con el tirador.',
+      'road.tunnelBit': 'túnel {n}',
+      'road.bridgeBit': 'puente {n}',
+      'road.join': ' · ',
+      'road.rule13': 'El terreno libre tiene <b>edificios, montes, ríos y lagos</b>. <b>Ninguna vía atraviesa un edificio</b>; los montes se cruzan con un <b>túnel</b> y el agua con un <b>puente</b>, y ambos cuestan más.',
     }
   });
 })();
