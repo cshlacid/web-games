@@ -678,7 +678,9 @@ function ringAhead(world, v) {
 // 세 가지 다스림이 저마다 다른 방식으로 **교차로 안에서 엇갈릴 짝을 없앤다** —
 // 아무것도 없으면 한 대씩, 신호등은 한 갈래씩, 회전교차로는 한 방향으로만 돌게.
 function blocked(world, v, node, gap, holder) {
-  if (!node || node.kind === 'gate' || node.segs.length < 3) return false;
+  // **엇갈릴 짝이 없는 자리에서는 아무도 기다리지 않는다.** 갈래가 셋이라도 지나는
+  // 길이 서로 가로지르지 않으면 한 대씩 보낼 이유가 없다(`canControl`이 그 잣대다).
+  if (!node || !Net.canControl(node)) return false;
   if (v.lane.isLink) return false;
   if (node.control === 'signal') return redLight(world, v, node, gap, holder);
   if (node.control === 'circle') return mustYield(world, v, node, gap, holder);

@@ -333,10 +333,19 @@ function addLane(net, seg, dir) {
 }
 
 // 차로가 허락하는 이동을 갈아 끼운다. 판 위에서 화살표를 고치는 것이 이 함수다.
-function setAllow(lane, moves) {
+// net을 함께 받으면 그 차로가 닿는 교차로의 엇갈림을 다시 잰다 — 좌회전을 끄면
+// 가로지를 짝이 사라져 교차로가 아니게 되는 자리가 있다.
+function setAllow(lane, moves, net) {
   const list = MOVES.filter((m) => moves.indexOf(m) >= 0);
   // 아무것도 못 가는 차로는 둘 수 없다 — 그 차로에 들어온 차가 갇힌다.
   lane.allow = list.length ? list : ['through'];
+  if (net) {
+    const at = node(net, lane.to);
+    if (at) {
+      at.conflict = hasCrossing(net, at);
+      if (!canControl(at)) at.control = 'none';
+    }
+  }
   return lane;
 }
 
@@ -382,6 +391,15 @@ function relink(net) {
     let radius = 0;
     for (const id of node.segs) radius = Math.max(radius, segment(net, id).width / 2);
     node.radius = radius;
+  }
+  // **엇갈릴 짝이 있는지는 여기서 한 번만 잰다.** 화면이 프레임마다 묻는 값이라
+  // 그때마다 이동을 모두 훑을 수는 없다. 차로 구성과 허용 이동이 바뀌면 판이
+  // 다시 이어지므로(`reshape`) 여기가 그 자리다.
+  for (const node of net.nodes) {
+    node.conflict = hasCrossing(net, node);
+    // 엇갈림이 사라진 자리에 놓여 있던 신호는 거둔다. 아무것도 갈라 줄 것이 없는데
+    // 차만 세우게 된다.
+    if (!canControl(node)) node.control = 'none';
   }
   for (const node of net.nodes) assignPhases(node);
   return net;
@@ -448,10 +466,86 @@ function phaseCount(node) {
   return Math.max(1, node.phases || 1);
 }
 
-// 갈림이 있는 자리에만 놓을 수 있다. 길이 그저 꺾이기만 하는 이음매에 신호를 세우면
-// 아무것도 갈라 주지 않으면서 차만 세운다.
+// **엇갈릴 짝이 있는 자리에만 놓을 수 있다.** 갈래가 셋이라고 다 교차로인 것은
+// 아니다 — 지나는 길이 서로 가로지르지 않으면 아무것도 갈라 줄 것이 없고, 거기에
+// 신호를 세우면 차만 세운다. 길이 꺾이기만 하는 이음매도 이 잣대에 저절로 걸린다.
 function canControl(node) {
-  return node.kind !== 'gate' && node.segs.length >= 3;
+  return node.kind !== 'gate' && !!node.conflict;
+}
+
+// 갈래의 방위. 교차로에서 그 구간 쪽을 본 방향이다.
+function approachAngle(net, node, segId) {
+  const seg = segment(net, segId);
+  if (!seg) return null;
+  const out = seg.a === node.id;
+  const at = Geom.at(seg.center, out ? 0 : seg.center.total);
+  return out ? Math.atan2(at.dy, at.dx) : Math.atan2(-at.dy, -at.dx);
+}
+
+const TAU = Math.PI * 2;
+const norm = (a) => ((a % TAU) + TAU) % TAU;
+
+// **들고 나는 자리는 갈래의 방위에서 조금 비켜 있다.** 우측 통행이라 들어오는 차는
+// 제 갈래의 오른쪽으로 닿고 나가는 차는 나갈 갈래의 오른쪽으로 떠나는데, 화면
+// 좌표에서 그 오른쪽은 각이 커지는 쪽이다. 그래서 **들어오는 자리는 방위보다 조금
+// 작고 나가는 자리는 조금 크다.** 이 비킴이 없으면 마주 보는 직진 둘이 한 점에서
+// 만나 서로 엇갈리는 것으로 잡힌다.
+const SIDE = 0.08;
+
+// 두 이동이 교차로 안에서 가로지르는가. 원 위의 두 현이 서로를 건너는지를 본다 —
+// 끝을 나눠 쓰는 둘(같은 데서 갈라지거나 같은 데로 합치는 둘)은 가로지르는 것이
+// 아니므로 먼저 걸러 낸다.
+function chordCross(p, q) {
+  if (p.from === q.from || p.to === q.to) return false;
+  const inside = (a, b, x) => norm(x - a) < norm(b - a);
+  return inside(p.a, p.b, q.a) !== inside(p.a, p.b, q.b);
+}
+
+// 이 교차로에서 허락된 이동들 가운데 서로 가로지르는 짝이 있는가.
+function hasCrossing(net, node) {
+  if (node.kind === 'gate' || node.segs.length < 2) return false;
+  const angle = new Map();
+  for (const id of node.segs) {
+    const a = approachAngle(net, node, id);
+    if (a != null) angle.set(id, a);
+  }
+
+  // 차로가 아니라 **(구간, 방향)**을 센다. 한 갈래에 차로가 여덟이면 차로끼리
+  // 짝지어 훑는 것만으로 수백 번이 되는데, 가로지르는지는 차로가 아니라 어느
+  // 갈래에서 어느 갈래로 가는가로 정해진다.
+  const ways = (lanes) => {
+    const out = [];
+    for (const lane of lanes) {
+      if (!out.some((w) => w.seg === lane.seg && w.dir === lane.dir)) {
+        out.push({ seg: lane.seg, dir: lane.dir });
+      }
+    }
+    return out;
+  };
+
+  const moves = [];
+  for (const into of ways(node.in)) {
+    for (const away of ways(node.out)) {
+      const from = segment(net, into.seg);
+      const to = segment(net, away.seg);
+      if (!from || !to) continue;
+      if (!movementAllowed(net, from, into.dir, to, away.dir)) continue;
+      const ain = angle.get(into.seg);
+      const aout = angle.get(away.seg);
+      if (ain == null || aout == null) continue;
+      moves.push({
+        from: into.seg, to: away.seg,
+        a: norm(ain - SIDE), b: norm(aout + SIDE),
+      });
+    }
+  }
+
+  for (let i = 0; i < moves.length; i++) {
+    for (let j = i + 1; j < moves.length; j++) {
+      if (chordCross(moves[i], moves[j])) return true;
+    }
+  }
+  return false;
 }
 
 function setControl(net, nodeId, mode) {
@@ -705,7 +799,7 @@ function gates(net) {
 
 const api = {
   build, setLanes, relink, node, segment, lanesOf, pickLane, boundaries, link, route, gates,
-  setControl, cycleControl, canControl, phaseOf, phaseCount, islandRadius, reach, ringPath,
+  setControl, cycleControl, canControl, hasCrossing, phaseOf, phaseCount, islandRadius, reach, ringPath,
   setPlan, setCrossing, crossingAt, setAllow, movement, movementAllowed, sideOf,
   reshape, flipLane, addLane, clearLinks, addSeg, removeSeg, splitSeg, connect, bend, draftPath, spotOf,
   stubOf,

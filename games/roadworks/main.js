@@ -239,8 +239,8 @@ function drawRoads() {
   for (const seg of net.segs) {
     const item = deco.get(seg.id);
     const cut = seg.width / 2 + 3;
-    const head = Net.canControl(Net.node(net, seg.a)) ? cut : 0;
-    const tail = Net.canControl(Net.node(net, seg.b)) ? cut : 0;
+    const head = trimAt(Net.node(net, seg.a), seg) ? cut : 0;
+    const tail = trimAt(Net.node(net, seg.b), seg) ? cut : 0;
     for (const path of item.dashes) {
       strokeTrimmed(path, head, tail, { color: skin.dash, width: 0.9, dash: [7, 9], alpha: 0.75 });
     }
@@ -250,7 +250,18 @@ function drawRoads() {
   }
 }
 
-// 양 끝을 잘라 그린다. 교차로 원 안까지 차선을 그으면 교차로가 격자무늬가 된다.
+// 이 끝에서 선을 끊는가. 교차로에서는 끊는다 — 원 안까지 차선을 그으면 교차로가
+// 격자무늬가 된다. **엇갈림이 없는 자리에서도 좁은 길이 넓은 길에 닿을 때는
+// 끊는다**: 구간은 상대의 한가운데까지 그어져 있어, 끊지 않으면 곁길의 중앙선이
+// 큰길의 차로를 가로질러 큰길 한복판까지 올라온다. 폭이 같은 자리(이음매)는
+// 끊을 것이 없다.
+function trimAt(node, seg) {
+  if (!node) return false;
+  if (Net.canControl(node)) return true;
+  return node.radius > seg.width / 2 + 0.5;
+}
+
+// 양 끝을 잘라 그린다.
 function strokeTrimmed(path, headTrim, tailTrim, style) {
   const from = Math.min(headTrim, path.total / 2 - 1);
   const to = path.total - Math.min(tailTrim, path.total / 2 - 1);
@@ -277,7 +288,9 @@ function drawLaneMarks() {
   for (const seg of net.segs) {
     for (const lane of seg.lanes) {
       const node = Net.node(net, lane.to);
-      if (!node || !Net.canControl(node)) continue;
+      // **엇갈림이 아니라 갈림을 본다.** 가로지르는 짝이 없어 교차로를 두지 않는
+      // 자리에서도 갈 길이 여럿이면 어디로 갈 수 있는지는 적어 주어야 한다.
+      if (!node || node.kind === 'gate' || node.segs.length < 3) continue;
       const back = Net.reach(node) + 16;
       if (lane.path.total < back + 22) continue;
       const at = Geom.at(lane.path, lane.path.total - back);
@@ -1053,7 +1066,7 @@ el.panel.addEventListener('click', (event) => {
     const next = lane.allow.indexOf(d.move) >= 0
       ? lane.allow.filter((m) => m !== d.move)
       : lane.allow.concat([d.move]);
-    Net.setAllow(lane, next);
+    Net.setAllow(lane, next, net);
   } else if (d.close != null) {
     picked = null;
   }
