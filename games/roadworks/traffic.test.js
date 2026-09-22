@@ -967,5 +967,34 @@ function block() {
     world.vehicles.every((v) => v.s >= -1 && v.s <= v.lane.path.total + 1), true);
 }
 
+{
+  // **판 가장자리로 빼는 길.** 거기에 관문이 새로 나므로 "관문에는 붙이지 않는다"에
+  // 걸리지 않는다.
+  const net = bare(5);
+  const world = T.create(net, { rng: seeded(61), spawnRate: 0, money: 1e6 });
+  // 관문에 닿지 않는 구간을 고른다 — 관문 코앞에서 시작하면 거기에 붙는 것이 된다.
+  const seg = net.segs.find((x) => Net.node(net, x.a).kind !== 'gate'
+    && Net.node(net, x.b).kind !== 'gate' && x.length > 120);
+  const from = { seg: seg.id, s: seg.length / 2 };
+  const able = T.canBuild(world, from, { edge: { x: -40, y: 900 } });
+  check('가장자리로는 놓을 수 있다', able.ok, true);
+
+  const gates = Net.gates(net).length;
+  const made = T.buildRoad(world, from, { edge: { x: -40, y: 900 } });
+  check('놓인다', made.ok, true);
+  check('관문이 는다', Net.gates(net).length, gates + 1);
+
+  // 새 관문으로도 차가 빠져나간다.
+  const born = Net.gates(net).find((g) => g.id[0] === 'e');
+  const v = T.spawn(world, { from: 'gE0', to: born.id });
+  check('그 관문을 목적지로 삼는다', !!v, true);
+  run(world, 300);
+  check('거기로 빠져나간다', world.arrived > 0, true);
+
+  // 가장자리끼리는 잇지 않는다 — 도시에 닿지 않는 길이 된다.
+  check('가장자리끼리는 거절',
+    T.canBuild(world, { edge: { x: -40, y: 300 } }, { edge: { x: -40, y: 1500 } }).why, 'same');
+}
+
 console.log(`${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);

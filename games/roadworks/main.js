@@ -945,6 +945,13 @@ function roadAt(spot) {
 
 // 누른 자리가 무엇인가. 고르는 것도 길을 뻗는 것도 이 하나를 쓴다 — 짚어 주는 자리와
 // 길이 붙는 자리가 갈리면 손가락이 짚은 곳과 다른 데서 길이 나간다.
+// 판 가장자리. **여기에 길을 대면 도시 밖으로 빠지는 관문이 새로 난다.** 고르기에는
+// 쓰지 않고 길을 놓는 끌기에서만 본다 — 빈 땅을 끄는 것은 둘러보기이기 때문이다.
+function edgeAt(spot) {
+  const at = Net.edgeSpot(net, spot.x, spot.y);
+  return at && { kind: 'edge', edge: { x: spot.x, y: spot.y }, x: at.x, y: at.y };
+}
+
 function anchorAt(spot) {
   const hit = roadAt(spot);
   const node = junctionAt(spot);
@@ -963,6 +970,7 @@ function anchorAt(spot) {
 
 // traffic에 넘기는 말. 화면은 구간 객체를 들고 있지만 규칙 쪽은 id로 받는다.
 function spotArg(a) {
+  if (a.kind === 'edge') return { edge: a.edge };
   return a.kind === 'node' ? { node: a.node.id } : { seg: a.seg.id, s: a.s };
 }
 
@@ -1052,7 +1060,7 @@ el.canvas.addEventListener('pointermove', (event) => {
   drag.cur = spot;
   const moved = Math.hypot(spot.x - drag.start.x, spot.y - drag.start.y) * view.z;
   if (moved > DRAG_SLOP) drag.moved = true;
-  if (drag.moved) drag.to = anchorAt(spot);
+  if (drag.moved) drag.to = anchorAt(spot) || edgeAt(spot);
 });
 
 function endPointer(event) {
@@ -1082,8 +1090,9 @@ el.canvas.addEventListener('pointerup', (event) => {
     paintPanel();
     return;
   }
-  if (!it.from || !it.to) { Sound.play('clear'); return; }
-  startDraft(it.from, it.to);
+  const to = it.to || edgeAt(spotOf(event));
+  if (!it.from || !to) { Sound.play('clear'); return; }
+  startDraft(it.from, to);
 });
 
 el.canvas.addEventListener('pointercancel', endPointer);
@@ -1207,7 +1216,8 @@ const DRAFT_WHY = {
 function draftPanel() {
   const able = draft.able;
   const rows = [`<p class="panel-title">${t('road.newRoad')}</p>`];
-  rows.push(`<p class="panel-note">${t(able.ok ? 'road.draftHint' : (DRAFT_WHY[able.why] || 'road.tooDear'))}</p>`);
+  const hint = draft.to.kind === 'edge' || draft.from.kind === 'edge' ? 'road.toEdge' : 'road.draftHint';
+  rows.push(`<p class="panel-note">${t(able.ok ? hint : (DRAFT_WHY[able.why] || 'road.tooDear'))}</p>`);
 
   // **값이 왜 비싼지 적어 준다.** 산을 돌아갈지 뚫을지를 고르려면 뚫는 값이 얼마나
   // 얹혔는지 보여야 한다.

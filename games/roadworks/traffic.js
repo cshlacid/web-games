@@ -426,9 +426,12 @@ function canBuild(world, from, to, handle) {
   // **관문에는 붙이지 않는다.** 도시 밖으로 나가는 입구라 신호도 회전교차로도 놓을
   // 수 없는 자리인데, 거기에 갈림을 만들면 아무도 가르지 않는 교차로가 생겨 차가
   // 서로를 통과한다.
+  // **판 가장자리에 새로 내는 관문은 다르다** — 닿는 길이 하나뿐이라 갈림이 없다.
   if (endsAtGate(world.net, from) || endsAtGate(world.net, to)) {
-    return { ok: false, why: 'gate', cost };
+    return { ok: false, why: 'gate', cost, span };
   }
+  // 가장자리끼리 이으면 도시에 닿지 않는 길이 된다. 차가 나서 그대로 빠져나갈 뿐이다.
+  if (from.edge && to.edge) return { ok: false, why: 'same', cost, span };
   if (world.money < cost) return { ok: false, why: 'money', cost, span };
   return { ok: true, cost, span, len: path.total };
 }
@@ -440,6 +443,7 @@ function segIdOf(spot) {
 // 이 자리가 관문으로 접히는가. 구간 끝에 가까운 자리는 가르지 않고 그 끝 점을 쓰므로
 // (`Net.splitSeg`), 가르기 전에 같은 잣대로 미리 본다.
 function endsAtGate(net, spot) {
+  if (spot.edge) return false;   // 그 자리에 관문을 새로 내는 것이라 붙이는 것이 아니다
   if (spot.node != null) {
     const at = Net.node(net, spot.node);
     return !!at && at.kind === 'gate';

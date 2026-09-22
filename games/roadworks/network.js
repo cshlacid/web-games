@@ -178,11 +178,16 @@ function splitSeg(net, seg, s) {
 // 돌려주는 것은 { seg, at: [시작점, 끝점], split: 가른 수 }.
 function connect(net, from, to, handle, lanes) {
   const splits = [];
-  const a = anchor(net, from, splits);
-  if (!a) return null;
-  const b = anchor(net, to, splits);
-  if (!b) return null;
-  if (a.id === b.id) return null;
+  // 가장자리에 낸 관문. 길을 놓지 못하고 돌아설 때는 도로 거둔다 — 아무것도 닿지
+  // 않은 관문이 판에 남으면 차가 거기서 나서 그 자리에 갇힌다.
+  const born = [];
+  const fail = () => { for (const made of born) dropNode(net, made); return null; };
+
+  const a = anchor(net, from, splits, born);
+  if (!a) return fail();
+  const b = anchor(net, to, splits, born);
+  if (!b) return fail();
+  if (a.id === b.id) return fail();
 
   // **지나가며 가로지르는 길에도 점을 낸다.** 그러지 않으면 두 길이 점 없이 겹쳐,
   // 차가 서로를 통과하고 신호를 놓을 자리도 없는 도로가 생긴다.
@@ -230,7 +235,7 @@ function connect(net, from, to, handle, lanes) {
     });
     if (last) segs.push(last);
   }
-  if (!segs.length) return null;
+  if (!segs.length) return fail();
   relink(net);
   return { seg: segs[0], segs, at: [a, b], splits };
 }
@@ -317,8 +322,62 @@ function segmentNear(net, spot, skipIds) {
   return best;
 }
 
-// 자리를 점으로 바꾼다. { node: id }면 그 점, { seg, s }면 그 구간을 가른 자리.
-function anchor(net, spot, splits) {
+// 관문을 판 끝보다 조금 안쪽에 둔다. 차가 사라지는 자리가 보여야 한다.
+const EDGE_IN = 6;
+// 판 끝에서 이만큼 안쪽까지를 "가장자리"로 본다. 여기에 길을 대면 시외로 빠진다.
+const EDGE_BAND = 52;
+
+// 그 자리가 판 가장자리인가. 맞으면 거기에 놓일 관문의 자리를 돌려준다. **네 변 중
+// 가장 가까운 쪽으로 붙인다** — 모서리 근처에서는 어느 쪽이든 하나를 골라야 한다.
+function edgeSpot(net, x, y, band) {
+  const { w, h } = net.world;
+  const reach = band == null ? EDGE_BAND : band;
+  const cx = Math.max(0, Math.min(w, x));
+  const cy = Math.max(0, Math.min(h, y));
+  const gaps = [cx, w - cx, cy, h - cy];
+  const near = Math.min(...gaps);
+  // 판 밖으로 끌어낸 것도 가장자리로 본다.
+  const out = x < 0 || y < 0 || x > w || y > h;
+  if (!out && near > reach) return null;
+  const k = gaps.indexOf(near);
+  if (k === 0) return { x: EDGE_IN, y: cy };
+  if (k === 1) return { x: w - EDGE_IN, y: cy };
+  if (k === 2) return { x: cx, y: EDGE_IN };
+  return { x: cx, y: h - EDGE_IN };
+}
+
+// 가장자리에 관문을 하나 낸다. **도시 밖으로 빠지는 길은 여기서 태어난다.**
+function addGate(net, x, y) {
+  const at = edgeSpot(net, x, y, Infinity);
+  const node = {
+    id: `e${net.nextNode++}`,
+    kind: 'gate',
+    control: 'none',
+    plan: 'paired',
+    crossing: false,
+    x: at.x,
+    y: at.y,
+    out: [],
+    in: [],
+    segs: [],
+  };
+  net.nodes.push(node);
+  return node;
+}
+
+function dropNode(net, node) {
+  const at = net.nodes.indexOf(node);
+  if (at >= 0) net.nodes.splice(at, 1);
+}
+
+// 자리를 점으로 바꾼다. { node: id }면 그 점, { seg, s }면 그 구간을 가른 자리,
+// { edge }면 판 가장자리에 새로 내는 관문.
+function anchor(net, spot, splits, born) {
+  if (spot.edge) {
+    const made = addGate(net, spot.edge.x, spot.edge.y);
+    if (born) born.push(made);
+    return made;
+  }
   if (spot.node != null) return node(net, spot.node);
   const seg = typeof spot.seg === 'object' ? spot.seg : segment(net, spot.seg);
   if (!seg) return null;
@@ -351,6 +410,7 @@ function draftPath(net, from, to, handle) {
 // 자리의 좌표. 판을 가르지 않고 어디인지만 본다.
 function spotOf(net, spot) {
   if (!spot) return null;
+  if (spot.edge) return edgeSpot(net, spot.edge.x, spot.edge.y, Infinity);
   if (spot.node != null) {
     const at = node(net, spot.node);
     return at && { x: at.x, y: at.y };
@@ -930,8 +990,9 @@ const api = {
   setControl, cycleControl, canControl, hasCrossing, phaseOf, phaseCount, islandRadius, reach, ringPath,
   setPlan, setCrossing, crossingAt, setAllow, movement, movementAllowed, sideOf,
   reshape, flipLane, addLane, clearLinks, addSeg, removeSeg, splitSeg, connect, bend, draftPath, spotOf, crossMarks,
+  edgeSpot, addGate,
   stubOf,
-  LANE_W, MAX_LANES, MIN_STUB, CONTROLS, PLANS, MOVES,
+  LANE_W, MAX_LANES, MIN_STUB, EDGE_BAND, EDGE_IN, CONTROLS, PLANS, MOVES,
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
