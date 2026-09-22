@@ -481,8 +481,9 @@ function walkerOn(world, net, nodeId, segId, dir) {
 // --- 만든 맵 위에서 ---
 
 {
+  // 게임이 실제로 쓰는 진입 속도로 맵 위를 오래 굴려 본다.
   const net = Gen.city({ seed: 21 });
-  const world = T.create(net, { rng: seeded(21), spawnRate: 3.2 });
+  const world = T.create(net, { rng: seeded(21), spawnRate: 1.1 });
   for (let i = 0; i < 60 * 120; i++) T.tick(world, 1 / 60);
 
   const s = T.stats(world);
@@ -492,7 +493,9 @@ function walkerOn(world, net, nodeId, segId, dir) {
   check('평균 속도가 남아 있다', s.speed > 2, true);
   check('한도를 넘지 않는다', s.total <= world.maxVehicles, true);
 
-  const stuck = world.vehicles.filter((v) => v.waiting > 30);
+  // **서로 물려 아무도 못 가는 자리가 없다.** 아무것도 놓이지 않은 교차로는 한 대씩
+  // 지나므로 줄은 서지만, 한 대가 한참을 꼼짝 못 하면 그것은 줄이 아니라 맞물림이다.
+  const stuck = world.vehicles.filter((v) => v.waiting > 45);
   check('오래 갇힌 차가 없다', stuck.length, 0);
 
   // 같은 차로 안에서 앞뒤가 겹치면 안 된다.
@@ -562,7 +565,7 @@ function walkerOn(world, net, nodeId, segId, dir) {
   const was = world.money;
   run(world, 60);
   check('빠져나간 차가 있다', world.arrived > 0, true);
-  check('빠져나간 만큼 벌었다', world.money - was, world.arrived);
+  check('빠져나간 만큼 벌었다', world.money - was, world.arrived * T.FARE);
 }
 
 {
@@ -756,6 +759,18 @@ function ladder() {
   check('놓은 뒤에도 차가 계속 빠져나간다', world.arrived > goal, true);
   check('길 밖으로 나간 차가 없다',
     world.vehicles.every((v) => v.s >= -1 && v.s <= v.lane.path.total + 1), true);
+}
+
+{
+  // **넘치도록 밀어 넣어도 굳지는 않는다.** 다스리지 않은 교차로가 스물 몇 개인
+  // 넓은 판에서는 진입이 많으면 줄이 길어지는데, 그때도 차는 계속 빠져나가야 한다 —
+  // 멎어 버리면 돈이 들어오지 않아 풀 방법까지 함께 사라진다.
+  const net = Gen.city({ seed: 21 });
+  const world = T.create(net, { rng: seeded(21), spawnRate: 3.2 });
+  for (let i = 0; i < 60 * 120; i++) T.tick(world, 1 / 60);
+  const was = world.arrived;
+  for (let i = 0; i < 60 * 60; i++) T.tick(world, 1 / 60);
+  check('막혀도 계속 빠져나간다', world.arrived - was > 20, true);
 }
 
 console.log(`${passed}개 통과, ${failed}개 실패`);

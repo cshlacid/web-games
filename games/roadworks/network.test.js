@@ -369,9 +369,12 @@ function straight(lanes) {
 
 {
   const net = Gen.city({ seed: 7 });
-  check('관문이 넷', Net.gates(net).length, 4);
-  // **처음에는 길이 적다.** 큰길 둘과 골목 하나, 그리고 관문으로 나가는 길뿐이다.
-  check('시작 도로가 적다', net.segs.length <= 12, true);
+  // 큰길은 가로 둘·세로 둘이고 관문은 그 끝마다 하나씩이다.
+  check('관문은 큰길 끝마다', Net.gates(net).length, 8);
+  // **처음에는 길이 적다.** 격자 자리는 대부분 비어 있고 플레이어가 채운다.
+  const spots = Gen.COLS * Gen.ROWS;
+  check('격자 자리가 넉넉하다', spots >= 60, true);
+  check('시작 도로가 격자보다 적다', net.segs.length < spots, true);
   check('네 갈래 교차로가 있다',
     net.nodes.some((n) => n.kind !== 'gate' && n.segs.length === 4), true);
 

@@ -41,7 +41,7 @@ const ctx = el.canvas.getContext('2d');
 // 화면 색. 어두운 테마에서 갈리는 값만 둘로 둔다.
 const SKIN = {
   light: {
-    ground: '#e9ecef', asphalt: '#7d8794', kerb: '#69737f',
+    ground: '#e9ecef', outside: '#dbdfe4', asphalt: '#7d8794', kerb: '#69737f',
     dash: '#e8ecf1', middle: '#e7c94f', gate: '#59636f',
     island: '#9fbf96', stop: '#eef1f4',
     red: '#d4483b', amber: '#e0a52c', green: '#49a55f',
@@ -50,7 +50,7 @@ const SKIN = {
     taxi: '#eeb92a', bus: '#3f8f86', truck: '#cfd4da', moto: '#3c4650',
   },
   dark: {
-    ground: '#171a1e', asphalt: '#3b434c', kerb: '#2a3138',
+    ground: '#171a1e', outside: '#0d0f11', asphalt: '#3b434c', kerb: '#2a3138',
     dash: '#7c8794', middle: '#a98f31', gate: '#8b96a2',
     island: '#41603f', stop: '#aeb7c0',
     red: '#c04336', amber: '#c9932a', green: '#3f9153',
@@ -64,7 +64,13 @@ let skin = SKIN.light;
 let net = null;
 let world = null;
 let deco = new Map();      // 구간 id → 차선·가장자리 꺾은선
-let view = { scale: 1, dx: 0, dy: 0 };
+// **시야.** `z`는 맵 한 단위가 화면에서 몇 CSS 픽셀인가이고, `(x, y)`는 판 왼쪽 위에
+// 놓인 맵 좌표다. 맵이 화면보다 훨씬 커졌으므로 판은 맵 전체가 아니라 그 일부를 비추는
+// 창이다.
+let view = { z: 1, x: 0, y: 0 };
+let box = { w: 0, h: 0 };   // 판의 CSS 크기
+const ZOOM_MAX = 2.4;       // 이보다 키우면 차 한 대가 화면을 채운다
+const VIEW_PAD = 40;        // 맵 가장자리 바깥으로 이만큼은 밀어 둘 수 있다
 let running = true;
 let rate = 1;
 let last = 0;
@@ -78,12 +84,13 @@ let drag = null;     // 지금 끌고 있는 것
 function fresh(nextSeed) {
   seed = nextSeed == null ? Math.floor(Math.random() * 1e9) : nextSeed;
   net = Gen.city({ seed });
-  world = Traffic.create(net, { spawnRate: 1.7 });
+  world = Traffic.create(net, { spawnRate: 1.1 });
   picked = null;
   draft = null;
   drag = null;
   buildDeco();
   layout();
+  lookAtCity();
   paintPanel();
   window.__net = net;
   window.__world = world;
@@ -114,12 +121,11 @@ function buildDeco() {
 
 // --- 배치 ---
 
+// **판의 크기는 맵이 아니라 화면이 정한다.** 예전에는 맵의 비율대로 판을 잘라
+// 맵 전체가 언제나 들어왔는데, 맵이 커진 지금은 그러면 아무것도 알아볼 수 없다.
 function layout() {
-  const width = el.app.clientWidth;
-  const room = Math.max(260, window.innerHeight - 250);
-  const scale = Math.min(width / net.world.w, room / net.world.h);
-  const w = Math.round(net.world.w * scale);
-  const h = Math.round(net.world.h * scale);
+  const w = el.app.clientWidth;
+  const h = Math.max(300, window.innerHeight - 250);
   const dpr = window.devicePixelRatio || 1;
 
   el.canvas.width = Math.round(w * dpr);
@@ -127,8 +133,54 @@ function layout() {
   el.canvas.style.width = `${w}px`;
   el.canvas.style.height = `${h}px`;
   el.wrap.style.width = `${w}px`;
-  view = { scale: scale * dpr, dx: 0, dy: 0 };
+  box = { w, h };
+  clampView();
   window.SharedSnap.snap(el.canvas);
+}
+
+// 맵 전체가 들어오는 배율. 이보다 작게는 줄이지 않는다 — 더 줄이면 바탕만 늘어난다.
+function fitZoom() {
+  return Math.min(box.w / net.world.w, box.h / net.world.h);
+}
+
+function clamp(v, lo, hi) {
+  return Math.max(lo, Math.min(hi, v));
+}
+
+// **보는 자리를 맵 안에 붙들어 둔다.** 끌다가 맵을 놓치면 빈 바탕만 보이는 자리에서
+// 어느 쪽으로 돌아가야 하는지 알 수 없다. 맵이 화면보다 작은 쪽은 가운데에 둔다.
+function clampView() {
+  view.z = clamp(view.z, fitZoom(), ZOOM_MAX);
+  const vw = box.w / view.z;
+  const vh = box.h / view.z;
+  view.x = vw >= net.world.w ? (net.world.w - vw) / 2
+    : clamp(view.x, -VIEW_PAD, net.world.w - vw + VIEW_PAD);
+  view.y = vh >= net.world.h ? (net.world.h - vh) / 2
+    : clamp(view.y, -VIEW_PAD, net.world.h - vh + VIEW_PAD);
+}
+
+// **집은 자리의 땅을 손가락 밑에 붙들어 둔 채 배율만 바꾼다.** 가운데를 기준으로
+// 키우면 키울 때마다 보던 곳이 화면 밖으로 밀려나, 확대하고 다시 끌어 찾는 일을
+// 되풀이하게 된다.
+function zoomAt(next, cx, cy, hold) {
+  const rect = el.canvas.getBoundingClientRect();
+  const px = cx - rect.left;
+  const py = cy - rect.top;
+  const at = hold || { x: view.x + px / view.z, y: view.y + py / view.z };
+  view.z = clamp(next, fitZoom(), ZOOM_MAX);
+  view.x = at.x - px / view.z;
+  view.y = at.y - py / view.z;
+  clampView();
+}
+
+// **새 도시는 통째로 보여 주고 시작한다.** 도시가 화면보다 훨씬 크니, 가운데를
+// 확대해 놓고 시작하면 첫 화면이 대개 빈 땅이다 — 길이 어디 있는지부터 보여야
+// 어디를 손볼지 고를 수 있다.
+function lookAtCity() {
+  view.z = fitZoom();
+  view.x = net.world.w / 2 - box.w / view.z / 2;
+  view.y = net.world.h / 2 - box.h / view.z / 2;
+  clampView();
 }
 
 function readSkin() {
@@ -331,20 +383,25 @@ function drawWalkers() {
 }
 
 // 고른 교차로나 길을 짚어 준다.
+// **우리가 판 위에 얹는 표시는 배율을 거스른다.** 도로와 차는 맵의 일부라 줄이면
+// 같이 줄어드는 것이 맞지만, 무엇을 골랐는지 짚어 주는 선까지 같이 줄면 멀리서 볼 때
+// 사라진다. 화면에서 늘 같은 굵기로 남기려면 배율로 나눠 둔다.
+const overlay = (px) => px / view.z;
+
 function drawPick() {
   if (!picked) return;
   ctx.strokeStyle = skin.pick;
-  ctx.lineWidth = 2;
-  ctx.setLineDash([4, 3]);
+  ctx.lineWidth = overlay(2);
+  ctx.setLineDash([overlay(4), overlay(3)]);
   if (picked.kind === 'node') {
     ctx.beginPath();
-    ctx.arc(picked.node.x, picked.node.y, Net.reach(picked.node) + 7, 0, Math.PI * 2);
+    ctx.arc(picked.node.x, picked.node.y, Net.reach(picked.node) + overlay(7), 0, Math.PI * 2);
     ctx.stroke();
   } else {
     // 길은 가운데를 따라 가늘게 짚는다. 길 전체를 굵게 덧그렸더니 줄무늬가 도로를
     // 덮어 무엇이 그려져 있는지 보이지 않았다.
     trace(picked.seg.center);
-    ctx.lineWidth = 2.2;
+    ctx.lineWidth = overlay(2.2);
     ctx.stroke();
   }
   ctx.setLineDash([]);
@@ -355,15 +412,15 @@ function drawPick() {
 function drawDraft() {
   if (drag && drag.kind === 'line' && drag.moved && drag.from) {
     ctx.strokeStyle = skin.pick;
-    ctx.lineWidth = 2;
-    ctx.setLineDash([6, 5]);
+    ctx.lineWidth = overlay(2);
+    ctx.setLineDash([overlay(6), overlay(5)]);
     ctx.beginPath();
     ctx.moveTo(drag.from.x, drag.from.y);
     ctx.lineTo(drag.cur.x, drag.cur.y);
     ctx.stroke();
     ctx.setLineDash([]);
-    dot(drag.from.x, drag.from.y, 4);
-    if (drag.to) dot(drag.to.x, drag.to.y, 5);
+    dot(drag.from.x, drag.from.y, overlay(4));
+    if (drag.to) dot(drag.to.x, drag.to.y, overlay(5));
   }
 
   if (!draft || !draft.path) return;
@@ -380,16 +437,18 @@ function drawDraft() {
 
   trace(draft.path);
   ctx.strokeStyle = ok ? skin.pick : skin.red;
-  ctx.lineWidth = 1.8;
-  ctx.setLineDash([6, 5]);
+  ctx.lineWidth = overlay(1.8);
+  ctx.setLineDash([overlay(6), overlay(5)]);
   ctx.stroke();
   ctx.setLineDash([]);
 
   // 1차로는 한 방향뿐이다. 어느 쪽으로 가는 길인지 촉으로 보인다.
-  const tipAt = Geom.at(draft.path, draft.path.total - 6);
+  const tipAt = Geom.at(draft.path, Math.max(0, draft.path.total - overlay(6)));
+  const tip = overlay(1);
   ctx.save();
   ctx.translate(tipAt.x, tipAt.y);
   ctx.rotate(Math.atan2(tipAt.dy, tipAt.dx));
+  ctx.scale(tip, tip);
   ctx.fillStyle = ok ? skin.pick : skin.red;
   ctx.beginPath();
   ctx.moveTo(5, 0);
@@ -400,16 +459,16 @@ function drawDraft() {
   ctx.restore();
 
   ctx.fillStyle = ok ? skin.pick : skin.red;
-  dot(draft.from.x, draft.from.y, 4);
-  dot(draft.to.x, draft.to.y, 4);
+  dot(draft.from.x, draft.from.y, overlay(4));
+  dot(draft.to.x, draft.to.y, overlay(4));
 
   // 손잡이. **잡을 것이 있다는 게 보여야 굽힐 생각을 한다.**
   ctx.beginPath();
-  ctx.arc(draft.handle.x, draft.handle.y, 7, 0, Math.PI * 2);
+  ctx.arc(draft.handle.x, draft.handle.y, overlay(7), 0, Math.PI * 2);
   ctx.fillStyle = skin.ground;
   ctx.fill();
   ctx.strokeStyle = ok ? skin.pick : skin.red;
-  ctx.lineWidth = 2.4;
+  ctx.lineWidth = overlay(2.4);
   ctx.stroke();
 }
 
@@ -547,15 +606,28 @@ function drawVehicles() {
   }
 }
 
+// 멀리서 볼 때는 바닥 화살표와 횡단보도 줄무늬를 그리지 않는다. 한 칸이 몇 픽셀인
+// 배율에서 그것들은 읽히는 그림이 아니라 지저분한 점이 된다.
+const DETAIL_ZOOM = 0.5;
+
 function draw() {
   const dpr = window.devicePixelRatio || 1;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.fillStyle = skin.ground;
+  // **도시 바깥은 바탕색이다.** 판이 맵보다 클 수 있으므로 땅을 맵 크기만큼만 칠해
+  // 어디까지가 도시인지 보이게 한다.
+  ctx.fillStyle = skin.outside;
   ctx.fillRect(0, 0, el.canvas.width, el.canvas.height);
-  ctx.setTransform(view.scale, 0, 0, view.scale, view.dx, view.dy);
+
+  const k = view.z * dpr;
+  ctx.setTransform(k, 0, 0, k, -view.x * k, -view.y * k);
+  ctx.fillStyle = skin.ground;
+  ctx.fillRect(0, 0, net.world.w, net.world.h);
+
   drawRoads();
-  drawLaneMarks();
-  drawCrossings();
+  if (view.z >= DETAIL_ZOOM) {
+    drawLaneMarks();
+    drawCrossings();
+  }
   drawControls();
   drawGates();
   drawPick();
@@ -563,7 +635,6 @@ function draw() {
   drawWalkers();
   drawDraft();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  void dpr;
 }
 
 // --- 시계 ---
@@ -600,18 +671,24 @@ function paintStats() {
 // 판 위의 자리를 맵 좌표로 옮긴다. 캔버스는 기기 픽셀로 그리지만 손가락은 CSS
 // 픽셀로 온다.
 function spotOf(event) {
-  const box = el.canvas.getBoundingClientRect();
-  const scale = box.width / net.world.w;
-  return { x: (event.clientX - box.left) / scale, y: (event.clientY - box.top) / scale };
+  const rect = el.canvas.getBoundingClientRect();
+  return {
+    x: view.x + (event.clientX - rect.left) / view.z,
+    y: view.y + (event.clientY - rect.top) / view.z,
+  };
 }
+
+// 손가락 굵기만큼의 여유. **화면의 픽셀로 재서 맵 단위로 바꾼다** — 맵 단위로 고정해
+// 두면 줄여 놓았을 때 손가락 밑의 몇 픽셀이 맵에서는 백 단위가 되어 온 도시를 집는다.
+const GRAB_PX = 14;
+const grab = () => GRAB_PX / view.z;
 
 function junctionAt(spot) {
   let best = null;
   for (const node of net.nodes) {
     if (!Net.canControl(node)) continue;
     const d = Math.hypot(node.x - spot.x, node.y - spot.y);
-    // 손가락이 두꺼우므로 교차로보다 넉넉히 잡는다.
-    if (d > Net.reach(node) + 16) continue;
+    if (d > Net.reach(node) + grab()) continue;
     if (!best || d < best.d) best = { node, d };
   }
   return best && best.node;
@@ -640,7 +717,7 @@ function roadAt(spot) {
   let best = null;
   for (const seg of net.segs) {
     const hit = nearestOn(seg.center, spot);
-    if (hit.d > seg.width / 2 + 6) continue;
+    if (hit.d > seg.width / 2 + grab() * 0.7) continue;
     if (!best || hit.d < best.d) best = { seg, d: hit.d, s: hit.s };
   }
   return best;
@@ -674,24 +751,75 @@ function spotArg(a) {
 // **click을 쓰지 않는다.** 판은 끌어서 길을 놓는 자리라 `touch-action: none`이고,
 // 그 자리에서는 `shared/base.js`가 touchend를 취소해 click이 나지 않는다.
 // 고르기는 "거의 움직이지 않은 손가락"으로 가른다.
-const DRAG_SLOP = 7;
+const DRAG_SLOP = 7;   // 화면 픽셀. 이보다 덜 움직였으면 끈 것이 아니라 누른 것이다
+
+// 판 위에 올라와 있는 손가락들. **둘이 되는 순간 집기로 넘어간다** — 한 손가락으로
+// 하던 것은 그 자리에서 놓아 준다. 손가락 좌표를 우리가 읽는 것이라 브라우저의
+// 확대와는 상관이 없고, `shared/base.js`가 막아 둔 것도 그대로다.
+const pointers = new Map();
+let pinch = null;
+
+function pinchPair() {
+  const [a, b] = [...pointers.values()];
+  if (!a || !b) return null;
+  const d = Math.hypot(a.x - b.x, a.y - b.y);
+  return d > 0 ? { d, x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } : null;
+}
 
 el.canvas.addEventListener('pointerdown', (event) => {
+  pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+  if (pointers.size >= 2) {
+    const at = pinchPair();
+    drag = null;
+    if (at) pinch = { d0: at.d, z0: view.z, hold: spotOf({ clientX: at.x, clientY: at.y }) };
+    return;
+  }
+  if (pinch) return;
+
   const spot = spotOf(event);
   el.canvas.setPointerCapture(event.pointerId);
 
   // 놓기를 기다리는 길이 있으면 손잡이만 받는다. 그래야 굽히다가 딴 데를 눌러
-  // 하던 것이 날아가지 않는다.
+  // 하던 것이 날아가지 않는다. 나머지 자리는 둘러보기다.
   if (draft) {
-    const grab = Math.hypot(draft.handle.x - spot.x, draft.handle.y - spot.y);
-    drag = grab < 18 ? { kind: 'handle' } : null;
+    const near = Math.hypot(draft.handle.x - spot.x, draft.handle.y - spot.y);
+    drag = near < grab() * 1.3 ? { kind: 'handle' } : panDrag(event);
     return;
   }
-  drag = { kind: 'line', from: anchorAt(spot), start: spot, cur: spot, moved: false };
+
+  // **길을 짚었으면 길을 놓는 끌기, 빈 땅을 짚었으면 둘러보는 끌기다.** 맵이 화면보다
+  // 크니 옮겨 보는 일이 잦은데, 길 위에서만 끌 수 있게 하면 빈 곳이 대부분인 이
+  // 판에서 옮길 방법이 없다.
+  const from = anchorAt(spot);
+  drag = from
+    ? { kind: 'line', from, start: spot, cur: spot, moved: false }
+    : panDrag(event);
 });
 
+function panDrag(event) {
+  return { kind: 'pan', sx: event.clientX, sy: event.clientY, vx: view.x, vy: view.y };
+}
+
 el.canvas.addEventListener('pointermove', (event) => {
+  if (pointers.has(event.pointerId)) {
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+  }
+  // 집는 동안에는 **처음 잡은 땅이 두 손가락 가운데에 붙어 다닌다.** 그래서 벌리고
+  // 오므리는 것만이 아니라 두 손가락을 함께 옮기는 것으로도 판이 따라온다.
+  if (pinch) {
+    const at = pinchPair();
+    if (at) zoomAt(pinch.z0 * (at.d / pinch.d0), at.x, at.y, pinch.hold);
+    return;
+  }
   if (!drag) return;
+
+  if (drag.kind === 'pan') {
+    view.x = drag.vx - (event.clientX - drag.sx) / view.z;
+    view.y = drag.vy - (event.clientY - drag.sy) / view.z;
+    clampView();
+    return;
+  }
+
   const spot = spotOf(event);
   if (drag.kind === 'handle') {
     draft.handle = spot;
@@ -699,14 +827,29 @@ el.canvas.addEventListener('pointermove', (event) => {
     return;
   }
   drag.cur = spot;
-  if (Math.hypot(spot.x - drag.start.x, spot.y - drag.start.y) > DRAG_SLOP) drag.moved = true;
+  const moved = Math.hypot(spot.x - drag.start.x, spot.y - drag.start.y) * view.z;
+  if (moved > DRAG_SLOP) drag.moved = true;
   if (drag.moved) drag.to = anchorAt(spot);
 });
 
-el.canvas.addEventListener('pointerup', () => {
+function endPointer(event) {
+  pointers.delete(event.pointerId);
+  // 집기가 끝나면 남은 손가락으로 무엇을 고르지 않는다. 벌리던 손을 하나씩 떼는
+  // 것뿐인데 그것이 고르기가 되면 판이 손 밑에서 바뀐다.
+  if (pinch) {
+    if (pointers.size < 2) pinch = null;
+    drag = null;
+    return null;
+  }
   const it = drag;
   drag = null;
+  return it;
+}
+
+el.canvas.addEventListener('pointerup', (event) => {
+  const it = endPointer(event);
   if (!it) return;
+  if (it.kind === 'pan') return;
   if (it.kind === 'handle') { Sound.play('place'); return; }
 
   // 거의 움직이지 않았으면 고르기다.
@@ -720,7 +863,17 @@ el.canvas.addEventListener('pointerup', () => {
   startDraft(it.from, it.to);
 });
 
-el.canvas.addEventListener('pointercancel', () => { drag = null; });
+el.canvas.addEventListener('pointercancel', endPointer);
+
+// 휠·트랙패드. **지수로 먹인다** — 배율은 곱으로 움직여야 같은 손짓이 어느 배율에서나
+// 같은 만큼 바꾼다. deltaMode는 기기마다 픽셀·줄·쪽으로 달라 픽셀로 맞춘 뒤 넣는다.
+const WHEEL_RATE = 0.0016;
+
+el.canvas.addEventListener('wheel', (event) => {
+  event.preventDefault();
+  const step = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 400 : 1;
+  zoomAt(view.z * Math.exp(-event.deltaY * step * WHEEL_RATE), event.clientX, event.clientY);
+}, { passive: false });
 
 // --- 새 길 ---
 
@@ -959,6 +1112,7 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', rea
 // 손가락 조작뿐이라, 헤드리스 브라우저에서 이것으로 상태를 읽는다.
 window.__draft = () => draft;
 window.__picked = () => picked;
+window.__view = () => view;
 window.__net = null;
 
 readSkin();

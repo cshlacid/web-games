@@ -60,7 +60,10 @@ const RING_STANDOFF = 8;
 
 // 돈. **관문으로 빠져나간 차 한 대가 수입이고, 공사가 지출이다** — 길을 뚫어 차를
 // 흘려보내야 다음 공사를 할 수 있다는 고리가 여기서 생긴다.
-const FARE = 1;
+// 시외로 빠져나간 차가 남기는 삯. **도시가 넓어지면서 한 대가 남기는 값도 올렸다** —
+// 한 판을 가로지르는 데 걸리는 시간이 길어졌는데 삯이 그대로면, 넓어진 만큼 공사할
+// 자리는 늘고 그것을 할 돈은 그대로다.
+const FARE = 3;
 // 차로 하나를 늘리는 값. 긴 길일수록 비싸다.
 const LANE_COST = 0.55;
 const LANE_MIN = 30;
@@ -107,7 +110,7 @@ function create(net, options) {
     spawnDebt: 0,
     maxVehicles: opts.maxVehicles == null ? 260 : opts.maxVehicles,
     arrived: 0,
-    money: opts.money == null ? 420 : opts.money,
+    money: opts.money == null ? 900 : opts.money,
     spent: 0,
   };
 }

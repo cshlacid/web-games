@@ -20,9 +20,17 @@
 
 const Net = (typeof require !== 'undefined') ? require('./network.js') : root.RoadNet;
 
-const COLS = 3;
-const ROWS = 4;
+// **격자는 도시의 뼈대가 아니라 길을 놓을 자리다.** 대부분은 비어 있고, 플레이어가
+// 끌어서 채운다. 그래서 칸 수가 곧 놀 자리의 넓이다.
+const COLS = 7;
+const ROWS = 10;
 const JITTER = 22;
+
+// 격자 한 칸의 크기. **맵 크기가 아니라 이것을 고정한다** — 구간 길이가 차 길이(17)와
+// 교차로 반지름(20~40)에 대해 얼마나 되는지가 게임의 느낌을 정하므로, 맵을 넓힐 때
+// 칸을 함께 늘리면 같은 도시가 그저 확대된 것이 된다.
+const STEP_X = 150;
+const STEP_Y = 165;
 
 // 차로 구성. 왼쪽이 역방향, 오른쪽이 정방향 — 우측 통행이라 이 순서가 기본이다.
 const TWO = [-1, 1];
@@ -40,14 +48,14 @@ function mulberry32(seed) {
 
 function generate(options) {
   const opts = options || {};
-  const w = opts.w || 420;
-  const h = opts.h || 660;
   const rng = mulberry32(opts.seed == null ? 1 : opts.seed);
 
-  const marginX = w * 0.17;
-  const marginY = h * 0.14;
-  const stepX = (w - marginX * 2) / (COLS - 1);
-  const stepY = (h - marginY * 2) / (ROWS - 1);
+  const stepX = opts.stepX || STEP_X;
+  const stepY = opts.stepY || STEP_Y;
+  const marginX = stepX * 0.55;
+  const marginY = stepY * 0.55;
+  const w = opts.w || Math.round(stepX * (COLS - 1) + marginX * 2);
+  const h = opts.h || Math.round(stepY * (ROWS - 1) + marginY * 2);
   const edge = 6;   // 관문을 화면 끝보다 조금 안쪽에 두어 차가 사라지는 자리가 보인다
 
   const spot = [];
@@ -63,27 +71,45 @@ function generate(options) {
     }
   }
 
-  const mainRow = 1 + Math.floor(rng() * (ROWS - 2));
-  const mainCol = 1;
+  // **큰길은 가로 둘·세로 둘이다.** 맵이 넓어지면서 큰길 하나씩으로는 관문에서
+  // 관문까지가 너무 멀고, 갈래가 없어 막혀도 돌아갈 길이 없었다. 서로 떨어진 줄을
+  // 골라 도시를 넷으로 가른다.
+  const pick2 = (n) => {
+    const a = 1 + Math.floor(rng() * (n - 2));
+    let b = 1 + Math.floor(rng() * (n - 2));
+    // 붙어 있으면 큰길 둘이 한 줄처럼 보인다. 적어도 두 칸은 떨어뜨린다.
+    for (let i = 0; i < 8 && Math.abs(a - b) < 2; i++) b = 1 + Math.floor(rng() * (n - 2));
+    return a === b ? [a] : [a, b].sort((p, q) => p - q);
+  };
+  const mainRows = pick2(ROWS);
+  const mainCols = pick2(COLS);
+  // 골목이 도는 줄. 큰길 사이의 빈 줄이다.
+  const loopRow = mainRows[0] + 1 < ROWS ? mainRows[0] + 1 : mainRows[0] - 1;
   const side = rng() < 0.5 ? 0 : COLS - 1;
-  // 골목이 도는 줄. 큰길 바로 위나 아래다.
-  const up = mainRow - 1 >= 0;
-  const down = mainRow + 1 < ROWS;
-  const loopRow = (up && down) ? (rng() < 0.5 ? mainRow - 1 : mainRow + 1) : (up ? mainRow - 1 : mainRow + 1);
 
   const gate = (id, x, y) => ({ id, kind: 'gate', x, y });
-  const gW = gate('gW', edge, spot[mainRow][0].y);
-  const gE = gate('gE', w - edge, spot[mainRow][COLS - 1].y);
-  const gN = gate('gN', spot[0][mainCol].x, edge);
-  const gS = gate('gS', spot[ROWS - 1][mainCol].x, h - edge);
 
   // 한 줄기는 지나는 점들의 줄이다. 관문도 그 줄기의 끝점으로 함께 꿴다 — 따로
   // 붙이면 도시를 빠져나가는 대목에서만 길이 꺾인다.
-  const chains = [
-    { lanes: FOUR, nodes: [gW, ...spot[mainRow], gE] },
-    { lanes: FOUR, nodes: [gN, ...spot.map((row) => row[mainCol]), gS] },
-    { lanes: TWO, nodes: [spot[mainRow][side], spot[loopRow][side], spot[loopRow][mainCol]] },
-  ];
+  const chains = [];
+  mainRows.forEach((row, i) => {
+    chains.push({
+      lanes: FOUR,
+      nodes: [gate(`gW${i}`, edge, spot[row][0].y), ...spot[row],
+        gate(`gE${i}`, w - edge, spot[row][COLS - 1].y)],
+    });
+  });
+  mainCols.forEach((col, i) => {
+    chains.push({
+      lanes: FOUR,
+      nodes: [gate(`gN${i}`, spot[0][col].x, edge), ...spot.map((row) => row[col]),
+        gate(`gS${i}`, spot[ROWS - 1][col].x, h - edge)],
+    });
+  });
+  chains.push({
+    lanes: TWO,
+    nodes: [spot[mainRows[0]][side], spot[loopRow][side], spot[loopRow][mainCols[0]]],
+  });
 
   const nodes = [];
   const segments = [];
@@ -156,7 +182,7 @@ function city(options) {
   return net;
 }
 
-const api = { generate, city, weave, mulberry32, COLS, ROWS };
+const api = { generate, city, weave, mulberry32, COLS, ROWS, STEP_X, STEP_Y };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 root.RoadMapGen = api;
