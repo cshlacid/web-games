@@ -52,7 +52,20 @@ function makePath(points) {
     const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
     dir.push({ x: (b.x - a.x) / len, y: (b.y - a.y) / len });
   }
-  return { points, cum, dir, total: cum[cum.length - 1] };
+  // 둘러싼 네모. 무엇이 이 길 가까이에 있는지 묻는 자리가 많은데(장애물 놓기, 길
+  // 짚기), 대개는 멀리 떨어져 있어 여기서 먼저 걸러 내면 점을 훑지 않아도 된다.
+  let x0 = Infinity;
+  let y0 = Infinity;
+  let x1 = -Infinity;
+  let y1 = -Infinity;
+  for (const p of points) {
+    if (p.x < x0) x0 = p.x;
+    if (p.y < y0) y0 = p.y;
+    if (p.x > x1) x1 = p.x;
+    if (p.y > y1) y1 = p.y;
+  }
+  const box = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+  return { points, cum, dir, box, total: cum[cum.length - 1] };
 }
 
 function right(d) {

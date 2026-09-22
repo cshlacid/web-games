@@ -15,6 +15,7 @@
 (function (root) {
 
 const Net = (typeof require !== 'undefined') ? require('./network.js') : root.RoadNet;
+const Land = (typeof require !== 'undefined') ? require('./terrain.js') : root.RoadTerrain;
 const Geom = (typeof require !== 'undefined') ? require('./geom.js') : root.RoadGeom;
 
 // 차종. len·w는 화면 단위(차로 폭이 10이다), v0는 바라는 속도, a·b는 가속과 감속.
@@ -73,6 +74,11 @@ const ROAD_COST = 1.1;
 const ROAD_MIN = 60;
 // 이보다 짧은 길은 놓지 않는다. 양 끝의 교차로 원이 겹쳐 길이 보이지도 않는다.
 const ROAD_SHORT = 44;
+// 산을 뚫고 물을 건너는 삯. **길이당 더 내는 값이다**(기본값에 얹힌다). 터널이 더
+// 비싼 것은 실제로도 그렇고, 게임에서도 산을 돌아가는 길과 뚫는 길 중에 고르게 하려면
+// 뚫는 쪽이 눈에 띄게 비싸야 한다.
+const TUNNEL_COST = 2.4;
+const BRIDGE_COST = 1.5;
 
 // 사람. 차가 34쯤으로 달리니 사람은 한참 느리다.
 const WALK_SPEED = 7.5;
@@ -295,8 +301,10 @@ function reshape(world, seg, apply) {
 
 // --- 새 길 놓기 ---
 
-function roadCost(len) {
-  return Math.max(ROAD_MIN, Math.round(len * ROAD_COST));
+// 값. **지나는 땅이 값을 올린다** — 산은 터널, 물은 다리다.
+function roadCost(len, span) {
+  const extra = span ? span.tunnel * TUNNEL_COST + span.bridge * BRIDGE_COST : 0;
+  return Math.max(ROAD_MIN, Math.round(len * ROAD_COST + extra));
 }
 
 // 놓을 수 있는가, 값은 얼마인가. **놓기 전에 묻는다** — 확정하기 전에 값을 보여
@@ -304,8 +312,11 @@ function roadCost(len) {
 function canBuild(world, from, to, handle) {
   const path = Net.draftPath(world.net, from, to, handle);
   if (!path) return { ok: false, why: 'spot', cost: 0 };
-  const cost = roadCost(path.total);
-  if (path.total < ROAD_SHORT) return { ok: false, why: 'short', cost };
+  const span = Land.spanOf(world.net.land, path);
+  const cost = roadCost(path.total, span);
+  // **건물 위로는 지나갈 수 없다.** 헐 수 없는 것이 이 게임의 전제다.
+  if (span.wall > 0) return { ok: false, why: 'building', cost, span };
+  if (path.total < ROAD_SHORT) return { ok: false, why: 'short', cost, span };
   // 같은 구간의 두 자리를 이으면 가르는 순간 뒤쪽 자리가 사라진 구간을 가리킨다.
   if (from.seg != null && to.seg != null && segIdOf(from) === segIdOf(to)) {
     return { ok: false, why: 'same', cost };
@@ -319,8 +330,8 @@ function canBuild(world, from, to, handle) {
   if (endsAtGate(world.net, from) || endsAtGate(world.net, to)) {
     return { ok: false, why: 'gate', cost };
   }
-  if (world.money < cost) return { ok: false, why: 'money', cost };
-  return { ok: true, cost, len: path.total };
+  if (world.money < cost) return { ok: false, why: 'money', cost, span };
+  return { ok: true, cost, span, len: path.total };
 }
 
 function segIdOf(spot) {
@@ -937,6 +948,7 @@ const api = {
   spawnWalker, stepWalkers, walkerSpot, walkerOn, crossLine,
   laneCost, buyLane, flipLane, reroute, roadCost, canBuild, buildRoad,
   WALK_SPEED, WALK_RATE, FARE, LANE_COST, LANE_MIN, ROAD_COST, ROAD_MIN, ROAD_SHORT,
+  TUNNEL_COST, BRIDGE_COST,
   KINDS, S0, HEADWAY, STEP, CLAIM_AHEAD, GREEN, AMBER, RING_GAP,
 };
 

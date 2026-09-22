@@ -20,6 +20,10 @@ function near(name, actual, expected, slack) {
   else { failed++; console.log(`실패: ${name}\n  결과 ${actual}\n  기대 ${expected} ±${slack}`); }
 }
 
+// 장애물 없는 맵. 길을 놓는 것만 보는 테스트는 건물에 막히지 말아야 한다 —
+// 막히는 것 자체는 따로 본다.
+const bare = (seed) => Gen.city({ seed, land: { buildings: 0, hills: 0, lakes: 0, river: false } });
+
 // 초 단위로 돌린다. `step`은 한 프레임치로 잘리므로 긴 시간은 나눠 넣어야 한다.
 const run = (world, secs) => { for (let i = 0; i < secs * 60; i++) T.tick(world, 1 / 60); };
 
@@ -744,7 +748,7 @@ function ladder() {
 {
   // 맵 위에서 길을 놓고 한참 돌려도 터지지 않아야 한다. 길이 갈리면 경로에 적힌
   // 구간이 통째로 사라지므로, 남은 길을 모두 다시 잡아 주지 않으면 여기서 터진다.
-  const net = Gen.city({ seed: 5 });
+  const net = bare(5);
   const world = T.create(net, { rng: seeded(5), spawnRate: 2.5, money: 9000 });
   run(world, 40);
   const before = world.vehicles.length;
@@ -805,6 +809,74 @@ function ladder() {
 
   run(world, 120);
   check('모두 도착한다', world.arrived, count);
+}
+
+// --- 땅이 값을 매긴다 ---
+
+// 나란한 두 길 사이에 장애물 하나를 놓을 수 있는 판.
+function withLand(land) {
+  const net = Net.build(
+    [{ id: 'W1', kind: 'gate', x: 0, y: 0 }, { id: 'E1', kind: 'gate', x: 600, y: 0 },
+      { id: 'W2', kind: 'gate', x: 0, y: 300 }, { id: 'E2', kind: 'gate', x: 600, y: 300 }],
+    [{ a: 'W1', b: 'E1', lanes: [-1, 1] }, { a: 'W2', b: 'E2', lanes: [-1, 1] }],
+  );
+  net.land = { buildings: [], hills: [], water: [], ...land };
+  return net;
+}
+
+const across = (net) => [{ seg: net.segs[0].id, s: 300 }, { seg: net.segs[1].id, s: 300 }];
+
+{
+  const plain = withLand({});
+  const world = T.create(plain, { rng: seeded(41), spawnRate: 0, money: 1e6 });
+  const [from, to] = across(plain);
+  const flat = T.canBuild(world, from, to);
+  check('빈 땅에는 얹히는 값이 없다', flat.cost, Math.round(flat.len * T.ROAD_COST));
+  check('지나는 땅이 없다', [flat.span.wall, flat.span.tunnel, flat.span.bridge], [0, 0, 0]);
+
+  // **건물 위로는 지나갈 수 없다.** 헐 수 없는 것이 이 게임의 전제다.
+  const walled = withLand({ buildings: [{ kind: 'building', x: 280, y: 130, w: 40, h: 40 }] });
+  const w2 = T.create(walled, { rng: seeded(41), spawnRate: 0, money: 1e6 });
+  const blocked = T.canBuild(w2, ...across(walled));
+  check('건물에 막힌다', [blocked.ok, blocked.why], [false, 'building']);
+  check('판은 그대로', T.buildRoad(w2, ...across(walled)).ok, false);
+  check('구간이 늘지 않았다', walled.segs.length, 2);
+
+  // 산은 터널을 뚫고 지난다 — 지날 수는 있고 비싸다.
+  const hilly = withLand({ hills: [{ kind: 'hill', x: 300, y: 150, r: 50 }] });
+  const w3 = T.create(hilly, { rng: seeded(41), spawnRate: 0, money: 1e6 });
+  const tunnel = T.canBuild(w3, ...across(hilly));
+  check('산은 지날 수 있다', tunnel.ok, true);
+  near('산을 지나는 길이', tunnel.span.tunnel, 100, 6);
+  check('터널 값이 얹힌다',
+    tunnel.cost, Math.round(tunnel.len * T.ROAD_COST + tunnel.span.tunnel * T.TUNNEL_COST));
+  check('빈 땅보다 비싸다', tunnel.cost > flat.cost, true);
+
+  // 물은 다리를 놓고 지난다.
+  const wet = withLand({ water: [{ kind: 'lake', x: 300, y: 150, r: 50 }] });
+  const w4 = T.create(wet, { rng: seeded(41), spawnRate: 0, money: 1e6 });
+  const bridge = T.canBuild(w4, ...across(wet));
+  check('물은 지날 수 있다', bridge.ok, true);
+  check('다리 값이 얹힌다',
+    bridge.cost, Math.round(bridge.len * T.ROAD_COST + bridge.span.bridge * T.BRIDGE_COST));
+  // **터널이 다리보다 비싸다.** 돌아갈지 뚫을지를 고르게 하려면 뚫는 쪽이 눈에 띄게
+  // 비싸야 한다.
+  check('같은 길이면 터널이 더 비싸다', tunnel.cost > bridge.cost, true);
+
+  // 값을 치르고 놓으면 그만큼 준다.
+  const was = w3.money;
+  const made = T.buildRoad(w3, ...across(hilly));
+  check('터널 길을 놓는다', made.ok, true);
+  check('얹힌 값까지 치른다', was - w3.money, made.cost);
+}
+
+{
+  // 손잡이로 굽혀 건물을 비켜 가면 놓을 수 있다.
+  const net = withLand({ buildings: [{ kind: 'building', x: 280, y: 130, w: 40, h: 40 }] });
+  const world = T.create(net, { rng: seeded(42), spawnRate: 0, money: 1e6 });
+  const [from, to] = across(net);
+  check('곧게 가면 막힌다', T.canBuild(world, from, to).why, 'building');
+  check('굽히면 비켜 간다', T.canBuild(world, from, to, { x: 150, y: 150 }).ok, true);
 }
 
 console.log(`${passed}개 통과, ${failed}개 실패`);

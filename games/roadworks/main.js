@@ -13,6 +13,7 @@ const Geom = window.RoadGeom;
 const Net = window.RoadNet;
 const Gen = window.RoadMapGen;
 const Traffic = window.RoadTraffic;
+const Land = window.RoadTerrain;
 const Sound = window.RoadSound;
 const t = (key, vars) => window.SharedI18n.t(key, vars);
 
@@ -42,6 +43,8 @@ const ctx = el.canvas.getContext('2d');
 const SKIN = {
   light: {
     ground: '#e9ecef', outside: '#dbdfe4', asphalt: '#7d8794', kerb: '#69737f',
+    build: '#c4ccd5', buildTop: '#d6dce3', hill: '#a3b29e', hillTop: '#b7c4b1',
+    water: '#a8c6d8', shore: '#93b5cb',
     dash: '#e8ecf1', middle: '#e7c94f', gate: '#59636f',
     island: '#9fbf96', stop: '#eef1f4',
     red: '#d4483b', amber: '#e0a52c', green: '#49a55f',
@@ -51,6 +54,8 @@ const SKIN = {
   },
   dark: {
     ground: '#171a1e', outside: '#0d0f11', asphalt: '#3b434c', kerb: '#2a3138',
+    build: '#242a31', buildTop: '#2e353d', hill: '#28352a', hillTop: '#334035',
+    water: '#1c2f3c', shore: '#20323f',
     dash: '#7c8794', middle: '#a98f31', gate: '#8b96a2',
     island: '#41603f', stop: '#aeb7c0',
     red: '#c04336', amber: '#c9932a', green: '#3f9153',
@@ -100,23 +105,29 @@ function fresh(nextSeed) {
 
 // 도로를 그리는 데 쓰는 선들. 차로가 바뀔 때만 다시 만든다 — 프레임마다 오프셋을
 // 다시 재면 곡선 백 개를 매번 훑게 된다.
+// **버리기만 한다. 다시 만드는 것은 그릴 때다.** 미리 다 만들어 두던 때가 있었는데,
+// 길을 늘리는 자리가 늘면서 한 군데서 이것을 부르는 것을 잊으면 그 구간을 그릴 때
+// 터졌다. 없으면 그 자리에서 만들게 두면 잊을 자리가 없다.
 function buildDeco() {
   deco = new Map();
-  for (const seg of net.segs) {
-    const n = seg.lanes.length;
-    const half = (n / 2) * Net.LANE_W;
-    const item = {
-      edges: [Geom.offsetPath(seg.center, -half), Geom.offsetPath(seg.center, half)],
-      dashes: [],
-      middles: [],
-    };
-    for (const line of Net.boundaries(seg)) {
-      const path = Geom.offsetPath(seg.center, line.offset);
-      if (line.kind === 'dash') item.dashes.push(path);
-      else item.middles.push(path);
-    }
-    deco.set(seg.id, item);
+}
+
+function decoOf(seg) {
+  let item = deco.get(seg.id);
+  if (item) return item;
+  const half = (seg.lanes.length / 2) * Net.LANE_W;
+  item = {
+    edges: [Geom.offsetPath(seg.center, -half), Geom.offsetPath(seg.center, half)],
+    dashes: [],
+    middles: [],
+  };
+  for (const line of Net.boundaries(seg)) {
+    const path = Geom.offsetPath(seg.center, line.offset);
+    if (line.kind === 'dash') item.dashes.push(path);
+    else item.middles.push(path);
   }
+  deco.set(seg.id, item);
+  return item;
 }
 
 // --- 배치 ---
@@ -196,6 +207,57 @@ function trace(path) {
   for (let i = 1; i < path.points.length; i++) ctx.lineTo(path.points[i].x, path.points[i].y);
 }
 
+// 물. 강과 호수다. 길보다 아래에 그리므로 그 위를 지나는 길은 다리로 보인다.
+function drawWater() {
+  const land = net.land;
+  if (!land) return;
+  for (const item of land.water) {
+    ctx.fillStyle = skin.water;
+    ctx.strokeStyle = skin.shore;
+    if (item.kind === 'river') {
+      trace(item.path);
+      ctx.lineWidth = item.w;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = skin.water;
+      ctx.stroke();
+      continue;
+    }
+    ctx.beginPath();
+    ctx.arc(item.x, item.y, item.r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+// 건물. 길이 지날 수 없는 자리다. **윗면을 조금 밝게 두어** 바닥에 그린 무늬가 아니라
+// 서 있는 것으로 보이게 한다.
+function drawBuildings() {
+  const land = net.land;
+  if (!land) return;
+  for (const item of land.buildings) {
+    ctx.fillStyle = skin.build;
+    ctx.fillRect(item.x, item.y, item.w, item.h);
+    ctx.fillStyle = skin.buildTop;
+    ctx.fillRect(item.x, item.y, item.w, Math.min(4, item.h * 0.3));
+  }
+}
+
+function drawHills() {
+  const land = net.land;
+  if (!land) return;
+  for (const item of land.hills) {
+    ctx.beginPath();
+    ctx.arc(item.x, item.y, item.r, 0, Math.PI * 2);
+    ctx.fillStyle = skin.hill;
+    ctx.fill();
+    // 꼭대기. 어느 쪽이 높은지 보이면 원이 아니라 산으로 읽힌다.
+    ctx.beginPath();
+    ctx.arc(item.x - item.r * 0.18, item.y - item.r * 0.22, item.r * 0.45, 0, Math.PI * 2);
+    ctx.fillStyle = skin.hillTop;
+    ctx.fill();
+  }
+}
+
 function drawRoads() {
   ctx.lineCap = 'butt';
   ctx.lineJoin = 'round';
@@ -237,7 +299,7 @@ function drawRoads() {
   // 차선과 중앙선. 교차로 안에서는 끊어야 하므로 그쪽 끝을 조금 잘라 그린다.
   // **갈림이 없는 이음매에서는 자르지 않는다** — 덮을 교차로가 없어 선만 끊긴다.
   for (const seg of net.segs) {
-    const item = deco.get(seg.id);
+    const item = decoOf(seg);
     const cut = seg.width / 2 + 3;
     const head = trimAt(Net.node(net, seg.a), seg) ? cut : 0;
     const tail = trimAt(Net.node(net, seg.b), seg) ? cut : 0;
@@ -636,6 +698,17 @@ function draw() {
   ctx.fillStyle = skin.ground;
   ctx.fillRect(0, 0, net.world.w, net.world.h);
 
+  // **땅에 놓인 것은 도시 안으로 잘라 그린다.** 강은 가장자리에서 끊긴 것처럼 보이지
+  // 않게 판 밖으로 조금 내밀어 두는데, 자르지 않으면 그 자락이 도시 바깥 바탕 위에
+  // 뜬다.
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, net.world.w, net.world.h);
+  ctx.clip();
+  drawWater();
+  drawBuildings();
+  ctx.restore();
+
   drawRoads();
   if (view.z >= DETAIL_ZOOM) {
     drawLaneMarks();
@@ -643,9 +716,18 @@ function draw() {
   }
   drawControls();
   drawGates();
-  drawPick();
   drawVehicles();
   drawWalkers();
+  // **산은 길과 차 위에 그린다.** 산을 지나는 길은 터널이고, 터널에 든 차는 보이지
+  // 않는 것이 맞다 — 따로 가리는 처리를 두지 않아도 산이 덮어 주면 그대로 터널이다.
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, net.world.w, net.world.h);
+  ctx.clip();
+  drawHills();
+  ctx.restore();
+
+  drawPick();
   drawDraft();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 }
@@ -673,10 +755,9 @@ function paintStats() {
     const add = el.panel.querySelector('[data-add]');
     if (add) add.disabled = !canAdd(picked.seg);
   }
-  if (draft) {
-    const able = Traffic.canBuild(world, spotArg(draft.from), spotArg(draft.to), draft.handle);
-    if (able.ok !== draft.able.ok) { draft.able = able; paintPanel(); }
-  }
+  // **초안을 프레임마다 다시 재지 않는다.** 값을 매기려면 길이 지나는 땅을 훑어야
+  // 하는데, 바뀌는 것은 돈뿐이므로 살 수 있는지만 본다.
+  if (draft && draft.able.why === 'money' && world.money >= draft.able.cost) refreshDraft();
 }
 
 // --- 고르기와 패널 ---
@@ -990,12 +1071,28 @@ function canAdd(seg) {
 
 // 놓기를 기다리는 길. **값을 보여 주고 확정할지 물어본다** — 돈이 드는 일이라
 // 손가락을 떼는 순간 지어 버리면 잘못 그은 선을 되돌릴 길이 없다.
+const DRAFT_WHY = {
+  short: 'road.tooShort', money: 'road.tooDear', building: 'road.onBuilding',
+};
+
 function draftPanel() {
   const able = draft.able;
   const rows = [`<p class="panel-title">${t('road.newRoad')}</p>`];
-  const why = able.ok ? 'road.draftHint'
-    : (able.why === 'short' ? 'road.tooShort' : 'road.tooDear');
-  rows.push(`<p class="panel-note">${t(why)}</p>`);
+  rows.push(`<p class="panel-note">${t(able.ok ? 'road.draftHint' : (DRAFT_WHY[able.why] || 'road.tooDear'))}</p>`);
+
+  // **값이 왜 비싼지 적어 준다.** 산을 돌아갈지 뚫을지를 고르려면 뚫는 값이 얼마나
+  // 얹혔는지 보여야 한다.
+  const span = able.span;
+  if (span && (span.tunnel > 1 || span.bridge > 1)) {
+    const parts = [];
+    if (span.tunnel > 1) {
+      parts.push(t('road.tunnelBit', { n: Math.round(span.tunnel * Traffic.TUNNEL_COST) }));
+    }
+    if (span.bridge > 1) {
+      parts.push(t('road.bridgeBit', { n: Math.round(span.bridge * Traffic.BRIDGE_COST) }));
+    }
+    rows.push(`<p class="panel-note dim">${parts.join(t('road.join'))}</p>`);
+  }
   rows.push('<div class="chips">'
     + `<button class="chip go" type="button" data-build="1"${able.ok ? '' : ' disabled'}>`
     + `${t('road.build')}<b class="cost">${able.cost}</b></button>`
