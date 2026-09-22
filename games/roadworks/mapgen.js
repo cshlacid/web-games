@@ -23,8 +23,8 @@ const Land = (typeof require !== 'undefined') ? require('./terrain.js') : root.R
 
 // **격자는 도시의 뼈대가 아니라 길을 놓을 자리다.** 대부분은 비어 있고, 플레이어가
 // 끌어서 채운다. 그래서 칸 수가 곧 놀 자리의 넓이다.
-const COLS = 7;
-const ROWS = 10;
+const COLS = 11;
+const ROWS = 15;
 const JITTER = 22;
 
 // 격자 한 칸의 크기. **맵 크기가 아니라 이것을 고정한다** — 구간 길이가 차 길이(17)와
@@ -32,6 +32,13 @@ const JITTER = 22;
 // 칸을 함께 늘리면 같은 도시가 그저 확대된 것이 된다.
 const STEP_X = 150;
 const STEP_Y = 165;
+
+// 큰길이 몇 줄인가. **격자 크기를 탄다** — 맵이 넓어질 때 큰길을 그대로 두면 관문에서
+// 관문까지가 너무 멀고, 갈래가 없어 막혀도 돌아갈 길이 없다. 네 칸에 하나쯤이 도시를
+// 알맞게 가른다.
+function mainCount(n) {
+  return Math.max(2, Math.round(n / 4));
+}
 
 // 차로 구성. 왼쪽이 역방향, 오른쪽이 정방향 — 우측 통행이라 이 순서가 기본이다.
 const TWO = [-1, 1];
@@ -72,20 +79,24 @@ function generate(options) {
     }
   }
 
-  // **큰길은 가로 둘·세로 둘이다.** 맵이 넓어지면서 큰길 하나씩으로는 관문에서
-  // 관문까지가 너무 멀고, 갈래가 없어 막혀도 돌아갈 길이 없었다. 서로 떨어진 줄을
-  // 골라 도시를 넷으로 가른다.
-  const pick2 = (n) => {
-    const a = 1 + Math.floor(rng() * (n - 2));
-    let b = 1 + Math.floor(rng() * (n - 2));
-    // 붙어 있으면 큰길 둘이 한 줄처럼 보인다. 적어도 두 칸은 떨어뜨린다.
-    for (let i = 0; i < 8 && Math.abs(a - b) < 2; i++) b = 1 + Math.floor(rng() * (n - 2));
-    return a === b ? [a] : [a, b].sort((p, q) => p - q);
+  // 놓일 줄을 고른다. **띠를 먼저 나누고 그 안에서 흔든다** — 그냥 뽑아 서로
+  // 떨어졌는지 다시 보는 방식은 개수가 늘수록 허탕이 잦고, 운이 나쁘면 모자란 채로
+  // 끝난다.
+  const pickMains = (n, count) => {
+    const out = [];
+    const band = (n - 2) / count;
+    for (let i = 0; i < count; i++) {
+      const lo = 1 + Math.floor(i * band);
+      const hi = Math.min(n - 2, Math.floor(1 + (i + 1) * band) - 1);
+      out.push(lo + Math.floor(rng() * Math.max(1, hi - lo + 1)));
+    }
+    return out;
   };
-  const mainRows = pick2(ROWS);
-  const mainCols = pick2(COLS);
-  // 골목이 도는 줄. 큰길 사이의 빈 줄이다.
-  const loopRow = mainRows[0] + 1 < ROWS ? mainRows[0] + 1 : mainRows[0] - 1;
+  const mainRows = pickMains(ROWS, mainCount(ROWS));
+  const mainCols = pickMains(COLS, mainCount(COLS));
+  // 골목이 도는 줄. 큰길 바로 옆의 빈 줄이다.
+  const loopRow = [mainRows[0] + 1, mainRows[0] - 1]
+    .find((r) => r >= 0 && r < ROWS && mainRows.indexOf(r) < 0);
   const side = rng() < 0.5 ? 0 : COLS - 1;
 
   const gate = (id, x, y) => ({ id, kind: 'gate', x, y });
@@ -192,7 +203,7 @@ function city(options) {
   return net;
 }
 
-const api = { generate, city, weave, mulberry32, COLS, ROWS, STEP_X, STEP_Y };
+const api = { generate, city, weave, mulberry32, mainCount, COLS, ROWS, STEP_X, STEP_Y };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 root.RoadMapGen = api;

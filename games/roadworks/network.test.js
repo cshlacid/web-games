@@ -369,8 +369,10 @@ function straight(lanes) {
 
 {
   const net = Gen.city({ seed: 7 });
-  // 큰길은 가로 둘·세로 둘이고 관문은 그 끝마다 하나씩이다.
-  check('관문은 큰길 끝마다', Net.gates(net).length, 8);
+  // 관문은 큰길 끝마다 하나씩이다. 큰길 수는 격자 크기를 타므로 숫자를 박지 않는다.
+  const mains = Gen.mainCount(Gen.ROWS) + Gen.mainCount(Gen.COLS);
+  check('관문은 큰길 끝마다', Net.gates(net).length, mains * 2);
+  check('관문에 닿는 길은 하나씩', Net.gates(net).every((g) => g.segs.length === 1), true);
   // **처음에는 길이 적다.** 격자 자리는 대부분 비어 있고 플레이어가 채운다.
   const spots = Gen.COLS * Gen.ROWS;
   check('격자 자리가 넉넉하다', spots >= 60, true);

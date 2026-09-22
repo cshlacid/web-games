@@ -114,7 +114,7 @@ function create(net, options) {
     nextId: 1,
     spawnRate: opts.spawnRate == null ? 2.6 : opts.spawnRate,  // 초당 진입 대수
     spawnDebt: 0,
-    maxVehicles: opts.maxVehicles == null ? 260 : opts.maxVehicles,
+    maxVehicles: opts.maxVehicles == null ? 400 : opts.maxVehicles,
     arrived: 0,
     money: opts.money == null ? 900 : opts.money,
     spent: 0,
