@@ -183,10 +183,138 @@ function connect(net, from, to, handle, lanes) {
   const b = anchor(net, to, splits);
   if (!b) return null;
   if (a.id === b.id) return null;
-  const seg = addSeg(net, { a: a.id, b: b.id, ...bend(a, b, handle), lanes: lanes || [1] });
-  if (!seg) return null;
+
+  // **지나가며 가로지르는 길에도 점을 낸다.** 그러지 않으면 두 길이 점 없이 겹쳐,
+  // 차가 서로를 통과하고 신호를 놓을 자리도 없는 도로가 생긴다.
+  const bow = bend(a, b, handle);
+  let curve = [a, bow.c1, bow.c2, b];
+  const marks = crossMarks(net, curve, a, b);
+
+  const segs = [];
+  let head = a;
+  let base = 0;   // 지금까지 잘라 낸 만큼. 남은 곡선에서의 t로 옮기는 데 쓴다.
+  for (const mark of marks) {
+    // **표식이 가리키는 그 길을 가른다.** 가까이 지나는 다른 길을 집으면 정작
+    // 가로지른 길은 점 없이 남는다. 앞의 표식이 이미 그 길을 갈랐으면 사라졌으므로,
+    // 그때만 자리로 다시 찾는다.
+    const still = segment(net, mark.seg);
+    const hit = still ? { seg: still, s: mark.at } : segmentNear(net, mark, [head.id]);
+    if (!hit) continue;
+    const t = (mark.t - base) / (1 - base);
+    if (!(t > 0.001 && t < 0.999)) continue;
+
+    const cut = splitSeg(net, hit.seg, hit.s);
+    if (cut.was) splits.push(cut);
+    if (cut.at.id === head.id) continue;
+
+    const piece = Geom.splitCubic(curve[0], curve[1], curve[2], curve[3], t);
+    // **너무 짧은 토막은 만들지 않고 점만 앞으로 옮긴다.** 양 끝 교차로 원에 덮여
+    // 보이지도 않으면서 차를 두 번 세우는 구간이 되기 때문이다. 거기서는 새 길이
+    // 조금 앞에서 시작하는 것으로 친다.
+    if (Math.hypot(cut.at.x - head.x, cut.at.y - head.y) >= MIN_PIECE) {
+      const seg = addSeg(net, {
+        a: head.id, b: cut.at.id, c1: piece.left[1], c2: piece.left[2], lanes: lanes || [1],
+      });
+      if (seg) segs.push(seg);
+    }
+    curve = piece.right;
+    base = mark.t;
+    head = cut.at;
+  }
+
+  // 마지막 토막도 같은 잣대로 본다 — 끝점 코앞에서 가로질렀으면 거기가 끝이다.
+  if (head.id !== b.id
+    && (!segs.length || Math.hypot(b.x - head.x, b.y - head.y) >= MIN_PIECE)) {
+    const last = addSeg(net, {
+      a: head.id, b: b.id, c1: curve[1], c2: curve[2], lanes: lanes || [1],
+    });
+    if (last) segs.push(last);
+  }
+  if (!segs.length) return null;
   relink(net);
-  return { seg, at: [a, b], splits };
+  return { seg: segs[0], segs, at: [a, b], splits };
+}
+
+// 새 길을 토막 내는 가장 짧은 길이. 이보다 짧은 토막은 만들지 않는다.
+const MIN_PIECE = 24;
+
+// 놓을 곡선이 기존 길의 가운데선을 가로지르는 자리들. 곡선을 따라 앞에서부터 차례로
+// 돌려준다.
+function crossMarks(net, curve, a, b) {
+  const path = Geom.makePath(Geom.sampleCubic(curve[0], curve[1], curve[2], curve[3], 5));
+  const out = [];
+  for (const seg of net.segs) {
+    const mine = [];
+    for (const hit of meets(path, seg.center)) {
+      // **양 끝에서의 맞닿음만 걸러 낸다.** 새 길은 붙일 길 위에서 시작하고 끝나므로
+      // 그 점에서 두 가운데선이 정확히 만난다 — 그것은 가로지르는 것이 아니다.
+      // 넉넉히 잡아 걸렀더니 끝점 가까이에서 다른 길을 가로지르는 것까지 놓쳤다.
+      if (Math.hypot(hit.x - a.x, hit.y - a.y) < 2) continue;
+      if (Math.hypot(hit.x - b.x, hit.y - b.y) < 2) continue;
+      // **같은 길을 코앞에서 두 번 스친 것만 하나로 본다.** 자리로만 걸렀더니 가까이
+      // 지나는 두 길을 가로지를 때 한쪽이 점을 못 받았다.
+      if (mine.some((p) => Math.hypot(p.x - hit.x, p.y - hit.y) < 6)) continue;
+      mine.push(hit);
+      out.push({ ...hit, seg: seg.id });
+    }
+  }
+  out.sort((p, q) => p.t - q.t);
+  return out;
+}
+
+// 두 꺾은선이 만나는 자리. t는 첫 번째 꺾은선 위에서 얼마나 왔는지(0~1)다.
+function meets(one, other) {
+  const out = [];
+  const n = one.points.length - 1;
+  for (let i = 1; i <= n; i++) {
+    const a1 = one.points[i - 1];
+    const a2 = one.points[i];
+    for (let j = 1; j < other.points.length; j++) {
+      const b1 = other.points[j - 1];
+      const b2 = other.points[j];
+      const d = (a2.x - a1.x) * (b2.y - b1.y) - (a2.y - a1.y) * (b2.x - b1.x);
+      if (Math.abs(d) < 1e-9) continue;
+      const t = ((b1.x - a1.x) * (b2.y - b1.y) - (b1.y - a1.y) * (b2.x - b1.x)) / d;
+      const u = ((b1.x - a1.x) * (a2.y - a1.y) - (b1.y - a1.y) * (a2.x - a1.x)) / d;
+      // **반만 열어 둔다.** 곧은 길이 반듯한 자리에서 만나면 만나는 점이 두 꺾은선의
+      // 꼭짓점과 정확히 겹치는데, 양끝을 다 닫으면 그 자리가 앞 토막에서는 t=1,
+      // 뒤 토막에서는 t=0이라 어느 쪽에도 걸리지 않는다. 한쪽만 열어 두면 꼭 한 번
+      // 잡히고 두 번 세지도 않는다.
+      if (t < 0 || t >= 1 || u < 0 || u >= 1) continue;
+      out.push({
+        t: (i - 1 + t) / n,
+        // 만나는 자리가 상대 길의 어디쯤인지. 그 길을 가를 때 바로 쓴다.
+        at: other.cum[j - 1] + Math.hypot(b2.x - b1.x, b2.y - b1.y) * u,
+        x: a1.x + (a2.x - a1.x) * t,
+        y: a1.y + (a2.y - a1.y) * t,
+      });
+    }
+  }
+  return out;
+}
+
+// 그 자리를 지나는 길. 가른 뒤에는 구간이 바뀌므로 자리로 다시 찾는다.
+function segmentNear(net, spot, skipIds) {
+  let best = null;
+  for (const seg of net.segs) {
+    if (skipIds && (skipIds.indexOf(seg.a) >= 0 || skipIds.indexOf(seg.b) >= 0)) continue;
+    let near = { d: Infinity, s: 0 };
+    const pts = seg.center.points;
+    for (let i = 1; i < pts.length; i++) {
+      const p = pts[i - 1];
+      const q = pts[i];
+      const dx = q.x - p.x;
+      const dy = q.y - p.y;
+      const len2 = dx * dx + dy * dy;
+      let t = len2 ? ((spot.x - p.x) * dx + (spot.y - p.y) * dy) / len2 : 0;
+      t = Math.max(0, Math.min(1, t));
+      const d = Math.hypot(spot.x - (p.x + dx * t), spot.y - (p.y + dy * t));
+      if (d < near.d) near = { d, s: seg.center.cum[i - 1] + Math.sqrt(len2) * t };
+    }
+    if (near.d > 2) continue;
+    if (!best || near.d < best.d) best = { seg, d: near.d, s: near.s };
+  }
+  return best;
 }
 
 // 자리를 점으로 바꾼다. { node: id }면 그 점, { seg, s }면 그 구간을 가른 자리.
@@ -801,7 +929,7 @@ const api = {
   build, setLanes, relink, node, segment, lanesOf, pickLane, boundaries, link, route, gates,
   setControl, cycleControl, canControl, hasCrossing, phaseOf, phaseCount, islandRadius, reach, ringPath,
   setPlan, setCrossing, crossingAt, setAllow, movement, movementAllowed, sideOf,
-  reshape, flipLane, addLane, clearLinks, addSeg, removeSeg, splitSeg, connect, bend, draftPath, spotOf,
+  reshape, flipLane, addLane, clearLinks, addSeg, removeSeg, splitSeg, connect, bend, draftPath, spotOf, crossMarks,
   stubOf,
   LANE_W, MAX_LANES, MIN_STUB, CONTROLS, PLANS, MOVES,
 };

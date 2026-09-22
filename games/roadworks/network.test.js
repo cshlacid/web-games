@@ -653,5 +653,88 @@ function tee(stemLanes) {
   check('맵의 이음매는 모두 교차로가 아니다', bends.some((n) => Net.canControl(n)), false);
 }
 
+// --- 점 없이 겹치는 도로는 없다 ---
+
+// 두 구간의 가운데선이 만나는데 그 자리에 점이 없는 짝. 하나라도 있으면 차가 서로를
+// 통과하고 신호를 놓을 자리도 없는, **있을 수 없는 도로**다.
+function ghostCrossings(net) {
+  const out = [];
+  for (let i = 0; i < net.segs.length; i++) {
+    for (let j = i + 1; j < net.segs.length; j++) {
+      const A = net.segs[i];
+      const B = net.segs[j];
+      if (A.a === B.a || A.a === B.b || A.b === B.a || A.b === B.b) continue;
+      if (meetsSomewhere(A.center, B.center)) out.push([A.id, B.id]);
+    }
+  }
+  return out;
+}
+
+function meetsSomewhere(one, other) {
+  for (let i = 1; i < one.points.length; i++) {
+    const a1 = one.points[i - 1];
+    const a2 = one.points[i];
+    for (let j = 1; j < other.points.length; j++) {
+      const b1 = other.points[j - 1];
+      const b2 = other.points[j];
+      const d = (a2.x - a1.x) * (b2.y - b1.y) - (a2.y - a1.y) * (b2.x - b1.x);
+      if (Math.abs(d) < 1e-9) continue;
+      const t = ((b1.x - a1.x) * (b2.y - b1.y) - (b1.y - a1.y) * (b2.x - b1.x)) / d;
+      const u = ((b1.x - a1.x) * (a2.y - a1.y) - (b1.y - a1.y) * (a2.x - a1.x)) / d;
+      if (t >= 0 && t < 1 && u >= 0 && u < 1) return true;
+    }
+  }
+  return false;
+}
+
+{
+  // **만든 맵에는 점 없이 겹치는 자리가 없다.** 골목의 가로 구간을 옆 칸에서 큰길
+  // 칸까지 단숨에 이었더니 사이에 낀 격자 자리를 그냥 지나쳐 큰길을 가로질렀다 —
+  // 줄기는 격자 한 칸씩만 건너뛴다.
+  let bad = 0;
+  for (let seed = 1; seed <= 30; seed++) bad += ghostCrossings(Gen.city({ seed })).length;
+  check('만든 맵에 점 없는 교차가 없다', bad, 0);
+}
+
+{
+  // 나란한 길 셋. 맨 위에서 맨 아래로 이으면 가운데를 가로지른다.
+  const net = Net.build(
+    [{ id: 'W1', kind: 'gate', x: 0, y: 0 }, { id: 'E1', kind: 'gate', x: 600, y: 0 },
+      { id: 'W2', kind: 'gate', x: 0, y: 200 }, { id: 'E2', kind: 'gate', x: 600, y: 200 },
+      { id: 'W3', kind: 'gate', x: 0, y: 400 }, { id: 'E3', kind: 'gate', x: 600, y: 400 }],
+    [{ a: 'W1', b: 'E1', lanes: [-1, 1] }, { a: 'W2', b: 'E2', lanes: [-1, 1] },
+      { a: 'W3', b: 'E3', lanes: [-1, 1] }],
+  );
+  const made = Net.connect(net, { seg: net.segs[0].id, s: 300 }, { seg: net.segs[2].id, s: 300 });
+  // 위·아래 길이 각각 갈리고, 새 길은 가운데 길을 가로지르며 두 토막이 된다.
+  check('가로지른 자리에도 점이 난다', net.segs.length, 8);
+  check('새 길이 토막 난다', made.segs.length, 2);
+  check('점 없이 겹치지 않는다', ghostCrossings(net), []);
+
+  const mid = net.nodes.filter((n) => n.kind !== 'gate' && Math.abs(n.y - 200) < 3);
+  check('가로지른 자리는 네 갈래 교차로',
+    mid.map((n) => [n.segs.length, n.conflict]), [[4, true]]);
+
+  // 가른 길도 그대로 이어져 있어야 한다.
+  check('가른 뒤에도 오간다', !!Net.route(net, 'W2', 'E2'), true);
+}
+
+{
+  // **가로지르는 자리가 딱 꼭짓점에 떨어지는 자리.** 곧은 길이 반듯하게 놓이면
+  // 만나는 점이 두 꺾은선의 꼭짓점과 정확히 겹치는데, 양끝을 다 닫고 재면 앞 토막
+  // 에서는 t=1, 뒤 토막에서는 t=0이라 어느 쪽에도 걸리지 않는다.
+  const net = Net.build(
+    [{ id: 'W', kind: 'gate', x: 0, y: 200 }, { id: 'E', kind: 'gate', x: 600, y: 200 },
+      { id: 'N', kind: 'gate', x: 300, y: 0 }, { id: 'S', kind: 'gate', x: 300, y: 400 }],
+    [{ a: 'W', b: 'E', lanes: [-1, 1] }],
+  );
+  const marks = Net.crossMarks(net,
+    [{ x: 300, y: 0 }, { x: 300, y: 133.333 }, { x: 300, y: 266.667 }, { x: 300, y: 400 }],
+    { x: 300, y: 0 }, { x: 300, y: 400 });
+  check('꼭짓점에 떨어져도 찾는다', marks.length, 1);
+  near('만나는 자리', marks[0].x, 300, 0.5);
+  near('만나는 자리(y)', marks[0].y, 200, 0.5);
+}
+
 console.log(`${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);

@@ -106,10 +106,14 @@ function generate(options) {
         gate(`gS${i}`, spot[ROWS - 1][col].x, h - edge)],
     });
   });
-  chains.push({
-    lanes: TWO,
-    nodes: [spot[mainRows[0]][side], spot[loopRow][side], spot[loopRow][mainCols[0]]],
-  });
+  // **줄기는 격자 한 칸씩만 건너뛴다.** 골목의 가로 구간을 옆 칸에서 큰길 칸까지
+  // 단숨에 잇던 때가 있었는데, 그러면 사이에 낀 격자 자리를 그냥 지나쳐 **큰길을
+  // 점 없이 가로지르는 구간**이 생겼다 — 차가 서로를 통과하고 신호를 놓을 자리도
+  // 없는, 있을 수 없는 도로다. 지나는 칸을 모두 줄기에 꿰면 그 자리마다 교차로가 난다.
+  const run = [spot[mainRows[0]][side]];
+  const step = mainCols[0] > side ? 1 : -1;
+  for (let c = side; c !== mainCols[0] + step; c += step) run.push(spot[loopRow][c]);
+  chains.push({ lanes: TWO, nodes: run });
 
   const nodes = [];
   const segments = [];

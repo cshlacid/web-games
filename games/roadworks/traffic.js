@@ -381,44 +381,55 @@ function mark(v) {
 }
 
 // 갈라진 구간 위의 차를 두 토막 중 맞는 쪽으로 옮긴다.
+//
+// **한 구간이 여러 번 갈릴 수 있다.** 새 길이 지나가며 가로지르는 길마다 점을 내므로
+// 같은 길이 두 번 갈리는 일이 있고, 그러면 한 번 옮긴 토막이 또 갈려 있다. 더 갈릴
+// 것이 없을 때까지 따라간다.
 function remap(it, splits) {
   // **지나온 걸음은 차로와 따로 본다.** 갈라진 구간에서 나와 갈라지지 않은 구간으로
   // 들어가던 차가 있어, 차로가 멀쩡하다고 지나온 걸음까지 멀쩡한 것은 아니다.
   it.origin = remapEntry(it.origin, splits);
 
-  const cut = splits.find((c) => c.was.id === it.seg);
-  if (!cut) return;
-  const [head, tail] = cut.segs;
-
-  if (it.link) {
-    // 교차로를 돌아 들어오려던 차. 그 교차로에 닿아 있는 토막이 갈 곳이다.
-    const seg = it.node === cut.was.a ? head : tail;
-    const lane = Net.pickLane(seg, it.dir, it.rank);
-    if (lane) it.v.lane.next = lane;
-    return;
+  let seg = null;
+  let id = it.seg;
+  // A에서 잰 비율. 차로는 밀려 있어 길이가 조금 다르지만, 비율로 옮기면 그 차이만큼만
+  // 어긋나고 앞뒤로 튀지 않는다.
+  let fromA = it.link ? 0 : (it.dir > 0 ? it.on.frac : 1 - it.on.frac);
+  for (;;) {
+    const cut = splits.find((c) => c.was.id === id);
+    if (!cut) break;
+    const [head, tail] = cut.segs;
+    if (it.link) {
+      // 교차로를 돌아 들어오려던 차. 그 교차로에 닿아 있는 토막이 갈 곳이다.
+      seg = it.node === cut.was.a ? head : tail;
+    } else {
+      const first = fromA <= cut.q;
+      seg = first ? head : tail;
+      fromA = first ? fromA / cut.q : (fromA - cut.q) / (1 - cut.q);
+    }
+    id = seg.id;
   }
+  if (!seg) return;
 
-  // A에서 잰 비율로 어느 토막인지 가른다. 차로는 밀려 있어 길이가 조금 다르지만,
-  // 비율로 옮기면 그 차이만큼만 어긋나고 앞뒤로 튀지 않는다.
-  const fromA = it.dir > 0 ? it.on.frac : 1 - it.on.frac;
-  const first = fromA <= cut.q;
-  const seg = first ? head : tail;
-  const local = first ? fromA / cut.q : (fromA - cut.q) / (1 - cut.q);
   const lane = Net.pickLane(seg, it.dir, it.rank);
   if (!lane) return;
+  if (it.link) { it.v.lane.next = lane; return; }
   it.v.lane = lane;
   it.v.rank = lane.rank;
-  it.v.s = Math.max(0, Math.min(1, it.dir > 0 ? local : 1 - local)) * lane.path.total;
+  it.v.s = Math.max(0, Math.min(1, it.dir > 0 ? fromA : 1 - fromA)) * lane.path.total;
 }
 
 // 경로에 적힌 한 걸음을 갈라진 뒤의 말로 옮긴다. 어느 토막인지는 그 걸음이 향하던
 // 쪽으로 가른다 — 정방향이면 뒤 토막에서, 역방향이면 앞 토막에서 빠져나온다.
 function remapEntry(entry, splits) {
   if (!entry) return null;
-  const cut = splits.find((c) => c.was.id === entry.seg.id);
-  if (!cut) return entry;
-  const [head, tail] = cut.segs;
-  return { seg: entry.dir > 0 ? tail : head, dir: entry.dir };
+  let at = entry;
+  for (;;) {
+    const cut = splits.find((c) => c.was.id === at.seg.id);
+    if (!cut) return at;
+    const [head, tail] = cut.segs;
+    at = { seg: at.dir > 0 ? tail : head, dir: at.dir };
+  }
 }
 
 // 판이 바뀌었으니 남은 길을 다시 잡는다. **잇는 곡선 위의 차는 그 곡선이 가리키는
