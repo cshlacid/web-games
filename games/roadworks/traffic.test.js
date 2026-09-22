@@ -312,8 +312,10 @@ function laneOf(net, v) {
   // 돌아가는 도중에 다스림을 바꿔도 차가 사라지거나 튀지 않는다.
   const net = Gen.city({ seed: 40 });
   const world = T.create(net, { rng: seeded(40), spawnRate: 3 });
-  for (let i = 0; i < 60 * 20; i++) T.tick(world, 1 / 60);
+  // 도시를 가로지르는 데 시간이 걸리므로, 차가 이미 빠져나가고 있을 때 바꿔 본다.
+  for (let i = 0; i < 60 * 60; i++) T.tick(world, 1 / 60);
   const before = world.vehicles.length;
+  const gone = world.arrived;
   for (const node of net.nodes) if (Net.canControl(node)) Net.setControl(net, node.id, 'circle');
   let jump = 0;
   const seen = new Map();
@@ -331,7 +333,7 @@ function laneOf(net, v) {
   }
   check('달리던 차가 그대로 있다', world.vehicles.length > before / 3, true);
   check('바꾼 뒤에도 튀지 않는다', jump < 1.2, true);
-  check('바뀐 교차로로도 빠져나간다', world.arrived > 10, true);
+  check('바뀐 교차로로도 빠져나간다', world.arrived - gone > 5, true);
 }
 
 // --- 차로가 허락하는 이동 ---

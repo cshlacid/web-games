@@ -89,7 +89,7 @@ let drag = null;     // 지금 끌고 있는 것
 function fresh(nextSeed) {
   seed = nextSeed == null ? Math.floor(Math.random() * 1e9) : nextSeed;
   net = Gen.city({ seed });
-  world = Traffic.create(net, { spawnRate: 1.1 });
+  world = Traffic.create(net, { spawnRate: 1.5 });
   picked = null;
   draft = null;
   drag = null;

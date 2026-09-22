@@ -207,11 +207,15 @@ function generate(net, rng, opts) {
       made++;
     }
   };
-  blobs('lake', o.lakes == null ? 3 : o.lakes, 26, 52, land.water);
-  blobs('hill', o.hills == null ? 5 : o.hills, 30, 62, land.hills);
+  // **수는 판 넓이를 탄다.** 개수를 고정해 두면 맵을 넓힐 때 도시가 듬성해져, 같은
+  // 게임이 아니라 그저 넓기만 한 판이 된다. 나누는 값은 지금 판의 빽빽함이다.
+  const area = w * h;
+  const some = (fixed, per) => (fixed == null ? Math.max(1, Math.round(area / per)) : fixed);
+  blobs('lake', some(o.lakes, 592000), 26, 52, land.water);
+  blobs('hill', some(o.hills, 355000), 30, 62, land.hills);
 
   // 건물. 길이 남긴 빈 자리를 채운다.
-  const want = o.buildings == null ? 150 : o.buildings;
+  const want = some(o.buildings, 11800);
   let left = want * 12;
   while (land.buildings.length < want && left-- > 0) {
     const bw = 16 + rng() * 30;
