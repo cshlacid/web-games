@@ -15,6 +15,7 @@
 <meta name="theme-color" content="#eff1f4" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#131619" media="(prefers-color-scheme: dark)">
 <link rel="stylesheet" href="../../shared/base.css">
+<link rel="stylesheet" href="../../shared/result.css">
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="../../shared/sheet.css">
 <script src="../../shared/analytics.js"></script>
@@ -44,8 +45,23 @@
     </div>
   </header>
 
+  <div class="mission" id="mission" hidden>
+    <b id="mission-time">0:00</b>
+    <i id="mission-what" data-i18n="road.missionOn">배달 중</i>
+    <button class="pick" id="mission-find" type="button" data-i18n="road.missionFind">보기</button>
+  </div>
+
   <div class="board-wrap" id="board-wrap">
     <canvas class="board" id="board" aria-hidden="true"></canvas>
+    <div class="result" id="result" role="status" aria-live="polite" hidden>
+      <div class="result-card">
+        <p class="sheet-title" id="result-title"></p>
+        <p class="sheet-note" id="result-note"></p>
+        <div class="sheet-actions">
+          <button class="btn" id="result-again" type="button" data-i18n="road.newCity">새 도시</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div class="panel" id="panel" hidden>
@@ -92,6 +108,10 @@
         <b>회전교차로</b>는 도는 차가 먼저이고 들어가려는 차가 틈을 기다립니다.</li>
       <li data-i18n-html="road.rule8"><b>차로 바닥의 화살표</b>가 그 차로에서 갈 수 있는 곳입니다. 좌회전 차로를
         없애면 그 길로 가려던 차가 <b>다른 길로 돌아갑니다</b>.</li>
+      <li data-i18n-html="road.rule14"><b>이따금 배달 미션이 붙습니다.</b> 관문 하나에서 다른
+        관문까지 <b>정해진 시간 안에</b> 그 차를 보내야 하고, 늦으면 <b>거기서 게임이 끝납니다</b>.
+        닿으면 <b>삯을 더 받습니다</b>. 미션 차는 판 위에 테두리로 표시되고, 화면 밖에 있으면
+        가장자리의 화살표가 가리킵니다.</li>
       <li data-i18n-html="road.rule13">빈 땅에는 <b>건물·산·강·호수</b>가 있습니다.
         <b>건물 위로는 길을 낼 수 없고</b>, 산은 <b>터널</b>을, 강과 호수는 <b>다리</b>를 놓고
         지나므로 그만큼 값이 더 듭니다.</li>
@@ -122,6 +142,7 @@
 <script src="terrain.js"></script>
 <script src="mapgen.js"></script>
 <script src="traffic.js"></script>
+<script src="mission.js"></script>
 <script src="icons.js"></script>
 <script src="../../shared/audio.js"></script>
 <script src="audio.js"></script>

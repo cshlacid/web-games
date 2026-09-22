@@ -2,7 +2,7 @@
 (function () {
   SharedI18n.add({
     ko: {
-      'meta.desc': '곡선과 직선이 섞인 도시의 도로 위로 자동차·택시·버스·트럭·오토바이가 실시간으로 오간다',
+      'meta.desc': '실시간으로 오가는 차들의 길을 놓고 다듬어, 시간 안에 배달을 성공시킨다',
       'road.onRoad': '주행',
       'road.avgSpeed': '평균 속도',
       'road.left': '시외로',
@@ -45,6 +45,13 @@
       'road.bridgeBit': '다리 {n}',
       'road.join': ' · ',
       'road.rule13': '빈 땅에는 <b>건물·산·강·호수</b>가 있습니다. <b>건물 위로는 길을 낼 수 없고</b>, 산은 <b>터널</b>을, 강과 호수는 <b>다리</b>를 놓고 지나므로 그만큼 값이 더 듭니다.',
+      'road.missionOn': '배달 중',
+      'road.missionFind': '보기',
+      'road.missionDone': '배달 성공',
+      'road.missionLost': '배달 취소',
+      'road.overTitle': '늦었습니다',
+      'road.overNote': '배달 {n}번 성공 · 남은 예산 {money}',
+      'road.rule14': '<b>이따금 배달 미션이 붙습니다.</b> 관문 하나에서 다른 관문까지 <b>정해진 시간 안에</b> 그 차를 보내야 하고, 늦으면 <b>거기서 게임이 끝납니다</b>. 닿으면 <b>삯을 더 받습니다</b>. 미션 차는 판 위에 테두리로 표시되고, 화면 밖에 있으면 가장자리의 화살표가 가리킵니다.',
     },
     en: {
       'meta.desc': 'Cars, taxis, buses, trucks and motorcycles drive in real time across a city of straight and curved roads',
@@ -90,6 +97,13 @@
       'road.bridgeBit': 'bridge {n}',
       'road.join': ' · ',
       'road.rule13': 'Open ground holds <b>buildings, hills, rivers and lakes</b>. <b>No road can cross a building</b>; hills are bored as a <b>tunnel</b> and water is spanned by a <b>bridge</b>, and both cost extra.',
+      'road.missionOn': 'delivering',
+      'road.missionFind': 'Find',
+      'road.missionDone': 'delivered',
+      'road.missionLost': 'call off',
+      'road.overTitle': 'Too late',
+      'road.overNote': '{n} deliveries made · {money} left in the budget',
+      'road.rule14': '<b>Now and then a delivery comes in.</b> That vehicle has to get from one gate to another <b>within the time given</b>; miss it and <b>the game ends there</b>. Make it and you <b>earn a bonus</b>. The vehicle carries a ring on the board, and an arrow at the edge points to it when it is off screen.',
     },
     ja: {
       'meta.desc': '直線と曲線が混ざった街の道路を、乗用車・タクシー・バス・トラック・バイクがリアルタイムで走る',
@@ -135,6 +149,13 @@
       'road.bridgeBit': '橋{n}',
       'road.join': '・',
       'road.rule13': '空き地には<b>建物・山・川・湖</b>があります。<b>建物の上に道は通せません</b>。山は<b>トンネル</b>、川と湖は<b>橋</b>で越えるので、その分だけ高くつきます。',
+      'road.missionOn': '配達中',
+      'road.missionFind': '表示',
+      'road.missionDone': '配達成功',
+      'road.missionLost': '配達取消',
+      'road.overTitle': '間に合いませんでした',
+      'road.overNote': '配達{n}回成功・残り予算{money}',
+      'road.rule14': '<b>ときどき配達の依頼が入ります。</b>その車を関門から関門まで<b>決められた時間内に</b>届けなければならず、遅れると<b>そこでゲームが終わります</b>。届けば<b>報酬が増えます</b>。配達の車は盤上で輪がつき、画面の外にいるときは端の矢印が指します。',
     },
     'zh-CN': {
       'meta.desc': '轿车、出租车、公交车、卡车和摩托车在直路与弯路交错的城市里实时行驶',
@@ -180,6 +201,13 @@
       'road.bridgeBit': '桥{n}',
       'road.join': '·',
       'road.rule13': '空地上有<b>建筑、山、河和湖</b>。<b>路不能穿过建筑</b>；过山要打<b>隧道</b>，过水要架<b>桥</b>，都要多花钱。',
+      'road.missionOn': '配送中',
+      'road.missionFind': '查看',
+      'road.missionDone': '配送成功',
+      'road.missionLost': '配送取消',
+      'road.overTitle': '来不及了',
+      'road.overNote': '成功配送{n}次 · 剩余预算{money}',
+      'road.rule14': '<b>时不时会来一单配送。</b>那辆车得在<b>规定时间内</b>从一个关口跑到另一个关口，迟到就<b>到此为止</b>。送到则<b>另有奖励</b>。配送车在图上带一圈标记，跑出画面时边缘的箭头会指向它。',
     },
     'zh-TW': {
       'meta.desc': '轎車、計程車、公車、卡車和機車在直路與彎路交錯的城市裡即時行駛',
@@ -225,6 +253,13 @@
       'road.bridgeBit': '橋{n}',
       'road.join': '·',
       'road.rule13': '空地上有<b>建築、山、河與湖</b>。<b>路不能穿過建築</b>；過山要開<b>隧道</b>，過水要架<b>橋</b>，都要多花錢。',
+      'road.missionOn': '配送中',
+      'road.missionFind': '查看',
+      'road.missionDone': '配送成功',
+      'road.missionLost': '配送取消',
+      'road.overTitle': '來不及了',
+      'road.overNote': '成功配送{n}次 · 剩餘預算{money}',
+      'road.rule14': '<b>不時會來一單配送。</b>那輛車得在<b>規定時間內</b>從一個關口跑到另一個關口，遲到就<b>到此為止</b>。送到則<b>另有獎勵</b>。配送車在圖上帶一圈標記，跑出畫面時邊緣的箭頭會指向它。',
     },
     es: {
       'meta.desc': 'Coches, taxis, autobuses, camiones y motos circulan en tiempo real por una ciudad de calles rectas y curvas',
@@ -270,6 +305,13 @@
       'road.bridgeBit': 'puente {n}',
       'road.join': ' · ',
       'road.rule13': 'El terreno libre tiene <b>edificios, montes, ríos y lagos</b>. <b>Ninguna vía atraviesa un edificio</b>; los montes se cruzan con un <b>túnel</b> y el agua con un <b>puente</b>, y ambos cuestan más.',
+      'road.missionOn': 'en reparto',
+      'road.missionFind': 'Ver',
+      'road.missionDone': 'entregado',
+      'road.missionLost': 'reparto anulado',
+      'road.overTitle': 'Llegó tarde',
+      'road.overNote': '{n} entregas hechas · quedan {money} de presupuesto',
+      'road.rule14': '<b>De vez en cuando llega un reparto.</b> Ese vehículo tiene que ir de una puerta a otra <b>dentro del tiempo dado</b>; si no llega, <b>la partida termina ahí</b>. Si llega, <b>cobras una prima</b>. El vehículo lleva un aro en el tablero, y una flecha en el borde lo señala cuando queda fuera de pantalla.',
     }
   });
 })();

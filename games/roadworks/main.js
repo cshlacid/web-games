@@ -14,6 +14,7 @@ const Net = window.RoadNet;
 const Gen = window.RoadMapGen;
 const Traffic = window.RoadTraffic;
 const Land = window.RoadTerrain;
+const Mission = window.RoadMission;
 const Sound = window.RoadSound;
 const t = (key, vars) => window.SharedI18n.t(key, vars);
 
@@ -35,6 +36,14 @@ const el = {
   toggleSfx: document.getElementById('toggle-sfx'),
   panel: document.getElementById('panel'),
   panelBody: document.getElementById('panel-body'),
+  mission: document.getElementById('mission'),
+  missionTime: document.getElementById('mission-time'),
+  missionWhat: document.getElementById('mission-what'),
+  missionFind: document.getElementById('mission-find'),
+  result: document.getElementById('result'),
+  resultTitle: document.getElementById('result-title'),
+  resultNote: document.getElementById('result-note'),
+  resultAgain: document.getElementById('result-again'),
 };
 
 const ctx = el.canvas.getContext('2d');
@@ -48,7 +57,7 @@ const SKIN = {
     dash: '#e8ecf1', middle: '#e7c94f', gate: '#59636f',
     island: '#9fbf96', stop: '#eef1f4',
     red: '#d4483b', amber: '#e0a52c', green: '#49a55f',
-    mark: '#e8ecf1', zebra: '#eef1f4', walker: '#3c4650', pick: '#3b6ea5',
+    mark: '#e8ecf1', zebra: '#eef1f4', walker: '#3c4650', pick: '#3b6ea5', quest: '#c8452f',
     body: ['#d05b4e', '#4a7fc1', '#e4e7ea', '#59636f', '#5aa06a', '#b8722e'],
     taxi: '#eeb92a', bus: '#3f8f86', truck: '#cfd4da', moto: '#3c4650',
   },
@@ -59,7 +68,7 @@ const SKIN = {
     dash: '#7c8794', middle: '#a98f31', gate: '#8b96a2',
     island: '#41603f', stop: '#aeb7c0',
     red: '#c04336', amber: '#c9932a', green: '#3f9153',
-    mark: '#8994a1', zebra: '#aeb7c0', walker: '#cfd7de', pick: '#79a7d8',
+    mark: '#8994a1', zebra: '#aeb7c0', walker: '#cfd7de', pick: '#79a7d8', quest: '#e0705a',
     body: ['#b8544a', '#4a76ad', '#c9ced4', '#6b7682', '#4f8d60', '#a3672c'],
     taxi: '#d8a726', bus: '#3a807a', truck: '#9aa2ab', moto: '#2b3138',
   },
@@ -83,6 +92,7 @@ let seed = 1;
 let picked = null;   // 고른 교차로나 길
 let draft = null;    // 놓기를 기다리는 새 길
 let drag = null;     // 지금 끌고 있는 것
+let game = null;     // 미션과 이기고 지는 것
 
 // --- 판 만들기 ---
 
@@ -93,6 +103,9 @@ function fresh(nextSeed) {
   picked = null;
   draft = null;
   drag = null;
+  game = Mission.create();
+  follow = false;
+  el.result.hidden = true;
   buildDeco();
   layout();
   lookAtCity();
@@ -727,20 +740,127 @@ function draw() {
   drawHills();
   ctx.restore();
 
+  drawQuest();
   drawPick();
   drawDraft();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 }
 
+// 미션. **큰 판에서 차 한 대를 찾는 일이라 표시가 절반이다.** 차에 테두리를 두르고,
+// 닿아야 할 관문에 고리를 그리고, 차가 화면 밖이면 가장자리에서 그쪽을 가리킨다.
+function drawQuest() {
+  const m = game && game.active;
+  if (!m) return;
+  ctx.strokeStyle = skin.quest;
+
+  // 닿아야 할 관문.
+  const goal = Net.node(net, m.to);
+  if (goal) {
+    const beat = 1 + Math.sin(game.clock * 4) * 0.12;
+    ctx.beginPath();
+    ctx.arc(goal.x, goal.y, overlay(13) * beat, 0, Math.PI * 2);
+    ctx.lineWidth = overlay(2.4);
+    ctx.stroke();
+  }
+
+  const at = Traffic.place(m.car);
+  // 차. 몸통 뒤까지 감싸야 어느 것인지 보인다.
+  ctx.beginPath();
+  ctx.arc(at.x - at.dx * m.car.kind.len / 2, at.y - at.dy * m.car.kind.len / 2,
+    m.car.kind.len * 0.7 + overlay(4), 0, Math.PI * 2);
+  ctx.lineWidth = overlay(2.4);
+  ctx.stroke();
+
+  // 화면 밖이면 가장자리에서 가리킨다.
+  const px = (at.x - view.x) * view.z;
+  const py = (at.y - view.y) * view.z;
+  const pad = 18;
+  if (px >= pad && px <= box.w - pad && py >= pad && py <= box.h - pad) return;
+  const cx = Math.max(pad, Math.min(box.w - pad, px));
+  const cy = Math.max(pad, Math.min(box.h - pad, py));
+  const angle = Math.atan2(py - cy, px - cx);
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  const dpr = window.devicePixelRatio || 1;
+  ctx.translate(cx * dpr, cy * dpr);
+  ctx.rotate(angle);
+  ctx.scale(dpr, dpr);
+  ctx.fillStyle = skin.quest;
+  ctx.beginPath();
+  ctx.moveTo(9, 0);
+  ctx.lineTo(-5, 6);
+  ctx.lineTo(-5, -6);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
 // --- 시계 ---
+
+let follow = false;   // 미션 차를 화면 가운데에 붙들고 다니는가
 
 function frame(now) {
   const dt = last ? Math.min(0.25, (now - last) / 1000) : 0;
   last = now;
-  if (running && dt > 0) Traffic.step(world, dt * rate);
+  if (running && dt > 0 && !game.over) {
+    const span = dt * rate;
+    Traffic.step(world, span);
+    const was = game.over;
+    Mission.step(world, game, span);
+    if (game.over && !was) endGame();
+  }
+  if (follow && game.active) lookAt(game.active.car);
   draw();
   paintStats();
+  paintMission();
   requestAnimationFrame(frame);
+}
+
+// 미션 차를 화면 가운데에 둔다.
+function lookAt(car) {
+  const at = Traffic.place(car);
+  view.x = at.x - box.w / view.z / 2;
+  view.y = at.y - box.h / view.z / 2;
+  clampView();
+}
+
+function endGame() {
+  Sound.play('clear');
+  el.resultTitle.textContent = t('road.overTitle');
+  el.resultNote.textContent = t('road.overNote', {
+    n: game.over.done, money: Math.round(world.money),
+  });
+  el.result.hidden = false;
+}
+
+const clock = (secs) => {
+  const s = Math.max(0, Math.ceil(secs));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+};
+
+function paintMission() {
+  const m = game.active;
+  if (!m && !game.last) { el.mission.hidden = true; return; }
+  el.mission.hidden = false;
+  if (m) {
+    el.missionTime.textContent = clock(m.left);
+    el.missionWhat.textContent = t('road.missionOn');
+    el.missionFind.hidden = false;
+    // 남은 시간이 얼마 없으면 붉게. 숫자만으로는 눈에 들어오지 않는다.
+    el.mission.classList.toggle('hurry', m.left < m.limit * 0.25);
+    el.mission.classList.remove('good');
+    return;
+  }
+  el.missionFind.hidden = true;
+  el.mission.classList.remove('hurry');
+  el.mission.classList.toggle('good', game.last.kind === 'done');
+  if (game.last.kind === 'done') {
+    el.missionTime.textContent = `+${game.last.reward}`;
+    el.missionWhat.textContent = t('road.missionDone');
+  } else {
+    el.missionTime.textContent = '';
+    el.missionWhat.textContent = t('road.missionLost');
+  }
 }
 
 function paintStats() {
@@ -908,6 +1028,9 @@ el.canvas.addEventListener('pointermove', (event) => {
   if (!drag) return;
 
   if (drag.kind === 'pan') {
+    // 손으로 판을 옮기면 따라가기를 놓는다. 끌자마자 도로 끌려가면 옮길 수가 없다.
+    follow = false;
+    el.missionFind.setAttribute('aria-pressed', 'false');
     view.x = drag.vx - (event.clientX - drag.sx) / view.z;
     view.y = drag.vy - (event.clientY - drag.sy) / view.z;
     clampView();
@@ -1192,6 +1315,26 @@ el.rates.addEventListener('click', (event) => {
   Sound.play('click');
 });
 
+// **보기는 따라가기다.** 한 번 눌러 찾아 놓아도 차가 곧 화면 밖으로 나가므로,
+// 다시 누를 때까지 붙들고 다닌다. **처음 누를 때는 배율도 끌어올린다** — 도시 전체를
+// 보고 있으면 차가 이미 화면 안에 있어 가운데로 옮겨도 아무 일도 일어나지 않는다.
+const FOLLOW_ZOOM = 0.85;
+
+el.missionFind.addEventListener('click', () => {
+  follow = !follow;
+  el.missionFind.setAttribute('aria-pressed', String(follow));
+  if (follow && game.active) {
+    view.z = Math.max(view.z, clamp(FOLLOW_ZOOM, fitZoom(), ZOOM_MAX));
+    lookAt(game.active.car);
+  }
+  Sound.play('click');
+});
+
+el.resultAgain.addEventListener('click', () => {
+  Sound.play('click');
+  fresh();
+});
+
 el.fresh.addEventListener('click', () => {
   Sound.play('click');
   fresh();
@@ -1223,6 +1366,7 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', rea
 window.__draft = () => draft;
 window.__picked = () => picked;
 window.__view = () => view;
+window.__game = () => game;
 window.__net = null;
 
 readSkin();
