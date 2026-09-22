@@ -19,7 +19,7 @@ const PACE = 26;     // 막히지 않았을 때의 대략적인 속도(단위/�
 // **자유 주행 시간의 몇 배를 주는가.** 1에 가까우면 아무리 뚫려 있어도 못 닿고,
 // 너무 크면 판이 막혀도 그냥 닿아 미션이 아무것도 묻지 않는다.
 const SLACK = 1.7;
-const REWARD = 0.3;  // 길이당 삯
+const REWARD = 0.18;  // 길이당 삯
 const TRIES = 40;    // 멀리 떨어진 관문 짝을 찾는 시도
 
 function create(opts) {

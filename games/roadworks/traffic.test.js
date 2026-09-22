@@ -4,6 +4,7 @@
 const T = require('./traffic.js');
 const Net = require('./network.js');
 const Gen = require('./mapgen.js');
+const Land = require('./terrain.js');
 
 let passed = 0;
 let failed = 0;
@@ -879,6 +880,91 @@ const across = (net) => [{ seg: net.segs[0].id, s: 300 }, { seg: net.segs[1].id,
   const [from, to] = across(net);
   check('곧게 가면 막힌다', T.canBuild(world, from, to).why, 'building');
   check('굽히면 비켜 간다', T.canBuild(world, from, to, { x: 150, y: 150 }).ok, true);
+}
+
+// --- 건물에서 나고 건물로 든다 ---
+
+// 관문 둘 사이의 곧은 길 하나와, 그 옆에 선 건물 하나.
+function block() {
+  const net = Net.build(
+    [{ id: 'W', kind: 'gate', x: 0, y: 100 }, { id: 'M', kind: 'junction', x: 500, y: 100 },
+      { id: 'E', kind: 'gate', x: 1000, y: 100 }],
+    [{ a: 'W', b: 'M', lanes: [-1, 1] }, { a: 'M', b: 'E', lanes: [-1, 1] }],
+  );
+  net.land = { buildings: [{ kind: 'building', x: 230, y: 130, w: 30, h: 30 }], hills: [], water: [] };
+  return net;
+}
+
+{
+  const net = block();
+  const door = Land.doorOf(net, net.land.buildings[0]);
+  check('건물이 길에 닿는다', !!door, true);
+  check('닿는 구간', door.seg.id, net.segs[0].id);
+  near('닿는 자리', door.s, 245, 6);
+}
+
+{
+  // **건물에서 나온다.** 관문이 아니라 길 한가운데에서 태어난다.
+  const net = block();
+  const door = Land.doorOf(net, net.land.buildings[0]);
+  const world = T.create(net, { rng: seeded(51), spawnRate: 0 });
+  const v = T.spawn(world, { door: { seg: door.seg.id, s: door.s }, to: 'E' });
+  check('나온다', !!v, true);
+  check('관문이 아니라 길 위에서 난다', v.s > 1, true);
+  check('첫 걸음이 그 구간', v.route[0].seg.id, door.seg.id);
+  const at = T.place(v);
+  near('건물 곁에서 난다', Math.hypot(at.x - 245, at.y - 100), 0, 14);
+
+  run(world, 120);
+  check('나온 차도 관문으로 빠져나간다', world.arrived, 1);
+}
+
+{
+  // **건물로 든다.** 구간 끝이 아니라 그 한가운데에서 멈춘다.
+  const net = block();
+  const door = Land.doorOf(net, net.land.buildings[0]);
+  const world = T.create(net, { rng: seeded(52), spawnRate: 0 });
+  const v = T.spawn(world, { from: 'E', stop: { seg: door.seg.id, s: door.s } });
+  check('든다', !!v, true);
+  check('멈출 자리를 들고 간다', v.stop.seg, door.seg.id);
+  // 그 구간을 실제로 달려 지나가는 쪽을 목적지로 삼아야 한다.
+  check('그 구간으로 들어가는 길을 잡는다',
+    v.route[v.route.length - 1].seg.id, door.seg.id);
+
+  run(world, 120);
+  check('건물 앞에서 도착으로 센다', world.arrived, 1);
+  check('차가 사라졌다', world.vehicles.length, 0);
+}
+
+{
+  // 닿기 전에는 도착이 아니다.
+  const net = block();
+  const door = Land.doorOf(net, net.land.buildings[0]);
+  const world = T.create(net, { rng: seeded(53), spawnRate: 0 });
+  const v = T.spawn(world, { from: 'E', stop: { seg: door.seg.id, s: door.s } });
+  run(world, 3);
+  check('아직 달리는 중', [world.arrived, T.arrived(world, v)], [0, false]);
+}
+
+{
+  // 맵 위에서 섞어 돌린다. **관문만 오가는 차만 있으면 도시가 그저 길목이다.**
+  const net = Gen.city({ seed: 6 });
+  const world = T.create(net, { rng: seeded(6), spawnRate: 1.2 });
+  let doors = 0;
+  let stops = 0;
+  for (let i = 0; i < 300; i++) {
+    const trip = T.randomTrip(world);
+    if (trip.door) doors++;
+    if (trip.stop) stops++;
+  }
+  check('건물에서 나는 통행이 섞인다', doors > 60 && doors < 260, true);
+  check('건물로 드는 통행이 섞인다', stops > 60 && stops < 260, true);
+
+  run(world, 240);
+  check('도시 안을 도는 차가 있다', world.vehicles.some((v) => v.stop), true);
+  check('그래도 빠져나간다', world.arrived > 20, true);
+  check('길 밖으로 나간 차가 없다',
+    world.vehicles.every((v) => v.s >= -1 && v.s <= v.lane.path.total + 1), true);
 }
 
 console.log(`${passed}개 통과, ${failed}개 실패`);

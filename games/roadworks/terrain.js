@@ -117,11 +117,21 @@ function offRoads(net, x, y, pad) {
   return true;
 }
 
-// 네모의 네 귀와 가장자리 몇 곳을 훑어 길에서 떨어졌는지 본다. 가운데만 보면 큰
-// 건물이 길을 물고 앉는다.
+// 네모를 격자로 훑어 길에서 떨어졌는지 본다. 가운데만 보면 큰 건물이 길을 물고 앉는다.
+//
+// **양 끝을 반드시 포함한다.** 일정한 간격으로 더해 가던 때가 있었는데, 폭이 그
+// 간격의 배수가 아니면 먼 쪽 가장자리를 건너뛰어 **그 귀퉁이가 길을 물어도 지나갔다**
+// — 건물을 길가에 세우기 시작하면서 드러났다.
+function samples(from, size) {
+  const n = Math.max(1, Math.ceil(size / 12));
+  const out = [];
+  for (let i = 0; i <= n; i++) out.push(from + (size * i) / n);
+  return out;
+}
+
 function rectClear(net, land, r, pad) {
-  for (let x = r.x; x <= r.x + r.w; x += Math.min(12, r.w)) {
-    for (let y = r.y; y <= r.y + r.h; y += Math.min(12, r.h)) {
+  for (const x of samples(r.x, r.w)) {
+    for (const y of samples(r.y, r.h)) {
       if (!offRoads(net, x, y, pad)) return false;
       if (at(land, x, y)) return false;
     }
@@ -214,21 +224,74 @@ function generate(net, rng, opts) {
   blobs('lake', some(o.lakes, 592000), 26, 52, land.water);
   blobs('hill', some(o.hills, 355000), 30, 62, land.hills);
 
-  // 건물. 길이 남긴 빈 자리를 채운다.
-  const want = some(o.buildings, 11800);
-  let left = want * 12;
-  while (land.buildings.length < want && left-- > 0) {
-    const bw = 16 + rng() * 30;
-    const bh = 16 + rng() * 30;
-    const r = { x: 12 + rng() * (w - 24 - bw), y: 12 + rng() * (h - 24 - bh), w: bw, h: bh };
-    if (!rectClear(net, land, r, ROAD_PAD)) continue;
-    land.buildings.push(make('building', r));
-  }
+  // 건물. **처음에는 길가에 조금만 둔다** — 나머지는 도시가 자라면서 채워진다.
+  sprout(net, land, rng, o.buildings == null ? 40 : o.buildings);
   return land;
 }
 
+// **건물은 길가에 선다.** 판 위 아무 데나 던지고 길을 물었는지 보는 방식은, 길이 적은
+// 판에서는 들판 한가운데 집이 서고 길이 늘어도 그 자리를 따라가지 않는다. 길을 하나
+// 골라 그 위의 한 자리에서 옆으로 물러난 곳에 세우면, **도시가 길을 따라 자란다** —
+// 플레이어가 새로 놓은 길가에도 저절로 집이 들어선다.
+//
+// 세운 수를 돌려준다. 자리가 없으면 그만큼 적게 선다.
+function sprout(net, land, rng, count) {
+  if (!net.segs.length) return 0;
+  let made = 0;
+  let left = count * 14;
+  while (made < count && left-- > 0) {
+    const seg = net.segs[Math.floor(rng() * net.segs.length)];
+    const at = Geom.at(seg.center, rng() * seg.length);
+    const side = Geom.right({ x: at.dx, y: at.dy });
+    const flip = rng() < 0.5 ? 1 : -1;
+    const bw = 16 + rng() * 30;
+    const bh = 16 + rng() * 30;
+    // 길 가장자리에서 조금 물러난 자리. 더 멀리 가면 뒷줄이 되어 골목이 생긴다.
+    const off = seg.width / 2 + ROAD_PAD + 3 + rng() * 26;
+    const cx = at.x + side.x * off * flip;
+    const cy = at.y + side.y * off * flip;
+    const r = { x: cx - bw / 2, y: cy - bh / 2, w: bw, h: bh };
+    if (r.x < 8 || r.y < 8) continue;
+    if (r.x + r.w > net.world.w - 8 || r.y + r.h > net.world.h - 8) continue;
+    if (!rectClear(net, land, r, ROAD_PAD)) continue;
+    land.buildings.push(make('building', r));
+    made++;
+  }
+  return made;
+}
+
+// **건물이 길에 닿는 자리.** 차가 그 건물에서 나오고 그 건물로 드는 지점이다. 길이
+// 갈리고 늘어나므로 적어 두지 않고 그때그때 찾는다 — 적어 두면 가른 구간을 가리킨
+// 채로 남는다.
+function doorOf(net, item, reach) {
+  const far = reach == null ? 90 : reach;
+  const cx = item.x + item.w / 2;
+  const cy = item.y + item.h / 2;
+  let best = null;
+  for (const seg of net.segs) {
+    const keep = seg.width / 2 + far;
+    const box = seg.center.box;
+    if (cx < box.x - keep || cx > box.x + box.w + keep) continue;
+    if (cy < box.y - keep || cy > box.y + box.h + keep) continue;
+    const pts = seg.center.points;
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1];
+      const b = pts[i];
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const len2 = dx * dx + dy * dy;
+      let t = len2 ? ((cx - a.x) * dx + (cy - a.y) * dy) / len2 : 0;
+      t = Math.max(0, Math.min(1, t));
+      const d = Math.hypot(cx - (a.x + dx * t), cy - (a.y + dy * t));
+      if (d > far) continue;
+      if (!best || d < best.d) best = { seg, d, s: seg.center.cum[i - 1] + Math.sqrt(len2) * t };
+    }
+  }
+  return best;
+}
+
 const api = {
-  generate, spanOf, at, offRoads, smooth, boxOf, river,
+  generate, sprout, doorOf, spanOf, at, offRoads, smooth, boxOf, river,
   inRect, inCircle, inBand, holds,
   ROAD_PAD, STEP,
 };

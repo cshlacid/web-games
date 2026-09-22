@@ -36,12 +36,14 @@ const STEP_Y = 165;
 // 큰길이 몇 줄인가. **격자 크기를 탄다** — 맵이 넓어질 때 큰길을 그대로 두면 관문에서
 // 관문까지가 너무 멀고, 갈래가 없어 막혀도 돌아갈 길이 없다. 네 칸에 하나쯤이 도시를
 // 알맞게 가른다.
-function mainCount(n) {
-  return Math.max(2, Math.round(n / 4));
+// 큰길이 몇 줄인가. **처음에는 가로 하나·세로 하나뿐이다** — 판 위에 열십자 하나만
+// 놓고 시작해 나머지는 플레이어가 놓는다. 격자를 큰길로 미리 채워 두면 할 일이 넓히는
+// 것뿐이고, 어디에 길을 낼지 고르는 재미가 없다.
+function mainCount() {
+  return 1;
 }
 
 // 차로 구성. 왼쪽이 역방향, 오른쪽이 정방향 — 우측 통행이라 이 순서가 기본이다.
-const TWO = [-1, 1];
 const FOUR = [-1, -1, 1, 1];
 
 function mulberry32(seed) {
@@ -94,10 +96,6 @@ function generate(options) {
   };
   const mainRows = pickMains(ROWS, mainCount(ROWS));
   const mainCols = pickMains(COLS, mainCount(COLS));
-  // 골목이 도는 줄. 큰길 바로 옆의 빈 줄이다.
-  const loopRow = [mainRows[0] + 1, mainRows[0] - 1]
-    .find((r) => r >= 0 && r < ROWS && mainRows.indexOf(r) < 0);
-  const side = rng() < 0.5 ? 0 : COLS - 1;
 
   const gate = (id, x, y) => ({ id, kind: 'gate', x, y });
 
@@ -118,14 +116,12 @@ function generate(options) {
         gate(`gS${i}`, spot[ROWS - 1][col].x, h - edge)],
     });
   });
-  // **줄기는 격자 한 칸씩만 건너뛴다.** 골목의 가로 구간을 옆 칸에서 큰길 칸까지
-  // 단숨에 잇던 때가 있었는데, 그러면 사이에 낀 격자 자리를 그냥 지나쳐 **큰길을
-  // 점 없이 가로지르는 구간**이 생겼다 — 차가 서로를 통과하고 신호를 놓을 자리도
-  // 없는, 있을 수 없는 도로다. 지나는 칸을 모두 줄기에 꿰면 그 자리마다 교차로가 난다.
-  const run = [spot[mainRows[0]][side]];
-  const step = mainCols[0] > side ? 1 : -1;
-  for (let c = side; c !== mainCols[0] + step; c += step) run.push(spot[loopRow][c]);
-  chains.push({ lanes: TWO, nodes: run });
+  // **골목은 두지 않는다.** 처음에는 큰길 열십자 하나뿐이고 나머지는 플레이어가 놓는다.
+  //
+  // 골목을 놓던 때의 규율은 적어 둔다 — **줄기는 격자 한 칸씩만 건너뛴다.** 옆 칸에서
+  // 큰길 칸까지 단숨에 이었더니 사이에 낀 격자 자리를 그냥 지나쳐 큰길을 점 없이
+  // 가로지르는 구간이 생겼다. 차가 서로를 통과하고 신호를 놓을 자리도 없는, 있을 수
+  // 없는 도로다. 지나는 칸을 모두 줄기에 꿰면 그 자리마다 교차로가 난다.
 
   const nodes = [];
   const segments = [];

@@ -79,7 +79,9 @@ function line(x0, x1, y) {
   const net = Gen.city({ seed: 3 });
   const land = net.land;
   check('맵에 장애물이 붙어 온다', !!land, true);
-  check('건물이 있다', land.buildings.length > 50, true);
+  // **처음에는 길가에 조금만 있다.** 나머지는 도시가 자라면서 채워진다.
+  check('건물이 있다', land.buildings.length > 20, true);
+  check('처음에는 적다', land.buildings.length < 80, true);
   check('산이 있다', land.hills.length > 0, true);
   check('강이 있다', land.water.some((w) => w.kind === 'river'), true);
   check('호수가 있다', land.water.some((w) => w.kind === 'lake'), true);
@@ -102,6 +104,9 @@ function line(x0, x1, y) {
   for (const seg of net.segs) if (Land.spanOf({ buildings: [], hills: [], water: [river] }, seg.center).bridge > 0) crossed++;
   check('강이 길을 가로지른다', crossed > 0, true);
 
+  // **건물은 길가에 선다.** 길에서 멀면 차가 드나들 자리가 없다.
+  check('모든 건물이 길에 닿는다', land.buildings.every((b) => !!Land.doorOf(net, b)), true);
+
   check('같은 씨앗은 같은 땅',
     Gen.city({ seed: 3 }).land.buildings.length, land.buildings.length);
   check('씨앗이 다르면 다른 땅',
@@ -113,6 +118,36 @@ function line(x0, x1, y) {
   const net = Gen.city({ seed: 3, land: { buildings: 0, hills: 0, lakes: 0, river: false } });
   check('빈 땅으로도 만든다',
     [net.land.buildings.length, net.land.hills.length, net.land.water.length], [0, 0, 0]);
+}
+
+// --- 자라는 도시 ---
+
+{
+  // **길가에 더 세운다.** 플레이어가 새로 놓은 길가에도 들어서므로, 길을 놓으면
+  // 그 둘레가 도시가 된다.
+  const net = Gen.city({ seed: 5 });
+  const land = net.land;
+  const was = land.buildings.length;
+  const made = Land.sprout(net, land, Gen.mulberry32(99), 12);
+  check('더 선다', made > 0, true);
+  check('센 수와 실제가 맞는다', land.buildings.length, was + made);
+  const fresh = land.buildings.slice(was);
+  check('새로 선 것도 길에 닿는다', fresh.every((b) => !!Land.doorOf(net, b)), true);
+  let bad = 0;
+  for (const b of fresh) {
+    for (const [x, y] of [[b.x, b.y], [b.x + b.w, b.y], [b.x, b.y + b.h],
+      [b.x + b.w, b.y + b.h], [b.x + b.w / 2, b.y + b.h / 2]]) {
+      if (!Land.offRoads(net, x, y, 0)) bad++;
+    }
+  }
+  check('새로 선 것도 길을 물지 않는다', bad, 0);
+}
+
+{
+  // 길이 없으면 세울 곳도 없다.
+  const empty = { segs: [], world: { w: 500, h: 500 } };
+  check('길이 없으면 세우지 않는다',
+    Land.sprout(empty, { buildings: [], hills: [], water: [] }, Gen.mulberry32(1), 5), 0);
 }
 
 console.log(`${passed}개 통과, ${failed}개 실패`);

@@ -15,6 +15,7 @@ const Gen = window.RoadMapGen;
 const Traffic = window.RoadTraffic;
 const Land = window.RoadTerrain;
 const Mission = window.RoadMission;
+const Grow = window.RoadGrow;
 const Sound = window.RoadSound;
 const t = (key, vars) => window.SharedI18n.t(key, vars);
 
@@ -93,13 +94,15 @@ let picked = null;   // 고른 교차로나 길
 let draft = null;    // 놓기를 기다리는 새 길
 let drag = null;     // 지금 끌고 있는 것
 let game = null;     // 미션과 이기고 지는 것
+let grow = null;     // 자라는 통행량과 건물
 
 // --- 판 만들기 ---
 
 function fresh(nextSeed) {
   seed = nextSeed == null ? Math.floor(Math.random() * 1e9) : nextSeed;
   net = Gen.city({ seed });
-  world = Traffic.create(net, { spawnRate: 1.5 });
+  grow = Grow.create();
+  world = Traffic.create(net, { spawnRate: grow.rate });
   picked = null;
   draft = null;
   drag = null;
@@ -804,6 +807,9 @@ function frame(now) {
   last = now;
   if (running && dt > 0 && !game.over) {
     const span = dt * rate;
+    // **도시가 먼저 자라고 그다음에 차가 움직인다.** 자라는 쪽이 통행량을 정하므로
+    // 순서가 바뀌면 한 걸음 묵은 값으로 차를 넣게 된다.
+    Grow.step(world, grow, span);
     Traffic.step(world, span);
     const was = game.over;
     Mission.step(world, game, span);
@@ -1367,6 +1373,7 @@ window.__draft = () => draft;
 window.__picked = () => picked;
 window.__view = () => view;
 window.__game = () => game;
+window.__grow = () => grow;
 window.__net = null;
 
 readSkin();
