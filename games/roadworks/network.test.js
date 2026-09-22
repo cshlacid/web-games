@@ -565,5 +565,93 @@ function straight(lanes) {
   check('가운데는 가른다', ok.segs.length, 2);
 }
 
+// --- 엇갈릴 짝이 있어야 교차로다 ---
+
+// 동서로 뻗은 큰길 가운데에 남쪽으로 가지 하나.
+function tee(stemLanes) {
+  return Net.build(
+    [{ id: 'W', kind: 'gate', x: 0, y: 100 }, { id: 'M', kind: 'junction', x: 300, y: 100 },
+      { id: 'E', kind: 'gate', x: 700, y: 100 }, { id: 'S', kind: 'gate', x: 300, y: 400 }],
+    [{ a: 'W', b: 'M', lanes: [-1, 1] }, { a: 'M', b: 'E', lanes: [-1, 1] },
+      { a: 'M', b: 'S', lanes: stemLanes }],
+  );
+}
+
+{
+  // 길이 꺾이기만 하는 이음매는 가로지를 짝이 없다. **마주 보는 직진 둘은 서로를
+  // 건너지 않는다** — 우측 통행이라 서로의 오른쪽으로 지나기 때문이고, 그 비킴을
+  // 넣지 않으면 한 점에서 만나 엇갈리는 것으로 잡힌다.
+  const bend = Net.build(
+    [{ id: 'A', kind: 'gate', x: 0, y: 0 }, { id: 'B', kind: 'junction', x: 200, y: 0 },
+      { id: 'C', kind: 'gate', x: 200, y: 200 }],
+    [{ a: 'A', b: 'B', lanes: [-1, 1] }, { a: 'B', b: 'C', lanes: [-1, 1] }],
+  );
+  check('이음매는 교차로가 아니다',
+    [Net.node(bend, 'B').conflict, Net.canControl(Net.node(bend, 'B'))], [false, false]);
+}
+
+{
+  const net = tee([-1, 1]);
+  check('양방향 가지는 교차로다', Net.canControl(Net.node(net, 'M')), true);
+}
+
+{
+  // **가지가 나가는 일방통행이어도 마주편의 좌회전이 남아 있으면 교차로다** —
+  // 그 좌회전이 마주 오는 직진을 가로지른다.
+  const net = tee([1]);
+  const M = Net.node(net, 'M');
+  check('나가는 일방 가지', M.conflict, true);
+
+  // 그 좌회전을 끄면 가로지를 짝이 사라진다. 남는 것은 직진 둘과 우회전 하나뿐이다.
+  const east = Net.segment(net, 1);
+  for (const lane of east.lanes.filter((l) => l.dir < 0)) {
+    Net.setAllow(lane, ['through', 'right'], net);
+  }
+  check('마주편 좌회전을 끄면 교차로가 아니다', [M.conflict, Net.canControl(M)], [false, false]);
+}
+
+{
+  // 들어오는 일방 가지도 마찬가지다. 우회전만 남기면 합류일 뿐 가로지르지 않는다.
+  const net = tee([-1]);
+  const M = Net.node(net, 'M');
+  check('들어오는 일방 가지', M.conflict, true);
+  for (const lane of Net.segment(net, 2).lanes) Net.setAllow(lane, ['right'], net);
+  check('우회전만 남기면 교차로가 아니다', M.conflict, false);
+}
+
+{
+  // **교차로가 아니게 되면 놓여 있던 신호도 거둔다.** 아무것도 갈라 줄 것이 없는데
+  // 차만 세우게 된다.
+  const net = tee([-1]);
+  const M = Net.node(net, 'M');
+  Net.setControl(net, 'M', 'signal');
+  check('신호를 놓았다', M.control, 'signal');
+  for (const lane of Net.segment(net, 2).lanes) Net.setAllow(lane, ['right'], net);
+  check('엇갈림이 사라지면 신호도 사라진다', M.control, 'none');
+  check('다시 놓을 수도 없다', Net.setControl(net, 'M', 'signal'), null);
+}
+
+{
+  // 네 갈래는 좌회전을 다 꺼도 직진끼리 가로지른다.
+  const net = Net.build(
+    [{ id: 'W', kind: 'gate', x: 0, y: 200 }, { id: 'M', kind: 'junction', x: 200, y: 200 },
+      { id: 'E', kind: 'gate', x: 400, y: 200 }, { id: 'N', kind: 'gate', x: 200, y: 0 },
+      { id: 'S', kind: 'gate', x: 200, y: 400 }],
+    [{ a: 'W', b: 'M', lanes: [-1, 1] }, { a: 'M', b: 'E', lanes: [-1, 1] },
+      { a: 'N', b: 'M', lanes: [-1, 1] }, { a: 'M', b: 'S', lanes: [-1, 1] }],
+  );
+  for (const seg of net.segs) for (const lane of seg.lanes) Net.setAllow(lane, ['through'], net);
+  check('직진끼리도 가로지른다', Net.node(net, 'M').conflict, true);
+}
+
+{
+  // 만든 맵에서는 갈래가 셋 이상인 자리가 곧 교차로다.
+  const net = Gen.city({ seed: 7 });
+  const junctions = net.nodes.filter((n) => n.kind !== 'gate' && n.segs.length >= 3);
+  check('맵의 갈림은 모두 교차로', junctions.every((n) => Net.canControl(n)), true);
+  const bends = net.nodes.filter((n) => n.kind !== 'gate' && n.segs.length === 2);
+  check('맵의 이음매는 모두 교차로가 아니다', bends.some((n) => Net.canControl(n)), false);
+}
+
 console.log(`${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);
