@@ -46,6 +46,13 @@ const MISSIONS = [
   { id: 'nonogram.big', game: 'nonogram', tier: 2, text: 'size', vars: { size: 15 }, test: (r) => r.size >= 15 },
   { id: 'nonogram.hard', game: 'nonogram', tier: 3, text: 'sizeClean', vars: { size: 15 },
     test: (r) => r.size >= 15 && r.hints === 0 },
+
+  { id: 'zip.any', game: 'zip', tier: 1, text: 'any', test: () => true },
+  { id: 'zip.big', game: 'zip', tier: 2, text: 'size', vars: { size: 8 }, test: (r) => r.size >= 8 },
+  { id: 'zip.clean', game: 'zip', tier: 2, text: 'sizeUpClean', vars: { size: 7 },
+    test: (r) => r.size >= 7 && r.hints === 0 },
+  { id: 'zip.fast', game: 'zip', tier: 3, text: 'sizeFast', vars: { size: 8, min: 2 },
+    test: (r) => r.size >= 8 && r.hints === 0 && r.time <= 120 },
 ];
 
 const BY_ID = new Map(MISSIONS.map((m) => [m.id, m]));
