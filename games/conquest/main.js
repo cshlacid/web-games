@@ -319,6 +319,7 @@ function finish(winner) {
     : t('conquest.lostNote');
   el.result.hidden = false;
   Sound.play(winner === 1 ? 'win' : 'lose');
+  SharedDailyUI.report('conquest', { win: winner === 1, level, size });
 }
 
 function frame(now) {

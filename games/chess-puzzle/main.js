@@ -134,6 +134,7 @@
   let pending = null;        // 승격 선택을 기다리는 수
   let replyTimer = null;
   let solved = new Set();
+  let hinted = false;        // 이 문제에서 힌트를 봤는지 — 오늘의 도전만 읽는다
   // 다 푼 뒤 이어지는 수순을 되짚어 보는 중. 여기 있는 동안에는 판이 이 자리를
   // 보여 주고, 입력은 받지 않는다 — 문제는 이미 끝났으므로 둘 것이 없다.
   let review = null;
@@ -307,6 +308,7 @@
     }
 
     state = L.startPuzzle(puzzle);
+    hinted = false;
     selected = null;
     targets = new Map();
     pending = null;
@@ -453,6 +455,7 @@
   }
 
   function finish() {
+    SharedDailyUI.report('chess-puzzle', { level, mistakes: state.mistakes, hints: hinted ? 1 : 0 });
     solved.add(state.puzzle.id);
     save();
     renderInfo();
@@ -524,6 +527,7 @@
     // 도착 칸까지 알려 주면 문제가 사라진다. 어떤 말을 볼지까지만 짚는다.
     selectSquare(move.slice(0, 2));
     Sound.play('hint');
+    hinted = true;
     setMessage(t('cp.hintShown', { hint: t('cp.hint.' + state.puzzle.hint) }), 'hint');
   });
 

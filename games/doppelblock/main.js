@@ -458,6 +458,7 @@
     el.resultNote.textContent = t('doppel.resultNote', { size: state.n, level: t(G.LEVELS[state.level].labelKey), time: formatTime(state.elapsed) });
     el.result.hidden = false;
     Sound.play('win');
+    SharedDailyUI.report('doppelblock', { level: state.level, size: state.n, time: state.elapsed });
     save();
   }
 

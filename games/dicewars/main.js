@@ -478,6 +478,7 @@ function finish() {
   el.result.hidden = false;
   paint();
   Sound.play(winner === 1 ? 'victory' : 'defeat');
+  SharedDailyUI.report('dicewars', { win: winner === 1, level, players });
 }
 
 // 상대는 한 수씩 두고 그때마다 화면을 갱신한다. 한 번에 다 두면 무엇이 일어났는지
