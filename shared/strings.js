@@ -82,7 +82,9 @@
       'daily.fast': '{min}분 안에 풀기',
       'daily.tile': '{tile} 타일 만들기',
       'daily.kkodle.win': '단어 맞히기',
-      'daily.kkodle.tries': '{n}번 안에 맞히기'
+      'daily.kkodle.tries': '{n}번 안에 맞히기',
+      'daily.flawless': '틀리지 않고 힌트 없이 풀기',
+      'daily.hardFlawless': '어려움 문제를 틀리지 않고 힌트 없이 풀기'
     },
     en: {
       'game.2048': '2048',
@@ -163,7 +165,9 @@
       'daily.fast': 'Solve in under {min} minutes',
       'daily.tile': 'Make a {tile} tile',
       'daily.kkodle.win': 'Guess the word',
-      'daily.kkodle.tries': 'Guess it in {n} tries or fewer'
+      'daily.kkodle.tries': 'Guess it in {n} tries or fewer',
+      'daily.flawless': 'Solve with no mistakes or hints',
+      'daily.hardFlawless': 'Solve a Hard puzzle with no mistakes or hints'
     },
     ja: {
       'game.2048': '2048',
@@ -244,7 +248,9 @@
       'daily.fast': '{min}分以内に解く',
       'daily.tile': '{tile}のタイルを作る',
       'daily.kkodle.win': '単語を当てる',
-      'daily.kkodle.tries': '{n}回以内に当てる'
+      'daily.kkodle.tries': '{n}回以内に当てる',
+      'daily.flawless': 'ミスもヒントもなしで解く',
+      'daily.hardFlawless': 'むずかしいをミスもヒントもなしで解く'
     },
     'zh-CN': {
       'game.2048': '2048',
@@ -325,7 +331,9 @@
       'daily.fast': '{min}分钟内完成',
       'daily.tile': '合成{tile}方块',
       'daily.kkodle.win': '猜中单词',
-      'daily.kkodle.tries': '{n}次以内猜中'
+      'daily.kkodle.tries': '{n}次以内猜中',
+      'daily.flawless': '不出错、不用提示完成',
+      'daily.hardFlawless': '不出错、不用提示完成一道困难题'
     },
     'zh-TW': {
       'game.2048': '2048',
@@ -406,7 +414,9 @@
       'daily.fast': '{min}分鐘內完成',
       'daily.tile': '合成{tile}方塊',
       'daily.kkodle.win': '猜中單字',
-      'daily.kkodle.tries': '{n}次以內猜中'
+      'daily.kkodle.tries': '{n}次以內猜中',
+      'daily.flawless': '不出錯、不用提示完成',
+      'daily.hardFlawless': '不出錯、不用提示完成一道困難題'
     },
     es: {
       'game.2048': '2048',
@@ -487,7 +497,9 @@
       'daily.fast': 'Resuelve en menos de {min} minutos',
       'daily.tile': 'Consigue la ficha {tile}',
       'daily.kkodle.win': 'Adivina la palabra',
-      'daily.kkodle.tries': 'Adivínala en {n} intentos o menos'
+      'daily.kkodle.tries': 'Adivínala en {n} intentos o menos',
+      'daily.flawless': 'Resuelve sin errores ni pistas',
+      'daily.hardFlawless': 'Resuelve uno Difícil sin errores ni pistas'
     }
   });
 })();

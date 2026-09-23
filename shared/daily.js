@@ -89,6 +89,13 @@ const MISSIONS = [
   { id: 'kkodle.win', game: 'kkodle', tier: 1, text: 'kkodle.win', test: (r) => r.won },
   { id: 'kkodle.tries4', game: 'kkodle', tier: 2, text: 'kkodle.tries', vars: { n: 4 }, test: (r) => r.won && r.tries <= 4 },
   { id: 'kkodle.tries3', game: 'kkodle', tier: 3, text: 'kkodle.tries', vars: { n: 3 }, test: (r) => r.won && r.tries <= 3 },
+
+  { id: 'chess.any', game: 'chess-puzzle', tier: 1, text: 'any', test: () => true },
+  { id: 'chess.medium', game: 'chess-puzzle', tier: 2, text: 'medium', test: (r) => r.level === 'medium' || r.level === 'hard' },
+  { id: 'chess.flawless', game: 'chess-puzzle', tier: 2, text: 'flawless', test: (r) => r.mistakes === 0 && r.hints === 0 },
+  { id: 'chess.hard', game: 'chess-puzzle', tier: 3, text: 'hard', test: (r) => r.level === 'hard' },
+  { id: 'chess.hardFlawless', game: 'chess-puzzle', tier: 3, text: 'hardFlawless',
+    test: (r) => r.level === 'hard' && r.mistakes === 0 && r.hints === 0 },
 ];
 
 const BY_ID = new Map(MISSIONS.map((m) => [m.id, m]));
