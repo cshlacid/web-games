@@ -31,6 +31,10 @@ const DRAG_START = 0.3;
 const VERTEX_REACH = 0.38;
 // 누른 자리에서 변까지 이보다 멀면(칸 단위) 아무 변도 고르지 않는다.
 const EDGE_REACH = 0.5;
+// SVG 좌표에서 칸 한 변의 길이. 칸을 1로 두면 숫자의 글꼴 크기가 0.6이 되는데, 웹킷은
+// 이렇게 작은 글자를 viewBox로 키워 그릴 때 글자 폭과 기준선을 작은 크기에서 재어
+// 숫자가 칸 가운데서 비껴 났다. 칸을 100으로 두면 글자를 제 크기 근처에서 잰다.
+const U = 100;
 
 const el = {
   app: document.querySelector('.app'),
@@ -117,17 +121,22 @@ function build() {
   const cell = measure(size);
   el.board.textContent = '';
 
-  // 크기를 속성으로 직접 준다(저장소 규칙). viewBox가 칸 단위라 좌표는 점 번호 그대로다.
+  // 크기를 속성으로 직접 준다(저장소 규칙). 좌표는 점 번호에 U를 곱한 값이다.
   const root = svg('svg', {
     width: (size + 1) * cell, height: (size + 1) * cell,
-    viewBox: `-0.5 -0.5 ${size + 1} ${size + 1}`,
+    viewBox: `${-U / 2} ${-U / 2} ${(size + 1) * U} ${(size + 1) * U}`,
   }, el.board);
 
   const clues = [];
   for (let c = 0; c < geo.cellCount; c++) {
     const k = game.puzzle.clues[c];
     if (k < 0) { clues.push(null); continue; }
-    const text = svg('text', { class: 'clue', x: (c % size) + 0.5, y: Math.floor(c / size) + 0.5, 'font-size': 0.6 }, root);
+    // 세로 가운데는 dominant-baseline에 맡기지 않고 기준선에서 0.35em 내려 맞춘다. 숫자의
+    // 높이가 글꼴마다 0.7em 안팎이라 이것이 어느 브라우저에서나 같은 자리에 놓인다.
+    const text = svg('text', {
+      class: 'clue', x: ((c % size) + 0.5) * U, y: (Math.floor(c / size) + 0.5) * U,
+      dy: '0.35em', 'font-size': 0.6 * U,
+    }, root);
     text.textContent = String(k);
     clues.push(text);
   }
@@ -137,30 +146,30 @@ function build() {
   const crosses = [];
   for (let e = 0; e < geo.edgeCount; e++) {
     const [a, b] = geo.edgeVerts[e].map((v) => point(v));
-    segs.push(svg('line', { class: 'seg', x1: a[0], y1: a[1], x2: b[0], y2: b[1], 'stroke-width': 0.13 }, root));
+    segs.push(svg('line', { class: 'seg', x1: a[0], y1: a[1], x2: b[0], y2: b[1], 'stroke-width': 0.13 * U }, root));
     const mx = (a[0] + b[0]) / 2;
     const my = (a[1] + b[1]) / 2;
-    const d = 0.1;
+    const d = 0.1 * U;
     crosses.push(svg('path', {
       class: 'x', d: `M${mx - d} ${my - d} L${mx + d} ${my + d} M${mx + d} ${my - d} L${mx - d} ${my + d}`,
-      'stroke-width': 0.055,
+      'stroke-width': 0.055 * U,
     }, root));
   }
 
   const dots = [];
   for (let v = 0; v < geo.vertexCount; v++) {
     const [x, y] = point(v);
-    dots.push(svg('circle', { class: 'dot', cx: x, cy: y, r: 0.085 }, root));
+    dots.push(svg('circle', { class: 'dot', cx: x, cy: y, r: 0.085 * U }, root));
   }
 
   view = { root, clues, segs, crosses, dots, size };
   SharedSnap.snap(root);
 }
 
-// 점 번호 → 칸 단위 좌표.
+// 점 번호 → SVG 좌표.
 function point(v) {
   const w = game.geo.cols + 1;
-  return [v % w, Math.floor(v / w)];
+  return [(v % w) * U, Math.floor(v / w) * U];
 }
 
 // --- 그리기 ---
