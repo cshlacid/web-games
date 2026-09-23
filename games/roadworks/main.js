@@ -21,8 +21,9 @@ const t = (key, vars) => window.SharedI18n.t(key, vars);
 
 const el = {
   canvas: document.getElementById('board'),
-  wrap: document.getElementById('board-wrap'),
   app: document.querySelector('.app'),
+  hudTop: document.querySelector('.hud-top'),
+  pad: document.querySelector('.pad'),
   count: document.getElementById('stat-count'),
   speed: document.getElementById('stat-speed'),
   gone: document.getElementById('stat-gone'),
@@ -83,7 +84,7 @@ let deco = new Map();      // 구간 id → 차선·가장자리 꺾은선
 // 놓인 맵 좌표다. 맵이 화면보다 훨씬 커졌으므로 판은 맵 전체가 아니라 그 일부를 비추는
 // 창이다.
 let view = { z: 1, x: 0, y: 0 };
-let box = { w: 0, h: 0 };   // 판의 CSS 크기
+let box = { w: 0, h: 0, top: 0, bottom: 0 };   // 판의 CSS 크기와 겹에 가린 띠
 const ZOOM_MAX = 2.4;       // 이보다 키우면 차 한 대가 화면을 채운다
 const VIEW_PAD = 40;        // 맵 가장자리 바깥으로 이만큼은 밀어 둘 수 있다
 let running = true;
@@ -246,26 +247,44 @@ function decoOf(seg) {
 
 // --- 배치 ---
 
-// **판의 크기는 맵이 아니라 화면이 정한다.** 예전에는 맵의 비율대로 판을 잘라
-// 맵 전체가 언제나 들어왔는데, 맵이 커진 지금은 그러면 아무것도 알아볼 수 없다.
+// **판이 화면 전체다.** 예전에는 맵의 비율대로 판을 잘라 맵 전체가 언제나
+// 들어왔고, 그 뒤에는 글상자 폭에 맞춘 상자였다. 맵이 커진 지금은 둘 다 도시를
+// 좁은 띠에 가두기만 한다.
+//
+// **대신 위아래 겹에 가린 띠를 재어 둔다**(`top`, `bottom`). 판은 화면 전체지만
+// 실제로 보이는 것은 그 사이뿐이라, 맵을 맞춰 넣는 계산은 이 띠를 빼고 해야 한다.
 function layout() {
   const w = el.app.clientWidth;
-  const h = Math.max(300, window.innerHeight - 250);
+  const h = el.app.clientHeight;
   const dpr = window.devicePixelRatio || 1;
 
   el.canvas.width = Math.round(w * dpr);
   el.canvas.height = Math.round(h * dpr);
   el.canvas.style.width = `${w}px`;
   el.canvas.style.height = `${h}px`;
-  el.wrap.style.width = `${w}px`;
-  box = { w, h };
+  // 겹의 높이는 내용이 정하므로(계기가 줄바꿈하면 머리글이 길어진다) 잰다.
+  // **패널은 세지 않는다** — 길을 고를 때마다 나타났다 사라져, 세면 그때마다
+  // 보던 자리가 움직인다.
+  box = {
+    w,
+    h,
+    top: el.hudTop ? el.hudTop.offsetHeight : 0,
+    bottom: el.pad ? el.pad.getBoundingClientRect().height + 20 : 0,
+  };
   clampView();
   window.SharedSnap.snap(el.canvas);
 }
 
+// 겹에 가리지 않고 남는 높이.
+function clearH() {
+  return Math.max(120, box.h - box.top - box.bottom);
+}
+
 // 맵 전체가 들어오는 배율. 이보다 작게는 줄이지 않는다 — 더 줄이면 바탕만 늘어난다.
+// **겹에 가린 띠를 뺀 자리에 맞춘다** — 화면 전체에 맞추면 가장 줄였을 때 도시의
+// 위아래가 머리글과 조작줄 밑에 깔린다.
 function fitZoom() {
-  return Math.min(box.w / net.world.w, box.h / net.world.h);
+  return Math.min(box.w / net.world.w, clearH() / net.world.h);
 }
 
 function clamp(v, lo, hi) {
@@ -280,8 +299,13 @@ function clampView() {
   const vh = box.h / view.z;
   view.x = vw >= net.world.w ? (net.world.w - vw) / 2
     : clamp(view.x, -VIEW_PAD, net.world.w - vw + VIEW_PAD);
-  view.y = vh >= net.world.h ? (net.world.h - vh) / 2
-    : clamp(view.y, -VIEW_PAD, net.world.h - vh + VIEW_PAD);
+  // 세로는 겹을 셈에 넣는다. 맵이 남는 자리보다 작으면 **화면 한가운데가 아니라
+  // 겹 사이 한가운데**에 두고, 끌 수 있는 범위도 그만큼 넓힌다 — 그러지 않으면
+  // 맵의 위아래 끝이 겹 밑에서 나오지 않는다.
+  view.y = clearH() / view.z >= net.world.h
+    ? net.world.h / 2 - (box.h + box.top - box.bottom) / (2 * view.z)
+    : clamp(view.y, -VIEW_PAD - box.top / view.z,
+      net.world.h - vh + VIEW_PAD + box.bottom / view.z);
 }
 
 // **집은 자리의 땅을 손가락 밑에 붙들어 둔 채 배율만 바꾼다.** 가운데를 기준으로
@@ -304,7 +328,7 @@ function zoomAt(next, cx, cy, hold) {
 function lookAtCity() {
   view.z = fitZoom();
   view.x = net.world.w / 2 - box.w / view.z / 2;
-  view.y = net.world.h / 2 - box.h / view.z / 2;
+  view.y = net.world.h / 2 - (box.h + box.top - box.bottom) / (2 * view.z);
   clampView();
 }
 
@@ -902,10 +926,13 @@ function drawQuest() {
   // 화면 밖이면 가장자리에서 가리킨다.
   const px = (at.x - view.x) * view.z;
   const py = (at.y - view.y) * view.z;
+  // 겹에 가린 띠 안쪽으로 붙인다. 화면 끝에 붙이면 화살표가 머리글 밑에 깔린다.
   const pad = 18;
-  if (px >= pad && px <= box.w - pad && py >= pad && py <= box.h - pad) return;
+  const top = pad + box.top;
+  const bottom = box.h - pad - box.bottom;
+  if (px >= pad && px <= box.w - pad && py >= top && py <= bottom) return;
   const cx = Math.max(pad, Math.min(box.w - pad, px));
-  const cy = Math.max(pad, Math.min(box.h - pad, py));
+  const cy = Math.max(top, Math.min(bottom, py));
   const angle = Math.atan2(py - cy, px - cx);
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -951,7 +978,7 @@ function frame(now) {
 function lookAt(car) {
   const at = Traffic.place(car);
   view.x = at.x - box.w / view.z / 2;
-  view.y = at.y - box.h / view.z / 2;
+  view.y = at.y - (box.h + box.top - box.bottom) / (2 * view.z);
   clampView();
 }
 
@@ -971,8 +998,11 @@ const clock = (secs) => {
 
 function paintMission() {
   const m = game.active;
-  if (!m && !game.last) { el.mission.hidden = true; return; }
-  el.mission.hidden = false;
+  // 미션 줄이 들고 나면 위쪽 겹의 높이가 바뀐다. **바뀐 순간에만 다시 잰다** —
+  // 프레임마다 재면 배치가 프레임마다 흔들린다.
+  const show = !!(m || game.last);
+  if (el.mission.hidden === show) { el.mission.hidden = !show; layout(); }
+  if (!show) return;
   if (m) {
     el.missionTime.textContent = clock(m.left);
     el.missionWhat.textContent = t('road.missionOn');

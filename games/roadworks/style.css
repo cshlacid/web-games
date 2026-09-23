@@ -18,6 +18,10 @@
      기대면 받아 주지 않는 판이 있고, 여기서 아낄 것은 없다. */
   --pick-fill: #6c8098;
 
+  /* 판 위에 얹는 겹의 바탕. 판이 비치도록 반투명이다. */
+  --veil: rgba(239, 241, 244, 0.86);
+  --veil-line: rgba(120, 131, 143, 0.22);
+
   --pad-x: clamp(10px, 4vmin, 26px);
   --app-max: 520px;
 }
@@ -39,28 +43,64 @@
     --road-dash: #7c8794;
     --pick: #79a7d8;
     --pick-fill: #4b5d70;
+    --veil: rgba(19, 22, 25, 0.84);
+    --veil-line: rgba(139, 149, 161, 0.22);
   }
 }
 
 * { box-sizing: border-box; }
-html, body { margin: 0; min-height: 100%; }
+
+/* **판이 화면 전체다.** 계기와 조작은 그 위에 겹으로 얹는다. 판을 글상자 폭에
+   맞춰 두던 때는 큰 화면에서 도시가 가운데 좁은 띠에만 보였고, 폰에서는 머리글과
+   조작줄이 세로를 먼저 가져가 정작 도시가 들어갈 자리가 남지 않았다.
+   **몸통은 스크롤하지 않는다** — 스크롤할 것이 없고, 판을 끌다 손가락이 새면
+   페이지가 따라 움직인다. */
+html, body { margin: 0; height: 100%; overflow: hidden; }
 
 body {
   background: var(--bg);
   color: var(--fg);
   font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     "Helvetica Neue", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
-  display: flex;
-  justify-content: center;
-  padding: clamp(8px, 2.5vmin, 20px) var(--pad-x);
 }
 
-.app {
-  width: min(100%, var(--app-max));
+.app { position: fixed; inset: 0; }
+
+/* 판 위에 얹는 겹. 위쪽에는 머리글과 미션, 아래쪽에는 패널과 조작줄이다.
+   **빈 자리는 손가락을 판으로 흘려보낸다**(`pointer-events`) — 겹이 차지한 띠가
+   통째로 판을 가리면 그 높이만큼 도시를 끌 수 없다. */
+.hud {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 3;
   display: flex;
   flex-direction: column;
-  gap: clamp(7px, 1.8vmin, 12px);
+  gap: 8px;
+  padding: 0 var(--pad-x);
+  pointer-events: none;
 }
+
+.hud > * {
+  pointer-events: auto;
+  width: min(100%, var(--app-max));
+  margin: 0 auto;
+}
+
+.hud-top { top: 0; padding-top: calc(env(safe-area-inset-top, 0px) + 8px); }
+.hud-bottom { bottom: 0; padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); }
+
+/* 머리글과 조작줄은 판 위에 뜬 카드다. */
+.head, .pad {
+  background: var(--veil);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--veil-line);
+  border-radius: 14px;
+  padding: 8px 12px 9px;
+}
+
+.head { display: flex; flex-direction: column; gap: 6px; }
 
 /* 헤더 배치는 모든 게임이 같다 — 왼쪽 위에 목록과 도움말, 가운데에 이름, 오른쪽에 소리. */
 .title-row {
@@ -119,6 +159,7 @@ h1 {
   margin: 0 auto;
 }
 
+.hud .mission { width: auto; max-width: 100%; }
 .mission[hidden] { display: none; }
 .mission b { font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; }
 .mission i { font-style: normal; font-size: 12.5px; color: var(--muted); }
@@ -132,16 +173,15 @@ h1 {
 /* --- 판 --- */
 
 .board-wrap {
-  position: relative;
-  margin: 0 auto;
-  border-radius: 12px;
+  position: absolute;
+  inset: 0;
   overflow: hidden;
 }
 
 /* **판은 `none`이다.** 손가락을 끌어 길을 놓는 자리라 페이지가 따라 스크롤되면
    선을 그을 수 없다. 그래서 판 안의 조작은 click이 아니라 포인터 이벤트로 돈다
    (`shared/base.js`가 이 자리의 touchend를 취소한다). */
-.board { display: block; touch-action: none; }
+.board { display: block; width: 100%; height: 100%; touch-action: none; }
 
 /* --- 고른 것을 손보는 패널 --- */
 
@@ -153,6 +193,10 @@ h1 {
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--sheet-bg);
+  /* **판을 다 덮지 않는다.** 여덟 차로짜리 고르개는 세로로 길어, 그대로 두면
+     고르는 동안 정작 고른 차로가 화면 밖으로 밀린다. */
+  max-height: 46vh;
+  overflow-y: auto;
 }
 
 .panel[hidden] { display: none; }
