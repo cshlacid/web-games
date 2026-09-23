@@ -26,6 +26,7 @@
       'game.roadworks': '도로공사',
       'game.sokoban': '소코반',
       'game.slitherlink': '슬리더링크',
+      'game.nurikabe': '누리카베',
 
       'ui.back': '← 목록',
       'ui.bgm': 'BGM',
@@ -120,6 +121,7 @@
       'game.roadworks': 'Roadworks',
       'game.sokoban': 'Sokoban',
       'game.slitherlink': 'Slitherlink',
+      'game.nurikabe': 'Nurikabe',
 
       'ui.back': '← All games',
       'ui.bgm': 'Music',
@@ -214,6 +216,7 @@
       'game.roadworks': '道路工事',
       'game.sokoban': '倉庫番',
       'game.slitherlink': 'スリザーリンク',
+      'game.nurikabe': 'ぬりかべ',
 
       'ui.back': '← 一覧',
       'ui.bgm': 'BGM',
@@ -308,6 +311,7 @@
       'game.roadworks': '道路改造',
       'game.sokoban': '推箱子',
       'game.slitherlink': '数回',
+      'game.nurikabe': '数墙',
 
       'ui.back': '← 列表',
       'ui.bgm': '音乐',
@@ -402,6 +406,7 @@
       'game.roadworks': '道路改造',
       'game.sokoban': '倉庫番',
       'game.slitherlink': '數迴',
+      'game.nurikabe': '數牆',
 
       'ui.back': '← 列表',
       'ui.bgm': '音樂',
@@ -496,6 +501,7 @@
       'game.roadworks': 'Obras Viales',
       'game.sokoban': 'Sokoban',
       'game.slitherlink': 'Slitherlink',
+      'game.nurikabe': 'Nurikabe',
 
       'ui.back': '← Lista',
       'ui.bgm': 'Música',

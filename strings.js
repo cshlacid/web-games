@@ -29,6 +29,7 @@
       'desc.roadworks': '도로를 손봐 차를 흐르게',
       'desc.sokoban': '상자를 밀어 제자리에',
       'desc.slitherlink': '숫자만큼 둘러 고리 하나 만들기',
+      'desc.nurikabe': '섬만 남기고 바다 칠하기',
 
       'daily.title': '오늘의 도전',
       'daily.calendar': '달력',
@@ -67,6 +68,7 @@
       'desc.roadworks': 'Keep the traffic moving',
       'desc.sokoban': 'Push every box into place',
       'desc.slitherlink': 'Loop around the numbers',
+      'desc.nurikabe': 'Shade the sea around the islands',
 
       'daily.title': 'Daily challenge',
       'daily.calendar': 'Calendar',
@@ -105,6 +107,7 @@
       'desc.roadworks': '道路を直して車を流す',
       'desc.sokoban': '箱を押して所定の位置へ',
       'desc.slitherlink': '数字どおりに輪をつなぐ',
+      'desc.nurikabe': '島を残して海を塗る',
 
       'daily.title': '今日のチャレンジ',
       'daily.calendar': 'カレンダー',
@@ -143,6 +146,7 @@
       'desc.roadworks': '疏通道路，让车流动',
       'desc.sokoban': '把箱子推到位',
       'desc.slitherlink': '按数字连成一个回路',
+      'desc.nurikabe': '留下岛屿，涂黑海洋',
 
       'daily.title': '今日挑战',
       'daily.calendar': '日历',
@@ -181,6 +185,7 @@
       'desc.roadworks': '疏通道路，讓車流動',
       'desc.sokoban': '把箱子推到位',
       'desc.slitherlink': '依數字連成一個迴路',
+      'desc.nurikabe': '留下島嶼，塗黑海洋',
 
       'daily.title': '今日挑戰',
       'daily.calendar': '日曆',
@@ -219,6 +224,7 @@
       'desc.roadworks': 'Haz que el tráfico fluya',
       'desc.sokoban': 'Empuja las cajas a su sitio',
       'desc.slitherlink': 'Un circuito según los números',
+      'desc.nurikabe': 'Sombrea el mar entre islas',
 
       'daily.title': 'Reto diario',
       'daily.calendar': 'Calendario',

@@ -1,0 +1,226 @@
+:root {
+  --bg: #f5f3ee;
+  --fg: #2c3138;
+  --muted: #7e858d;
+  --line: #d6d2c8;
+  --land: #fbfaf6;
+  --sea: #34495e;
+  --mark: #9aa3ab;
+  --grid: #cfcac0;
+  --frame: #3a4148;
+  --clue: #2c3138;
+  --clue-done: #b3b0a8;
+  --bad: #c0402f;
+  --win: #3f7a8c;
+  --hint: #f3d38a;
+  --hint-sea: #b98524;
+  --btn-bg: #3f4750;
+  --btn-fg: #f7f8f9;
+  --sheet-bg: #ffffff;
+
+  --pad-x: clamp(10px, 4vmin, 28px);
+  --app-max: 460px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #16181a;
+    --fg: #dfe3e7;
+    --muted: #848b93;
+    --line: #2d3136;
+    --land: #262a2e;
+    --sea: #7d93a8;
+    --mark: #6d757c;
+    --grid: #3a3f45;
+    --frame: #9aa3ab;
+    --clue: #eef0f2;
+    --clue-done: #5b6167;
+    --bad: #e0604c;
+    --win: #6aa6b8;
+    --hint: #6b5a2c;
+    --hint-sea: #d9a441;
+    --btn-bg: #353d45;
+    --sheet-bg: #1f2327;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  display: flex;
+  justify-content: center;
+  padding: clamp(10px, 3vmin, 24px) var(--pad-x);
+}
+
+.app {
+  width: min(100%, var(--app-max));
+  display: flex;
+  flex-direction: column;
+  gap: clamp(8px, 2vmin, 14px);
+}
+
+/* 헤더 배치는 모든 게임이 같다. */
+.title-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 10px;
+}
+
+.title-row h1 { text-align: center; }
+.title-row .head-nav { justify-self: start; }
+.head-nav { display: flex; align-items: center; gap: 14px; }
+.title-row .head-actions { justify-self: end; }
+
+h1 {
+  margin: 0;
+  font-size: clamp(20px, 5.2vmin, 30px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.head-actions { display: flex; align-items: baseline; gap: 14px; }
+
+.toggle {
+  border: 0; background: none; padding: 0;
+  color: inherit; font-family: inherit; font-size: 14px; font-weight: 600;
+  cursor: pointer; opacity: 0.6;
+}
+.toggle:hover { opacity: 1; }
+.toggle.sound { font-size: 12px; }
+.toggle.sound[aria-pressed="false"] { opacity: 0.38; text-decoration: line-through; }
+
+.back {
+  color: inherit; opacity: 0.6; text-decoration: none;
+  font-size: 14px; font-weight: 600;
+}
+.back:hover { opacity: 1; }
+
+.picker-row { display: flex; align-items: center; gap: 10px; }
+.picker { display: flex; gap: 4px; }
+
+.pick {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.pick[aria-pressed="true"] {
+  background: var(--btn-bg);
+  border-color: var(--btn-bg);
+  color: var(--btn-fg);
+}
+
+.best { font-size: 12px; font-weight: 600; color: var(--muted); }
+
+.timer {
+  margin-inline-start: auto;
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.board-wrap { position: relative; display: flex; justify-content: center; }
+
+/* 끌어서 칠하는 판이라 스크롤·확대에 넘기지 않는다. 이 자리에는 click으로 도는
+   조작을 두지 않는다 — shared/base.js가 touchend를 취소해 click이 나지 않는다. */
+.board {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: pointer;
+}
+.board svg { display: block; overflow: visible; }
+
+/* 칸마다 바탕·점을 미리 그려 두고 보이기만 바꾼다. 손가락 밑의 요소를 갈아 끼우지
+   않는다(저장소 규칙). */
+.land { fill: var(--land); }
+.land.sea { fill: var(--sea); }
+.land.pool { fill: var(--bad); }
+.land.hinted { fill: var(--hint); }
+.land.sea.hinted { fill: var(--hint-sea); }
+.mark { fill: var(--mark); visibility: hidden; }
+.mark.on { visibility: visible; }
+.grid { stroke: var(--grid); fill: none; }
+.frame { stroke: var(--frame); fill: none; }
+
+.clue {
+  fill: var(--clue);
+  font-family: inherit;
+  font-weight: 700;
+  text-anchor: middle;
+}
+.clue.done { fill: var(--clue-done); }
+.clue.wrong { fill: var(--bad); }
+.board.done .land.sea { fill: var(--win); }
+
+.toast {
+  margin: 0;
+  min-height: 20px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.toast b { color: var(--fg); }
+
+.pad { display: flex; }
+.tools { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; width: 100%; }
+
+.tool {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  padding: 8px 4px;
+  cursor: pointer;
+}
+.tool-icon { display: block; }
+.tool-icon svg { width: 19px; height: 19px; }
+.tool-label { font-size: 11px; font-weight: 600; opacity: 0.8; }
+.tool:disabled { opacity: 0.35; cursor: default; }
+.btn {
+  flex: 1;
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  border: 0;
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 15px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+/* 도움말 시트. 껍데기는 shared/sheet.css, 결과 덮개는 shared/result.css. */
+.sheet {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--sheet-bg);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sheet[hidden] { display: none; }
+
+.sheet-title { margin: 0; font-size: 19px; font-weight: 800; }
+.sheet-note { margin: 0; font-size: 14px; color: var(--muted); }
+.sheet-actions { display: flex; gap: 8px; }
+
+.help-list { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.7; }
+.help-list li { margin-bottom: 6px; }
