@@ -234,6 +234,91 @@ function laneOf(net, v) {
 }
 
 {
+  // 빨간 불이라도 우회전은 돈다. 좌회전은 그대로 기다린다.
+  const net = crossing();
+  Net.setControl(net, 'X', 'signal');
+  const world = T.create(net, { rng: seeded(41), spawnRate: 0 });
+  const node = Net.node(net, 'X');
+  const right = T.spawn(world, { from: 'W', to: 'S' });
+  const left = T.spawn(world, { from: 'E', to: 'S' });
+  const mine = Net.phaseOf(node, right.lane);
+
+  let leftIn = false;
+  for (let i = 0; i < 60 * 40 && world.arrived < 1; i++) {
+    const sig = T.signalOf(world, node);
+    sig.phase = 1 - mine;
+    sig.amber = false;
+    sig.timer = 0;
+    T.tick(world, 1 / 60);
+    if (left.lane.isLink) leftIn = true;
+  }
+  check('빨간 불에도 우회전은 지나간다', world.arrived, 1);
+  check('빨간 불의 좌회전은 기다린다', leftIn, false);
+}
+
+{
+  // 빨간 불의 우회전은 녹색을 받은 차와 같은 차로로 함께 들지 않는다.
+  const net = crossing();
+  Net.setControl(net, 'X', 'signal');
+  const world = T.create(net, { rng: seeded(42), spawnRate: 0 });
+  const node = Net.node(net, 'X');
+  const v = T.spawn(world, { from: 'W', to: 'S' });
+  const mine = Net.phaseOf(node, v.lane);
+
+  let together = false;
+  for (let i = 0; i < 60 * 60; i++) {
+    const sig = T.signalOf(world, node);
+    sig.phase = 1 - mine;
+    sig.amber = false;
+    sig.timer = 0;
+    if (i % 90 === 0) T.spawn(world, { from: 'N', to: 'S' });   // 녹색 직진
+    T.tick(world, 1 / 60);
+    if (!v.lane.isLink) continue;
+    const rival = world.vehicles.some((x) => x !== v && x.lane.isLink
+      && x.lane.node === 'X' && x.lane.next === v.lane.next);
+    if (rival) together = true;
+  }
+  check('우회전이 녹색 차와 같은 차로로 함께 들지 않는다', together, false);
+  check('틈이 나면 지나간다', world.arrived > 0, true);
+}
+
+{
+  // 사람이 밟고 있으면 빨간 불의 우회전도 선다.
+  const net = crossing();
+  Net.setControl(net, 'X', 'signal');
+  Net.setCrossing(net, 'X', true);
+  const world = T.create(net, { rng: seeded(43), spawnRate: 0 });
+  const node = Net.node(net, 'X');
+  const seg = net.segs[0];                       // 서쪽 갈래
+  const v = T.spawn(world, { from: 'W', to: 'S' });
+  const mine = Net.phaseOf(node, v.lane);
+  const walker = walkerOn(world, net, 'X', seg.id, 1);
+  walker.walking = true;
+
+  const red = () => {
+    const sig = T.signalOf(world, node);
+    sig.phase = 1 - mine;
+    sig.amber = false;
+    sig.timer = 0;
+  };
+
+  let entered = false;
+  for (let i = 0; i < 60 * 20; i++) {
+    red();
+    walker.u = 0;                                // 그 자리에 붙들어 둔다
+    T.tick(world, 1 / 60);
+    if (v.lane.isLink) entered = true;
+  }
+  check('사람이 건너는 동안 우회전도 들지 않는다', entered, false);
+  check('횡단보도 앞에 선다',
+    (v.lane.path.total - Net.crossingAt(node)) - v.s > 0, true);
+
+  world.walkers.length = 0;
+  for (let i = 0; i < 60 * 30 && world.vehicles.length; i++) { red(); T.tick(world, 1 / 60); }
+  check('다 건너면 빨간 불에도 돈다', world.arrived, 1);
+}
+
+{
   // 신호는 스스로 돈다 — 녹색, 황색, 그리고 다른 무리로.
   const net = crossing();
   Net.setControl(net, 'X', 'signal');
@@ -476,7 +561,8 @@ function walkerOn(world, net, nodeId, segId, dir) {
   for (let i = 0; i < 60 * 120; i++) {
     T.tick(world, 1 / 60);
     seen.add(T.signalOf(world, node).phase);
-    const groups = new Set(world.vehicles.filter((v) => v.lane.isLink)
+    // 우회전은 신호와 무관하게 도는 것이 규칙이므로 이 잣대에서 뺀다.
+    const groups = new Set(world.vehicles.filter((v) => v.lane.isLink && v.lane.side !== 'right')
       .map((v) => Net.phaseOf(node, laneOf(net, v))));
     if (groups.size > 1) together = true;
   }
