@@ -1,0 +1,239 @@
+:root {
+  --bg: #f5f3ee;
+  --fg: #2c3138;
+  --muted: #7e858d;
+  --line: #d6d2c8;
+  --floor: #ebe6db;
+  --wall: #8f8778;
+  --wall-top: #a59d8d;
+  --goal: #c0402f;
+  --box: #b07a3c;
+  --box-edge: #8a5c2a;
+  --box-on: #5f8a55;
+  --box-on-edge: #466a3e;
+  --player: #3f4750;
+  --player-eye: #f5f3ee;
+  --accent: #c0402f;
+  --btn-bg: #3f4750;
+  --btn-fg: #f7f8f9;
+  --sheet-bg: #ffffff;
+
+  --pad-x: clamp(10px, 4vmin, 28px);
+  --app-max: 440px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #16181a;
+    --fg: #dfe3e7;
+    --muted: #848b93;
+    --line: #2d3136;
+    --floor: #22262a;
+    --wall: #4a4f55;
+    --wall-top: #5a6066;
+    --goal: #d8503c;
+    --box: #b98547;
+    --box-edge: #8e6331;
+    --box-on: #6e9a62;
+    --box-on-edge: #52774a;
+    --player: #dfe3e7;
+    --player-eye: #16181a;
+    --accent: #d8503c;
+    --btn-bg: #353d45;
+    --sheet-bg: #1f2327;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  display: flex;
+  justify-content: center;
+  padding: clamp(10px, 3vmin, 24px) var(--pad-x);
+}
+
+.app {
+  width: min(100%, var(--app-max));
+  display: flex;
+  flex-direction: column;
+  gap: clamp(8px, 2vmin, 14px);
+}
+
+/* 헤더 배치는 모든 게임이 같다. */
+.title-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 10px;
+}
+
+.title-row h1 { text-align: center; }
+.title-row .head-nav { justify-self: start; }
+.head-nav { display: flex; align-items: center; gap: 14px; }
+.title-row .head-actions { justify-self: end; }
+
+h1 {
+  margin: 0;
+  font-size: clamp(20px, 5.2vmin, 30px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.head-actions { display: flex; align-items: baseline; gap: 14px; }
+
+.toggle {
+  border: 0; background: none; padding: 0;
+  color: inherit; font-family: inherit; font-size: 14px; font-weight: 600;
+  cursor: pointer; opacity: 0.6;
+}
+.toggle:hover { opacity: 1; }
+.toggle.sound { font-size: 12px; }
+.toggle.sound[aria-pressed="false"] { opacity: 0.38; text-decoration: line-through; }
+
+.back {
+  color: inherit; opacity: 0.6; text-decoration: none;
+  font-size: 14px; font-weight: 600;
+}
+.back:hover { opacity: 1; }
+
+.picker-row { display: flex; align-items: center; gap: 10px; }
+.picker { display: flex; gap: 4px; }
+
+.pick {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.pick[aria-pressed="true"] {
+  background: var(--btn-bg);
+  border-color: var(--btn-bg);
+  color: var(--btn-fg);
+}
+
+.count { margin-left: auto; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.best { font-size: 12px; font-weight: 600; color: var(--muted); }
+
+.board-wrap { position: relative; display: flex; justify-content: center; }
+
+/* 판을 감싼 자리 전체가 쓸기를 받는다. 작은 판이라도 손가락이 판 밖에서 시작해도
+   되도록 폭을 꽉 채운다. 이 자리에는 click으로 도는 조작을 두지 않는다 —
+   shared/base.js가 touchend를 취소해 click이 나지 않는다. */
+.board {
+  width: 100%;
+  min-height: 240px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: pointer;
+}
+
+.board svg { display: block; }
+
+.floor { fill: var(--floor); }
+.wall { fill: var(--wall); }
+.wall-top { fill: var(--wall-top); }
+.goal { fill: none; stroke: var(--goal); stroke-width: 0.09; }
+
+/* 움직이는 것은 자리만 옮기고 옮겨 가는 모습은 전환에 맡긴다. 길을 따라 걸을 때
+   걸음 사이 간격(main.js의 WALK_MS)과 길이를 맞춰야 뚝뚝 끊기지 않는다. */
+.mover { transition: transform 80ms linear; }
+
+.box-body { fill: var(--box); stroke: var(--box-edge); stroke-width: 0.07; }
+.box-mark { fill: none; stroke: var(--box-edge); stroke-width: 0.07; stroke-linecap: round; }
+.box.on .box-body { fill: var(--box-on); stroke: var(--box-on-edge); }
+.box.on .box-mark { stroke: var(--box-on-edge); }
+
+.player-body { fill: var(--player); }
+.player-eye { fill: var(--player-eye); }
+.eyes { transition: transform 80ms linear; }
+
+.still .mover, .still .eyes { transition: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .mover, .eyes { transition: none; }
+}
+
+.pad { display: flex; }
+.tools { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 100%; }
+
+.tool {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  padding: 8px 4px;
+  cursor: pointer;
+}
+.tool-icon { display: block; }
+.tool-icon svg { width: 19px; height: 19px; }
+.tool-label { font-size: 11px; font-weight: 600; opacity: 0.8; }
+.tool:disabled { opacity: 0.35; cursor: default; }
+
+.btn {
+  flex: 1;
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  border: 0;
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 15px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+/* 판 고르기. 푼 판은 칠하고 지금 판은 테두리를 두른다. */
+.level-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+  gap: 6px;
+}
+.level-cell {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  padding: 8px 0;
+  cursor: pointer;
+}
+.level-cell.solved { background: var(--box-on); border-color: var(--box-on); color: var(--btn-fg); }
+.level-cell.current { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* 도움말 시트. 껍데기는 shared/sheet.css, 결과 덮개는 shared/result.css. */
+.sheet {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--sheet-bg);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sheet[hidden] { display: none; }
+
+.sheet-title { margin: 0; font-size: 19px; font-weight: 800; }
+.sheet-note { margin: 0; font-size: 14px; color: var(--muted); }
+.sheet-actions { display: flex; gap: 8px; }
+
+.help-list { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.7; }
+.help-list li { margin-bottom: 6px; }
