@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title data-i18n="game.slitherlink">슬리더링크</title>
+<meta name="description" content="숫자만큼 선을 둘러 고리 하나를 만드는 퍼즐" data-i18n-attr="content=meta.desc">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><rect x='2' y='2' width='20' height='20' rx='3' fill='%23ece8df'/><path d='M5 5 H13 V11 H19 V19 H5 Z' fill='none' stroke='%232c3138' stroke-width='2.2' stroke-linejoin='round'/><circle cx='9' cy='15' r='1.6' fill='%23c0402f'/></svg>">
+<link rel="manifest" href="../../manifest.json">
+<link rel="apple-touch-icon" href="../../icons/icon-180.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="슬리더링크" data-i18n-attr="content=game.slitherlink">
+<meta name="theme-color" content="#f5f3ee" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#16181a" media="(prefers-color-scheme: dark)">
+<link rel="stylesheet" href="../../shared/base.css">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="../../shared/result.css">
+<link rel="stylesheet" href="../../shared/sheet.css">
+<link rel="stylesheet" href="../../shared/daily.css">
+<script src="../../shared/analytics.js"></script>
+<script src="../../shared/i18n.js"></script>
+<script src="../../shared/strings.js"></script>
+<script src="strings.js"></script>
+</head>
+<body>
+<main class="app">
+  <header class="head">
+    <div class="title-row">
+      <div class="head-nav">
+        <a class="back" href="../../" data-i18n="ui.back">← 목록</a>
+        <button class="toggle" id="help-open" type="button" aria-pressed="false" data-i18n="ui.help">도움말</button>
+      </div>
+      <h1 data-i18n="game.slitherlink">슬리더링크</h1>
+      <div class="head-actions">
+        <button class="toggle sound" id="toggle-bgm" type="button" aria-pressed="true" data-i18n="ui.bgm">BGM</button>
+        <button class="toggle sound" id="toggle-sfx" type="button" aria-pressed="true" data-i18n="ui.sfx">효과음</button>
+      </div>
+    </div>
+    <div class="picker-row">
+      <div class="picker" id="levels" role="group" aria-label="난이도" data-i18n-attr="aria-label=ui.difficulty"></div>
+      <span class="best" id="best"></span>
+      <span class="timer" id="timer">0:00</span>
+    </div>
+  </header>
+
+  <div class="board-wrap">
+    <div class="board" id="board"></div>
+    <div class="result" id="result" role="status" aria-live="polite" hidden>
+      <div class="result-card">
+        <p class="sheet-title" id="result-title"></p>
+        <p class="sheet-note" id="result-note"></p>
+        <div class="sheet-actions">
+          <button class="btn" id="again" type="button" data-i18n="ui.again">한 판 더</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="toast" id="toast" role="status" aria-live="polite"></p>
+
+  <div class="pad">
+    <div class="tools">
+      <button class="tool" id="undo" type="button">
+        <span class="tool-icon" data-icon="undo"></span><span class="tool-label" data-i18n="ui.undo">되돌리기</span>
+      </button>
+      <button class="tool" id="clear" type="button">
+        <span class="tool-icon" data-icon="backspace"></span><span class="tool-label" data-i18n="ui.erase">지우기</span>
+      </button>
+      <button class="tool" id="hint" type="button">
+        <span class="tool-icon" data-icon="hint"></span><span class="tool-label" data-i18n="ui.hint">힌트</span>
+      </button>
+      <button class="tool" id="new-game" type="button">
+        <span class="tool-icon" data-icon="plus"></span><span class="tool-label" data-i18n="ui.newBoard">새 판</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="sheet" id="help" hidden>
+    <p class="sheet-title" data-i18n="ui.rules">규칙</p>
+    <ul class="help-list">
+      <li data-i18n-html="slitherlink.rule1">점과 점 사이에 선을 그어 <b>끊기지 않은 고리 하나</b>를 만듭니다. 고리는
+        스스로 겹치거나 갈라지지 않습니다.</li>
+      <li data-i18n-html="slitherlink.rule2">칸의 숫자는 그 칸을 둘러싼 네 변 중 <b>선이 지나가는 변의 수</b>입니다.
+        숫자 없는 칸은 몇 개든 괜찮습니다.</li>
+      <li data-i18n-html="slitherlink.rule3">변을 누르면 <b>선 → X → 빈칸</b> 순서로 바뀝니다. X는 "여기는 선이 아니다"라는
+        메모라 정답 판정에 쓰이지 않습니다.</li>
+      <li data-i18n-html="slitherlink.rule4">점에서 <b>누른 채 끌면</b> 지나간 변에 선이 이어서 그어집니다. 선 위에서
+        시작해 끌면 반대로 지워집니다.</li>
+      <li data-i18n-html="slitherlink.rule5"><b>모든 판은 답이 하나뿐이고 찍지 않고 풀립니다.</b> 쉬움과 보통은 칸과 점만
+        보고도 풀리고, 어려움은 "여기에 선을 그으면 어떻게 될까"를 따져 봐야 하는 자리가 있습니다.</li>
+      <li data-i18n-html="slitherlink.rule6"><b>힌트</b>는 어긋난 선을 걷어 내고, 지금 알아낼 수 있는 변 하나를 채우며
+        그 까닭을 알려 줍니다. 힌트를 쓴 판은 최고 기록으로 남기지 않습니다.</li>
+    </ul>
+    <div class="sheet-actions">
+      <button class="btn" id="help-close" type="button" data-i18n="ui.close">닫기</button>
+    </div>
+  </div>
+</main>
+
+<script>SharedI18n.apply();</script>
+<script src="../../shared/base.js"></script>
+<script src="../../shared/icons.js"></script>
+<script src="../../shared/snap.js"></script>
+<script src="rules.js"></script>
+<script src="solver.js"></script>
+<script src="puzzles.js"></script>
+<script src="generator.js"></script>
+<script src="../../shared/audio.js"></script>
+<script src="audio.js"></script>
+<script src="../../shared/sheet.js"></script>
+<script src="../../shared/daily.js"></script>
+<script src="../../shared/daily-ui.js"></script>
+<script src="main.js"></script>
+</body>
+</html>

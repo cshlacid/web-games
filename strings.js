@@ -28,6 +28,7 @@
       'desc.metro': '노선을 깔아 도시 키우기',
       'desc.roadworks': '도로를 손봐 차를 흐르게',
       'desc.sokoban': '상자를 밀어 제자리에',
+      'desc.slitherlink': '숫자만큼 둘러 고리 하나 만들기',
 
       'daily.title': '오늘의 도전',
       'daily.calendar': '달력',
@@ -65,6 +66,7 @@
       'desc.metro': 'Grow a city by laying metro lines',
       'desc.roadworks': 'Keep the traffic moving',
       'desc.sokoban': 'Push every box into place',
+      'desc.slitherlink': 'Loop around the numbers',
 
       'daily.title': 'Daily challenge',
       'daily.calendar': 'Calendar',
@@ -102,6 +104,7 @@
       'desc.metro': '路線を引いて街を育てる',
       'desc.roadworks': '道路を直して車を流す',
       'desc.sokoban': '箱を押して所定の位置へ',
+      'desc.slitherlink': '数字どおりに輪をつなぐ',
 
       'daily.title': '今日のチャレンジ',
       'daily.calendar': 'カレンダー',
@@ -139,6 +142,7 @@
       'desc.metro': '铺地铁线路养大城市',
       'desc.roadworks': '疏通道路，让车流动',
       'desc.sokoban': '把箱子推到位',
+      'desc.slitherlink': '按数字连成一个回路',
 
       'daily.title': '今日挑战',
       'daily.calendar': '日历',
@@ -176,6 +180,7 @@
       'desc.metro': '鋪地鐵線路養大城市',
       'desc.roadworks': '疏通道路，讓車流動',
       'desc.sokoban': '把箱子推到位',
+      'desc.slitherlink': '依數字連成一個迴路',
 
       'daily.title': '今日挑戰',
       'daily.calendar': '日曆',
@@ -213,6 +218,7 @@
       'desc.metro': 'Haz crecer la ciudad con el metro',
       'desc.roadworks': 'Haz que el tráfico fluya',
       'desc.sokoban': 'Empuja las cajas a su sitio',
+      'desc.slitherlink': 'Un circuito según los números',
 
       'daily.title': 'Reto diario',
       'daily.calendar': 'Calendario',

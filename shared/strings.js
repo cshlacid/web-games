@@ -25,6 +25,7 @@
       'game.metro': '지하철 노선',
       'game.roadworks': '도로공사',
       'game.sokoban': '소코반',
+      'game.slitherlink': '슬리더링크',
 
       'ui.back': '← 목록',
       'ui.bgm': 'BGM',
@@ -118,6 +119,7 @@
       'game.metro': 'Metro Lines',
       'game.roadworks': 'Roadworks',
       'game.sokoban': 'Sokoban',
+      'game.slitherlink': 'Slitherlink',
 
       'ui.back': '← All games',
       'ui.bgm': 'Music',
@@ -211,6 +213,7 @@
       'game.metro': '地下鉄路線',
       'game.roadworks': '道路工事',
       'game.sokoban': '倉庫番',
+      'game.slitherlink': 'スリザーリンク',
 
       'ui.back': '← 一覧',
       'ui.bgm': 'BGM',
@@ -304,6 +307,7 @@
       'game.metro': '地铁线路',
       'game.roadworks': '道路改造',
       'game.sokoban': '推箱子',
+      'game.slitherlink': '数回',
 
       'ui.back': '← 列表',
       'ui.bgm': '音乐',
@@ -397,6 +401,7 @@
       'game.metro': '地鐵路線',
       'game.roadworks': '道路改造',
       'game.sokoban': '倉庫番',
+      'game.slitherlink': '數迴',
 
       'ui.back': '← 列表',
       'ui.bgm': '音樂',
@@ -490,6 +495,7 @@
       'game.metro': 'Líneas de Metro',
       'game.roadworks': 'Obras Viales',
       'game.sokoban': 'Sokoban',
+      'game.slitherlink': 'Slitherlink',
 
       'ui.back': '← Lista',
       'ui.bgm': 'Música',
