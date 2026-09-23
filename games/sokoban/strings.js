@@ -2,6 +2,10 @@
 (function () {
   SharedI18n.add({
     ko: {
+      'sokoban.dirUp': '위',
+      'sokoban.dirLeft': '왼쪽',
+      'sokoban.dirDown': '아래',
+      'sokoban.dirRight': '오른쪽',
       'meta.desc': '상자를 밀어 목표 자리에 모두 올리는 퍼즐',
       'sokoban.level': '{n}번 판',
       'sokoban.pick': '판 고르기',
@@ -12,11 +16,15 @@
       'sokoban.notePrev': '최고 기록은 {moves}걸음',
       'sokoban.rule1': '<b>상자를 모두 목표 자리</b>(동그라미)에 올리면 끝납니다.',
       'sokoban.rule2': '상자는 <b>밀 수만 있고 끌 수는 없습니다.</b> 한 번에 하나만 밀 수 있어서, 구석에 박은 상자는 다시 빼내지 못합니다.',
-      'sokoban.rule3': '판을 <b>쓸어서</b> 한 걸음씩 움직이세요. 빈 칸을 누르면 그 자리까지 <b>알아서 걸어가고</b>, 바로 옆 상자를 누르면 그쪽으로 밉니다. 키보드는 방향키를 씁니다.',
+      'sokoban.rule3': '판을 <b>쓸어서</b> 한 걸음씩 움직이세요. 빈 칸을 누르면 그 자리까지 <b>알아서 걸어가고</b>, 바로 옆 상자를 누르면 그쪽으로 밉니다. 화면 아래 방향 단추나 키보드 방향키로도 한 걸음씩 갑니다.',
       'sokoban.rule4': '막히면 <b>되돌리기</b>나 <b>처음으로</b>를 쓰세요. 누른 칸까지 걸어간 길은 한 번에 되돌아옵니다.',
       'sokoban.rule5': '판은 <b>David W. Skinner의 Microban</b> 155판입니다. 쉬운 판부터 차례로 어려워지고, 어느 판이든 골라서 할 수 있습니다.'
     },
     en: {
+      'sokoban.dirUp': 'Up',
+      'sokoban.dirLeft': 'Left',
+      'sokoban.dirDown': 'Down',
+      'sokoban.dirRight': 'Right',
       'meta.desc': 'Push every box onto a target square',
       'sokoban.level': 'Level {n}',
       'sokoban.pick': 'Choose a level',
@@ -27,11 +35,15 @@
       'sokoban.notePrev': 'Best: {moves} moves',
       'sokoban.rule1': 'Get <b>every box onto a target</b> (the rings) and you are done.',
       'sokoban.rule2': 'Boxes can be <b>pushed but never pulled</b>, and only one at a time — a box shoved into a corner is stuck for good.',
-      'sokoban.rule3': '<b>Swipe</b> the board to take one step. Tap an empty square to <b>walk there on your own</b>, or tap a box right next to you to push it. On a keyboard, use the arrow keys.',
+      'sokoban.rule3': '<b>Swipe</b> the board to take one step. Tap an empty square to <b>walk there on your own</b>, or tap a box right next to you to push it. The arrow buttons below the board and the arrow keys on a keyboard also take one step.',
       'sokoban.rule4': 'Stuck? Use <b>Undo</b> or <b>Restart</b>. A walk to a tapped square is undone in one go.',
       'sokoban.rule5': 'The boards are the 155 levels of <b>Microban by David W. Skinner</b>. They get harder as you go, and you can pick any of them.'
     },
     ja: {
+      'sokoban.dirUp': '上',
+      'sokoban.dirLeft': '左',
+      'sokoban.dirDown': '下',
+      'sokoban.dirRight': '右',
       'meta.desc': '箱を押してすべて目標の位置に置くパズル',
       'sokoban.level': '{n}面',
       'sokoban.pick': '面を選ぶ',
@@ -42,11 +54,15 @@
       'sokoban.notePrev': 'ベストは{moves}歩',
       'sokoban.rule1': '<b>箱をすべて目標</b>(丸印)に載せればクリアです。',
       'sokoban.rule2': '箱は<b>押せますが引けません。</b>一度に押せるのは一つだけなので、隅に押し込んだ箱はもう出せません。',
-      'sokoban.rule3': '盤を<b>スワイプ</b>すると一歩進みます。空いたマスを押すと<b>そこまで自動で歩き</b>、すぐ隣の箱を押すとその方向へ押します。キーボードでは矢印キーを使います。',
+      'sokoban.rule3': '盤を<b>スワイプ</b>すると一歩進みます。空いたマスを押すと<b>そこまで自動で歩き</b>、すぐ隣の箱を押すとその方向へ押します。盤の下の方向ボタンやキーボードの矢印キーでも一歩ずつ進めます。',
       'sokoban.rule4': '行き詰まったら<b>戻す</b>か<b>最初から</b>を使いましょう。マスを押して歩いた道は一度に戻ります。',
       'sokoban.rule5': '盤は<b>David W. Skinner の Microban</b> 全155面です。やさしい面から順に難しくなり、どの面からでも遊べます。'
     },
     'zh-CN': {
+      'sokoban.dirUp': '上',
+      'sokoban.dirLeft': '左',
+      'sokoban.dirDown': '下',
+      'sokoban.dirRight': '右',
       'meta.desc': '把所有箱子推到目标位置的益智游戏',
       'sokoban.level': '第 {n} 关',
       'sokoban.pick': '选择关卡',
@@ -57,11 +73,15 @@
       'sokoban.notePrev': '最佳纪录 {moves} 步',
       'sokoban.rule1': '把<b>所有箱子推到目标</b>(圆圈)上就过关。',
       'sokoban.rule2': '箱子<b>只能推，不能拉</b>，而且一次只能推一个。推进角落的箱子就再也出不来了。',
-      'sokoban.rule3': '在棋盘上<b>滑动</b>走一步。点空格会<b>自动走过去</b>，点紧挨着的箱子就朝那个方向推。键盘用方向键。',
+      'sokoban.rule3': '在棋盘上<b>滑动</b>走一步。点空格会<b>自动走过去</b>，点紧挨着的箱子就朝那个方向推。也可以用棋盘下方的方向按钮或键盘方向键一步一步走。',
       'sokoban.rule4': '卡住了就用<b>撤销</b>或<b>从头开始</b>。点格子走过去的路一次就能退回。',
       'sokoban.rule5': '关卡是 <b>David W. Skinner 的 Microban</b> 共 155 关。由易到难排列，任何一关都可以直接选。'
     },
     'zh-TW': {
+      'sokoban.dirUp': '上',
+      'sokoban.dirLeft': '左',
+      'sokoban.dirDown': '下',
+      'sokoban.dirRight': '右',
       'meta.desc': '把所有箱子推到目標位置的益智遊戲',
       'sokoban.level': '第 {n} 關',
       'sokoban.pick': '選擇關卡',
@@ -72,11 +92,15 @@
       'sokoban.notePrev': '最佳紀錄 {moves} 步',
       'sokoban.rule1': '把<b>所有箱子推到目標</b>(圓圈)上就過關。',
       'sokoban.rule2': '箱子<b>只能推，不能拉</b>，而且一次只能推一個。推進角落的箱子就再也出不來了。',
-      'sokoban.rule3': '在棋盤上<b>滑動</b>走一步。點空格會<b>自動走過去</b>，點緊挨著的箱子就朝那個方向推。鍵盤用方向鍵。',
+      'sokoban.rule3': '在棋盤上<b>滑動</b>走一步。點空格會<b>自動走過去</b>，點緊挨著的箱子就朝那個方向推。也可以用棋盤下方的方向按鈕或鍵盤方向鍵一步一步走。',
       'sokoban.rule4': '卡住了就用<b>復原</b>或<b>從頭開始</b>。點格子走過去的路一次就能退回。',
       'sokoban.rule5': '關卡是 <b>David W. Skinner 的 Microban</b> 共 155 關。由易到難排列，任何一關都可以直接選。'
     },
     es: {
+      'sokoban.dirUp': 'Arriba',
+      'sokoban.dirLeft': 'Izquierda',
+      'sokoban.dirDown': 'Abajo',
+      'sokoban.dirRight': 'Derecha',
       'meta.desc': 'Empuja todas las cajas hasta sus casillas de destino',
       'sokoban.level': 'Nivel {n}',
       'sokoban.pick': 'Elige un nivel',
@@ -87,7 +111,7 @@
       'sokoban.notePrev': 'Mejor marca: {moves} pasos',
       'sokoban.rule1': 'Lleva <b>todas las cajas a un destino</b> (los círculos) y habrás terminado.',
       'sokoban.rule2': 'Las cajas <b>se empujan, nunca se arrastran</b>, y solo de una en una: una caja metida en una esquina ya no sale.',
-      'sokoban.rule3': '<b>Desliza</b> sobre el tablero para dar un paso. Toca una casilla libre para <b>ir andando hasta ella</b>, o una caja justo a tu lado para empujarla. Con teclado, usa las flechas.',
+      'sokoban.rule3': '<b>Desliza</b> sobre el tablero para dar un paso. Toca una casilla libre para <b>ir andando hasta ella</b>, o una caja justo a tu lado para empujarla. También puedes dar un paso con los botones de flecha bajo el tablero o con las flechas del teclado.',
       'sokoban.rule4': '¿Atascado? Usa <b>Deshacer</b> o <b>Desde el principio</b>. Un paseo hasta una casilla tocada se deshace de una vez.',
       'sokoban.rule5': 'Los tableros son los 155 niveles de <b>Microban, de David W. Skinner</b>. Se van complicando poco a poco y puedes elegir cualquiera.'
     }
