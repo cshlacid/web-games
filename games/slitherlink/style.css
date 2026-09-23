@@ -145,7 +145,6 @@ h1 {
   font-family: inherit;
   font-weight: 700;
   text-anchor: middle;
-  dominant-baseline: central;
 }
 .clue.done { fill: var(--clue-done); }
 .clue.over { fill: var(--bad); }
