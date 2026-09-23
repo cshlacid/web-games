@@ -235,6 +235,7 @@
 
   function finish(status) {
     state.status = status;
+    SharedDailyUI.report('kkodle', { won: status === 'won', tries: state.rows.length });
     // 판정 공개음이 끝난 뒤에 울려야 둘이 뭉개지지 않는다.
     setTimeout(() => Sound.play(status === 'won' ? 'win' : 'lose'), 380);
     if (state.daily) {

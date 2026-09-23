@@ -80,7 +80,9 @@
       'daily.medium': '보통 이상 난이도 풀기',
       'daily.hard': '어려움 난이도 풀기',
       'daily.fast': '{min}분 안에 풀기',
-      'daily.tile': '{tile} 타일 만들기'
+      'daily.tile': '{tile} 타일 만들기',
+      'daily.kkodle.win': '단어 맞히기',
+      'daily.kkodle.tries': '{n}번 안에 맞히기'
     },
     en: {
       'game.2048': '2048',
@@ -159,7 +161,9 @@
       'daily.medium': 'Solve on Medium or harder',
       'daily.hard': 'Solve on Hard',
       'daily.fast': 'Solve in under {min} minutes',
-      'daily.tile': 'Make a {tile} tile'
+      'daily.tile': 'Make a {tile} tile',
+      'daily.kkodle.win': 'Guess the word',
+      'daily.kkodle.tries': 'Guess it in {n} tries or fewer'
     },
     ja: {
       'game.2048': '2048',
@@ -238,7 +242,9 @@
       'daily.medium': 'ふつう以上の難易度で解く',
       'daily.hard': 'むずかしいで解く',
       'daily.fast': '{min}分以内に解く',
-      'daily.tile': '{tile}のタイルを作る'
+      'daily.tile': '{tile}のタイルを作る',
+      'daily.kkodle.win': '単語を当てる',
+      'daily.kkodle.tries': '{n}回以内に当てる'
     },
     'zh-CN': {
       'game.2048': '2048',
@@ -317,7 +323,9 @@
       'daily.medium': '以普通或更高难度完成',
       'daily.hard': '以困难难度完成',
       'daily.fast': '{min}分钟内完成',
-      'daily.tile': '合成{tile}方块'
+      'daily.tile': '合成{tile}方块',
+      'daily.kkodle.win': '猜中单词',
+      'daily.kkodle.tries': '{n}次以内猜中'
     },
     'zh-TW': {
       'game.2048': '2048',
@@ -396,7 +404,9 @@
       'daily.medium': '以普通或更高難度完成',
       'daily.hard': '以困難難度完成',
       'daily.fast': '{min}分鐘內完成',
-      'daily.tile': '合成{tile}方塊'
+      'daily.tile': '合成{tile}方塊',
+      'daily.kkodle.win': '猜中單字',
+      'daily.kkodle.tries': '{n}次以內猜中'
     },
     es: {
       'game.2048': '2048',
@@ -475,7 +485,9 @@
       'daily.medium': 'Resuelve en dificultad Media o superior',
       'daily.hard': 'Resuelve en Difícil',
       'daily.fast': 'Resuelve en menos de {min} minutos',
-      'daily.tile': 'Consigue la ficha {tile}'
+      'daily.tile': 'Consigue la ficha {tile}',
+      'daily.kkodle.win': 'Adivina la palabra',
+      'daily.kkodle.tries': 'Adivínala en {n} intentos o menos'
     }
   });
 })();

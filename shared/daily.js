@@ -84,6 +84,11 @@ const MISSIONS = [
   { id: '2048.tile512', game: '2048', tier: 1, text: 'tile', vars: { tile: 512 }, test: (r) => r.tile >= 512 },
   { id: '2048.tile1024', game: '2048', tier: 2, text: 'tile', vars: { tile: 1024 }, test: (r) => r.tile >= 1024 },
   { id: '2048.tile2048', game: '2048', tier: 3, text: 'tile', vars: { tile: 2048 }, test: (r) => r.tile >= 2048 },
+
+  // 연습 판도 센다. 오늘의 꼬들을 미션이 나오기 전에 이미 했으면 그날은 영영 못 끝낸다.
+  { id: 'kkodle.win', game: 'kkodle', tier: 1, text: 'kkodle.win', test: (r) => r.won },
+  { id: 'kkodle.tries4', game: 'kkodle', tier: 2, text: 'kkodle.tries', vars: { n: 4 }, test: (r) => r.won && r.tries <= 4 },
+  { id: 'kkodle.tries3', game: 'kkodle', tier: 3, text: 'kkodle.tries', vars: { n: 3 }, test: (r) => r.won && r.tries <= 3 },
 ];
 
 const BY_ID = new Map(MISSIONS.map((m) => [m.id, m]));
