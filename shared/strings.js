@@ -90,7 +90,9 @@
       'daily.winHard': '어려움 난이도에서 이기기',
       'daily.winPlayers': '{n}인 판에서 이기기',
       'daily.yacht.finish': '한 판 끝까지 두기',
-      'daily.score': '{score}점 이상 내기'
+      'daily.score': '{score}점 이상 내기',
+      'daily.optimal': '힌트 없이 최소 이동으로 풀기',
+      'daily.hardOptimal': '어려움을 힌트 없이 최소 이동으로 풀기'
     },
     en: {
       'game.2048': '2048',
@@ -179,7 +181,9 @@
       'daily.winHard': 'Win on Hard',
       'daily.winPlayers': 'Win a {n}-player game',
       'daily.yacht.finish': 'Play a game to the end',
-      'daily.score': 'Score {score} or more'
+      'daily.score': 'Score {score} or more',
+      'daily.optimal': 'Solve in the fewest moves without hints',
+      'daily.hardOptimal': 'Solve a Hard puzzle in the fewest moves without hints'
     },
     ja: {
       'game.2048': '2048',
@@ -268,7 +272,9 @@
       'daily.winHard': 'むずかしいで勝つ',
       'daily.winPlayers': '{n}人戦で勝つ',
       'daily.yacht.finish': '1ゲーム最後まで遊ぶ',
-      'daily.score': '{score}点以上を取る'
+      'daily.score': '{score}点以上を取る',
+      'daily.optimal': 'ヒントなしで最少手数で解く',
+      'daily.hardOptimal': 'むずかしいをヒントなしで最少手数で解く'
     },
     'zh-CN': {
       'game.2048': '2048',
@@ -357,7 +363,9 @@
       'daily.winHard': '在困难难度获胜',
       'daily.winPlayers': '赢一局{n}人对战',
       'daily.yacht.finish': '完整玩完一局',
-      'daily.score': '得到{score}分以上'
+      'daily.score': '得到{score}分以上',
+      'daily.optimal': '不用提示以最少步数完成',
+      'daily.hardOptimal': '不用提示以最少步数完成一道困难题'
     },
     'zh-TW': {
       'game.2048': '2048',
@@ -446,7 +454,9 @@
       'daily.winHard': '在困難難度獲勝',
       'daily.winPlayers': '贏一局{n}人對戰',
       'daily.yacht.finish': '完整玩完一局',
-      'daily.score': '得到{score}分以上'
+      'daily.score': '得到{score}分以上',
+      'daily.optimal': '不用提示以最少步數完成',
+      'daily.hardOptimal': '不用提示以最少步數完成一道困難題'
     },
     es: {
       'game.2048': '2048',
@@ -535,7 +545,9 @@
       'daily.winHard': 'Gana en Difícil',
       'daily.winPlayers': 'Gana una partida de {n} jugadores',
       'daily.yacht.finish': 'Juega una partida completa',
-      'daily.score': 'Consigue {score} puntos o más'
+      'daily.score': 'Consigue {score} puntos o más',
+      'daily.optimal': 'Resuelve con el mínimo de movimientos sin pistas',
+      'daily.hardOptimal': 'Resuelve uno Difícil con el mínimo de movimientos sin pistas'
     }
   });
 })();

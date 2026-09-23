@@ -186,6 +186,7 @@ function finish() {
   drag = null;
   const best = game.moves <= game.puzzle.moves && !game.hinted;
   if (best) markBest();
+  SharedDailyUI.report('rushhour', { level: game.puzzle.level, optimal: best });
   el.resultTitle.textContent = t('rushhour.done');
   const note = best
     ? [t('rushhour.noteOptimal', { moves: game.moves })]

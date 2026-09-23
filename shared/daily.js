@@ -111,6 +111,13 @@ const MISSIONS = [
   { id: 'yacht.finish', game: 'yacht', tier: 1, text: 'yacht.finish', test: () => true },
   { id: 'yacht.win', game: 'yacht', tier: 2, text: 'win', test: (r) => r.win },
   { id: 'yacht.score', game: 'yacht', tier: 3, text: 'score', vars: { score: 250 }, test: (r) => r.score >= 250 },
+
+  // 최소 이동은 이 게임이 이미 가리는 "힌트 없이 최단 수 이하"를 그대로 쓴다.
+  { id: 'rushhour.any', game: 'rushhour', tier: 1, text: 'any', test: () => true },
+  { id: 'rushhour.medium', game: 'rushhour', tier: 2, text: 'medium', test: (r) => r.level === 'normal' || r.level === 'hard' },
+  { id: 'rushhour.optimal', game: 'rushhour', tier: 2, text: 'optimal', test: (r) => r.optimal },
+  { id: 'rushhour.hard', game: 'rushhour', tier: 3, text: 'hard', test: (r) => r.level === 'hard' },
+  { id: 'rushhour.hardOptimal', game: 'rushhour', tier: 3, text: 'hardOptimal', test: (r) => r.level === 'hard' && r.optimal },
 ];
 
 const BY_ID = new Map(MISSIONS.map((m) => [m.id, m]));
