@@ -101,6 +101,12 @@ const MISSIONS = [
   { id: 'conquest.medium', game: 'conquest', tier: 2, text: 'winMedium',
     test: (r) => r.win && (r.level === 'normal' || r.level === 'hard') },
   { id: 'conquest.hard', game: 'conquest', tier: 3, text: 'winHard', test: (r) => r.win && r.level === 'hard' },
+
+  { id: 'dicewars.win', game: 'dicewars', tier: 1, text: 'win', test: (r) => r.win },
+  { id: 'dicewars.medium', game: 'dicewars', tier: 2, text: 'winMedium',
+    test: (r) => r.win && (r.level === 'normal' || r.level === 'hard') },
+  { id: 'dicewars.crowd', game: 'dicewars', tier: 2, text: 'winPlayers', vars: { n: 4 }, test: (r) => r.win && r.players >= 4 },
+  { id: 'dicewars.hard', game: 'dicewars', tier: 3, text: 'winHard', test: (r) => r.win && r.level === 'hard' },
 ];
 
 const BY_ID = new Map(MISSIONS.map((m) => [m.id, m]));

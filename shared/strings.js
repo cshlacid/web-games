@@ -87,7 +87,8 @@
       'daily.hardFlawless': '어려움 문제를 틀리지 않고 힌트 없이 풀기',
       'daily.win': '한 판 이기기',
       'daily.winMedium': '보통 이상 난이도에서 이기기',
-      'daily.winHard': '어려움 난이도에서 이기기'
+      'daily.winHard': '어려움 난이도에서 이기기',
+      'daily.winPlayers': '{n}인 판에서 이기기'
     },
     en: {
       'game.2048': '2048',
@@ -173,7 +174,8 @@
       'daily.hardFlawless': 'Solve a Hard puzzle with no mistakes or hints',
       'daily.win': 'Win a game',
       'daily.winMedium': 'Win on Medium or harder',
-      'daily.winHard': 'Win on Hard'
+      'daily.winHard': 'Win on Hard',
+      'daily.winPlayers': 'Win a {n}-player game'
     },
     ja: {
       'game.2048': '2048',
@@ -259,7 +261,8 @@
       'daily.hardFlawless': 'むずかしいをミスもヒントもなしで解く',
       'daily.win': '1回勝つ',
       'daily.winMedium': 'ふつう以上の難易度で勝つ',
-      'daily.winHard': 'むずかしいで勝つ'
+      'daily.winHard': 'むずかしいで勝つ',
+      'daily.winPlayers': '{n}人戦で勝つ'
     },
     'zh-CN': {
       'game.2048': '2048',
@@ -345,7 +348,8 @@
       'daily.hardFlawless': '不出错、不用提示完成一道困难题',
       'daily.win': '赢一局',
       'daily.winMedium': '在普通或更高难度获胜',
-      'daily.winHard': '在困难难度获胜'
+      'daily.winHard': '在困难难度获胜',
+      'daily.winPlayers': '赢一局{n}人对战'
     },
     'zh-TW': {
       'game.2048': '2048',
@@ -431,7 +435,8 @@
       'daily.hardFlawless': '不出錯、不用提示完成一道困難題',
       'daily.win': '贏一局',
       'daily.winMedium': '在普通或更高難度獲勝',
-      'daily.winHard': '在困難難度獲勝'
+      'daily.winHard': '在困難難度獲勝',
+      'daily.winPlayers': '贏一局{n}人對戰'
     },
     es: {
       'game.2048': '2048',
@@ -517,7 +522,8 @@
       'daily.hardFlawless': 'Resuelve uno Difícil sin errores ni pistas',
       'daily.win': 'Gana una partida',
       'daily.winMedium': 'Gana en dificultad Media o superior',
-      'daily.winHard': 'Gana en Difícil'
+      'daily.winHard': 'Gana en Difícil',
+      'daily.winPlayers': 'Gana una partida de {n} jugadores'
     }
   });
 })();
