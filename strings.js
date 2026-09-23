@@ -26,7 +26,8 @@
       'desc.healer': '파티 힐러 맡기',
       'desc.defense': '길목에 사람을 세워 적을 막기',
       'desc.metro': '노선을 깔아 도시 키우기',
-      'desc.roadworks': '도로를 손봐 차를 흐르게'
+      'desc.roadworks': '도로를 손봐 차를 흐르게',
+      'desc.sokoban': '상자를 밀어 제자리에'
     },
     en: {
       'hub.tagline': 'Mini games you can play right in the browser',
@@ -53,7 +54,8 @@
       'desc.healer': 'Play the party healer',
       'desc.defense': 'Post units on the path to stop them',
       'desc.metro': 'Grow a city by laying metro lines',
-      'desc.roadworks': 'Keep the traffic moving'
+      'desc.roadworks': 'Keep the traffic moving',
+      'desc.sokoban': 'Push every box into place'
     },
     ja: {
       'hub.tagline': 'ブラウザですぐ遊べるミニゲーム集',
@@ -80,7 +82,8 @@
       'desc.healer': 'パーティのヒーラーを務める',
       'desc.defense': '通り道に人を置いて敵を止める',
       'desc.metro': '路線を引いて街を育てる',
-      'desc.roadworks': '道路を直して車を流す'
+      'desc.roadworks': '道路を直して車を流す',
+      'desc.sokoban': '箱を押して所定の位置へ'
     },
     'zh-CN': {
       'hub.tagline': '打开浏览器就能玩的小游戏',
@@ -107,7 +110,8 @@
       'desc.healer': '担任队伍的治疗',
       'desc.defense': '在路口布防挡住敌人',
       'desc.metro': '铺地铁线路养大城市',
-      'desc.roadworks': '疏通道路，让车流动'
+      'desc.roadworks': '疏通道路，让车流动',
+      'desc.sokoban': '把箱子推到位'
     },
     'zh-TW': {
       'hub.tagline': '打開瀏覽器就能玩的小遊戲',
@@ -134,7 +138,8 @@
       'desc.healer': '擔任隊伍的治療',
       'desc.defense': '在路口布防擋住敵人',
       'desc.metro': '鋪地鐵線路養大城市',
-      'desc.roadworks': '疏通道路，讓車流動'
+      'desc.roadworks': '疏通道路，讓車流動',
+      'desc.sokoban': '把箱子推到位'
     },
     es: {
       'hub.tagline': 'Minijuegos para jugar en el navegador',
@@ -161,7 +166,8 @@
       'desc.healer': 'Sé el sanador del grupo',
       'desc.defense': 'Coloca unidades en el paso',
       'desc.metro': 'Haz crecer la ciudad con el metro',
-      'desc.roadworks': 'Haz que el tráfico fluya'
+      'desc.roadworks': 'Haz que el tráfico fluya',
+      'desc.sokoban': 'Empuja las cajas a su sitio'
     }
   });
 })();

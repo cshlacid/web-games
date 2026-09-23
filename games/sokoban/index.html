@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title data-i18n="game.sokoban">상자 밀기</title>
+<meta name="description" content="상자를 밀어 목표 자리에 모두 올리는 퍼즐" data-i18n-attr="content=meta.desc">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><rect x='2' y='2' width='20' height='20' rx='3' fill='%23e5dfd2'/><rect x='9' y='8.5' width='7' height='7' rx='1.2' fill='%23b07a3c'/><circle cx='5.8' cy='12' r='2.3' fill='%233f4750'/><circle cx='19' cy='12' r='1.5' fill='none' stroke='%23c0402f' stroke-width='1.2'/></svg>">
+<link rel="manifest" href="../../manifest.json">
+<link rel="apple-touch-icon" href="../../icons/icon-180.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="상자 밀기" data-i18n-attr="content=game.sokoban">
+<meta name="theme-color" content="#f5f3ee" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#16181a" media="(prefers-color-scheme: dark)">
+<link rel="stylesheet" href="../../shared/base.css">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="../../shared/result.css">
+<link rel="stylesheet" href="../../shared/sheet.css">
+<script src="../../shared/analytics.js"></script>
+<script src="../../shared/i18n.js"></script>
+<script src="../../shared/strings.js"></script>
+<script src="strings.js"></script>
+</head>
+<body>
+<main class="app">
+  <header class="head">
+    <div class="title-row">
+      <div class="head-nav">
+        <a class="back" href="../../" data-i18n="ui.back">← 목록</a>
+        <button class="toggle" id="help-open" type="button" aria-pressed="false" data-i18n="ui.help">도움말</button>
+      </div>
+      <h1 data-i18n="game.sokoban">상자 밀기</h1>
+      <div class="head-actions">
+        <button class="toggle sound" id="toggle-bgm" type="button" aria-pressed="true" data-i18n="ui.bgm">BGM</button>
+        <button class="toggle sound" id="toggle-sfx" type="button" aria-pressed="true" data-i18n="ui.sfx">효과음</button>
+      </div>
+    </div>
+    <div class="picker-row">
+      <button class="pick" id="level-open" type="button" aria-pressed="false"></button>
+      <span class="count" id="count"></span>
+      <span class="best" id="solved"></span>
+    </div>
+  </header>
+
+  <div class="board-wrap">
+    <div class="board" id="board"></div>
+    <div class="result" id="result" role="status" aria-live="polite" hidden>
+      <div class="result-card">
+        <p class="sheet-title" id="result-title"></p>
+        <p class="sheet-note" id="result-note"></p>
+        <div class="sheet-actions">
+          <button class="btn" id="again" type="button" data-i18n="ui.nextBoard">다음 판</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pad">
+    <div class="tools">
+      <button class="tool" id="undo" type="button">
+        <span class="tool-icon" data-icon="undo"></span><span class="tool-label" data-i18n="ui.undo">되돌리기</span>
+      </button>
+      <button class="tool" id="reset" type="button">
+        <span class="tool-icon" data-icon="restart"></span><span class="tool-label" data-i18n="ui.toStart">처음으로</span>
+      </button>
+      <button class="tool" id="next" type="button">
+        <span class="tool-icon" data-icon="next"></span><span class="tool-label" data-i18n="ui.nextBoard">다음 판</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="sheet" id="levels" hidden>
+    <p class="sheet-title" data-i18n="sokoban.pick">판 고르기</p>
+    <div class="level-grid" id="level-grid"></div>
+  </div>
+
+  <div class="sheet" id="help" hidden>
+    <p class="sheet-title" data-i18n="ui.rules">규칙</p>
+    <ul class="help-list">
+      <li data-i18n-html="sokoban.rule1"><b>상자를 모두 목표 자리</b>(동그라미)에 올리면 끝납니다.</li>
+      <li data-i18n-html="sokoban.rule2">상자는 <b>밀 수만 있고 끌 수는 없습니다.</b> 한 번에 하나만 밀 수 있어서, 구석에
+        박은 상자는 다시 빼내지 못합니다.</li>
+      <li data-i18n-html="sokoban.rule3">판을 <b>쓸어서</b> 한 걸음씩 움직이세요. 빈 칸을 누르면 그 자리까지 <b>알아서
+        걸어가고</b>, 바로 옆 상자를 누르면 그쪽으로 밉니다. 키보드는 방향키를 씁니다.</li>
+      <li data-i18n-html="sokoban.rule4">막히면 <b>되돌리기</b>나 <b>처음으로</b>를 쓰세요. 누른 칸까지 걸어간 길은 한
+        번에 되돌아옵니다.</li>
+      <li data-i18n-html="sokoban.rule5">판은 <b>David W. Skinner의 Microban</b> 155판입니다. 쉬운 판부터 차례로
+        어려워지고, 어느 판이든 골라서 할 수 있습니다.</li>
+    </ul>
+    <div class="sheet-actions">
+      <button class="btn" id="help-close" type="button" data-i18n="ui.close">닫기</button>
+    </div>
+  </div>
+</main>
+
+<script>SharedI18n.apply();</script>
+<script src="../../shared/base.js"></script>
+<script src="../../shared/icons.js"></script>
+<script src="../../shared/snap.js"></script>
+<script src="rules.js"></script>
+<script src="levels.js"></script>
+<script src="../../shared/audio.js"></script>
+<script src="audio.js"></script>
+<script src="../../shared/sheet.js"></script>
+<script src="main.js"></script>
+</body>
+</html>
