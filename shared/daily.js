@@ -67,6 +67,13 @@ const MISSIONS = [
     test: (r) => r.size >= 6 && r.hints === 0 },
   { id: 'idioms.hard', game: 'idioms', tier: 3, text: 'sizeClean', vars: { size: 8 },
     test: (r) => r.size >= 8 && r.hints === 0 },
+
+  { id: 'hashi.any', game: 'hashi', tier: 1, text: 'any', test: () => true },
+  { id: 'hashi.clean', game: 'hashi', tier: 2, text: 'sizeUpClean', vars: { size: 11 },
+    test: (r) => r.size >= 11 && r.hints === 0 },
+  { id: 'hashi.big', game: 'hashi', tier: 2, text: 'size', vars: { size: 13 }, test: (r) => r.size >= 13 },
+  { id: 'hashi.hard', game: 'hashi', tier: 3, text: 'sizeClean', vars: { size: 13 },
+    test: (r) => r.size >= 13 && r.hints === 0 },
 ];
 
 const BY_ID = new Map(MISSIONS.map((m) => [m.id, m]));

@@ -283,6 +283,8 @@ function finish() {
   el.resultTitle.textContent = t('hashi.done');
   el.resultNote.textContent = note.join(' · ');
   el.result.hidden = false;
+  // 이 게임은 경과 시간을 밀리초로, 힌트를 횟수가 아닌 여부로 들고 있다.
+  SharedDailyUI.report('hashi', { size, time: Math.round(game.elapsed / 1000), hints: game.hinted ? 1 : 0 });
   Sound.play('win');
 }
 
