@@ -128,19 +128,117 @@ function buildDeco() {
   deco = new Map();
 }
 
+// **끝에서 이웃에 맞춰 좁아지는가.** 폭이 다른 두 길이 맞닿으면 넓은 쪽이 좁은 쪽에
+// 맞춰 줄어든다(차로가 하나 없어지는 실제 도로의 모양이다). 좁아지는 길이가
+// `reach`인 것은 우연이 아니다 — 차를 옆 차로로 옮기는 잇는 곡선이 시작되는 자리가
+// 거기라, 길이 좁아지는 동안 차도 안쪽으로 들어온다.
+//
+// **교차로에서는 좁히지 않는다.** 거기는 원이 덮으므로 좁히면 교차로 앞에서 길이
+// 잘록해 보이기만 한다.
+//
+// **`cap`은 이음매를 덮는 겹이다.** 두 길이 꺾여 만나면 각자 제 방향에 직각으로
+// 끝나 바깥쪽에 쐐기 모양의 틈이 남는다. 폭이 같아도 난다. 꺾인 각 θ에 대해 그
+// 틈의 깊이가 `h·tan(θ/2)`이므로 그만큼 이음매 너머로 더 그려 서로 덮게 한다 —
+// 같은 색이라 겹치는 것은 보이지 않는다.
+function jointAt(seg, node, isA) {
+  if (!node || node.kind === 'gate' || Net.canControl(node)) return null;
+  if (node.segs.length !== 2) return null;
+  const otherId = node.segs[0] === seg.id ? node.segs[1] : node.segs[0];
+  const other = Net.segment(net, otherId);
+  if (!other) return null;
+  const half = Math.min(seg.width, other.width) / 2;
+  const u = outDir(seg, isA);
+  const v = outDir(other, other.a === node.id);
+  const dot = Math.max(-1, Math.min(1, -(u.x * v.x + u.y * v.y)));
+  const turn = Math.acos(dot);
+  return {
+    half,
+    len: Math.min(Math.max(12, Net.reach(node)), seg.length * 0.45),
+    cap: (seg.width / 2) * Math.tan(Math.min(turn, 1) / 2) + 0.5,
+  };
+}
+
+// 이음매에서 길이 뻗어 나가는 쪽의 단위 방향.
+function outDir(seg, isA) {
+  const dir = seg.center.dir;
+  if (isA) return dir[0];
+  const d = dir[dir.length - 1];
+  return { x: -d.x, y: -d.y };
+}
+
+// 그 자리에서의 반폭.
+//
+// **곧게 줄이지 않고 S자로 줄인다.** 없어지는 차로의 차는 이음매의 연결 곡선을 타고
+// 들어오는데 그것이 3차 곡선이라, 좁아지는 구간의 바깥 절반에서는 아직 원래 차로
+// 가까이에 있다. 폭을 곧게 줄이면 그 구간에서 차가 아스팔트 밖으로 삐져나간다 —
+// 같은 모양(smoothstep)으로 줄이면 폭이 차를 따라간다.
+function halfAt(item, s) {
+  let h = item.half;
+  const a = item.endA;
+  const b = item.endB;
+  if (a && s < a.len) h = Math.min(h, a.half + (item.half - a.half) * ease(s / a.len));
+  if (b) {
+    const left = item.total - s;
+    if (left < b.len) h = Math.min(h, b.half + (item.half - b.half) * ease(left / b.len));
+  }
+  return h;
+}
+
+function ease(t) {
+  return t * t * (3 - 2 * t);
+}
+
+// ease의 역. 선이 아스팔트 안으로 들어오는 자리를 폭이 아니라 거리로 되돌린다.
+function unease(r) {
+  return 0.5 - Math.sin(Math.asin(1 - 2 * r) / 3);
+}
+
+// 아스팔트가 덮는 자리. 폭이 끝에서 달라질 수 있으므로 선이 아니라 다각형이다.
+function bandOf(item, path, pad) {
+  const left = [];
+  const right = [];
+  const push = (p, n, h) => {
+    left.push({ x: p.x - n.x * h, y: p.y - n.y * h });
+    right.push({ x: p.x + n.x * h, y: p.y + n.y * h });
+  };
+  const last = path.points.length - 1;
+  if (item.endA) {
+    const p = path.points[0];
+    const d = path.dir[0];
+    const c = item.endA.cap;
+    push({ x: p.x - d.x * c, y: p.y - d.y * c }, Geom.right(d), halfAt(item, 0) + pad);
+  }
+  for (let i = 0; i <= last; i++) {
+    push(path.points[i], Geom.right(path.dir[i]), halfAt(item, path.cum[i]) + pad);
+  }
+  if (item.endB) {
+    const p = path.points[last];
+    const d = path.dir[last];
+    const c = item.endB.cap;
+    push({ x: p.x + d.x * c, y: p.y + d.y * c }, Geom.right(d), halfAt(item, item.total) + pad);
+  }
+  right.reverse();
+  return left.concat(right);
+}
+
 function decoOf(seg) {
   let item = deco.get(seg.id);
   if (item) return item;
-  const half = (seg.lanes.length / 2) * Net.LANE_W;
   item = {
-    edges: [Geom.offsetPath(seg.center, -half), Geom.offsetPath(seg.center, half)],
-    dashes: [],
-    middles: [],
+    half: seg.width / 2,
+    total: seg.center.total,
+    endA: jointAt(seg, Net.node(net, seg.a), true),
+    endB: jointAt(seg, Net.node(net, seg.b), false),
+    lines: [],
   };
+  item.road = bandOf(item, seg.center, 0);
+  item.kerb = bandOf(item, seg.center, 1.25);
   for (const line of Net.boundaries(seg)) {
-    const path = Geom.offsetPath(seg.center, line.offset);
-    if (line.kind === 'dash') item.dashes.push(path);
-    else item.middles.push(path);
+    item.lines.push({
+      path: Geom.offsetPath(seg.center, line.offset),
+      off: Math.abs(line.offset),
+      kind: line.kind,
+    });
   }
   deco.set(seg.id, item);
   return item;
@@ -279,18 +377,12 @@ function drawRoads() {
   ctx.lineJoin = 'round';
 
   // 아스팔트와 갓길. 구간을 먼저 다 깔고 교차로를 덮어야 이음매가 메워진다.
-  for (const seg of net.segs) {
-    trace(seg.center);
-    ctx.strokeStyle = skin.kerb;
-    ctx.lineWidth = seg.width + 2.5;
-    ctx.stroke();
-  }
-  for (const seg of net.segs) {
-    trace(seg.center);
-    ctx.strokeStyle = skin.asphalt;
-    ctx.lineWidth = seg.width;
-    ctx.stroke();
-  }
+  //
+  // **선이 아니라 다각형이다.** 굵은 선으로 긋던 때는 폭이 다른 두 길이 맞닿는 자리에
+  // 턱이 졌고, 굽은 이음매에서는 두 선의 끝이 서로 다른 쪽을 보고 잘려 **아스팔트에
+  // 쐐기 모양 구멍**까지 났다. 다각형으로 두면 끝의 반폭을 이웃과 맞출 수 있다.
+  for (const seg of net.segs) fillBand(decoOf(seg).kerb, skin.kerb);
+  for (const seg of net.segs) fillBand(decoOf(seg).road, skin.asphalt);
 
   // 교차로. 맞닿은 길 중 가장 넓은 것에 맞춰 원으로 덮는다. 회전교차로는 섬을
   // 두를 자리가 있어야 하므로 더 넓다.
@@ -319,13 +411,37 @@ function drawRoads() {
     const cut = seg.width / 2 + 3;
     const head = trimAt(Net.node(net, seg.a), seg) ? cut : 0;
     const tail = trimAt(Net.node(net, seg.b), seg) ? cut : 0;
-    for (const path of item.dashes) {
-      strokeTrimmed(path, head, tail, { color: skin.dash, width: 0.9, dash: [7, 9], alpha: 0.75 });
-    }
-    for (const path of item.middles) {
-      strokeTrimmed(path, head, tail, { color: skin.middle, width: 1.4, alpha: 0.9 });
+    for (const line of item.lines) {
+      // **좁아지는 자리에서는 그 선도 함께 끊는다.** 바깥 차선을 끝까지 그으면
+      // 좁아진 아스팔트 밖으로 삐져나가 길가에 선만 떠 있다.
+      const style = line.kind === 'dash'
+        ? { color: skin.dash, width: 0.9, dash: [7, 9], alpha: 0.75 }
+        : { color: skin.middle, width: 1.4, alpha: 0.9 };
+      strokeTrimmed(line.path,
+        Math.max(head, fits(item.endA, item, line.off)),
+        Math.max(tail, fits(item.endB, item, line.off)), style);
     }
   }
+}
+
+// 그 선이 보이기 시작하는 자리까지의 거리. 좁아지는 구간 안에서 반폭이 선의 오프셋을
+// 넘어서는 지점이다.
+function fits(end, item, off) {
+  // 여유 3은 선 굵기가 아니라 토막을 없애려는 값이다. 딱 맞게 끊으면 좁아지는
+  // 끝자락에 점선 한 조각이 남아 길가에 떠 있는 것처럼 보인다.
+  if (!end || off + 3 <= end.half) return 0;
+  const span = item.half - end.half;
+  if (span <= 0) return 0;
+  return end.len * unease(Math.min(1, (off + 3 - end.half) / span));
+}
+
+function fillBand(points, color) {
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+  ctx.closePath();
+  ctx.fillStyle = color;
+  ctx.fill();
 }
 
 // 이 끝에서 선을 끊는가. 교차로에서는 끊는다 — 원 안까지 차선을 그으면 교차로가
@@ -1432,6 +1548,7 @@ window.__picked = () => picked;
 window.__view = () => view;
 window.__game = () => game;
 window.__grow = () => grow;
+window.__redeco = buildDeco;
 window.__net = null;
 
 readSkin();
