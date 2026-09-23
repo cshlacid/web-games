@@ -336,6 +336,7 @@ function finishIfDone() {
   el.resultTitle.textContent = t('record.done', { time: formatTime(game.elapsed) });
   el.resultNote.textContent = note.join(' ');
   el.result.hidden = false;
+  SharedDailyUI.report('queens', { size: game.size, time: game.elapsed, hints: game.hinted });
 }
 
 // --- 판 만들기 ---

@@ -27,7 +27,16 @@
       'desc.defense': '길목에 사람을 세워 적을 막기',
       'desc.metro': '노선을 깔아 도시 키우기',
       'desc.roadworks': '도로를 손봐 차를 흐르게',
-      'desc.sokoban': '상자를 밀어 제자리에'
+      'desc.sokoban': '상자를 밀어 제자리에',
+
+      'daily.title': '오늘의 도전',
+      'daily.calendar': '달력',
+      'daily.streak': '{count}일 연속',
+      'daily.best': '최고 {count}일',
+      'daily.prev': '이전 달',
+      'daily.next': '다음 달',
+      'daily.done': '완료',
+      'daily.note': '세 가지를 다 해낸 날이 연속 기록에 들어갑니다. 지난 날은 채울 수 없어요.'
     },
     en: {
       'hub.tagline': 'Mini games you can play right in the browser',
@@ -55,7 +64,16 @@
       'desc.defense': 'Post units on the path to stop them',
       'desc.metro': 'Grow a city by laying metro lines',
       'desc.roadworks': 'Keep the traffic moving',
-      'desc.sokoban': 'Push every box into place'
+      'desc.sokoban': 'Push every box into place',
+
+      'daily.title': 'Daily challenge',
+      'daily.calendar': 'Calendar',
+      'daily.streak': '{count}-day streak',
+      'daily.best': 'Best {count} days',
+      'daily.prev': 'Previous month',
+      'daily.next': 'Next month',
+      'daily.done': 'Done',
+      'daily.note': 'Days where you finish all three count toward your streak. Past days can\'t be filled in.'
     },
     ja: {
       'hub.tagline': 'ブラウザですぐ遊べるミニゲーム集',
@@ -83,7 +101,16 @@
       'desc.defense': '通り道に人を置いて敵を止める',
       'desc.metro': '路線を引いて街を育てる',
       'desc.roadworks': '道路を直して車を流す',
-      'desc.sokoban': '箱を押して所定の位置へ'
+      'desc.sokoban': '箱を押して所定の位置へ',
+
+      'daily.title': '今日のチャレンジ',
+      'daily.calendar': 'カレンダー',
+      'daily.streak': '{count}日連続',
+      'daily.best': '最高{count}日',
+      'daily.prev': '前の月',
+      'daily.next': '次の月',
+      'daily.done': '達成',
+      'daily.note': '3つすべて達成した日が連続記録に入ります。過ぎた日は埋められません。'
     },
     'zh-CN': {
       'hub.tagline': '打开浏览器就能玩的小游戏',
@@ -111,7 +138,16 @@
       'desc.defense': '在路口布防挡住敌人',
       'desc.metro': '铺地铁线路养大城市',
       'desc.roadworks': '疏通道路，让车流动',
-      'desc.sokoban': '把箱子推到位'
+      'desc.sokoban': '把箱子推到位',
+
+      'daily.title': '今日挑战',
+      'daily.calendar': '日历',
+      'daily.streak': '连续{count}天',
+      'daily.best': '最高{count}天',
+      'daily.prev': '上个月',
+      'daily.next': '下个月',
+      'daily.done': '已完成',
+      'daily.note': '三项全部完成的日子计入连续记录。过去的日子无法补做。'
     },
     'zh-TW': {
       'hub.tagline': '打開瀏覽器就能玩的小遊戲',
@@ -139,7 +175,16 @@
       'desc.defense': '在路口布防擋住敵人',
       'desc.metro': '鋪地鐵線路養大城市',
       'desc.roadworks': '疏通道路，讓車流動',
-      'desc.sokoban': '把箱子推到位'
+      'desc.sokoban': '把箱子推到位',
+
+      'daily.title': '今日挑戰',
+      'daily.calendar': '日曆',
+      'daily.streak': '連續{count}天',
+      'daily.best': '最高{count}天',
+      'daily.prev': '上個月',
+      'daily.next': '下個月',
+      'daily.done': '已完成',
+      'daily.note': '三項全部完成的日子計入連續紀錄。過去的日子無法補做。'
     },
     es: {
       'hub.tagline': 'Minijuegos para jugar en el navegador',
@@ -167,7 +212,16 @@
       'desc.defense': 'Coloca unidades en el paso',
       'desc.metro': 'Haz crecer la ciudad con el metro',
       'desc.roadworks': 'Haz que el tráfico fluya',
-      'desc.sokoban': 'Empuja las cajas a su sitio'
+      'desc.sokoban': 'Empuja las cajas a su sitio',
+
+      'daily.title': 'Reto diario',
+      'daily.calendar': 'Calendario',
+      'daily.streak': 'Racha de {count} días',
+      'daily.best': 'Mejor: {count} días',
+      'daily.prev': 'Mes anterior',
+      'daily.next': 'Mes siguiente',
+      'daily.done': 'Hecho',
+      'daily.note': 'Los días en que completas los tres cuentan para tu racha. Los días pasados no se pueden completar.'
     }
   });
 })();

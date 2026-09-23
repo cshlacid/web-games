@@ -241,6 +241,8 @@ function finish() {
   el.resultNote.textContent = note.join(' · ');
   el.result.hidden = false;
   Sound.play('win');
+  // 이 게임만 경과 시간을 밀리초로, 힌트를 횟수가 아닌 여부로 들고 있다.
+  SharedDailyUI.report('nonogram', { size, time: Math.round(game.elapsed / 1000), hints: game.hinted ? 1 : 0 });
 }
 
 // 한 칸을 누를 때 도는 차례: 빈칸 → 칠함 → 아님 → 빈칸. **칠하는 방식을 따로 고르지
