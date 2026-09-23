@@ -72,6 +72,15 @@
     </div>
   </div>
 
+  <!-- 화면 방향키. 손가락이 닿는 기기에서만 보인다(style.css). 역T자로 둔 것은 두 줄로
+       끝나 판이 차지할 높이를 덜 뺏기 때문이다. -->
+  <div class="dpad" id="dpad">
+    <button class="dpad-key" type="button" data-dir="up" aria-label="위" data-i18n-attr="aria-label=sokoban.dirUp"></button>
+    <button class="dpad-key" type="button" data-dir="left" aria-label="왼쪽" data-i18n-attr="aria-label=sokoban.dirLeft"></button>
+    <button class="dpad-key" type="button" data-dir="down" aria-label="아래" data-i18n-attr="aria-label=sokoban.dirDown"></button>
+    <button class="dpad-key" type="button" data-dir="right" aria-label="오른쪽" data-i18n-attr="aria-label=sokoban.dirRight"></button>
+  </div>
+
   <div class="sheet" id="levels" hidden>
     <p class="sheet-title" data-i18n="sokoban.pick">판 고르기</p>
     <div class="level-grid" id="level-grid"></div>
@@ -84,7 +93,8 @@
       <li data-i18n-html="sokoban.rule2">상자는 <b>밀 수만 있고 끌 수는 없습니다.</b> 한 번에 하나만 밀 수 있어서, 구석에
         박은 상자는 다시 빼내지 못합니다.</li>
       <li data-i18n-html="sokoban.rule3">판을 <b>쓸어서</b> 한 걸음씩 움직이세요. 빈 칸을 누르면 그 자리까지 <b>알아서
-        걸어가고</b>, 바로 옆 상자를 누르면 그쪽으로 밉니다. 키보드는 방향키를 씁니다.</li>
+        걸어가고</b>, 바로 옆 상자를 누르면 그쪽으로 밉니다. 화면 아래 방향 단추나
+        키보드 방향키로도 한 걸음씩 갑니다.</li>
       <li data-i18n-html="sokoban.rule4">막히면 <b>되돌리기</b>나 <b>처음으로</b>를 쓰세요. 누른 칸까지 걸어간 길은 한
         번에 되돌아옵니다.</li>
       <li data-i18n-html="sokoban.rule5">판은 <b>David W. Skinner의 Microban</b> 155판입니다. 쉬운 판부터 차례로

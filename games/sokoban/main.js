@@ -33,6 +33,8 @@ const KEYS = {
 };
 
 const el = {
+  app: document.querySelector('.app'),
+  dpad: document.getElementById('dpad'),
   board: document.getElementById('board'),
   levelOpen: document.getElementById('level-open'),
   levelSheet: document.getElementById('levels'),
@@ -90,10 +92,14 @@ function svg(name, attrs, parent) {
 }
 
 // 칸 크기. 폭과 높이 둘 다에 맞춘다 — 세운 판은 서른 줄까지 가서 폭만 보면 도구줄이
-// 화면 밖으로 밀려난다.
+// 화면 밖으로 밀려난다. 높이는 판을 뺀 나머지(헤더·도구줄·화면 방향키)를 재어 남는
+// 만큼만 쓴다. 방향키가 보이는지는 기기마다 달라 비율로 어림하면 한쪽에서 넘친다.
 function measure(level) {
   const room = el.board.clientWidth;
-  const tall = Math.max(240, window.innerHeight * 0.62);
+  const pad = getComputedStyle(document.body);
+  const rest = el.app.offsetHeight - el.board.offsetHeight
+    + parseFloat(pad.paddingTop) + parseFloat(pad.paddingBottom);
+  const tall = Math.max(200, window.innerHeight - rest);
   return Math.max(MIN_CELL, Math.min(MAX_CELL,
     Math.floor(Math.min(room / level.w, tall / level.h))));
 }
@@ -292,13 +298,13 @@ function move(dir, quiet) {
 
 function stepOnce(dir) {
   stopWalk();
-  if (game.done) return;
+  if (game.done) return false;
   const before = snapshot();
-  if (move(dir)) {
-    game.undo.push(before);
-    if (game.undo.length > UNDO_MAX) game.undo.shift();
-    paint();
-  }
+  if (!move(dir)) return false;
+  game.undo.push(before);
+  if (game.undo.length > UNDO_MAX) game.undo.shift();
+  paint();
+  return true;
 }
 
 function stopWalk() {
@@ -371,6 +377,52 @@ el.board.addEventListener('pointerup', (event) => {
 });
 
 el.board.addEventListener('pointercancel', () => { touch = null; });
+
+// --- 화면 방향키 ---
+//
+// 누르는 순간 한 걸음 가고, 누르고 있으면 되풀이한다. 떼는 순간이 아니라 누르는
+// 순간에 가야 빠르게 연달아 두드릴 때 걸음이 밀리지 않는다.
+
+// 되풀이가 시작되기까지와 되풀이 간격. 간격은 옮겨 가는 전환(80ms)보다 길어야
+// 한 걸음씩 끊어 보인다.
+const HOLD_MS = 320;
+const REPEAT_MS = 130;
+let hold = null;
+
+function release() {
+  if (!hold) return;
+  clearTimeout(hold.timer);
+  hold.key.classList.remove('pressed');
+  hold = null;
+}
+
+const CHEVRON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"'
+  + ' stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 15.5 L12 8.5 L19 15.5"/></svg>';
+
+for (const key of el.dpad.querySelectorAll('[data-dir]')) {
+  key.innerHTML = CHEVRON;
+  key.addEventListener('pointerdown', (event) => {
+    event.preventDefault();
+    release();
+    if (!game || game.done) return;
+    key.setPointerCapture(event.pointerId);
+    key.classList.add('pressed');
+    const dir = key.dataset.dir;
+    hold = { key, id: event.pointerId, timer: null };
+    stepOnce(dir);
+    // 막히면 되풀이를 멈춘다. 벽에 대고 누르고 있는 동안 막힌 소리가 줄줄이 나지 않게.
+    const again = () => {
+      if (!hold || game.done || !stepOnce(dir)) return;
+      hold.timer = setTimeout(again, REPEAT_MS);
+    };
+    hold.timer = setTimeout(again, HOLD_MS);
+  });
+  for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+    key.addEventListener(type, (event) => {
+      if (hold && hold.id === event.pointerId) release();
+    });
+  }
+}
 
 document.addEventListener('keydown', (event) => {
   if (event.altKey || event.ctrlKey || event.metaKey) return;

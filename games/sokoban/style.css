@@ -185,6 +185,45 @@ h1 {
 .tool-label { font-size: 11px; font-weight: 600; opacity: 0.8; }
 .tool:disabled { opacity: 0.35; cursor: default; }
 
+/* 화면 방향키. 쓸기는 판이 작으면 손가락이 판을 가리고, 한 걸음씩 정확히 옮기기엔
+   방향이 새기 쉽다. 마우스와 키보드가 있는 곳에서는 자리만 차지하므로 감춘다. */
+.dpad { display: none; }
+
+@media (pointer: coarse) {
+  .dpad {
+    display: grid;
+    grid-template-columns: repeat(3, 68px);
+    grid-template-rows: repeat(2, 54px);
+    gap: 6px;
+    justify-content: center;
+    /* 누르고 있으면 되풀이해 걷는다. 포인터 이벤트로만 짜므로 click은 쓰지 않는다 —
+       shared/base.js가 이 자리의 touchend를 취소한다. */
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+}
+
+.dpad-key {
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: none;
+  color: inherit;
+  padding: 0;
+  cursor: pointer;
+  touch-action: none;
+}
+.dpad-key[data-dir="up"] { grid-column: 2; grid-row: 1; }
+.dpad-key[data-dir="left"] { grid-column: 1; grid-row: 2; }
+.dpad-key[data-dir="down"] { grid-column: 2; grid-row: 2; }
+.dpad-key[data-dir="right"] { grid-column: 3; grid-row: 2; }
+.dpad-key svg { width: 24px; height: 24px; }
+.dpad-key[data-dir="down"] svg { transform: rotate(180deg); }
+.dpad-key[data-dir="left"] svg { transform: rotate(-90deg); }
+.dpad-key[data-dir="right"] svg { transform: rotate(90deg); }
+.dpad-key.pressed { background: var(--line); }
+
 .btn {
   flex: 1;
   background: var(--btn-bg);
