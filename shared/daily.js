@@ -96,6 +96,11 @@ const MISSIONS = [
   { id: 'chess.hard', game: 'chess-puzzle', tier: 3, text: 'hard', test: (r) => r.level === 'hard' },
   { id: 'chess.hardFlawless', game: 'chess-puzzle', tier: 3, text: 'hardFlawless',
     test: (r) => r.level === 'hard' && r.mistakes === 0 && r.hints === 0 },
+
+  { id: 'conquest.win', game: 'conquest', tier: 1, text: 'win', test: (r) => r.win },
+  { id: 'conquest.medium', game: 'conquest', tier: 2, text: 'winMedium',
+    test: (r) => r.win && (r.level === 'normal' || r.level === 'hard') },
+  { id: 'conquest.hard', game: 'conquest', tier: 3, text: 'winHard', test: (r) => r.win && r.level === 'hard' },
 ];
 
 const BY_ID = new Map(MISSIONS.map((m) => [m.id, m]));
