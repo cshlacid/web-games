@@ -11,20 +11,21 @@
 | [2048](games/2048/) | 같은 숫자를 밀어 붙여 2048을 만든다 | 순수 HTML/CSS/JS |
 | [꼬들](games/kkodle/) | 두 글자 한글 단어를 여섯 번 안에 맞힌다 | 순수 HTML/CSS/JS |
 | [스도쿠](games/sudoku/) | 힌트만으로 풀리는 판만 나온다 | 순수 HTML/CSS/JS |
-| [더블블록](games/doppelblock/) | 검은 칸 사이 숫자의 합을 맞힌다 | 순수 HTML/CSS/JS |
+| [도펠블록](games/doppelblock/) | 검은 칸 사이 숫자의 합을 맞힌다 | 순수 HTML/CSS/JS |
 | [체스 퍼즐](games/chess-puzzle/) | 가장 강한 수를 찾아 전술을 푼다 | 순수 HTML/CSS/JS |
-| [한붓그리기](games/zip/) | 숫자를 순서대로 밟아 모든 칸을 한 번에 지난다 | 순수 HTML/CSS/JS |
-| [왕관 놓기](games/queens/) | 행·열·색마다 왕관을 하나씩 놓는다 | 순수 HTML/CSS/JS |
+| [Zip](games/zip/) | 숫자를 순서대로 밟아 모든 칸을 한 번에 지난다 | 순수 HTML/CSS/JS |
+| [Queens](games/queens/) | 행·열·색마다 왕관을 하나씩 놓는다 | 순수 HTML/CSS/JS |
 | [Patches](games/patches/) | 격자를 직사각형 조각으로 남김없이 나눈다 | 순수 HTML/CSS/JS |
 | [Tango](games/tango/) | 해와 달을 반씩, 셋 연달아 오지 않게 놓는다 | 순수 HTML/CSS/JS |
 | [사자성어 찾기](games/idioms/) | 격자에 숨은 사자성어를 길로 이어 찾는다 | 순수 HTML/CSS/JS |
 | [힐러](games/healer/) | 파티에서 힐러 하나만 맡는다 | 순수 HTML/CSS/JS |
 | [점령전](games/conquest/) | 거점을 이어 병력을 보내 지도를 차지한다 | 순수 HTML/CSS/JS |
-| [다리 잇기](games/hashi/) | 섬을 숫자만큼 이어 하나로 만든다 | 순수 HTML/CSS/JS |
-| [주사위 영토전](games/dicewars/) | 주사위를 굴려 이웃 영토를 뺏는다 | 순수 HTML/CSS/JS |
+| [하시](games/hashi/) | 섬을 숫자만큼 이어 하나로 만든다 | 순수 HTML/CSS/JS |
+| [다이스 워즈](games/dicewars/) | 주사위를 굴려 이웃 영토를 뺏는다 | 순수 HTML/CSS/JS |
 | [야추](games/yacht/) | 주사위 다섯 개를 굴려 상대와 점수를 겨룬다 | 순수 HTML/CSS/JS |
 | [노노그램](games/nonogram/) | 가장자리 숫자대로 칠해 숨은 그림을 찾는다 | 순수 HTML/CSS/JS |
-| [차 빼기](games/rushhour/) | 막힌 차들을 밀어 빨간 차를 빼낸다 | 순수 HTML/CSS/JS |
+| [러시아워](games/rushhour/) | 막힌 차들을 밀어 빨간 차를 빼낸다 | 순수 HTML/CSS/JS |
+| [소코반](games/sokoban/) | 상자를 밀어 목표 자리에 모두 올린다 | 순수 HTML/CSS/JS |
 | [길목 지키기](games/defense/) | 길목에 사람을 세워 밀려오는 적을 막는다 | 순수 HTML/CSS/JS |
 
 ## 로컬에서 실행
