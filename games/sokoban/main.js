@@ -244,6 +244,7 @@ function finish() {
   const key = String(game.index + 1);
   const before = solved[key];
   const best = !before || game.moves < before.moves;
+  SharedDailyUI.report('sokoban', { fresh: !before, improved: Boolean(before) && game.moves < before.moves });
   if (best) {
     solved[key] = { moves: game.moves, pushes: game.pushes };
     write(SOLVED_KEY, solved);

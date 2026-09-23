@@ -92,7 +92,9 @@
       'daily.yacht.finish': '한 판 끝까지 두기',
       'daily.score': '{score}점 이상 내기',
       'daily.optimal': '힌트 없이 최소 이동으로 풀기',
-      'daily.hardOptimal': '어려움을 힌트 없이 최소 이동으로 풀기'
+      'daily.hardOptimal': '어려움을 힌트 없이 최소 이동으로 풀기',
+      'daily.newStage': '처음 푸는 단계 풀기',
+      'daily.improve': '푼 단계를 더 적은 이동으로 다시 풀기'
     },
     en: {
       'game.2048': '2048',
@@ -183,7 +185,9 @@
       'daily.yacht.finish': 'Play a game to the end',
       'daily.score': 'Score {score} or more',
       'daily.optimal': 'Solve in the fewest moves without hints',
-      'daily.hardOptimal': 'Solve a Hard puzzle in the fewest moves without hints'
+      'daily.hardOptimal': 'Solve a Hard puzzle in the fewest moves without hints',
+      'daily.newStage': 'Clear a new stage',
+      'daily.improve': 'Beat your move record on a cleared stage'
     },
     ja: {
       'game.2048': '2048',
@@ -274,7 +278,9 @@
       'daily.yacht.finish': '1ゲーム最後まで遊ぶ',
       'daily.score': '{score}点以上を取る',
       'daily.optimal': 'ヒントなしで最少手数で解く',
-      'daily.hardOptimal': 'むずかしいをヒントなしで最少手数で解く'
+      'daily.hardOptimal': 'むずかしいをヒントなしで最少手数で解く',
+      'daily.newStage': '初めてのステージをクリアする',
+      'daily.improve': 'クリア済みのステージを少ない手数で解き直す'
     },
     'zh-CN': {
       'game.2048': '2048',
@@ -365,7 +371,9 @@
       'daily.yacht.finish': '完整玩完一局',
       'daily.score': '得到{score}分以上',
       'daily.optimal': '不用提示以最少步数完成',
-      'daily.hardOptimal': '不用提示以最少步数完成一道困难题'
+      'daily.hardOptimal': '不用提示以最少步数完成一道困难题',
+      'daily.newStage': '通过一个新关卡',
+      'daily.improve': '以更少步数重玩已通过的关卡'
     },
     'zh-TW': {
       'game.2048': '2048',
@@ -456,7 +464,9 @@
       'daily.yacht.finish': '完整玩完一局',
       'daily.score': '得到{score}分以上',
       'daily.optimal': '不用提示以最少步數完成',
-      'daily.hardOptimal': '不用提示以最少步數完成一道困難題'
+      'daily.hardOptimal': '不用提示以最少步數完成一道困難題',
+      'daily.newStage': '通過一個新關卡',
+      'daily.improve': '以更少步數重玩已通過的關卡'
     },
     es: {
       'game.2048': '2048',
@@ -547,7 +557,9 @@
       'daily.yacht.finish': 'Juega una partida completa',
       'daily.score': 'Consigue {score} puntos o más',
       'daily.optimal': 'Resuelve con el mínimo de movimientos sin pistas',
-      'daily.hardOptimal': 'Resuelve uno Difícil con el mínimo de movimientos sin pistas'
+      'daily.hardOptimal': 'Resuelve uno Difícil con el mínimo de movimientos sin pistas',
+      'daily.newStage': 'Supera un nivel nuevo',
+      'daily.improve': 'Mejora tu récord de movimientos en un nivel superado'
     }
   });
 })();

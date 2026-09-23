@@ -118,6 +118,12 @@ const MISSIONS = [
   { id: 'rushhour.optimal', game: 'rushhour', tier: 2, text: 'optimal', test: (r) => r.optimal },
   { id: 'rushhour.hard', game: 'rushhour', tier: 3, text: 'hard', test: (r) => r.level === 'hard' },
   { id: 'rushhour.hardOptimal', game: 'rushhour', tier: 3, text: 'hardOptimal', test: (r) => r.level === 'hard' && r.optimal },
+
+  // 단계가 순서대로 어려워지고 사람마다 와 있는 자리가 달라, 단계 번호 대신 "처음 푸는
+  // 단계"와 "기록 줄이기"로 가린다. 최단 수 자료가 없어 비교할 것은 제 기록뿐이다.
+  { id: 'sokoban.any', game: 'sokoban', tier: 1, text: 'any', test: () => true },
+  { id: 'sokoban.new', game: 'sokoban', tier: 2, text: 'newStage', test: (r) => r.fresh },
+  { id: 'sokoban.improve', game: 'sokoban', tier: 3, text: 'improve', test: (r) => r.improved },
 ];
 
 const BY_ID = new Map(MISSIONS.map((m) => [m.id, m]));
