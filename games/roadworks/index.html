@@ -25,30 +25,32 @@
 </head>
 <body>
 <main class="app">
-  <header class="head">
-    <div class="title-row">
-      <div class="head-nav">
-        <a class="back" href="../../" data-i18n="ui.back">← 목록</a>
-        <button class="toggle" id="help-open" type="button" aria-pressed="false" data-i18n="ui.help">도움말</button>
+  <div class="hud hud-top">
+    <header class="head">
+      <div class="title-row">
+        <div class="head-nav">
+          <a class="back" href="../../" data-i18n="ui.back">← 목록</a>
+          <button class="toggle" id="help-open" type="button" aria-pressed="false" data-i18n="ui.help">도움말</button>
+        </div>
+        <h1 data-i18n="game.roadworks">도로공사</h1>
+        <div class="head-actions">
+          <button class="toggle sound" id="toggle-bgm" type="button" aria-pressed="true" data-i18n="ui.bgm">BGM</button>
+          <button class="toggle sound" id="toggle-sfx" type="button" aria-pressed="true" data-i18n="ui.sfx">효과음</button>
+        </div>
       </div>
-      <h1 data-i18n="game.roadworks">도로공사</h1>
-      <div class="head-actions">
-        <button class="toggle sound" id="toggle-bgm" type="button" aria-pressed="true" data-i18n="ui.bgm">BGM</button>
-        <button class="toggle sound" id="toggle-sfx" type="button" aria-pressed="true" data-i18n="ui.sfx">효과음</button>
+      <div class="gauges">
+        <span class="gauge"><b id="stat-count">0</b><i data-i18n="road.onRoad">주행</i></span>
+        <span class="gauge"><b id="stat-speed">0</b><i data-i18n="road.avgSpeed">평균 속도</i></span>
+        <span class="gauge"><b id="stat-gone">0</b><i data-i18n="road.left">시외로</i></span>
+        <span class="gauge"><b id="stat-money">0</b><i data-i18n="road.money">예산</i></span>
       </div>
-    </div>
-    <div class="gauges">
-      <span class="gauge"><b id="stat-count">0</b><i data-i18n="road.onRoad">주행</i></span>
-      <span class="gauge"><b id="stat-speed">0</b><i data-i18n="road.avgSpeed">평균 속도</i></span>
-      <span class="gauge"><b id="stat-gone">0</b><i data-i18n="road.left">시외로</i></span>
-      <span class="gauge"><b id="stat-money">0</b><i data-i18n="road.money">예산</i></span>
-    </div>
-  </header>
+    </header>
 
-  <div class="mission" id="mission" hidden>
-    <b id="mission-time">0:00</b>
-    <i id="mission-what" data-i18n="road.missionOn">배달 중</i>
-    <button class="pick" id="mission-find" type="button" data-i18n="road.missionFind">보기</button>
+    <div class="mission" id="mission" hidden>
+      <b id="mission-time">0:00</b>
+      <i id="mission-what" data-i18n="road.missionOn">배달 중</i>
+      <button class="pick" id="mission-find" type="button" data-i18n="road.missionFind">보기</button>
+    </div>
   </div>
 
   <div class="board-wrap" id="board-wrap">
@@ -64,22 +66,24 @@
     </div>
   </div>
 
-  <div class="panel" id="panel" hidden>
-    <div class="panel-body" id="panel-body"></div>
-    <button class="panel-close" type="button" data-close="1" data-i18n="ui.close">닫기</button>
-  </div>
+  <div class="hud hud-bottom">
+    <div class="panel" id="panel" hidden>
+      <div class="panel-body" id="panel-body"></div>
+      <button class="panel-close" type="button" data-close="1" data-i18n="ui.close">닫기</button>
+    </div>
 
-  <div class="pad">
-    <div class="row">
-      <button class="btn" id="play" type="button" aria-pressed="true">
-        <span class="play-label" data-i18n="road.pause">멈춤</span>
-      </button>
-      <div class="picker" id="rates" role="group" aria-label="빠르기" data-i18n-attr="aria-label=road.rate">
-        <button class="pick" type="button" data-rate="1" aria-pressed="true">1×</button>
-        <button class="pick" type="button" data-rate="2" aria-pressed="false">2×</button>
-        <button class="pick" type="button" data-rate="4" aria-pressed="false">4×</button>
+    <div class="pad">
+      <div class="row">
+        <button class="btn" id="play" type="button" aria-pressed="true">
+          <span class="play-label" data-i18n="road.pause">멈춤</span>
+        </button>
+        <div class="picker" id="rates" role="group" aria-label="빠르기" data-i18n-attr="aria-label=road.rate">
+          <button class="pick" type="button" data-rate="1" aria-pressed="true">1×</button>
+          <button class="pick" type="button" data-rate="2" aria-pressed="false">2×</button>
+          <button class="pick" type="button" data-rate="4" aria-pressed="false">4×</button>
+        </div>
+        <button class="btn ghost" id="fresh" type="button" data-i18n="road.newCity">새 도시</button>
       </div>
-      <button class="btn ghost" id="fresh" type="button" data-i18n="road.newCity">새 도시</button>
     </div>
   </div>
 
