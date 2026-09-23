@@ -68,10 +68,6 @@
 
       'daily.toast': '오늘의 도전 {done}/{total}',
       'daily.toastAll': '오늘의 도전 완료!',
-      'daily.sudoku.any': '아무 난이도나 한 판 풀기',
-      'daily.sudoku.medium': '보통 이상 난이도 풀기',
-      'daily.sudoku.fast': '{min}분 안에 풀기',
-      'daily.sudoku.hard': '어려움 난이도 풀기',
       'daily.any': '한 판 풀기',
       'daily.size': '{size}×{size} 판 풀기',
       'daily.sizeUp': '{size}×{size} 이상 풀기',
@@ -79,7 +75,11 @@
       'daily.sizeClean': '{size}×{size} 판을 힌트 없이 풀기',
       'daily.sizeUpClean': '{size}×{size} 이상을 힌트 없이 풀기',
       'daily.sizeFast': '{size}×{size} 판을 힌트 없이 {min}분 안에 풀기',
-      'daily.sizeUpFast': '{size}×{size} 이상을 힌트 없이 {min}분 안에 풀기'
+      'daily.sizeUpFast': '{size}×{size} 이상을 힌트 없이 {min}분 안에 풀기',
+      'daily.anyLevel': '아무 난이도나 한 판 풀기',
+      'daily.medium': '보통 이상 난이도 풀기',
+      'daily.hard': '어려움 난이도 풀기',
+      'daily.fast': '{min}분 안에 풀기'
     },
     en: {
       'game.2048': '2048',
@@ -146,10 +146,6 @@
 
       'daily.toast': 'Daily challenge {done}/{total}',
       'daily.toastAll': 'Daily challenge complete!',
-      'daily.sudoku.any': 'Solve a puzzle on any level',
-      'daily.sudoku.medium': 'Solve on Medium or harder',
-      'daily.sudoku.fast': 'Solve in under {min} minutes',
-      'daily.sudoku.hard': 'Solve on Hard',
       'daily.any': 'Solve a puzzle',
       'daily.size': 'Solve a {size}×{size} puzzle',
       'daily.sizeUp': 'Solve {size}×{size} or larger',
@@ -157,7 +153,11 @@
       'daily.sizeClean': 'Solve {size}×{size} without hints',
       'daily.sizeUpClean': 'Solve {size}×{size} or larger without hints',
       'daily.sizeFast': 'Solve {size}×{size} without hints in under {min} min',
-      'daily.sizeUpFast': 'Solve {size}×{size} or larger without hints in under {min} min'
+      'daily.sizeUpFast': 'Solve {size}×{size} or larger without hints in under {min} min',
+      'daily.anyLevel': 'Solve a puzzle on any level',
+      'daily.medium': 'Solve on Medium or harder',
+      'daily.hard': 'Solve on Hard',
+      'daily.fast': 'Solve in under {min} minutes'
     },
     ja: {
       'game.2048': '2048',
@@ -224,10 +224,6 @@
 
       'daily.toast': '今日のチャレンジ {done}/{total}',
       'daily.toastAll': '今日のチャレンジ達成!',
-      'daily.sudoku.any': 'どの難易度でも1問解く',
-      'daily.sudoku.medium': 'ふつう以上の難易度で解く',
-      'daily.sudoku.fast': '{min}分以内に解く',
-      'daily.sudoku.hard': 'むずかしいで解く',
       'daily.any': '1問解く',
       'daily.size': '{size}×{size}を解く',
       'daily.sizeUp': '{size}×{size}以上を解く',
@@ -235,7 +231,11 @@
       'daily.sizeClean': '{size}×{size}をヒントなしで解く',
       'daily.sizeUpClean': '{size}×{size}以上をヒントなしで解く',
       'daily.sizeFast': '{size}×{size}をヒントなしで{min}分以内に解く',
-      'daily.sizeUpFast': '{size}×{size}以上をヒントなしで{min}分以内に解く'
+      'daily.sizeUpFast': '{size}×{size}以上をヒントなしで{min}分以内に解く',
+      'daily.anyLevel': 'どの難易度でも1問解く',
+      'daily.medium': 'ふつう以上の難易度で解く',
+      'daily.hard': 'むずかしいで解く',
+      'daily.fast': '{min}分以内に解く'
     },
     'zh-CN': {
       'game.2048': '2048',
@@ -302,10 +302,6 @@
 
       'daily.toast': '今日挑战 {done}/{total}',
       'daily.toastAll': '今日挑战完成!',
-      'daily.sudoku.any': '任意难度完成一局',
-      'daily.sudoku.medium': '以中等或更高难度完成',
-      'daily.sudoku.fast': '{min}分钟内完成',
-      'daily.sudoku.hard': '以困难难度完成',
       'daily.any': '完成一局',
       'daily.size': '完成一局{size}×{size}',
       'daily.sizeUp': '完成一局{size}×{size}以上',
@@ -313,7 +309,11 @@
       'daily.sizeClean': '{size}×{size}不用提示完成',
       'daily.sizeUpClean': '{size}×{size}以上不用提示完成',
       'daily.sizeFast': '{size}×{size}不用提示{min}分钟内完成',
-      'daily.sizeUpFast': '{size}×{size}以上不用提示{min}分钟内完成'
+      'daily.sizeUpFast': '{size}×{size}以上不用提示{min}分钟内完成',
+      'daily.anyLevel': '任意难度完成一局',
+      'daily.medium': '以普通或更高难度完成',
+      'daily.hard': '以困难难度完成',
+      'daily.fast': '{min}分钟内完成'
     },
     'zh-TW': {
       'game.2048': '2048',
@@ -380,10 +380,6 @@
 
       'daily.toast': '今日挑戰 {done}/{total}',
       'daily.toastAll': '今日挑戰完成!',
-      'daily.sudoku.any': '任意難度完成一局',
-      'daily.sudoku.medium': '以中等或更高難度完成',
-      'daily.sudoku.fast': '{min}分鐘內完成',
-      'daily.sudoku.hard': '以困難難度完成',
       'daily.any': '完成一局',
       'daily.size': '完成一局{size}×{size}',
       'daily.sizeUp': '完成一局{size}×{size}以上',
@@ -391,7 +387,11 @@
       'daily.sizeClean': '{size}×{size}不用提示完成',
       'daily.sizeUpClean': '{size}×{size}以上不用提示完成',
       'daily.sizeFast': '{size}×{size}不用提示{min}分鐘內完成',
-      'daily.sizeUpFast': '{size}×{size}以上不用提示{min}分鐘內完成'
+      'daily.sizeUpFast': '{size}×{size}以上不用提示{min}分鐘內完成',
+      'daily.anyLevel': '任意難度完成一局',
+      'daily.medium': '以普通或更高難度完成',
+      'daily.hard': '以困難難度完成',
+      'daily.fast': '{min}分鐘內完成'
     },
     es: {
       'game.2048': '2048',
@@ -458,10 +458,6 @@
 
       'daily.toast': 'Reto diario {done}/{total}',
       'daily.toastAll': '¡Reto diario completado!',
-      'daily.sudoku.any': 'Resuelve uno en cualquier nivel',
-      'daily.sudoku.medium': 'Resuelve en Medio o más difícil',
-      'daily.sudoku.fast': 'Resuelve en menos de {min} minutos',
-      'daily.sudoku.hard': 'Resuelve en Difícil',
       'daily.any': 'Resuelve un tablero',
       'daily.size': 'Resuelve uno de {size}×{size}',
       'daily.sizeUp': 'Resuelve uno de {size}×{size} o mayor',
@@ -469,7 +465,11 @@
       'daily.sizeClean': 'Resuelve {size}×{size} sin pistas',
       'daily.sizeUpClean': 'Resuelve {size}×{size} o mayor sin pistas',
       'daily.sizeFast': 'Resuelve {size}×{size} sin pistas en menos de {min} min',
-      'daily.sizeUpFast': 'Resuelve {size}×{size} o mayor sin pistas en menos de {min} min'
+      'daily.sizeUpFast': 'Resuelve {size}×{size} o mayor sin pistas en menos de {min} min',
+      'daily.anyLevel': 'Resuelve uno en cualquier nivel',
+      'daily.medium': 'Resuelve en dificultad Media o superior',
+      'daily.hard': 'Resuelve en Difícil',
+      'daily.fast': 'Resuelve en menos de {min} minutos'
     }
   });
 })();

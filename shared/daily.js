@@ -22,10 +22,10 @@ const PER_DAY = 3;
 // 알파 게임은 넣지 않는다 — 규칙과 균형이 바뀌는 중이라 오늘 낸 미션이 내일
 // 불가능해질 수 있다. 판 결과를 알려 오지 않는 게임도 당연히 넣을 수 없다.
 const MISSIONS = [
-  { id: 'sudoku.any', game: 'sudoku', tier: 1, test: () => true },
-  { id: 'sudoku.medium', game: 'sudoku', tier: 2, test: (r) => r.level === 'medium' || r.level === 'hard' },
-  { id: 'sudoku.fast', game: 'sudoku', tier: 2, vars: { min: 10 }, test: (r) => r.time <= 600 },
-  { id: 'sudoku.hard', game: 'sudoku', tier: 3, test: (r) => r.level === 'hard' },
+  { id: 'sudoku.any', game: 'sudoku', tier: 1, text: 'anyLevel', test: () => true },
+  { id: 'sudoku.medium', game: 'sudoku', tier: 2, text: 'medium', test: (r) => r.level === 'medium' || r.level === 'hard' },
+  { id: 'sudoku.fast', game: 'sudoku', tier: 2, text: 'fast', vars: { min: 10 }, test: (r) => r.time <= 600 },
+  { id: 'sudoku.hard', game: 'sudoku', tier: 3, text: 'hard', test: (r) => r.level === 'hard' },
 
   { id: 'queens.any', game: 'queens', tier: 1, text: 'any', test: () => true },
   { id: 'queens.big', game: 'queens', tier: 2, text: 'size', vars: { size: 9 }, test: (r) => r.size >= 9 },
@@ -74,6 +74,12 @@ const MISSIONS = [
   { id: 'hashi.big', game: 'hashi', tier: 2, text: 'size', vars: { size: 13 }, test: (r) => r.size >= 13 },
   { id: 'hashi.hard', game: 'hashi', tier: 3, text: 'sizeClean', vars: { size: 13 },
     test: (r) => r.size >= 13 && r.hints === 0 },
+
+  { id: 'doppelblock.any', game: 'doppelblock', tier: 1, text: 'anyLevel', test: () => true },
+  { id: 'doppelblock.medium', game: 'doppelblock', tier: 2, text: 'medium',
+    test: (r) => r.level === 'medium' || r.level === 'hard' },
+  { id: 'doppelblock.big', game: 'doppelblock', tier: 3, text: 'sizeUp', vars: { size: 7 }, test: (r) => r.size >= 7 },
+  { id: 'doppelblock.hard', game: 'doppelblock', tier: 3, text: 'hard', test: (r) => r.level === 'hard' },
 ];
 
 const BY_ID = new Map(MISSIONS.map((m) => [m.id, m]));
