@@ -27,6 +27,7 @@
 | [러시아워](games/rushhour/) | 막힌 차들을 밀어 빨간 차를 빼낸다 | 순수 HTML/CSS/JS |
 | [소코반](games/sokoban/) | 상자를 밀어 목표 자리에 모두 올린다 | 순수 HTML/CSS/JS |
 | [슬리더링크](games/slitherlink/) | 숫자만큼 변을 둘러 고리 하나를 만든다 | 순수 HTML/CSS/JS |
+| [누리카베](games/nurikabe/) | 숫자만큼 섬을 남기고 나머지를 바다로 칠한다 | 순수 HTML/CSS/JS |
 | [길목 지키기](games/defense/) | 길목에 사람을 세워 밀려오는 적을 막는다 | 순수 HTML/CSS/JS |
 
 ## 로컬에서 실행
