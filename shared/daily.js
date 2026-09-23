@@ -53,6 +53,12 @@ const MISSIONS = [
     test: (r) => r.size >= 7 && r.hints === 0 },
   { id: 'zip.fast', game: 'zip', tier: 3, text: 'sizeFast', vars: { size: 8, min: 2 },
     test: (r) => r.size >= 8 && r.hints === 0 && r.time <= 120 },
+
+  { id: 'patches.any', game: 'patches', tier: 1, text: 'any', test: () => true },
+  { id: 'patches.big', game: 'patches', tier: 2, text: 'size', vars: { size: 8 }, test: (r) => r.size >= 8 },
+  { id: 'patches.clean', game: 'patches', tier: 2, text: 'clean', test: (r) => r.hints === 0 },
+  { id: 'patches.fast', game: 'patches', tier: 3, text: 'sizeFast', vars: { size: 8, min: 3 },
+    test: (r) => r.size >= 8 && r.hints === 0 && r.time <= 180 },
 ];
 
 const BY_ID = new Map(MISSIONS.map((m) => [m.id, m]));
