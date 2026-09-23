@@ -1,0 +1,40 @@
+/* 오늘의 도전을 해냈을 때 게임 화면 위에 잠깐 뜨는 알림. 게임마다 색이 달라
+   어느 바탕에서도 읽히도록 제 바탕을 들고 다닌다. 헤더를 가리지 않게 그 아래에
+   띄우고, 누를 것이 없으므로 손가락을 받지 않는다. */
+.daily-toast {
+  position: fixed;
+  left: 50%;
+  top: calc(env(safe-area-inset-top, 0px) + 64px);
+  z-index: 120;
+  max-width: min(92vw, 420px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 18px;
+  border-radius: 14px;
+  background: rgba(28, 26, 24, 0.92);
+  color: #fff;
+  font-size: 14px;
+  line-height: 1.35;
+  text-align: center;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, -10px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.daily-toast.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.daily-toast strong {
+  color: #f2cf5b;
+  font-size: 13px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .daily-toast { transition: none; }
+}

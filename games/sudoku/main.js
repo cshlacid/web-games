@@ -225,6 +225,7 @@
     el.result.hidden = false;
     Sound.play('win');
     save();
+    SharedDailyUI.report('sudoku', { level: state.level, time: state.elapsed });
   }
 
   function boardString() {
