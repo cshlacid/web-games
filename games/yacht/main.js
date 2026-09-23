@@ -384,6 +384,7 @@ function finish() {
   const my = R.total(game, 1);
   const best = saveBest(my);
   const rank = board.findIndex((one) => one.player === 1) + 1;
+  SharedDailyUI.report('yacht', { win: rank === 1, score: my, level, players });
 
   el.resultTitle.textContent = rank === 1 ? t('yacht.win', { score: my }) : t('yacht.rank', { rank, score: my });
   const line = board.map((one) => (one.player === 1

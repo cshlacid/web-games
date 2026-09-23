@@ -88,7 +88,9 @@
       'daily.win': '한 판 이기기',
       'daily.winMedium': '보통 이상 난이도에서 이기기',
       'daily.winHard': '어려움 난이도에서 이기기',
-      'daily.winPlayers': '{n}인 판에서 이기기'
+      'daily.winPlayers': '{n}인 판에서 이기기',
+      'daily.yacht.finish': '한 판 끝까지 두기',
+      'daily.score': '{score}점 이상 내기'
     },
     en: {
       'game.2048': '2048',
@@ -175,7 +177,9 @@
       'daily.win': 'Win a game',
       'daily.winMedium': 'Win on Medium or harder',
       'daily.winHard': 'Win on Hard',
-      'daily.winPlayers': 'Win a {n}-player game'
+      'daily.winPlayers': 'Win a {n}-player game',
+      'daily.yacht.finish': 'Play a game to the end',
+      'daily.score': 'Score {score} or more'
     },
     ja: {
       'game.2048': '2048',
@@ -262,7 +266,9 @@
       'daily.win': '1回勝つ',
       'daily.winMedium': 'ふつう以上の難易度で勝つ',
       'daily.winHard': 'むずかしいで勝つ',
-      'daily.winPlayers': '{n}人戦で勝つ'
+      'daily.winPlayers': '{n}人戦で勝つ',
+      'daily.yacht.finish': '1ゲーム最後まで遊ぶ',
+      'daily.score': '{score}点以上を取る'
     },
     'zh-CN': {
       'game.2048': '2048',
@@ -349,7 +355,9 @@
       'daily.win': '赢一局',
       'daily.winMedium': '在普通或更高难度获胜',
       'daily.winHard': '在困难难度获胜',
-      'daily.winPlayers': '赢一局{n}人对战'
+      'daily.winPlayers': '赢一局{n}人对战',
+      'daily.yacht.finish': '完整玩完一局',
+      'daily.score': '得到{score}分以上'
     },
     'zh-TW': {
       'game.2048': '2048',
@@ -436,7 +444,9 @@
       'daily.win': '贏一局',
       'daily.winMedium': '在普通或更高難度獲勝',
       'daily.winHard': '在困難難度獲勝',
-      'daily.winPlayers': '贏一局{n}人對戰'
+      'daily.winPlayers': '贏一局{n}人對戰',
+      'daily.yacht.finish': '完整玩完一局',
+      'daily.score': '得到{score}分以上'
     },
     es: {
       'game.2048': '2048',
@@ -523,7 +533,9 @@
       'daily.win': 'Gana una partida',
       'daily.winMedium': 'Gana en dificultad Media o superior',
       'daily.winHard': 'Gana en Difícil',
-      'daily.winPlayers': 'Gana una partida de {n} jugadores'
+      'daily.winPlayers': 'Gana una partida de {n} jugadores',
+      'daily.yacht.finish': 'Juega una partida completa',
+      'daily.score': 'Consigue {score} puntos o más'
     }
   });
 })();
