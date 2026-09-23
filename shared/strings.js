@@ -79,7 +79,8 @@
       'daily.anyLevel': '아무 난이도나 한 판 풀기',
       'daily.medium': '보통 이상 난이도 풀기',
       'daily.hard': '어려움 난이도 풀기',
-      'daily.fast': '{min}분 안에 풀기'
+      'daily.fast': '{min}분 안에 풀기',
+      'daily.tile': '{tile} 타일 만들기'
     },
     en: {
       'game.2048': '2048',
@@ -157,7 +158,8 @@
       'daily.anyLevel': 'Solve a puzzle on any level',
       'daily.medium': 'Solve on Medium or harder',
       'daily.hard': 'Solve on Hard',
-      'daily.fast': 'Solve in under {min} minutes'
+      'daily.fast': 'Solve in under {min} minutes',
+      'daily.tile': 'Make a {tile} tile'
     },
     ja: {
       'game.2048': '2048',
@@ -235,7 +237,8 @@
       'daily.anyLevel': 'どの難易度でも1問解く',
       'daily.medium': 'ふつう以上の難易度で解く',
       'daily.hard': 'むずかしいで解く',
-      'daily.fast': '{min}分以内に解く'
+      'daily.fast': '{min}分以内に解く',
+      'daily.tile': '{tile}のタイルを作る'
     },
     'zh-CN': {
       'game.2048': '2048',
@@ -313,7 +316,8 @@
       'daily.anyLevel': '任意难度完成一局',
       'daily.medium': '以普通或更高难度完成',
       'daily.hard': '以困难难度完成',
-      'daily.fast': '{min}分钟内完成'
+      'daily.fast': '{min}分钟内完成',
+      'daily.tile': '合成{tile}方块'
     },
     'zh-TW': {
       'game.2048': '2048',
@@ -391,7 +395,8 @@
       'daily.anyLevel': '任意難度完成一局',
       'daily.medium': '以普通或更高難度完成',
       'daily.hard': '以困難難度完成',
-      'daily.fast': '{min}分鐘內完成'
+      'daily.fast': '{min}分鐘內完成',
+      'daily.tile': '合成{tile}方塊'
     },
     es: {
       'game.2048': '2048',
@@ -469,7 +474,8 @@
       'daily.anyLevel': 'Resuelve uno en cualquier nivel',
       'daily.medium': 'Resuelve en dificultad Media o superior',
       'daily.hard': 'Resuelve en Difícil',
-      'daily.fast': 'Resuelve en menos de {min} minutos'
+      'daily.fast': 'Resuelve en menos de {min} minutos',
+      'daily.tile': 'Consigue la ficha {tile}'
     }
   });
 })();

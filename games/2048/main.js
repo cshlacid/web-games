@@ -173,6 +173,9 @@
       // 여러 쌍이 한 번에 합쳐져도 소리는 하나만 낸다. 겹쳐 울리면 시끄럽다.
       if (loudest) Sound.play('merge', loudest);
       setScore(result.gained);
+      // 판이 끝나기 전에 새 판을 눌러도 만든 타일은 인정한다. 큰 타일은 합칠 때만
+      // 생기므로 그때만 알린다 — 매 수마다 기록을 읽고 쓸 이유가 없다.
+      if (loudest >= 256) SharedDailyUI.report('2048', { tile: loudest });
       spawnTile(true);
       state.busy = false;
 

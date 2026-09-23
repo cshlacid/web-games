@@ -80,6 +80,10 @@ const MISSIONS = [
     test: (r) => r.level === 'medium' || r.level === 'hard' },
   { id: 'doppelblock.big', game: 'doppelblock', tier: 3, text: 'sizeUp', vars: { size: 7 }, test: (r) => r.size >= 7 },
   { id: 'doppelblock.hard', game: 'doppelblock', tier: 3, text: 'hard', test: (r) => r.level === 'hard' },
+
+  { id: '2048.tile512', game: '2048', tier: 1, text: 'tile', vars: { tile: 512 }, test: (r) => r.tile >= 512 },
+  { id: '2048.tile1024', game: '2048', tier: 2, text: 'tile', vars: { tile: 1024 }, test: (r) => r.tile >= 1024 },
+  { id: '2048.tile2048', game: '2048', tier: 3, text: 'tile', vars: { tile: 2048 }, test: (r) => r.tile >= 2048 },
 ];
 
 const BY_ID = new Map(MISSIONS.map((m) => [m.id, m]));
