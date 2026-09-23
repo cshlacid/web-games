@@ -59,6 +59,14 @@ const MISSIONS = [
   { id: 'patches.clean', game: 'patches', tier: 2, text: 'clean', test: (r) => r.hints === 0 },
   { id: 'patches.fast', game: 'patches', tier: 3, text: 'sizeFast', vars: { size: 8, min: 3 },
     test: (r) => r.size >= 8 && r.hints === 0 && r.time <= 180 },
+
+  // 기본 크기가 4×4라 그대로 두고 푼 판은 쉬움에도 넣지 않는다.
+  { id: 'idioms.any', game: 'idioms', tier: 1, text: 'sizeUp', vars: { size: 5 }, test: (r) => r.size >= 5 },
+  { id: 'idioms.big', game: 'idioms', tier: 2, text: 'sizeUp', vars: { size: 7 }, test: (r) => r.size >= 7 },
+  { id: 'idioms.clean', game: 'idioms', tier: 2, text: 'sizeUpClean', vars: { size: 6 },
+    test: (r) => r.size >= 6 && r.hints === 0 },
+  { id: 'idioms.hard', game: 'idioms', tier: 3, text: 'sizeClean', vars: { size: 8 },
+    test: (r) => r.size >= 8 && r.hints === 0 },
 ];
 
 const BY_ID = new Map(MISSIONS.map((m) => [m.id, m]));
