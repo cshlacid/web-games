@@ -33,6 +33,27 @@ for (const game of games) {
     check(`${game} tier ${tier} 있음`, D.MISSIONS.some((m) => m.game === game && m.tier === tier), true);
   }
 }
+{
+  // 사전을 브라우저 없이 읽는다. 없는 문구 열쇠나 빈 틀 값이 있으면 화면에 열쇠가 그대로 나온다.
+  global.localStorage = { getItem: () => null, setItem() {} };
+  global.document = { documentElement: {}, querySelectorAll: () => [], dispatchEvent() {} };
+  global.CustomEvent = class {};
+  global.window = global;
+  require('./i18n.js');
+  require('./strings.js');
+  // 빠진 언어는 영어로 내려 보이므로, 영어가 아닌데 영어와 같으면 빠진 것으로 본다.
+  const english = {};
+  SharedI18n.set('en');
+  for (const m of D.MISSIONS) english[m.id] = SharedI18n.t('daily.' + (m.text || m.id), m.vars);
+  for (const { code } of SharedI18n.LANGS) {
+    SharedI18n.set(code);
+    for (const m of D.MISSIONS) {
+      const text = SharedI18n.t('daily.' + (m.text || m.id), m.vars);
+      check(`${code} ${m.id} 문구`, typeof text === 'string' && !/\{\w+\}/.test(text)
+        && (code === 'en' || text !== english[m.id]), true);
+    }
+  }
+}
 check('id 중복 없음', new Set(D.MISSIONS.map((m) => m.id)).size, D.MISSIONS.length);
 
 // --- 고르기 ---

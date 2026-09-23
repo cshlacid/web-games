@@ -14,8 +14,10 @@ const PER_DAY = 3;
 // 미션은 서로 다른 게임 셋에서 tier를 하나씩 받는다 — 같은 게임이 둘 나오면
 // 그 게임 한 판으로 둘이 한꺼번에 끝나 "여러 게임"이 무너진다.
 //
-// 문구는 사전의 `daily.<id>`에 있고 `vars`를 끼운다. 기준 숫자를 vars로 빼 둔 것은
-// 난이도를 손볼 때 여섯 언어의 문장을 다 고치지 않기 위해서다.
+// 문구는 사전의 `daily.<text>`(없으면 `daily.<id>`)에 있고 `vars`를 끼운다. 판 크기와
+// 힌트처럼 여러 게임에 되풀이되는 조건은 공통 틀(`any`, `sizeUpClean` 같은)을 같이 쓴다 —
+// 게임마다 문장을 따로 두면 열몇 게임 × 여섯 언어가 거의 같은 문장으로 채워진다.
+// 기준 숫자를 vars로 빼 둔 것도 난이도를 손볼 때 문장을 고치지 않기 위해서다.
 //
 // 알파 게임은 넣지 않는다 — 규칙과 균형이 바뀌는 중이라 오늘 낸 미션이 내일
 // 불가능해질 수 있다. 판 결과를 알려 오지 않는 게임도 당연히 넣을 수 없다.
@@ -25,23 +27,25 @@ const MISSIONS = [
   { id: 'sudoku.fast', game: 'sudoku', tier: 2, vars: { min: 10 }, test: (r) => r.time <= 600 },
   { id: 'sudoku.hard', game: 'sudoku', tier: 3, test: (r) => r.level === 'hard' },
 
-  { id: 'queens.any', game: 'queens', tier: 1, test: () => true },
-  { id: 'queens.big', game: 'queens', tier: 2, vars: { size: 9 }, test: (r) => r.size >= 9 },
-  { id: 'queens.clean', game: 'queens', tier: 2, test: (r) => r.hints === 0 },
-  { id: 'queens.fast', game: 'queens', tier: 3, vars: { size: 8, min: 2 },
+  { id: 'queens.any', game: 'queens', tier: 1, text: 'any', test: () => true },
+  { id: 'queens.big', game: 'queens', tier: 2, text: 'size', vars: { size: 9 }, test: (r) => r.size >= 9 },
+  { id: 'queens.clean', game: 'queens', tier: 2, text: 'clean', test: (r) => r.hints === 0 },
+  { id: 'queens.fast', game: 'queens', tier: 3, text: 'sizeUpFast', vars: { size: 8, min: 2 },
     test: (r) => r.size >= 8 && r.hints === 0 && r.time <= 120 },
 
-  { id: 'tango.any', game: 'tango', tier: 1, test: () => true },
-  { id: 'tango.big', game: 'tango', tier: 2, vars: { size: 8 }, test: (r) => r.size >= 8 },
-  { id: 'tango.clean', game: 'tango', tier: 2, test: (r) => r.hints === 0 },
-  { id: 'tango.fast', game: 'tango', tier: 3, vars: { size: 8, min: 4 },
+  { id: 'tango.any', game: 'tango', tier: 1, text: 'any', test: () => true },
+  { id: 'tango.big', game: 'tango', tier: 2, text: 'size', vars: { size: 8 }, test: (r) => r.size >= 8 },
+  { id: 'tango.clean', game: 'tango', tier: 2, text: 'clean', test: (r) => r.hints === 0 },
+  { id: 'tango.fast', game: 'tango', tier: 3, text: 'sizeFast', vars: { size: 8, min: 4 },
     test: (r) => r.size >= 8 && r.hints === 0 && r.time <= 240 },
 
   // 5×5는 몇 초면 끝나 쉬움으로도 싱겁다. 가장 쉬운 미션도 10×10부터다.
-  { id: 'nonogram.any', game: 'nonogram', tier: 1, vars: { size: 10 }, test: (r) => r.size >= 10 },
-  { id: 'nonogram.clean', game: 'nonogram', tier: 2, vars: { size: 10 }, test: (r) => r.size >= 10 && r.hints === 0 },
-  { id: 'nonogram.big', game: 'nonogram', tier: 2, vars: { size: 15 }, test: (r) => r.size >= 15 },
-  { id: 'nonogram.hard', game: 'nonogram', tier: 3, vars: { size: 15 }, test: (r) => r.size >= 15 && r.hints === 0 },
+  { id: 'nonogram.any', game: 'nonogram', tier: 1, text: 'sizeUp', vars: { size: 10 }, test: (r) => r.size >= 10 },
+  { id: 'nonogram.clean', game: 'nonogram', tier: 2, text: 'sizeUpClean', vars: { size: 10 },
+    test: (r) => r.size >= 10 && r.hints === 0 },
+  { id: 'nonogram.big', game: 'nonogram', tier: 2, text: 'size', vars: { size: 15 }, test: (r) => r.size >= 15 },
+  { id: 'nonogram.hard', game: 'nonogram', tier: 3, text: 'sizeClean', vars: { size: 15 },
+    test: (r) => r.size >= 15 && r.hints === 0 },
 ];
 
 const BY_ID = new Map(MISSIONS.map((m) => [m.id, m]));

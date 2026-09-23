@@ -28,7 +28,7 @@ function t(key, vars) {
 
 function goal(id) {
   const mission = D.mission(id);
-  return t('daily.' + id, mission && mission.vars);
+  return t('daily.' + ((mission && mission.text) || id), mission && mission.vars);
 }
 
 let toastEl = null;
