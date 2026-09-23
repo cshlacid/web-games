@@ -879,13 +879,52 @@ function nextPhase(node, counts, phase) {
 
 function redLight(world, v, node, gap, holder) {
   const sig = signalOf(world, node);
-  if (Net.phaseOf(node, v.lane) !== sig.phase) return true;
+  const green = Net.phaseOf(node, v.lane) === sig.phase;
+
+  // **우회전은 신호를 기다리지 않는다.** 꺾어 드는 자리가 교차로 복판이 아니라
+  // 모퉁이라, 빨간불에도 지나갈 수 있다. 대신 **신호가 지켜 주지 않으므로 스스로
+  // 양보한다** — 녹색을 받은 차와 같은 차로로 나가려 하면 기다린다.
+  //
+  // 횡단보도의 사람은 여기서 보지 않는다. `crossAhead`가 신호와 상관없이 모든 차를
+  // 세우므로, 빨간불에 도는 우회전도 사람이 밟고 있으면 그 앞에서 선다.
+  if (holder && holder.side === 'right' && !green) {
+    // 멀리서부터 양보할 차를 찾을 이유가 없다. 정지선 가까이에서만 본다.
+    return gap <= CLAIM_AHEAD && rightYield(world, v, node, holder, sig);
+  }
+
+  if (!green) return true;
   if (sig.amber) {
     // 황색에는 **설 수 있는 차만** 선다. 코앞에서 급정거시키면 뒤차가 받는다.
     return gap > v.v * 0.7 + 1;
   }
   // 녹색이라도 좌회전은 마주 오는 차 앞을 가로지른다. 틈이 날 때까지 기다린다.
   if (holder && holder.side === 'left' && oncoming(world, v, node)) return true;
+  return false;
+}
+
+// 빨간불에 도는 우회전이 양보할 차가 있는가. **내가 들어설 차로로 지금 들어오는
+// 차**만 본다 — 교차로를 가로지르는 다른 차와는 만날 자리가 없고, 그 차로에 이미
+// 달리고 있는 차는 따라가기가 알아서 본다.
+function rightYield(world, v, node, holder, sig) {
+  const target = holder.next;
+  if (!target) return false;
+  for (const other of world.vehicles) {
+    if (other === v) continue;
+    if (other.lane.isLink) {
+      if (other.lane.node === node.id && other.lane.next === target) return true;
+      continue;
+    }
+    // 아직 들어오지 않았어도 곧 들어올 차는 본다. 녹색 직진은 빠르게 지나므로
+    // 교차로 안에 든 차만 보면 그 앞으로 끼어들게 된다.
+    //
+    // **녹색을 받은 차만 본다.** 나와 같이 빨간 불에 선 차까지 세면, 같은 차로로
+    // 나갈 차가 맞은편에 서 있는 동안 둘 다 영영 못 간다.
+    if (other.lane.to !== node.id || other.v <= 2) continue;
+    if (Net.phaseOf(node, other.lane) !== sig.phase) continue;
+    if (other.lane.path.total - other.s > ONCOMING) continue;
+    const next = nextHolder(world, other);
+    if (next && next.isLink && next.next === target) return true;
+  }
   return false;
 }
 
