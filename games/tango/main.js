@@ -100,7 +100,7 @@ function buildBoard() {
   // **그림을 둘 다 넣어 두고 감춘다.** 눌릴 때마다 innerHTML을 갈아 끼우면
   // 손가락 밑의 요소가 그 자리에서 사라진다. 사라진 요소에서 시작한 두드림은
   // 뒤이은 터치 이벤트가 문서까지 올라오지 않아, 더블 탭을 가로채는 공용
-  // 처리기(`shared/base.js`)가 듣지 못한다 — 왕관 놓기에서 실제로 겪었다.
+  // 처리기(`shared/base.js`)가 듣지 못한다 — Queens에서 실제로 겪었다.
   for (let cell = 0; cell < size * size; cell++) {
     const node = document.createElement('div');
     node.className = R.locked(game.board, cell) ? 'cell fixed' : 'cell';

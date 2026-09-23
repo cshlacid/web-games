@@ -124,6 +124,11 @@ const MISSIONS = [
   { id: 'sokoban.any', game: 'sokoban', tier: 1, text: 'any', test: () => true },
   { id: 'sokoban.new', game: 'sokoban', tier: 2, text: 'newStage', test: (r) => r.fresh },
   { id: 'sokoban.improve', game: 'sokoban', tier: 3, text: 'improve', test: (r) => r.improved },
+
+  { id: 'slitherlink.any', game: 'slitherlink', tier: 1, text: 'anyLevel', test: () => true },
+  { id: 'slitherlink.medium', game: 'slitherlink', tier: 2, text: 'medium', test: (r) => r.level === 'normal' || r.level === 'hard' },
+  { id: 'slitherlink.clean', game: 'slitherlink', tier: 2, text: 'clean', test: (r) => r.hints === 0 },
+  { id: 'slitherlink.hard', game: 'slitherlink', tier: 3, text: 'hard', test: (r) => r.level === 'hard' },
 ];
 
 const BY_ID = new Map(MISSIONS.map((m) => [m.id, m]));
