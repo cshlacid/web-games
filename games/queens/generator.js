@@ -91,20 +91,21 @@ function grow(size, seeds, rng, cap) {
   return left === 0 ? { regions, counts } : null;
 }
 
-// 대안해가 쓰는 칸 하나를 옆 영역으로 넘겨 그 해만 깬다.
-function refine(size, grown, solution, rng, cap) {
+// 대안해가 쓰는 칸 하나를 옆 영역으로 넘겨 그 해만 깬다. 왕관이 둘인 판도 같다 —
+// 넘긴 칸 때문에 그 배치는 한 영역에 왕관이 셋이 되어 무너진다.
+function refine(size, grown, solution, rng, cap, stars = 1) {
   const { regions, counts } = grown;
-  const seeds = new Set(solution.map((c, r) => r * size + c));
-  const puzzle = { size, regions };
+  const cellsOf = (sol) => R.solutionCells({ size, solution: sol });
+  const seeds = new Set(cellsOf(solution));
+  const puzzle = { size, stars, regions };
 
   for (let round = 0; round <= REFINE_ROUNDS; round++) {
     const found = S.solve(puzzle, { limit: 2 });
     if (found.count === 1) return true;
-    const other = found.solutions.find((s) => s.some((c, r) => c !== solution[r]));
+    const other = found.solutions.find((sol) => cellsOf(sol).some((cell) => !seeds.has(cell)));
     if (!other) return false;
 
-    const cells = shuffle(
-      other.map((c, r) => r * size + c).filter((cell) => !seeds.has(cell)), rng);
+    const cells = shuffle(cellsOf(other).filter((cell) => !seeds.has(cell)), rng);
 
     let moved = false;
     for (const cell of cells) {
@@ -156,7 +157,140 @@ function generate(size, options = {}) {
   return null;
 }
 
-const Generator = { SIZES, MAX_REGION, REFINE_ROUNDS, ATTEMPTS, generate, mulberry32, grow, refine };
+// --- 왕관이 둘인 판 ---
+//
+// 영역마다 정답 왕관이 둘 들어가야 한다. 왕관 하나마다 조각을 키운 뒤 **이웃한 조각끼리
+// 둘씩 짝지어 합친다.** 이웃한 둘을 합치니 영역은 이어져 있고, 조각마다 왕관이 하나라
+// 영역마다 둘이다. 짝이 안 맞는 판(외톨이 조각이 남는 판)은 버린다.
+//
+// 이 판은 여기서 만들지 않고 미리 구워 둔다(`bake.js` → `doubles.js`). 만드는 것은
+// 10×10도 수십 밀리초지만, 찍지 않고 풀리는지 보는 논리 풀이가 판 하나에 1초 가까이
+// 걸리고 절반쯤은 떨어진다 — 폰에서 새 판마다 몇 초씩 기다리게 된다.
+
+const DOUBLE_SIZES = [8, 9, 10];
+
+// 영역 칸 수의 상한. 평균(판 한 변)의 두 배다.
+const DOUBLE_CAP = { 8: 16, 9: 18, 10: 20 };
+
+function growPairs(size, stars, rng, cap) {
+  const n = size * size;
+  const m = stars.length;
+  const piece = new Int32Array(n).fill(-1);
+  const counts = new Int32Array(m);
+  const frontier = [];
+  const spread = (cell, id) => { for (const other of neighbors(size, cell)) frontier.push([other, id]); };
+  stars.forEach((cell, id) => { piece[cell] = id; counts[id] = 1; spread(cell, id); });
+
+  let left = n - m;
+  while (left > 0 && frontier.length) {
+    const i = Math.floor(rng() * frontier.length);
+    const [cell, id] = frontier[i];
+    frontier[i] = frontier[frontier.length - 1];
+    frontier.pop();
+    if (piece[cell] !== -1 || counts[id] >= cap / 2) continue;
+    piece[cell] = id;
+    counts[id]++;
+    left--;
+    spread(cell, id);
+  }
+  if (left) return null;
+
+  const touching = Array.from({ length: m }, () => new Set());
+  for (let cell = 0; cell < n; cell++) {
+    for (const other of neighbors(size, cell)) {
+      if (piece[other] !== piece[cell]) touching[piece[cell]].add(piece[other]);
+    }
+  }
+
+  // 무작위 완전 짝짓기. 되짚다 오래 걸리면 판을 버린다.
+  const mate = new Int32Array(m).fill(-1);
+  let budget = 5000;
+  function match() {
+    if (--budget < 0) return false;
+    let a = -1;
+    for (let x = 0; x < m; x++) if (mate[x] === -1) { a = x; break; }
+    if (a === -1) return true;
+    for (const b of shuffle([...touching[a]], rng)) {
+      if (mate[b] !== -1) continue;
+      mate[a] = b;
+      mate[b] = a;
+      if (match()) return true;
+      mate[a] = -1;
+      mate[b] = -1;
+    }
+    return false;
+  }
+  if (!match()) return null;
+
+  const regionOf = new Int32Array(m).fill(-1);
+  let next = 0;
+  for (let a = 0; a < m; a++) {
+    if (regionOf[a] === -1) { regionOf[a] = next; regionOf[mate[a]] = next; next++; }
+  }
+  // 영역 번호를 섞는다. 짝을 찾은 순서대로 두면 위쪽 영역이 늘 앞 번호라 색이 판마다
+  // 같은 자리에 몰린다.
+  const relabel = shuffle(Array.from({ length: size }, (_, i) => i), rng);
+  const regions = new Int32Array(n);
+  const regionCounts = new Int32Array(size);
+  for (let cell = 0; cell < n; cell++) {
+    regions[cell] = relabel[regionOf[piece[cell]]];
+    regionCounts[regions[cell]]++;
+  }
+  return { regions, counts: regionCounts };
+}
+
+function generateDouble(size, options = {}) {
+  if (!DOUBLE_SIZES.includes(size)) throw new Error(`지원하지 않는 크기: ${size}`);
+  const rng = options.rng || (options.seed !== undefined ? mulberry32(options.seed) : Math.random);
+  const cap = DOUBLE_CAP[size];
+
+  for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
+    const solution = S.randomArrangementMulti(size, 2, rng);
+    if (!solution) continue;
+    const grown = growPairs(size, R.solutionCells({ size, solution }), rng, cap);
+    if (!grown) continue;
+    if (!refine(size, grown, solution, rng, cap, 2)) continue;
+
+    const puzzle = { size, stars: 2, regions: Array.from(grown.regions), solution };
+    const logic = S.logicSolve(puzzle);
+    if (!logic.solved) continue;
+    puzzle.order = logic.order;
+    puzzle.trials = logic.trials;
+    return puzzle;
+  }
+  return null;
+}
+
+// 구워 둔 판 한 줄: 칸마다 영역 번호(0~9) + ':' + 논리 풀이가 왕관을 놓은 순서(칸 번호
+// 두 자리씩). 정답은 그 순서에서 다시 얻는다.
+function encodeDouble(puzzle) {
+  return `${puzzle.regions.join('')}:${puzzle.order.map((cell) => String(cell).padStart(2, '0')).join('')}`;
+}
+
+function decodeDouble(size, code) {
+  const [regionText, orderText] = code.split(':');
+  const regions = Array.from(regionText, Number);
+  const order = [];
+  for (let i = 0; i < orderText.length; i += 2) order.push(Number(orderText.slice(i, i + 2)));
+  const solution = Array.from({ length: size }, () => []);
+  for (const cell of order) solution[Math.floor(cell / size)].push(cell % size);
+  for (const cols of solution) cols.sort((a, b) => a - b);
+  return { size, stars: 2, regions, solution, order };
+}
+
+// 구워 둔 판 하나. 방금 푼 판은 건너뛴다.
+function pickDouble(size, skip, rng = Math.random) {
+  const D = typeof require !== 'undefined' ? require('./doubles.js') : window.QueensDoubles;
+  const list = D.DOUBLES[size];
+  let id = Math.floor(rng() * list.length);
+  if (id === skip && list.length > 1) id = (id + 1) % list.length;
+  return { id, ...decodeDouble(size, list[id]) };
+}
+
+const Generator = {
+  SIZES, MAX_REGION, REFINE_ROUNDS, ATTEMPTS, generate, mulberry32, grow, refine,
+  DOUBLE_SIZES, DOUBLE_CAP, growPairs, generateDouble, encodeDouble, decodeDouble, pickDouble,
+};
 
 if (typeof module !== 'undefined' && module.exports) module.exports = Generator;
 if (typeof window !== 'undefined') window.QueensGenerator = Generator;

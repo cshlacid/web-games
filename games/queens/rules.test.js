@@ -59,5 +59,31 @@ check('끊어진 영역이 있으면 판이 아니다',
   R.wellFormed({ size: 4, regions: [0, 1, 1, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3] }), false);
 check('칸 수가 맞지 않으면 판이 아니다', R.wellFormed({ size: 4, regions: [0, 1, 2, 3] }), false);
 
+// --- 왕관이 둘인 판 ---
+// 행 하나가 영역 하나인 6×6 판.
+const rowsAsRegions = { size: 6, stars: 2, regions: [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5] };
+{
+  const b = R.board(rowsAsRegions);
+  const state = R.reset(b, R.newState(b));
+  R.set(b, state, 0, R.CROWN);
+  R.set(b, state, 2, R.CROWN);
+  check('둘인 판: 한 행에 둘은 괜찮다', R.conflicts(b, state), []);
+  R.set(b, state, 4, R.CROWN);
+  check('둘인 판: 한 행에 셋이면 셋 다 걸린다', R.conflicts(b, state), [0, 2, 4]);
+  R.set(b, state, 4, R.EMPTY);
+  R.set(b, state, 7, R.CROWN);
+  check('둘인 판: 닿으면 걸린다', R.conflicts(b, state), [0, 2, 7]);
+}
+{
+  // 구워 둔 둘씩 판의 첫 판으로 완성 판정을 본다.
+  const G = require('./generator.js');
+  const puzzle = G.decodeDouble(8, require('./doubles.js').DOUBLES[8][0]);
+  const cells = R.solutionCells(puzzle);
+  check('둘씩 판의 정답 칸은 16개', cells.length, 16);
+  check('둘씩 판의 정답은 완성', R.validate(puzzle, cells).done, true);
+  check('하나 빠지면 완성이 아니다', R.validate(puzzle, cells.slice(1)).done, false);
+  check('하나인 판의 정답 칸 목록', R.solutionCells({ size: 4, solution: [1, 3, 0, 2] }), [1, 7, 8, 14]);
+}
+
 console.log(`\n${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);

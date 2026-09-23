@@ -103,5 +103,64 @@ for (let i = 0; i < 200; i++) {
 }
 check('무작위 배치는 열이 겹치지도 위아래로 닿지도 않는다', spread.every(Boolean), true);
 
+// --- 왕관이 둘인 판 ---
+check('한 행의 두 열 조합은 서로 붙지 않는다',
+  S.rowCombos(8, 2).every((combo) => combo.cols[1] - combo.cols[0] >= 2), true);
+check('8칸 행의 두 열 조합 수', S.rowCombos(8, 2).length, 21);
+
+// 대조: 가지치기(영역이 마지막 행에서 다 찼는지, 열을 남은 행으로 채울 수 있는지)
+// 없이 행을 내려가며 모든 조합을 세어 맞춰 본다.
+function bruteMulti(puzzle, limit) {
+  const { size, regions } = puzzle;
+  const combos = S.rowCombos(size, 2);
+  const col = new Int32Array(size);
+  const reg = new Int32Array(size);
+  let count = 0;
+  (function row(r, prev) {
+    if (count >= limit) return;
+    if (r === size) {
+      if (col.every((v) => v === 2) && reg.every((v) => v === 2)) count++;
+      return;
+    }
+    for (const combo of combos) {
+      if (prev & (combo.mask | (combo.mask << 1) | (combo.mask >> 1))) continue;
+      for (const c of combo.cols) { col[c]++; reg[regions[r * size + c]]++; }
+      if (combo.cols.every((c) => col[c] <= 2 && reg[regions[r * size + c]] <= 2)) row(r + 1, combo.mask);
+      for (const c of combo.cols) { col[c]--; reg[regions[r * size + c]]--; }
+    }
+  })(0, 0);
+  return count;
+}
+
+// 대안해를 깨기 전의 판(해가 여럿인 판이 흔하다)으로 센다.
+let multiMismatch = 0;
+let multiLogicWrong = 0;
+let multiChecked = 0;
+for (let i = 0; multiChecked < 12 && i < 200; i++) {
+  const solution = S.randomArrangementMulti(8, 2, rng);
+  if (!solution) continue;
+  const grown = G.growPairs(8, R.solutionCells({ size: 8, solution }), rng, 16);
+  if (!grown) continue;
+  multiChecked++;
+  const puzzle = { size: 8, stars: 2, regions: Array.from(grown.regions) };
+  const mine = S.solve(puzzle, { limit: 8 }).count;
+  const theirs = bruteMulti(puzzle, 8);
+  if (mine !== theirs) multiMismatch++;
+  // 논리 풀이가 끝까지 갔다면 해는 하나여야 한다.
+  if (S.logicSolve(puzzle).solved && theirs !== 1) multiLogicWrong++;
+}
+check('둘인 판: 대조할 판을 만들었다', multiChecked, 12);
+check('둘인 판: 완전 탐색이 대조와 같은 수를 센다', multiMismatch, 0);
+check('둘인 판: 논리 풀이가 끝낸 판은 해가 하나다', multiLogicWrong, 0);
+
+{
+  const puzzle = G.decodeDouble(8, require('./doubles.js').DOUBLES[8][0]);
+  const logic = S.logicSolve(puzzle);
+  const answer = R.solutionCells(puzzle).sort((a2, b2) => a2 - b2);
+  check('둘인 판: 논리 풀이가 끝까지 간다', logic.solved, true);
+  check('둘인 판: 논리 풀이가 놓은 자리가 정답이다', logic.order.slice().sort((a2, b2) => a2 - b2), answer);
+}
+check('7×7에는 둘씩 놓는 배치가 없다', S.randomArrangementMulti(7, 2, rng), null);
+
 console.log(`\n${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);

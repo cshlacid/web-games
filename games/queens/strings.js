@@ -4,6 +4,9 @@
     ko: {
       'meta.desc': '행·열·색 영역마다 왕관을 하나씩, 서로 닿지 않게 놓는 퍼즐',
       'queens.autoCheck': '자동 체크',
+      'queens.double': '왕관 둘씩',
+      'queens.noteDouble': '{size}×{size}, 영역 {count}개, 왕관 둘씩.',
+      'queens.rule10': '왕관 두 개 단추를 누르면 <b>행·열·영역마다 왕관을 둘씩</b> 놓는 판이 나옵니다. 닿으면 안 되는 것은 같습니다. 큰 판에는 "여기에 놓으면 어떻게 되나"를 끝까지 따져 봐야 하는 자리가 있습니다.',
       'queens.note': '{size}×{size}, 영역 {count}개.',
       'queens.hintCleared': '어긋난 왕관 {count}개를 걷어 내고 다음 자리를 짚었습니다.',
       'queens.hintPlaced': '지금 알아낼 수 있는 영역에 왕관을 놓았습니다.',
@@ -20,6 +23,9 @@
     en: {
       'meta.desc': 'Place one crown in every row, column and colored region, none of them touching',
       'queens.autoCheck': 'Auto-check',
+      'queens.double': 'Two crowns each',
+      'queens.noteDouble': '{size}×{size}, {count} regions, two crowns each.',
+      'queens.rule10': 'Press the two-crown button for boards with <b>two crowns in every row, column and region</b>. Crowns still may not touch. Bigger boards have spots where you must follow “what if a crown went here?” all the way through.',
       'queens.note': '{size}×{size}, {count} regions.',
       'queens.hintCleared': 'Removed {count} misplaced crowns and pointed at the next spot.',
       'queens.hintPlaced': 'Placed a crown in a region logic can settle now.',
@@ -36,6 +42,9 @@
     ja: {
       'meta.desc': '行・列・色の領域ごとにクイーンをひとつずつ、互いに触れないように置くパズル',
       'queens.autoCheck': '自動チェック',
+      'queens.double': '王冠2つずつ',
+      'queens.noteDouble': '{size}×{size}、領域{count}個、王冠2つずつ。',
+      'queens.rule10': '王冠2つのボタンを押すと、<b>行・列・領域ごとに王冠を2つずつ</b>置く盤になります。触れ合ってはいけないのは同じです。大きな盤には「ここに置いたらどうなるか」を最後まで追う必要がある場所があります。',
       'queens.note': '{size}×{size}、領域 {count} 個。',
       'queens.hintCleared': 'ずれたクイーン{count}個を取り除き、次の場所を示しました。',
       'queens.hintPlaced': 'いま確定できる領域にクイーンを置きました。',
@@ -52,6 +61,9 @@
     'zh-CN': {
       'meta.desc': '每行、每列、每个颜色区域各放一个皇冠，且彼此不相邻',
       'queens.autoCheck': '自动检查',
+      'queens.double': '每处两个皇冠',
+      'queens.noteDouble': '{size}×{size}，{count} 个区域，每处两个皇冠。',
+      'queens.rule10': '按下双皇冠按钮，会出现<b>每行、每列、每个区域各放两个皇冠</b>的盘面。皇冠依然不能相邻。大盘面里有需要把“如果放在这里会怎样”一路推到底的地方。',
       'queens.note': '{size}×{size}，区域 {count} 个。',
       'queens.hintCleared': '移走了 {count} 个放错的皇冠，并指出了下一个位置。',
       'queens.hintPlaced': '在当前可以确定的区域放好了皇冠。',
@@ -68,6 +80,9 @@
     'zh-TW': {
       'meta.desc': '每行、每列、每個顏色區域各放一個皇冠，且彼此不相鄰',
       'queens.autoCheck': '自動檢查',
+      'queens.double': '每處兩個皇冠',
+      'queens.noteDouble': '{size}×{size}，{count} 個區域，每處兩個皇冠。',
+      'queens.rule10': '按下雙皇冠按鈕，會出現<b>每行、每列、每個區域各放兩個皇冠</b>的盤面。皇冠依然不能相鄰。大盤面裡有需要把「如果放在這裡會怎樣」一路推到底的地方。',
       'queens.note': '{size}×{size}，區域 {count} 個。',
       'queens.hintCleared': '移走了 {count} 個放錯的皇冠，並指出了下一個位置。',
       'queens.hintPlaced': '在目前可以確定的區域放好了皇冠。',
@@ -84,6 +99,9 @@
     es: {
       'meta.desc': 'Coloca una corona en cada fila, columna y región de color, sin que se toquen',
       'queens.autoCheck': 'Comprobación automática',
+      'queens.double': 'Dos coronas por zona',
+      'queens.noteDouble': '{size}×{size}, {count} regiones, dos coronas en cada una.',
+      'queens.rule10': 'Pulsa el botón de dos coronas para tableros con <b>dos coronas en cada fila, columna y región</b>. Siguen sin poder tocarse. Los tableros grandes tienen sitios donde hay que seguir «¿y si pongo una corona aquí?» hasta el final.',
       'queens.note': '{size}×{size}, {count} regiones.',
       'queens.hintCleared': 'Se quitaron {count} coronas mal puestas y se señaló el siguiente sitio.',
       'queens.hintPlaced': 'Se colocó una corona en una región que la lógica ya fija.',
