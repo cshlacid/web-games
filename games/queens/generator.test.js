@@ -72,5 +72,48 @@ check('지원하지 않는 크기는 거절한다', (() => {
   try { G.generate(5); return false; } catch { return true; }
 })(), true);
 
+// --- 왕관이 둘인 판 ---
+{
+  const puzzle = G.generateDouble(8, { seed: 3 });
+  const cells = R.solutionCells(puzzle);
+  check('둘인 판: 만든 판의 모양이 온전하다', R.wellFormed(puzzle), true);
+  check('둘인 판: 만든 판은 유일해다', S.solve(puzzle, { limit: 2 }).count, 1);
+  check('둘인 판: 정답이 실제로 답이다', R.validate(puzzle, cells).done, true);
+  check('둘인 판: 힌트 순서가 정답 자리 전부다', puzzle.order.slice().sort((x, y) => x - y), cells.slice().sort((x, y) => x - y));
+  check('둘인 판: 적어 두었다 읽으면 같은 판', G.decodeDouble(8, G.encodeDouble(puzzle)).regions, puzzle.regions);
+}
+
+// 구워 둔 판을 모두 본다. 논리 풀이는 10×10 한 판에 1초 가까이 들어 앞의 몇 판만 푼다 —
+// 나머지는 굽는 자리에서 이미 통과한 것이고, 여기서는 자료가 깨지지 않았는지를 본다.
+{
+  const D = require('./doubles.js').DOUBLES;
+  const bad = { count: 0, shape: 0, oversized: 0, notUnique: 0, solution: 0, order: 0, logic: 0 };
+  for (const size of G.DOUBLE_SIZES) {
+    if (!D[size] || D[size].length !== 60) bad.count++;
+    D[size].forEach((code, id) => {
+      const puzzle = G.decodeDouble(size, code);
+      if (!R.wellFormed(puzzle)) bad.shape++;
+      const counts = new Array(size).fill(0);
+      for (const g of puzzle.regions) counts[g]++;
+      if (counts.some((c) => c > G.DOUBLE_CAP[size])) bad.oversized++;
+      if (S.solve(puzzle, { limit: 2 }).count !== 1) bad.notUnique++;
+      const cells = R.solutionCells(puzzle);
+      if (!R.validate(puzzle, cells).done) bad.solution++;
+      if (puzzle.order.length !== size * 2) bad.order++;
+      if (id < 2 && !S.logicSolve(puzzle).solved) bad.logic++;
+    });
+  }
+  check('둘인 판 자료: 크기마다 60판', bad.count, 0);
+  check('둘인 판 자료: 영역 모양이 온전하다', bad.shape, 0);
+  check('둘인 판 자료: 영역 크기가 상한을 넘지 않는다', bad.oversized, 0);
+  check('둘인 판 자료: 모두 유일해다', bad.notUnique, 0);
+  check('둘인 판 자료: 정답이 실제로 답이다', bad.solution, 0);
+  check('둘인 판 자료: 힌트 순서에 왕관이 다 있다', bad.order, 0);
+  check('둘인 판 자료: 찍지 않고 풀린다(앞의 두 판씩)', bad.logic, 0);
+
+  const first = G.pickDouble(9, -1, () => 0);
+  check('방금 푼 판은 건너뛴다', G.pickDouble(9, first.id, () => 0).id !== first.id, true);
+}
+
 console.log(`\n${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);

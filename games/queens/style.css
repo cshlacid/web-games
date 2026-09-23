@@ -31,6 +31,8 @@
   --rg6: #bfe6dd;
   --rg7: #fadcbb;
   --rg8: #d8dce3;
+  /* 10×10(왕관 둘씩)에서만 쓰는 열 번째 색. */
+  --rg9: #d9c6a5;
   --pad-x: clamp(10px, 4vmin, 28px);
   --app-max: 440px;
 }
@@ -59,6 +61,7 @@
     --rg6: #2b6360;
     --rg7: #7d5730;
     --rg8: #454c58;
+    --rg9: #6b5a3a;
   }
 }
 
@@ -142,6 +145,10 @@ h1 {
   color: var(--btn-fg);
 }
 
+/* 왕관 둘씩. 글자 대신 왕관 두 개를 그려 어느 언어에서도 같은 폭을 차지한다. */
+.stars { display: inline-flex; align-items: center; padding: 3px 8px; }
+.stars .ico { display: block; width: 15px; height: 15px; }
+
 /* 자동 체크는 크기 고르기와 성격이 달라 같은 줄에 있어도 한 칸 떼어 둔다. */
 .check { margin-inline-start: 4px; }
 
@@ -218,6 +225,7 @@ h1 {
 .cell.rg6 { background: var(--rg6); }
 .cell.rg7 { background: var(--rg7); }
 .cell.rg8 { background: var(--rg8); }
+.cell.rg9 { background: var(--rg9); }
 
 /* 그림은 칸마다 둘 다 넣어 두고 여기서 감춘다 — 이유는 main.js에 적어 두었다. */
 .cell .ico { display: none; width: 78%; height: 78%; }

@@ -5,8 +5,10 @@
 (function () {
 
 // Queens의 규칙 모델. 판 하나는
-//   { size, regions: [칸마다 영역 번호 0..size-1], solution: [행마다 왕관의 열] }
-// 이고, 푸는 것은 행·열·영역마다 왕관을 정확히 하나씩, 서로 닿지 않게 놓는 일이다.
+//   { size, stars, regions: [칸마다 영역 번호 0..size-1], solution }
+// 이고, 푸는 것은 행·열·영역마다 왕관을 정확히 `stars`개씩, 서로 닿지 않게 놓는 일이다.
+// `stars`가 없으면 하나다(원작). 둘인 판은 Star Battle의 규칙과 같다.
+// `solution`은 행마다 왕관의 열이고, 둘인 판은 행마다 열 두 개의 배열이다.
 // 칸은 r * size + c 로 번호를 매긴다.
 //
 // 칸의 상태는 셋이다. X는 사람이 직접 찍는 배제 표시일 뿐 판정에 쓰이지 않는다 —
@@ -21,7 +23,7 @@ function board(puzzle) {
   const regions = Int32Array.from(puzzle.regions);
   const regionCells = Array.from({ length: size }, () => []);
   for (let cell = 0; cell < n; cell++) regionCells[regions[cell]].push(cell);
-  return { size, n, regions, regionCells, solution: puzzle.solution };
+  return { size, n, stars: puzzle.stars || 1, regions, regionCells, solution: puzzle.solution };
 }
 
 function newState(b) {
@@ -57,7 +59,8 @@ function adjacent(size, a, b2) {
 }
 
 // 규칙을 어기고 있는 왕관들. 어느 왕관이 잘못됐는지 가릴 수 없으므로 충돌에
-// 관여한 쪽을 모두 돌려준다 — 화면은 이걸 그대로 붉게 칠한다.
+// 관여한 쪽을 모두 돌려준다 — 화면은 이걸 그대로 붉게 칠한다. 한 줄·영역에 왕관이
+// 넘치면 그 줄의 왕관이 전부, 서로 닿은 왕관은 그 둘이 걸린다.
 function conflicts(b, state) {
   const size = b.size;
   const placed = [];
@@ -65,26 +68,37 @@ function conflicts(b, state) {
     if (state.marks[cell] === CROWN) placed.push(cell);
   }
   const bad = new Set();
+  const units = [
+    (cell) => Math.floor(cell / size),
+    (cell) => size + (cell % size),
+    (cell) => 2 * size + b.regions[cell],
+  ];
+  const members = Array.from({ length: 3 * size }, () => []);
+  for (const cell of placed) for (const unit of units) members[unit(cell)].push(cell);
+  for (const list of members) {
+    if (list.length > b.stars) for (const cell of list) bad.add(cell);
+  }
   for (let i = 0; i < placed.length; i++) {
     for (let j = i + 1; j < placed.length; j++) {
-      const a = placed[i];
-      const c = placed[j];
-      const sameRow = Math.floor(a / size) === Math.floor(c / size);
-      const sameCol = a % size === c % size;
-      const sameRegion = b.regions[a] === b.regions[c];
-      if (sameRow || sameCol || sameRegion || adjacent(size, a, c)) {
-        bad.add(a);
-        bad.add(c);
+      if (adjacent(size, placed[i], placed[j])) {
+        bad.add(placed[i]);
+        bad.add(placed[j]);
       }
     }
   }
   return [...bad].sort((x, y) => x - y);
 }
 
-// 왕관이 size개이고 충돌이 없으면 행·열·영역마다 정확히 하나씩이다 — 비둘기집이라
-// 따로 셀 필요가 없다.
+// 왕관이 size × stars개이고 충돌이 없으면 행·열·영역마다 정확히 stars개씩이다 —
+// 비둘기집이라 따로 셀 필요가 없다.
 function isDone(b, state) {
-  return state.crowns === b.size && conflicts(b, state).length === 0;
+  return state.crowns === b.size * b.stars && conflicts(b, state).length === 0;
+}
+
+// 정답 왕관의 칸 목록. 하나인 판과 둘인 판의 `solution` 모양이 달라 여기서 맞춘다.
+function solutionCells(puzzle) {
+  const size = puzzle.size;
+  return puzzle.solution.flatMap((cols, r) => [].concat(cols).map((c) => r * size + c));
 }
 
 // 왕관 자리 목록 하나를 통째로 검사한다. 화면 밖(테스트·솔버 검증)에서 쓴다.
@@ -135,7 +149,7 @@ function wellFormed(puzzle) {
 
 const Rules = {
   EMPTY, MARK, CROWN,
-  board, newState, reset, set, cycle, adjacent, conflicts, isDone, validate,
+  board, newState, reset, set, cycle, adjacent, conflicts, isDone, solutionCells, validate,
   connected, wellFormed,
 };
 

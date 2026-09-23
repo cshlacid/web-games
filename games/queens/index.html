@@ -40,6 +40,7 @@
     </div>
     <div class="picker-row">
       <div class="picker" id="sizes" role="group" aria-label="판 크기" data-i18n-attr="aria-label=ui.boardSize"></div>
+      <button class="pick stars" id="stars" type="button" aria-pressed="false" aria-label="왕관 둘씩" data-i18n-attr="aria-label=queens.double"></button>
       <button class="pick check" id="auto-check" type="button" aria-pressed="true" data-i18n="queens.autoCheck">자동 체크</button>
       <span class="best" id="best"></span>
       <span class="timer" id="timer">0:00</span>
@@ -97,6 +98,9 @@
         스스로 찾고 싶으면 꺼 두세요.</li>
       <li data-i18n-html="queens.rule7"><b>이 게임의 모든 판은 답이 하나뿐이고, 찍지 않고 논리만으로 풀립니다.</b>
         마지막에 두 자리를 놓고 고민하게 되는 판은 나오지 않습니다.</li>
+      <li data-i18n-html="queens.rule10">왕관 두 개 단추를 누르면 <b>행·열·영역마다 왕관을 둘씩</b> 놓는 판이 나옵니다.
+        닿으면 안 되는 것은 같습니다. 큰 판에는 "여기에 놓으면 어떻게 되나"를 끝까지 따져 봐야 하는
+        자리가 있습니다.</li>
       <li data-i18n-html="queens.rule8"><b>힌트</b>는 어긋난 왕관을 걷어 내고, 지금 알아낼 수 있는 영역 하나에
         왕관을 놓아 줍니다. 힌트를 쓴 판은 최고 기록으로 남기지 않습니다.</li>
       <li data-i18n-html="queens.rule9">키보드: <b>방향키</b>로 칸을 옮기고, <b>스페이스</b>로 바꾸고,
@@ -112,6 +116,7 @@
 <script src="../../shared/base.js"></script>
 <script src="rules.js"></script>
 <script src="solver.js"></script>
+<script src="doubles.js"></script>
 <script src="generator.js"></script>
 <script src="icons.js"></script>
 <script src="../../shared/icons.js"></script>

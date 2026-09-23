@@ -10,11 +10,15 @@ const t = SharedI18n.t;
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
 const SIZE_KEY = 'web-games.queens.size';
+// 왕관이 둘인 판은 크기가 따로라(8·9·10) 고른 크기도 따로 남긴다.
+const SIZE2_KEY = 'web-games.queens.size2';
+const STARS_KEY = 'web-games.queens.stars';
 const BEST_KEY = 'web-games.queens.best';
 const CHECK_KEY = 'web-games.queens.autocheck';
 
 const el = {
   sizes: document.getElementById('sizes'),
+  stars: document.getElementById('stars'),
   autoCheck: document.getElementById('auto-check'),
   best: document.getElementById('best'),
   timer: document.getElementById('timer'),
@@ -37,7 +41,8 @@ const el = {
 };
 
 const game = {
-  size: loadSize(),
+  stars: loadStars(),
+  size: 0,
   autoCheck: loadCheck(),
   puzzle: null,
   board: null,
@@ -55,12 +60,28 @@ const game = {
   dragLast: -1,
 };
 
+game.size = loadSize();
+
+function sizesNow() {
+  return game.stars === 2 ? G.DOUBLE_SIZES : G.SIZES;
+}
+
+function loadStars() {
+  try { return localStorage.getItem(STARS_KEY) === '2' ? 2 : 1; } catch { return 1; }
+}
+
 function loadSize() {
+  const sizes = sizesNow();
   try {
-    const saved = Number(localStorage.getItem(SIZE_KEY));
-    if (G.SIZES.includes(saved)) return saved;
+    const saved = Number(localStorage.getItem(game.stars === 2 ? SIZE2_KEY : SIZE_KEY));
+    if (sizes.includes(saved)) return saved;
   } catch { /* 저장된 값이 없거나 접근 불가 */ }
-  return 7;
+  return sizes[0];
+}
+
+// 최고 기록의 열쇠. 하나인 판은 예전처럼 크기만 쓴다 — 이미 쌓인 기록을 그대로 읽는다.
+function bestKey() {
+  return game.stars === 2 ? `${game.size}x2` : String(game.size);
 }
 
 function loadCheck() {
@@ -82,7 +103,7 @@ function formatTime(seconds) {
 }
 
 function showBest() {
-  const best = loadBest()[game.size];
+  const best = loadBest()[bestKey()];
   el.best.textContent = best ? t('record.best', { time: formatTime(best) }) : '';
 }
 
@@ -285,8 +306,7 @@ function clearBoard() {
 // 지금 이 판에서 사람이 다음으로 알아낼 수 있는 자리라야 힌트가 배움이 된다.
 function hint() {
   if (game.done) return;
-  const size = game.size;
-  const answer = new Set(game.puzzle.solution.map((c, r) => r * size + c));
+  const answer = new Set(R.solutionCells(game.puzzle));
 
   const changes = [];
   for (let cell = 0; cell < game.board.n; cell++) {
@@ -319,13 +339,13 @@ function finishIfDone() {
   Sound.play('win');
 
   const best = loadBest();
-  const previous = best[game.size];
+  const previous = best[bestKey()];
   // 조각에 앞 공백을 넣어 두면 언어마다 빈칸 규칙이 달라 어긋난다 — 모아서 붙인다.
-  const note = [t('queens.note', { size: game.size, count: game.size })];
+  const note = [t(game.stars === 2 ? 'queens.noteDouble' : 'queens.note', { size: game.size, count: game.size })];
   if (game.hinted) {
     note.push(t('record.hinted', { count: game.hinted }));
   } else if (!previous || game.elapsed < previous) {
-    best[game.size] = game.elapsed;
+    best[bestKey()] = game.elapsed;
     saveBest(best);
     note.push(previous ? t('record.improved', { time: formatTime(previous) }) : t('record.first'));
     showBest();
@@ -336,7 +356,7 @@ function finishIfDone() {
   el.resultTitle.textContent = t('record.done', { time: formatTime(game.elapsed) });
   el.resultNote.textContent = note.join(' ');
   el.result.hidden = false;
-  SharedDailyUI.report('queens', { size: game.size, time: game.elapsed, hints: game.hinted });
+  SharedDailyUI.report('queens', { size: game.size, stars: game.stars, time: game.elapsed, hints: game.hinted });
 }
 
 // --- 판 만들기 ---
@@ -348,7 +368,11 @@ function newGame() {
   // 9×9는 만드는 데 0.5초가 걸리기도 한다. 가림막이 먼저 그려지도록 한 프레임
   // 뒤로 미룬다 — 바로 만들면 화면이 멈춘 채로 아무 표시가 없다.
   requestAnimationFrame(() => setTimeout(() => {
-    const puzzle = G.generate(game.size) || G.generate(game.size);
+    // 왕관이 둘인 판은 구워 둔 것에서 고른다(generator.js의 "왕관이 둘인 판").
+    const last = game.puzzle && game.puzzle.stars === 2 && game.puzzle.size === game.size ? game.puzzle.id : -1;
+    const puzzle = game.stars === 2
+      ? G.pickDouble(game.size, last)
+      : G.generate(game.size) || G.generate(game.size);
     if (!puzzle) {
       el.veil.hidden = true;
       toast(t('record.genFail'));
@@ -373,7 +397,7 @@ function newGame() {
 
 function buildSizePicker() {
   el.sizes.replaceChildren();
-  for (const size of G.SIZES) {
+  for (const size of sizesNow()) {
     const button = document.createElement('button');
     button.className = 'pick';
     button.type = 'button';
@@ -382,7 +406,7 @@ function buildSizePicker() {
     button.addEventListener('click', () => {
       if (size === game.size) return;
       game.size = size;
-      try { localStorage.setItem(SIZE_KEY, String(size)); } catch { /* 무시 */ }
+      try { localStorage.setItem(game.stars === 2 ? SIZE2_KEY : SIZE_KEY, String(size)); } catch { /* 무시 */ }
       for (const other of el.sizes.children) {
         other.setAttribute('aria-pressed', String(other === button));
       }
@@ -473,6 +497,20 @@ el.clear.addEventListener('click', clearBoard);
 el.hint.addEventListener('click', hint);
 el.newGame.addEventListener('click', () => { Sound.play('click'); newGame(); });
 el.again.addEventListener('click', () => { Sound.play('click'); newGame(); });
+
+// 왕관 둘씩. 누르면 크기 고르개가 그 판의 크기(8·9·10)로 바뀐다.
+el.stars.innerHTML = Icons.svg('crown') + Icons.svg('crown');
+el.stars.setAttribute('aria-pressed', String(game.stars === 2));
+el.stars.addEventListener('click', () => {
+  game.stars = game.stars === 2 ? 1 : 2;
+  try { localStorage.setItem(STARS_KEY, String(game.stars)); } catch { /* 무시 */ }
+  el.stars.setAttribute('aria-pressed', String(game.stars === 2));
+  game.size = loadSize();
+  buildSizePicker();
+  showBest();
+  Sound.play('click');
+  newGame();
+});
 
 el.autoCheck.setAttribute('aria-pressed', String(game.autoCheck));
 el.autoCheck.addEventListener('click', () => {
