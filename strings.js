@@ -31,6 +31,7 @@
       'desc.slitherlink': '숫자만큼 둘러 고리 하나 만들기',
       'desc.nurikabe': '섬만 남기고 바다 칠하기',
       'desc.lightup': '전구로 모든 칸 밝히기',
+      'desc.kenken': '행과 열, 케이지의 셈 맞추기',
 
       'daily.title': '오늘의 도전',
       'daily.calendar': '달력',
@@ -71,6 +72,7 @@
       'desc.slitherlink': 'Loop around the numbers',
       'desc.nurikabe': 'Shade the sea around the islands',
       'desc.lightup': 'Light every cell with bulbs',
+      'desc.kenken': 'Fill rows and columns to make every cage add up',
 
       'daily.title': 'Daily challenge',
       'daily.calendar': 'Calendar',
@@ -111,6 +113,7 @@
       'desc.slitherlink': '数字どおりに輪をつなぐ',
       'desc.nurikabe': '島を残して海を塗る',
       'desc.lightup': '照明ですべてを照らす',
+      'desc.kenken': '行と列を埋めてケージの計算を合わせる',
 
       'daily.title': '今日のチャレンジ',
       'daily.calendar': 'カレンダー',
@@ -151,6 +154,7 @@
       'desc.slitherlink': '按数字连成一个回路',
       'desc.nurikabe': '留下岛屿，涂黑海洋',
       'desc.lightup': '用灯泡照亮所有格子',
+      'desc.kenken': '填满行列，凑出每个笼子的算式',
 
       'daily.title': '今日挑战',
       'daily.calendar': '日历',
@@ -191,6 +195,7 @@
       'desc.slitherlink': '依數字連成一個迴路',
       'desc.nurikabe': '留下島嶼，塗黑海洋',
       'desc.lightup': '用燈泡照亮所有格子',
+      'desc.kenken': '填滿行列，湊出每個籠子的算式',
 
       'daily.title': '今日挑戰',
       'daily.calendar': '日曆',
@@ -231,6 +236,7 @@
       'desc.slitherlink': 'Un circuito según los números',
       'desc.nurikabe': 'Sombrea el mar entre islas',
       'desc.lightup': 'Ilumina todas las casillas',
+      'desc.kenken': 'Completa filas y columnas cuadrando cada jaula',
 
       'daily.title': 'Reto diario',
       'daily.calendar': 'Calendario',

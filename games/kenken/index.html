@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title data-i18n="game.kenken">KenKen</title>
+<meta name="description" content="행과 열에 숫자를 한 번씩 넣고 케이지의 셈을 맞추는 퍼즐" data-i18n-attr="content=meta.desc">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><rect x='2' y='2' width='20' height='20' rx='3' fill='%23ffffff' stroke='%233f5a55' stroke-width='1.6'/><path d='M12 2 V12 H22' fill='none' stroke='%233f5a55' stroke-width='1.6'/><path d='M4.5 6.5 H9 M6.75 4.25 V8.75' stroke='%232b7a6b' stroke-width='1.6'/><path d='M14.5 15.5 L19 20 M19 15.5 L14.5 20' stroke='%232b7a6b' stroke-width='1.6'/></svg>">
+<link rel="manifest" href="../../manifest.json">
+<link rel="apple-touch-icon" href="../../icons/icon-180.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="KenKen" data-i18n-attr="content=game.kenken">
+<meta name="theme-color" content="#f6f5f0" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1a1714" media="(prefers-color-scheme: dark)">
+<link rel="stylesheet" href="../../shared/base.css">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="../../shared/result.css">
+<link rel="stylesheet" href="../../shared/sheet.css">
+<link rel="stylesheet" href="../../shared/daily.css">
+<script src="../../shared/analytics.js"></script>
+<script src="../../shared/i18n.js"></script>
+<script src="../../shared/strings.js"></script>
+<script src="strings.js"></script>
+</head>
+<body>
+<main class="app">
+  <header class="head">
+    <div class="title-row">
+      <div class="head-nav">
+        <a class="back" href="../../" data-i18n="ui.back">← 목록</a>
+        <button class="toggle" id="help-open" type="button" aria-pressed="false" data-i18n="ui.help">도움말</button>
+      </div>
+      <h1 data-i18n="game.kenken">KenKen</h1>
+      <div class="head-actions">
+        <button class="toggle sound" id="toggle-bgm" type="button" aria-pressed="true" data-i18n="ui.bgm">BGM</button>
+        <button class="toggle sound" id="toggle-sfx" type="button" aria-pressed="true" data-i18n="ui.sfx">효과음</button>
+      </div>
+    </div>
+    <div class="status-row">
+      <div class="levels" id="levels" role="group" aria-label="난이도" data-i18n-attr="aria-label=ui.difficulty"></div>
+      <span class="timer" id="timer">0:00</span>
+    </div>
+  </header>
+
+  <div class="board-wrap">
+    <div class="board" id="board"></div>
+    <div class="result" id="result" role="status" aria-live="polite" hidden>
+      <div class="result-card">
+        <p class="sheet-title" id="result-title"></p>
+        <p class="sheet-note" id="result-note"></p>
+        <div class="sheet-actions">
+          <button class="btn" id="again" type="button" data-i18n="ui.again">한 판 더</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="toast" id="toast" role="status" aria-live="polite"></p>
+
+  <div class="pad">
+    <div class="digits" id="digits"></div>
+    <div class="tools">
+      <button class="tool" id="pencil" type="button" aria-pressed="false">
+        <span class="tool-icon" data-icon="pencil"></span><span class="tool-label" data-i18n="ui.pencil">연필</span>
+      </button>
+      <button class="tool" id="erase" type="button">
+        <span class="tool-icon" data-icon="backspace"></span><span class="tool-label" data-i18n="ui.erase">지우기</span>
+      </button>
+      <button class="tool" id="undo" type="button">
+        <span class="tool-icon" data-icon="undo"></span><span class="tool-label" data-i18n="ui.undo">되돌리기</span>
+      </button>
+      <button class="tool" id="hint" type="button">
+        <span class="tool-icon" data-icon="hint"></span><span class="tool-label" data-i18n="ui.hint">힌트</span>
+      </button>
+      <button class="tool" id="new-game" type="button">
+        <span class="tool-icon" data-icon="plus"></span><span class="tool-label" data-i18n="ui.newBoard">새 판</span>
+      </button>
+    </div>
+  </div>
+
+
+  <div class="sheet" id="help" hidden>
+    <p class="sheet-title" data-i18n="ui.rules">규칙</p>
+    <ul class="help-list">
+      <li data-i18n-html="kenken.rule1"><b>행마다, 열마다 1부터 판 크기까지의 숫자를 한 번씩</b> 넣습니다. 6×6이면
+        1~6입니다.</li>
+      <li data-i18n-html="kenken.rule2">굵은 선으로 묶인 <b>케이지</b>의 숫자를 적힌 연산으로 셈하면 적힌 수가 나와야
+        합니다. <b>−</b>와 <b>÷</b>는 두 칸짜리이고, 큰 수에서 작은 수를 빼거나 나눕니다. 연산 없이 숫자만
+        있으면 그 숫자가 그대로 들어갑니다.</li>
+      <li data-i18n-html="kenken.rule3">케이지 안에서 숫자가 겹쳐도 됩니다 — 같은 행이나 열에만 있지 않으면.</li>
+      <li data-i18n-html="kenken.rule4">칸을 고르고 아래 숫자를 누릅니다. <b>연필</b>을 켜면 후보를 작게 적어 둘 수
+        있고, 숫자를 넣으면 같은 줄의 연필 표시에서 그 숫자가 지워집니다.</li>
+      <li data-i18n-html="kenken.rule5"><b>모든 판은 답이 하나뿐이고 찍지 않고 풀립니다.</b> 쉬움과 보통은 줄과 케이지만
+        보고 풀리고, 어려움에는 대개 "여기에 이 숫자를 넣으면 어떻게 되나"를 따져 봐야 하는 자리가 있습니다.</li>
+      <li data-i18n-html="kenken.rule6"><b>힌트</b>는 틀린 숫자를 짚어 주고, 틀린 것이 없으면 지금 확정할 수 있는 칸
+        하나를 까닭과 함께 채웁니다.</li>
+      <li data-i18n-html="kenken.rule7">키보드: 방향키로 이동, <b>숫자</b> 입력, <b>Shift+숫자</b>는 연필,
+        <b>Backspace</b> 지우기, <b>스페이스</b> 연필 전환, <b>Ctrl+Z</b> 되돌리기.</li>
+    </ul>
+    <div class="sheet-actions">
+      <button class="btn" id="help-close" type="button" data-i18n="ui.close">닫기</button>
+    </div>
+  </div>
+</main>
+
+<script>SharedI18n.apply();</script>
+<script src="../../shared/base.js"></script>
+<script src="../../shared/icons.js"></script>
+<script src="../../shared/snap.js"></script>
+<script src="rules.js"></script>
+<script src="solver.js"></script>
+<script src="puzzles.js"></script>
+<script src="generator.js"></script>
+<script src="../../shared/audio.js"></script>
+<script src="audio.js"></script>
+<script src="../../shared/sheet.js"></script>
+<script src="../../shared/daily.js"></script>
+<script src="../../shared/daily-ui.js"></script>
+<script src="main.js"></script>
+</body>
+</html>
