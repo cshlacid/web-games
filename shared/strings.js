@@ -27,6 +27,7 @@
       'game.sokoban': '소코반',
       'game.slitherlink': '슬리더링크',
       'game.nurikabe': '누리카베',
+      'game.lightup': '라이트 업',
 
       'ui.back': '← 목록',
       'ui.bgm': 'BGM',
@@ -122,6 +123,7 @@
       'game.sokoban': 'Sokoban',
       'game.slitherlink': 'Slitherlink',
       'game.nurikabe': 'Nurikabe',
+      'game.lightup': 'Light Up',
 
       'ui.back': '← All games',
       'ui.bgm': 'Music',
@@ -217,6 +219,7 @@
       'game.sokoban': '倉庫番',
       'game.slitherlink': 'スリザーリンク',
       'game.nurikabe': 'ぬりかべ',
+      'game.lightup': '美術館',
 
       'ui.back': '← 一覧',
       'ui.bgm': 'BGM',
@@ -312,6 +315,7 @@
       'game.sokoban': '推箱子',
       'game.slitherlink': '数回',
       'game.nurikabe': '数墙',
+      'game.lightup': '美术馆',
 
       'ui.back': '← 列表',
       'ui.bgm': '音乐',
@@ -407,6 +411,7 @@
       'game.sokoban': '倉庫番',
       'game.slitherlink': '數迴',
       'game.nurikabe': '數牆',
+      'game.lightup': '美術館',
 
       'ui.back': '← 列表',
       'ui.bgm': '音樂',
@@ -502,6 +507,7 @@
       'game.sokoban': 'Sokoban',
       'game.slitherlink': 'Slitherlink',
       'game.nurikabe': 'Nurikabe',
+      'game.lightup': 'Light Up',
 
       'ui.back': '← Lista',
       'ui.bgm': 'Música',

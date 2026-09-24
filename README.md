@@ -28,6 +28,7 @@
 | [소코반](games/sokoban/) | 상자를 밀어 목표 자리에 모두 올린다 | 순수 HTML/CSS/JS |
 | [슬리더링크](games/slitherlink/) | 숫자만큼 변을 둘러 고리 하나를 만든다 | 순수 HTML/CSS/JS |
 | [누리카베](games/nurikabe/) | 숫자만큼 섬을 남기고 나머지를 바다로 칠한다 | 순수 HTML/CSS/JS |
+| [라이트 업](games/lightup/) | 전구를 놓아 모든 칸을 밝힌다 | 순수 HTML/CSS/JS |
 | [길목 지키기](games/defense/) | 길목에 사람을 세워 밀려오는 적을 막는다 | 순수 HTML/CSS/JS |
 
 ## 로컬에서 실행
