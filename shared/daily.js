@@ -139,6 +139,11 @@ const MISSIONS = [
   { id: 'lightup.medium', game: 'lightup', tier: 2, text: 'medium', test: (r) => r.level === 'normal' || r.level === 'hard' },
   { id: 'lightup.clean', game: 'lightup', tier: 2, text: 'clean', test: (r) => r.hints === 0 },
   { id: 'lightup.hard', game: 'lightup', tier: 3, text: 'hard', test: (r) => r.level === 'hard' },
+
+  { id: 'kenken.any', game: 'kenken', tier: 1, text: 'anyLevel', test: () => true },
+  { id: 'kenken.medium', game: 'kenken', tier: 2, text: 'medium', test: (r) => r.level === 'normal' || r.level === 'hard' },
+  { id: 'kenken.clean', game: 'kenken', tier: 2, text: 'clean', test: (r) => r.hints === 0 },
+  { id: 'kenken.hard', game: 'kenken', tier: 3, text: 'hard', test: (r) => r.level === 'hard' },
 ];
 
 const BY_ID = new Map(MISSIONS.map((m) => [m.id, m]));
