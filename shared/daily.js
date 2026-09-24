@@ -134,6 +134,11 @@ const MISSIONS = [
   { id: 'nurikabe.medium', game: 'nurikabe', tier: 2, text: 'medium', test: (r) => r.level === 'normal' || r.level === 'hard' },
   { id: 'nurikabe.clean', game: 'nurikabe', tier: 2, text: 'clean', test: (r) => r.hints === 0 },
   { id: 'nurikabe.hard', game: 'nurikabe', tier: 3, text: 'hard', test: (r) => r.level === 'hard' },
+
+  { id: 'lightup.any', game: 'lightup', tier: 1, text: 'anyLevel', test: () => true },
+  { id: 'lightup.medium', game: 'lightup', tier: 2, text: 'medium', test: (r) => r.level === 'normal' || r.level === 'hard' },
+  { id: 'lightup.clean', game: 'lightup', tier: 2, text: 'clean', test: (r) => r.hints === 0 },
+  { id: 'lightup.hard', game: 'lightup', tier: 3, text: 'hard', test: (r) => r.level === 'hard' },
 ];
 
 const BY_ID = new Map(MISSIONS.map((m) => [m.id, m]));
