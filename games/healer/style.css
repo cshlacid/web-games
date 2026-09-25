@@ -1079,7 +1079,7 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 }
 .attr-add:hover:not(:disabled) { background: var(--sel); }
 .attr-add:disabled { opacity: 0.25; cursor: default; }
-/* 배우기 단추는 글자라 폭이 넓다. ＋와 같은 칸에 두면 글자가 잘린다. */
+/* 배우기 단추는 글자라 폭이 넓다. 올리기(plus 아이콘)와 같은 칸에 두면 글자가 잘린다. */
 .attr-add.learn { width: auto; padding: 0 10px; font-size: 13px; font-weight: 600; }
 
 /* 동료의 계열 바꾸기. 칩 줄이라 시트 안에서 스킬 칩과 같은 결로 읽힌다. */

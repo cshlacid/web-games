@@ -264,7 +264,8 @@ const gear = (defId, tier) => Items.make(defId, tier || 0, 3);
   };
 
   const saved = P.create();
-  saved.charLevel = 4;
+  // 음유시인의 조건(캐릭터 레벨 5)을 채운 저장본. 채우지 못한 계열은 겪은 것으로 치지 않는다.
+  saved.charLevel = D.HERO_JOBS.bard.need.charLevel;
   saved.gold = 500;
   saved.inventory = [gear('staff', 1), { defId: '없는물건', tier: 0 }, null];
   saved.equipped.weapon = gear('robe', 0);   // 슬롯이 맞지 않는 장착
@@ -279,7 +280,7 @@ const gear = (defId, tier) => Items.make(defId, tier || 0, 3);
   check('저장된다', P.save(saved), true);
 
   const loaded = P.load();
-  check('레벨이 남는다', loaded.charLevel, 4);
+  check('레벨이 남는다', loaded.charLevel, D.HERO_JOBS.bard.need.charLevel);
   check('골드가 남는다', loaded.gold, 500);
   check('모르는 물건은 버린다', loaded.inventory.length, 1);
   check('슬롯이 안 맞는 장착은 비운다', loaded.equipped.weapon, null);
@@ -313,6 +314,33 @@ const gear = (defId, tier) => Items.make(defId, tier || 0, 3);
   // 사제 예산으로 음유시인 스킬을 배운 것이 되면 계열을 나눈 뜻이 사라진다.
   check('점수는 계열마다 따로 센다',
     P.spentSkillPoints(loaded, 'bard') <= P.earnedSkillPoints(loaded, 'bard'), true);
+
+  // 조건을 못 채운 계열이 적혀 있으면 겪은 것으로 치지 않고, 그 계열의 스킬도 배운
+  // 것으로 받지 않는다. 계열 이름만 적어 넣으면 기본 점수로 첫 스킬을 배울 수 있었다.
+  const sneaky = P.create();
+  sneaky.jobs = { priest: { level: 1, exp: 0 }, bishop: { level: 5, exp: 0 } };
+  sneaky.learned = Object.fromEntries(D.heroSkillsOf('bishop').map((def) => [def.id, 1]));
+  P.save(sneaky);
+  const snuck = P.load();
+  check('못 간 계열은 겪은 것이 아니다', snuck.jobs.bishop, undefined);
+  check('못 간 계열의 스킬은 배운 것이 아니다',
+    D.heroSkillsOf('bishop').some((def) => snuck.learned[def.id]), false);
+
+  // 숫자 칸에 글자가 들어 있어도 숫자로 받는다. 글자로 두면 경험치가 이어 붙어
+  // ("10050") 레벨이 한꺼번에 튄다.
+  const texty = P.create();
+  texty.charExp = '100';
+  texty.gold = 'lots';
+  P.save(texty);
+  const read = P.load();
+  check('글자로 적힌 숫자는 숫자로 받는다', read.charExp, 100);
+  check('숫자가 아니면 기본값', read.gold, 0);
+  const plain = P.create();
+  plain.charExp = 100;
+  P.addExp(read, 50, 0);
+  P.addExp(plain, 50, 0);
+  check('경험치가 이어 붙지 않는다', [read.charLevel, read.charExp], [plain.charLevel, plain.charExp]);
+  P.save(saved);
 
   // 판이 바뀌면 저장본을 통째로 버린다. 어중간하게 읽으면 더 이상한 상태가 된다.
   // 모르는 방식이 적혀 있으면 기본값으로 돌린다. 저장본을 손대도 전투로

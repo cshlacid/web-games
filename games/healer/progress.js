@@ -466,6 +466,15 @@ function load() {
   if (!saved || saved.version !== VERSION) return fresh;
 
   const progress = Object.assign(fresh, saved);
+  // **숫자 칸은 숫자로 받는다.** 손댄 저장본에 `charExp: "100"`이 들어 있으면 경험치를
+  // 더할 때 글자가 이어 붙어("10050") 레벨이 한꺼번에 튀었다. 기본값이 숫자인 칸은
+  // 전부 숫자로 바꾸고, 못 바꾸면 기본값으로 둔다. 범위는 아래에서 칸마다 자른다.
+  for (const [key, value] of Object.entries(create())) {
+    if (typeof value !== 'number') continue;
+    const n = Number(saved[key]);
+    progress[key] = Number.isFinite(n) ? Math.max(0, Math.floor(n)) : value;
+  }
+  progress.charLevel = Math.max(1, Math.min(D.LEVEL.maxLevel, progress.charLevel));
 
   // 아이템은 uid를 다시 붙여 받는다. 저장본의 uid를 그대로 믿으면 겹칠 수 있고,
   // 겹치면 하나를 장착할 때 다른 하나가 사라진다.
@@ -509,6 +518,11 @@ function load() {
   for (const id of Object.keys(D.HERO_JOBS)) {
     const kept = (saved.jobs || {})[id];
     if (!kept && id !== progress.job) continue;   // 겪지 않은 계열은 만들지 않는다
+    // 적혀 있어도 조건을 못 채운 계열은 겪은 것으로 치지 않는다. 저장본에 계열 이름만
+    // 적어 넣으면 그 계열의 스킬을 배울 수 있었다. 계열 표가 아래 계열부터 적혀 있어
+    // 상위 계열의 조건(아래 계열 레벨)은 여기서 이미 채운 칸을 본다.
+    if (id !== progress.job && id !== D.HERO_JOB_START
+      && !canChangeJob(Object.assign({}, progress, { job: null }), id).ok) continue;
     progress.jobs[id] = {
       level: Math.max(1, Math.min(D.jobMaxLevel(id), (kept || {}).level | 0 || 1)),
       exp: Math.max(0, (kept || {}).exp | 0),
@@ -521,6 +535,9 @@ function load() {
   // 음유시인의 스킬을 배운 것으로 넘어간다.
   progress.learned = {};
   for (const jobId of Object.keys(D.HERO_JOBS)) {
+    // 겪지 않은 계열에는 점수가 없다. 기본 점수(`SKILL.start`)만으로도 그 계열의 첫
+    // 스킬을 배운 것으로 받던 자리다.
+    if (!progress.jobs[jobId]) continue;
     let budget = D.SKILL.start
       + (((progress.jobs[jobId] || {}).level || 1) - 1) * D.SKILL.pointsPerLevel;
     for (const def of D.heroSkillsOf(jobId)) {

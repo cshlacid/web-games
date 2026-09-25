@@ -394,7 +394,7 @@ function renderAttrs() {
 
     const add = el('button', 'attr-add');
     add.type = 'button';
-    add.textContent = '＋';
+    add.append(icon('plus'));
     add.disabled = left <= 0;
     add.setAttribute('aria-label', t('hl.raiseAttr', { name: attr.name }));
     add.addEventListener('click', () => {
@@ -518,7 +518,8 @@ function renderCharacter() {
       // 누르는 것이 무슨 일인지 알 수 없어, 아직 안 배운 스킬에는 이름을 적는다.
       const add = el('button', known ? 'attr-add' : 'attr-add learn');
       add.type = 'button';
-      add.textContent = known ? '＋' : t('hl.learn');
+      if (known) add.append(icon('plus'));
+      else add.textContent = t('hl.learn');
       add.disabled = points <= 0 || level >= D.SKILL.max;
       add.setAttribute('aria-label', known ? t('hl.raiseSkill', { name: base.name }) : t('hl.learnSkill', { name: base.name }));
       add.addEventListener('click', () => {
@@ -1174,13 +1175,22 @@ $('roster-refresh').addEventListener('click', () => {
   said.hidden = !joined;
 });
 
+// 편성 화면의 알림. `note`는 전투 화면의 로그에 적어 여기서는 보이지 않는다 — 동료를
+// 누르면 거절 소리만 나고 까닭이 안 보였다. 동료 시트가 열려 있으면 시트에, 아니면
+// 목록 위에 적는다.
+function partyNote(label) {
+  const said = $('member-sheet').hidden ? $('roster-note') : $('member-note');
+  said.textContent = label || '';
+  said.hidden = !label;
+}
+
 function toggleMember(member) {
   const picked = app.party.includes(member);
   const contract = wageOf(member);
   if (!picked && app.party.length >= D.PARTY_MAX - 1) { sound.play('deny'); return; }
   // 응하지 않는 동료는 얼마를 준다 해도 따라나서지 않는다. 이유를 알리지 않으면
   // 단추가 고장 난 것으로 보인다.
-  if (!picked && contract && !contract.ok) { sound.play('deny'); note(contract.line); return; }
+  if (!picked && contract && !contract.ok) { sound.play('deny'); partyNote(msg(contract.line)); return; }
   sound.play('click');
   if (picked) app.party = app.party.filter((entry) => entry !== member);
   else app.party.push(member);
@@ -1194,6 +1204,9 @@ function toggleMember(member) {
 // 보지 않으면 편성이 이름 고르기가 된다. 물약과 장비도 함께 보여야 이 동료가
 // 마나가 떨어진 뒤에도 버티는지 알 수 있다.
 function openMember(member) {
+  // 다른 동료를 열면 앞 동료의 알림을 지운다. 같은 동료를 다시 그릴 때(선물 뒤)는
+  // 부른 쪽이 곧바로 새 알림을 적는다.
+  if (app.member !== member) { $('member-note').textContent = ''; $('member-note').hidden = true; }
   app.member = member;
   const def = Roster.defOf(member);
   const sheet = $('member-sheet');
@@ -1282,7 +1295,7 @@ function renderSpecSwap(member) {
     button.addEventListener('click', () => {
       const moved = Roster.changeSpec(member, spec);
       sound.play(moved.ok ? 'click' : 'deny');
-      if (!moved.ok) { note(msg(moved.reason)); return; }
+      if (!moved.ok) { partyNote(msg(moved.reason)); return; }
       persist();
       renderRoster();
       openMember(member);
@@ -1428,7 +1441,7 @@ function giveGift(member, item) {
   renderRoster();
   updateStart();
   openMember(member);
-  note(t('hl.trustMoved', { name: member.name, sign: moved.delta > 0 ? '+' : '', delta: moved.delta, after: moved.after }));
+  partyNote(t('hl.trustMoved', { name: member.name, sign: moved.delta > 0 ? '+' : '', delta: moved.delta, after: moved.after }));
 }
 
 function chipButton(cls, iconName, label, run) {
@@ -1945,7 +1958,10 @@ function renderSkillbar() {
     button.setAttribute('aria-pressed', 'false');
     button.append(icon(def.icon, 'glyph'));
     button.append(text('span', 'sname', def.name));
-    button.append(text('span', 'cost', def.mp ? num(def.mp) : '－'));
+    const cost = el('span', 'cost');
+    if (def.mp) cost.textContent = num(def.mp);
+    else cost.append(icon('minus'));
+    button.append(cost);
     const cool = el('div', 'cool');
     cool.style.transform = 'scaleY(0)';
     button.append(cool);
@@ -2691,6 +2707,20 @@ $('retry').addEventListener('click', () => {
   sound.play('click');
   // 다시 도전할 때는 스킬과 편성을 그대로 쓴다. 매번 다시 고르게 하면
   // 한 판 더 해 보는 것이 번거로워진다.
+  //
+  // **계약은 다시 낸다.** 진 판에서 신뢰도가 떨어졌으므로 보수가 달라지고, 거절로 넘어간
+  // 동료도 생긴다. 그대로 두면 앞 판의 값으로 싸우고, 거절해야 할 동료도 따라나섰다.
+  // 편성이 바뀌었거나 보수를 감당하지 못하면 편성 화면에서 확인하게 한다.
+  const before = app.party.length;
+  refreshWages();
+  renderBrief();
+  renderRoster();
+  updateStart();
+  if (app.party.length !== before || $('start').disabled) {
+    show('party', msg(app.quest.name));
+    partyNote(app.party.length !== before ? t('hl.retryChanged') : '');
+    return;
+  }
   startBattle();
 });
 
