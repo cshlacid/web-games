@@ -583,10 +583,14 @@ function runUnitSkill(state, unit, choice) {
   // 9레벨 저주가 1레벨 저주와 같은 값을 넣는다.
   const over = (base) => base * unit.power;
 
-  if (def.kind === 'heal') { applyHeal(state, unit, target, def.heal); return; }
-  if (def.kind === 'heal-dot') { addDot(state, unit, target, def, 'heal'); return; }
+  // 회복은 회복력 배수를 탄다 — 주인공 스킬(`heal`)과 같은 규칙이다. 빠져 있던 동안
+  // 동료 사제의 치유술은 1레벨이나 30레벨이나 같은 값이었고, 전투력은 배수가 먹힌다고
+  // 보고 셌다.
+  const mend = (base) => Math.round(base * unit.healPower);
+  if (def.kind === 'heal') { applyHeal(state, unit, target, mend(def.heal)); return; }
+  if (def.kind === 'heal-dot') { addDot(state, unit, target, def, 'heal', mend(def.tick)); return; }
   if (def.kind === 'heal-area') {
-    healSpread(state, unit, unit.side, target, def.radius, def.heal);
+    healSpread(state, unit, unit.side, target, def.radius, mend(def.heal));
     return;
   }
   // 자기 마나를 되찾는다. 마나를 다 쓴 시전자가 남은 전투 내내 기본 공격만
