@@ -40,5 +40,19 @@ check('다 푼 판', R.inspect(p, [1, 2, 2, 1]), { dup: [], wrong: [], done: [0,
 // 셈은 맞아도 줄이 겹치면 끝이 아니다.
 check('줄이 겹치면 풀린 것이 아니다', R.inspect(R.parse(2, '0011|+3,+3'), [1, 2, 1, 2]).solved, false);
 
+{
+  // 3×3 윗줄 두 칸 +4: 같은 줄이라 2·2는 안 된다.
+  const q = R.parse(3, '001222222|+4,=3,+12');
+  check('조합: 같은 줄은 겹치지 않는다', R.combos(q, 0, new Array(9).fill(0)), [{ digits: [1, 3], live: true }]);
+  // ㄱ자 세 칸 ×4(4×4): 1·1·4는 두 1이 대각선이면 되고, 1·2·2도 된다.
+  const r = R.parse(4, '0011011122222222|*4,+10,+30');
+  const all = R.combos(r, 0, new Array(16).fill(0)).map((c) => c.digits.join(''));
+  check('조합: 대각선에는 같은 숫자가 온다', all, ['114', '122']);
+  const values = new Array(16).fill(0);
+  values[0] = 4;
+  check('조합: 넣은 숫자와 맞지 않으면 흐린다',
+    R.combos(r, 0, values).map((c) => c.live), [true, false]);
+}
+
 console.log(`${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);

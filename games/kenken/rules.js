@@ -70,7 +70,36 @@ function inspect(puzzle, values) {
   return { dup: [...dup].sort((a, b) => a - b), wrong, done, solved };
 }
 
-const api = { ALPHABET, OPS, holds, parse, encode, inspect };
+// 케이지에 들어갈 수 있는 숫자 조합. 케이지의 셈과 모양(같은 행·열의 두 칸은 같은 숫자일
+// 수 없다)만 본다 — 다른 칸의 숫자로 거르면 조합표가 힌트가 된다. 케이지 안에 이미 넣은
+// 숫자와 맞게 놓을 수 없는 조합은 `live: false`다.
+// 결과: [{ digits: [작은 수부터], live }]
+function combos(puzzle, id, values) {
+  const n = puzzle.size;
+  const { op, target, cells } = puzzle.cages[id];
+  const found = new Map();
+  const pick = [];
+  (function rec(x) {
+    if (x === cells.length) {
+      if (!holds(op, target, pick)) return;
+      const key = pick.slice().sort((a, b) => a - b).join('');
+      const live = cells.every((i, y) => !values[i] || values[i] === pick[y]);
+      found.set(key, found.get(key) || live);
+      return;
+    }
+    for (let d = 1; d <= n; d++) {
+      const clash = cells.slice(0, x).some((j, y) => pick[y] === d
+        && (Math.floor(j / n) === Math.floor(cells[x] / n) || j % n === cells[x] % n));
+      if (clash) continue;
+      pick.push(d);
+      rec(x + 1);
+      pick.pop();
+    }
+  })(0);
+  return [...found.keys()].sort().map((key) => ({ digits: [...key].map(Number), live: found.get(key) }));
+}
+
+const api = { ALPHABET, OPS, holds, parse, encode, inspect, combos };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 if (typeof window !== 'undefined') window.KenKenRules = api;
