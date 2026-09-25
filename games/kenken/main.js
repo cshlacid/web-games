@@ -197,8 +197,11 @@ function paintCombos() {
   // 남은 조합을 앞에 둔다. 흐린 것이 앞을 차지하면 쓸 만한 조합을 보려고 옆으로 밀어야 한다.
   const list = R.combos(game.puzzle, id, game.values);
   const chips = [...list.filter((c) => c.live), ...list.filter((c) => !c.live)].map((combo) => {
-    const chip = document.createElement('span');
+    const chip = document.createElement('button');
+    chip.type = 'button';
     chip.className = combo.live ? 'combo' : 'combo off';
+    chip.disabled = !combo.live;
+    chip.dataset.digits = combo.digits.join('');
     chip.textContent = combo.digits.join(' ');
     return chip;
   });
@@ -251,6 +254,20 @@ function mark(digit) {
   started();
   snapshot();
   game.marks[i] ^= S.bit(digit);
+  Sound.play('pencil');
+  afterChange();
+}
+
+// 조합의 숫자를 고른 칸의 연필 표시에 더한다. 지우지는 않는다 — 조합 둘을 차례로 눌러
+// 후보를 모으는 것이 쓰임새라, 이미 있는 숫자를 끄면 앞에서 모은 것이 사라진다.
+function markCombo(digits) {
+  const i = game.selected;
+  if (game.done || game.values[i]) return;
+  const add = digits.reduce((mask, d) => mask | S.bit(d), 0);
+  if ((game.marks[i] | add) === game.marks[i]) return;
+  started();
+  snapshot();
+  game.marks[i] |= add;
   Sound.play('pencil');
   afterChange();
 }
@@ -436,6 +453,11 @@ for (const item of LEVELS) {
 el.board.addEventListener('click', (event) => {
   const cell = event.target.closest('.cell');
   if (cell) select(Number(cell.dataset.index));
+});
+
+el.combos.addEventListener('click', (event) => {
+  const chip = event.target.closest('.combo');
+  if (chip && !chip.disabled) markCombo([...chip.dataset.digits].map(Number));
 });
 
 el.pencil.addEventListener('click', () => {

@@ -16,7 +16,7 @@
       'kenken.rule2': '굵은 선으로 묶인 <b>케이지</b>의 숫자를 적힌 연산으로 셈하면 적힌 수가 나와야 합니다. <b>−</b>와 <b>÷</b>는 두 칸짜리이고, 큰 수에서 작은 수를 빼거나 나눕니다. 연산 없이 숫자만 있으면 그 숫자가 그대로 들어갑니다.',
       'kenken.rule3': '케이지 안에서 숫자가 겹쳐도 됩니다 — 같은 행이나 열에만 있지 않으면.',
       'kenken.rule4': '칸을 고르고 아래 숫자를 누릅니다. <b>연필</b>을 켜면 후보를 작게 적어 둘 수 있고, 숫자를 넣으면 같은 줄의 연필 표시에서 그 숫자가 지워집니다.',
-      'kenken.ruleCombos': '칸을 고르면 판 아래에 그 케이지에 들어갈 수 있는 <b>숫자 조합</b>이 나옵니다. 셈과 케이지 모양만 따진 것이라 다른 칸의 숫자는 보지 않고, 케이지에 이미 넣은 숫자와 맞지 않는 조합만 흐려집니다.',
+      'kenken.ruleCombos': '칸을 고르면 판 아래에 그 케이지에 들어갈 수 있는 <b>숫자 조합</b>이 나옵니다. 셈과 케이지 모양만 따진 것이라 다른 칸의 숫자는 보지 않고, 케이지에 이미 넣은 숫자와 맞지 않는 조합만 흐려집니다. 조합을 누르면 그 숫자들이 고른 칸의 연필 표시에 더해집니다.',
       'kenken.rule5': '<b>모든 판은 답이 하나뿐이고 찍지 않고 풀립니다.</b> 쉬움과 보통은 줄과 케이지만 보고 풀리고, 어려움에는 대개 "여기에 이 숫자를 넣으면 어떻게 되나"를 따져 봐야 하는 자리가 있습니다.',
       'kenken.rule6': '<b>힌트</b>는 틀린 숫자를 짚어 주고, 틀린 것이 없으면 지금 확정할 수 있는 칸 하나를 까닭과 함께 채웁니다.',
       'kenken.rule7': '키보드: 방향키로 이동, <b>숫자</b> 입력, <b>Shift+숫자</b>는 연필, <b>Backspace</b> 지우기, <b>스페이스</b> 연필 전환, <b>Ctrl+Z</b> 되돌리기.'
@@ -34,7 +34,7 @@
       'kenken.rule2': 'The numbers in each <b>cage</b> (the bold outlines) must combine with its operation to make its target. <b>−</b> and <b>÷</b> cages have two cells; take the smaller from the larger. A cage with no operation just gives its number.',
       'kenken.rule3': 'Numbers may repeat inside a cage — as long as not in the same row or column.',
       'kenken.rule4': 'Pick a cell and tap a number below. Turn on <b>Pencil</b> to jot candidates; entering a number clears it from the pencil marks in its row and column.',
-      'kenken.ruleCombos': 'Selecting a cell lists the <b>number combinations</b> that fit its cage below the board. They only follow the cage’s math and shape, not the numbers elsewhere; combinations that clash with numbers already in the cage are dimmed.',
+      'kenken.ruleCombos': 'Selecting a cell lists the <b>number combinations</b> that fit its cage below the board. They only follow the cage’s math and shape, not the numbers elsewhere; combinations that clash with numbers already in the cage are dimmed. Tap a combination to add its numbers to the selected cell’s pencil marks.',
       'kenken.rule5': '<b>Every board has exactly one answer and needs no guessing.</b> Easy and Medium fall to lines and cages alone; Hard usually has spots where you must ask “what if this number went here?”',
       'kenken.rule6': 'A <b>Hint</b> points out a wrong number, or if there is none, fills in one cell you can settle now and tells you why.',
       'kenken.rule7': 'Keyboard: arrows to move, <b>digits</b> to enter, <b>Shift+digit</b> for pencil, <b>Backspace</b> to clear, <b>Space</b> to toggle pencil, <b>Ctrl+Z</b> to undo.'
@@ -52,7 +52,7 @@
       'kenken.rule2': '太線で囲まれた<b>ケージ</b>の数字を書かれた演算で計算すると、書かれた数になります。<b>−</b>と<b>÷</b>は2マスで、大きい数から小さい数を引く・割ります。演算がなく数字だけなら、その数字がそのまま入ります。',
       'kenken.rule3': 'ケージの中では数字が重なってもかまいません — 同じ行や列でなければ。',
       'kenken.rule4': 'マスを選んで下の数字を押します。<b>鉛筆</b>をオンにすると候補を小さく書けて、数字を入れると同じ列の鉛筆書きからその数字が消えます。',
-      'kenken.ruleCombos': 'マスを選ぶと、盤の下にそのケージに入る<b>数字の組み合わせ</b>が出ます。計算とケージの形だけで決めたもので、ほかのマスの数字は見ません。ケージにすでに入れた数字と合わない組み合わせだけ薄くなります。',
+      'kenken.ruleCombos': 'マスを選ぶと、盤の下にそのケージに入る<b>数字の組み合わせ</b>が出ます。計算とケージの形だけで決めたもので、ほかのマスの数字は見ません。ケージにすでに入れた数字と合わない組み合わせだけ薄くなります。組み合わせを押すと、その数字が選んだマスの鉛筆書きに加わります。',
       'kenken.rule5': '<b>どの盤も答えはひとつで、当て推量なしで解けます。</b>やさしいとふつうは列とケージだけで解け、むずかしいにはたいてい「ここにこの数字を入れたらどうなるか」を考える場所があります。',
       'kenken.rule6': '<b>ヒント</b>は間違った数字を示し、なければ今確定できるマスをひとつ理由とともに埋めます。',
       'kenken.rule7': 'キーボード: 矢印で移動、<b>数字</b>で入力、<b>Shift+数字</b>で鉛筆、<b>Backspace</b>で消去、<b>スペース</b>で鉛筆切替、<b>Ctrl+Z</b>で元に戻す。'
@@ -70,7 +70,7 @@
       'kenken.rule2': '粗线围起的<b>笼子</b>里的数字，按标出的运算算出来要等于标出的数。<b>−</b> 和 <b>÷</b> 的笼子是两格，用大数减或除以小数。只有数字没有运算时，就直接填那个数。',
       'kenken.rule3': '笼子里的数字可以重复——只要不在同一行或同一列。',
       'kenken.rule4': '选一格再点下方数字。打开<b>铅笔</b>可以记下候选数；填入数字后，同一行列铅笔记号里的这个数字会被擦掉。',
-      'kenken.ruleCombos': '选中一格后，盘面下方会列出这个笼子能填的<b>数字组合</b>。只按算式和笼子形状算，不看其他格的数字；和笼子里已填数字对不上的组合会变淡。',
+      'kenken.ruleCombos': '选中一格后，盘面下方会列出这个笼子能填的<b>数字组合</b>。只按算式和笼子形状算，不看其他格的数字；和笼子里已填数字对不上的组合会变淡。点一个组合，它的数字会加进所选格的铅笔记号。',
       'kenken.rule5': '<b>每一盘都只有一个答案，不用猜。</b>简单和普通只看行列和笼子就能解；困难里通常有需要想“如果这里放这个数会怎样”的地方。',
       'kenken.rule6': '<b>提示</b>会指出错误的数字；没有错误时，会填上一个现在能确定的格子并说明理由。',
       'kenken.rule7': '键盘：方向键移动，<b>数字</b>输入，<b>Shift+数字</b>为铅笔，<b>Backspace</b>清除，<b>空格</b>切换铅笔，<b>Ctrl+Z</b>撤销。'
@@ -88,7 +88,7 @@
       'kenken.rule2': '粗線圍起的<b>籠子</b>裡的數字，按標出的運算算出來要等於標出的數。<b>−</b> 和 <b>÷</b> 的籠子是兩格，用大數減或除以小數。只有數字沒有運算時，就直接填那個數。',
       'kenken.rule3': '籠子裡的數字可以重複——只要不在同一行或同一列。',
       'kenken.rule4': '選一格再點下方數字。打開<b>鉛筆</b>可以記下候選數；填入數字後，同一行列鉛筆記號裡的這個數字會被擦掉。',
-      'kenken.ruleCombos': '選中一格後，盤面下方會列出這個籠子能填的<b>數字組合</b>。只按算式和籠子形狀算，不看其他格的數字；和籠子裡已填數字對不上的組合會變淡。',
+      'kenken.ruleCombos': '選中一格後，盤面下方會列出這個籠子能填的<b>數字組合</b>。只按算式和籠子形狀算，不看其他格的數字；和籠子裡已填數字對不上的組合會變淡。點一個組合，它的數字會加進所選格的鉛筆記號。',
       'kenken.rule5': '<b>每一盤都只有一個答案，不用猜。</b>簡單和普通只看行列和籠子就能解；困難裡通常有需要想「如果這裡放這個數會怎樣」的地方。',
       'kenken.rule6': '<b>提示</b>會指出錯誤的數字；沒有錯誤時，會填上一個現在能確定的格子並說明理由。',
       'kenken.rule7': '鍵盤：方向鍵移動，<b>數字</b>輸入，<b>Shift+數字</b>為鉛筆，<b>Backspace</b>清除，<b>空白鍵</b>切換鉛筆，<b>Ctrl+Z</b>復原。'
@@ -106,7 +106,7 @@
       'kenken.rule2': 'Los números de cada <b>jaula</b> (contorno grueso) deben dar su resultado con la operación indicada. Las jaulas de <b>−</b> y <b>÷</b> tienen dos casillas: el mayor menos o entre el menor. Una jaula sin operación da su número tal cual.',
       'kenken.rule3': 'Dentro de una jaula los números pueden repetirse, siempre que no estén en la misma fila o columna.',
       'kenken.rule4': 'Elige una casilla y toca un número abajo. Con el <b>Lápiz</b> anotas candidatos; al poner un número se borra de las notas de su fila y columna.',
-      'kenken.ruleCombos': 'Al elegir una casilla, bajo el tablero aparecen las <b>combinaciones de números</b> que caben en su jaula. Solo cuentan la operación y la forma de la jaula, no los números de otras casillas; las que no encajan con lo ya puesto en la jaula se atenúan.',
+      'kenken.ruleCombos': 'Al elegir una casilla, bajo el tablero aparecen las <b>combinaciones de números</b> que caben en su jaula. Solo cuentan la operación y la forma de la jaula, no los números de otras casillas; las que no encajan con lo ya puesto en la jaula se atenúan. Toca una combinación para añadir sus números a las notas de la casilla elegida.',
       'kenken.rule5': '<b>Cada tablero tiene una sola solución y no hace falta adivinar.</b> Fácil y Normal salen solo con filas, columnas y jaulas; Difícil suele tener sitios donde hay que pensar «¿y si aquí fuera este número?».',
       'kenken.rule6': 'La <b>pista</b> señala un número incorrecto o, si no lo hay, completa una casilla que ya puedes fijar y te explica por qué.',
       'kenken.rule7': 'Teclado: flechas para moverte, <b>números</b> para escribir, <b>Mayús+número</b> para el lápiz, <b>Retroceso</b> para borrar, <b>Espacio</b> para el lápiz, <b>Ctrl+Z</b> para deshacer.'

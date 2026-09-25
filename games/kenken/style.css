@@ -229,13 +229,18 @@ h1 {
 .combos::-webkit-scrollbar { display: none; }
 .combos-label { color: var(--fg); margin-right: 2px; }
 .combo {
+  flex: none;
+  border: 0;
   padding: 3px 8px;
   border-radius: 6px;
+  font: inherit;
+  cursor: pointer;
   background: var(--key-bg);
   color: var(--entered);
   letter-spacing: 0.08em;
 }
-.combo.off { opacity: 0.35; text-decoration: line-through; }
+.combo:active { filter: brightness(0.92); }
+.combo.off { opacity: 0.35; text-decoration: line-through; cursor: default; }
 
 .toast {
   margin: 0;
