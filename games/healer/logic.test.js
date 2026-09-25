@@ -931,7 +931,9 @@ function cast(state, skillId, target) {
   run(state, D.UNIT_SKILLS.renew.interval + 0.05);
   check('시간이 지나면 찬다',
     L.drainEvents(state).some((e) => e.type === 'heal' && e.uid === bran.uid
-      && e.amount === D.UNIT_SKILLS.renew.tick), true);
+      && e.amount === Math.round(D.UNIT_SKILLS.renew.tick * noa.healPower)), true);
+  // 동료의 회복도 회복력 배수를 탄다. 빠져 있던 동안 레벨이 올라도 회복량이 그대로였다.
+  check('동료 회복은 회복력을 탄다', noa.healPower > 1, true);
 
   // 마나 회복: 자기 마나를 되찾는다.
   noa.mp = 0;

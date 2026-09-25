@@ -1925,25 +1925,29 @@ const POTION_MAX = 5;
 // 두 번 모두 난이도 확인의 승률이 그 전 수치로 돌아오는 자리를 씨앗 스물넷으로
 // 재서 골랐다.
 //
+// **동료의 회복이 회복력을 타게 고치면서 한 번 더 1.03배**(공격력·체력). 그전에는
+// 동료 사제의 치유술이 레벨과 상관없이 같은 값이었는데, 고치자 힐이 들어간 판의 평균
+// 승률이 47%에서 51%로 올라 되돌렸다.
+//
 // **적 탱커도 도발을 들고 온다.** 아군과 같은 논리로 움직인다는 것은 같은 표를
 // 본다는 뜻만이 아니라 같은 수단을 갖는다는 뜻이다 — 도발이 이쪽에만 있으면
 // 적 힐러가 아무에게도 보호받지 못하고, 후열을 먼저 치는 규칙이 한쪽에서만 돈다.
 const ENEMIES = {
   scout:  { id: 'scout', race: 'goblin', rank: 'trash', exp: 10,  name: '고블린 척후병', job: 'dealer', sprite: 'goblin',
-            hp: 798, mp: 64,  atk: 25, attackCd: 1.5, range: 7,  speed: 21,
-           attrs: { str: 45, agi: 16, int: 8, vit: 63 }, growth: 'enemy',
+            hp: 826, mp: 64,  atk: 26, attackCd: 1.5, range: 7,  speed: 21,
+           attrs: { str: 45, agi: 16, int: 8, vit: 65 }, growth: 'enemy',
             armor: 0.95, spec: 'grunt' },
   shaman: { id: 'shaman', race: 'goblin', rank: 'trash', exp: 13, name: '고블린 주술사', job: 'healer', sprite: 'shaman',
-            hp: 700, mp: 120, atk: 24, attackCd: 2.2, range: 30, speed: 15,
-           attrs: { str: 13, agi: 10, int: 16, vit: 56 }, growth: 'enemy', attackType: 'magic',
+            hp: 728, mp: 120, atk: 25, attackCd: 2.2, range: 30, speed: 15,
+           attrs: { str: 13, agi: 10, int: 16, vit: 58 }, growth: 'enemy', attackType: 'magic',
             armor: 1, spec: 'shaman' },
   orc:    { id: 'orc', race: 'orc', rank: 'elite', exp: 46,    name: '오크 전사',     job: 'tank',   sprite: 'orc',
-            hp: 2422, mp: 72,  atk: 51, attackCd: 1.8, range: 7,  speed: 16,
-           attrs: { str: 65, agi: 8, int: 10, vit: 144 }, growth: 'enemy',
+            hp: 2492, mp: 72,  atk: 53, attackCd: 1.8, range: 7,  speed: 16,
+           attrs: { str: 65, agi: 8, int: 10, vit: 148 }, growth: 'enemy',
             armor: 0.7,  spec: 'tank', always: ['sweep'] },
   hexer:  { id: 'hexer', race: 'orc', rank: 'elite', exp: 42,  name: '오크 주술사',   job: 'healer', sprite: 'hexer',
-            hp: 1484, mp: 128, atk: 38, attackCd: 2.4, range: 30, speed: 14,
-           attrs: { str: 18, agi: 8, int: 19, vit: 88 }, growth: 'enemy', attackType: 'magic',
+            hp: 1526, mp: 128, atk: 39, attackCd: 2.4, range: 30, speed: 14,
+           attrs: { str: 18, agi: 8, int: 19, vit: 91 }, growth: 'enemy', attackType: 'magic',
             armor: 0.9, spec: 'shaman', always: ['curse'] },
   // 좀비. **언데드 종족을 처음 쓴다.** 표에만 있고 아무도 쓰지 않던 자리다.
   //
@@ -1955,7 +1959,7 @@ const ENEMIES = {
   // 체력이 두 배 넘는데 걸음은 절반 아래고(9 대 21) 때리는 사이도 길다(2.2 대 1.5).
   // **등급은 잡졸이다** — 무리로 몰려오는 쪽이라 하나하나가 세면 안 된다.
   //
-  // **질긴 쪽으로만 세다**(체력 2,072 · 공격력 24). 처음에는 체력만 1,106 →
+  // **질긴 쪽으로만 세다**(체력 2,142 · 공격력 25). 처음에는 체력만 1,106 →
   // 1,218로 올려 다른 지역에 맞췄는데(공격력을 38로 올려 봤더니 승률이 34~44%로
   // 무너졌다 — 잡졸이 다섯씩 나오는 자리라 한 방이 다섯 배로 걸린다), 회복이
   // 언데드를 때리게 되면서 **체력을 1.7배로 올리고 공격력을 0.8배로 낮췄다.**
@@ -1965,15 +1969,15 @@ const ENEMIES = {
   // 86·94·87%로 거의 그대로다 — 자세한 것은 `CLAUDE.md`의 "언데드에게는 회복이
   // 공격이다"에 있다.
   zombie: { id: 'zombie', race: 'undead', rank: 'trash', exp: 14, name: '좀비',       job: 'dealer', sprite: 'zombie',
-            hp: 2072, mp: 72,  atk: 24, attackCd: 2.2, range: 7,  speed: 9,
-           attrs: { str: 30, agi: 6, int: 8, vit: 129 }, growth: 'enemy',
+            hp: 2142, mp: 72,  atk: 25, attackCd: 2.2, range: 7,  speed: 9,
+           attrs: { str: 30, agi: 6, int: 8, vit: 133 }, growth: 'enemy',
             armor: 0.9,  spec: 'zombie' },
   // 구울. **좀비의 상위 대체다**(`ENEMY_UP`) — 높은 레벨의 납골당에서는 좀비
   // 자리를 이쪽이 채운다. 같은 잡졸로 둔 것은 무리로 몰려오는 자리를 그대로
   // 물려받기 때문이고, 등급을 올리면 위협의 몫이 두 배가 되어 머릿수가 줄어
   // "무리 지어 사냥한다"가 사라진다.
   //
-  // **좀비와 다른 방향으로 세다**: 좀비가 느리고 끈질기다면(걸음 9·체력 2,072)
+  // **좀비와 다른 방향으로 세다**: 좀비가 느리고 끈질기다면(걸음 9·체력 2,142)
   // 구울은 빨리 붙고 조금 무르다(15·1,792). 한 방은 오히려 작다(21 대 24).
   // 둘 다 언데드라 질긴 쪽으로 함께 올라갔지만(체력 1.7배·공격력 0.8배), 그
   // 사이의 관계는 그대로다 — 자세한 것은 좀비 주석에 있다.
@@ -1986,8 +1990,8 @@ const ENEMIES = {
   // 한꺼번에 제자리로 왔다. 상위 대체가 "조금 센 같은 자리"로 읽히려면 이 둘을
   // 건드리지 않는 편이 안전하다.
   ghoul:  { id: 'ghoul', race: 'undead', rank: 'trash', exp: 20,   name: '구울',        job: 'dealer', sprite: 'ghoul',
-            hp: 1792, mp: 72,  atk: 21, attackCd: 1.9, range: 7,  speed: 15,
-           attrs: { str: 36, agi: 14, int: 8, vit: 111 }, growth: 'enemy',
+            hp: 1834, mp: 72,  atk: 22, attackCd: 1.9, range: 7,  speed: 15,
+           attrs: { str: 36, agi: 14, int: 8, vit: 114 }, growth: 'enemy',
             armor: 0.86, spec: 'ghoul' },
   // 오우거 전사. **오크와 같은 등급인데 하는 일이 다르다** — 오크는 수호 계열이라
   // 도발로 붙들고 버티고, 이쪽은 전사 계열이라 한 방이 크다(공격력 63 대 51).
@@ -2009,15 +2013,15 @@ const ENEMIES = {
   // **오우거 종족을 처음 쓴다.** 표에만 있고 아무도 쓰지 않던 자리이고, 힘·체력이
   // 1.45배라 곱만으로도 "거대하고 둔한" 쪽으로 기운다(민첩·지능 0.70).
   ogre:   { id: 'ogre', race: 'ogre', rank: 'elite', exp: 50,   name: '오우거 전사',   job: 'dealer', sprite: 'ogre',
-            hp: 2702, mp: 72,  atk: 63, attackCd: 2.2, range: 8,  speed: 10,
-           attrs: { str: 78, agi: 6, int: 13, vit: 133 }, growth: 'enemy',
+            hp: 2786, mp: 72,  atk: 65, attackCd: 2.2, range: 8,  speed: 10,
+           attrs: { str: 78, agi: 6, int: 13, vit: 137 }, growth: 'enemy',
             armor: 0.8,  spec: 'warrior', always: ['execute'] },
   // **우두머리는 제 계열을 쓴다.** 오크 전사와 같은 수호 계열을 들고 있던 동안에는
   // 덩치만 큰 오크였다 — 잡는 데 오래 걸릴 뿐 무섭지는 않았다. 지금은 휩쓸기로
   // 파티 전체를 긁고 마무리로 한 명을 끊는다.
   chief:  { id: 'chief', race: 'orc', rank: 'boss', exp: 210,  name: '오크 우두머리', job: 'tank',   sprite: 'chief',
-            hp: 5222, mp: 136, atk: 67, attackCd: 2.0, range: 8,  speed: 14,
-           attrs: { str: 100, agi: 6, int: 20, vit: 311 }, growth: 'enemy',
+            hp: 5376, mp: 136, atk: 69, attackCd: 2.0, range: 8,  speed: 14,
+           attrs: { str: 100, agi: 6, int: 20, vit: 320 }, growth: 'enemy',
             armor: 0.62, spec: 'chieftain', always: ['rupture', 'sweep'] },
 };
 
