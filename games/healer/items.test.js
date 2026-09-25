@@ -178,6 +178,19 @@ const SEEDS = [1, 7, 42, 999, 20260825];
   check('옵션이 남는다', adopted.affixes.length, 1);
 
   check('모르는 물건은 버린다', Items.adopt({ defId: '없음', tier: 0 }), null);
+  // 신화는 옵션 넷에 치명타·회피가 하나 더 붙어 다섯이 될 수 있다. 저장본을 읽어도 남는다.
+  const top = D.TIERS.length - 1;
+  let mythic = null;
+  for (let seed = 1; seed < 500 && !mythic; seed++) {
+    const made = Items.make('staff', top, seed);
+    if (made.affixes.length === D.AFFIX_COUNT[top] + 1) mythic = made;
+  }
+  check('신화의 다섯째 옵션이 있다', Boolean(mythic), true);
+  check('신화의 다섯째 옵션이 저장본을 지나도 남는다',
+    Items.adopt(JSON.parse(JSON.stringify(mythic))).affixes.length, mythic.affixes.length);
+  // 그보다 많으면 손댄 저장본이다. 그 등급이 가질 수 있는 수까지만 받는다.
+  const padded = { defId: 'staff', tier: 0, affixes: ['heal', 'mp', 'crit'].map((stat) => ({ stat, value: 0.01 })) };
+  check('등급보다 많은 옵션은 자른다', Items.adopt(padded).affixes.length, D.AFFIX_COUNT[0] + 1);
   check('null도 버린다', Items.adopt(null), null);
   check('모르는 스탯의 옵션은 버린다',
     Items.adopt({ defId: 'staff', tier: 0, affixes: [{ stat: '행운', value: 5 }] }).affixes, []);
