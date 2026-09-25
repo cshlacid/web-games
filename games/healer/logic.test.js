@@ -1987,6 +1987,16 @@ function cast(state, skillId, target) {
   check('왼쪽 끝에서 싸우는 시간은 드물다', left / ticks < 0.1, true);
 }
 
+// --- 주인공이 설 거리 ---------------------------------------------------
+{
+  // 근접 공격 스킬을 든 주인공(성기사의 심판)은 그 사거리까지 다가선다. 회복만 든
+  // 사제는 정의의 사거리 그대로다.
+  const melee = battle({ skills: ['smite', 'layHands'] });
+  check('공격 스킬의 사거리까지 다가선다', L.hero(melee).range, D.PLAYER_SKILLS.smite.range);
+  const priest = battle({ skills: ['touch', 'quick'] });
+  check('회복만 들면 정의의 사거리', L.hero(priest).range, D.HERO.range);
+}
+
 // --- 난이도 확인 --------------------------------------------------------
 //
 // 힐러가 게임의 전부이므로, "가만히 둬도 이긴다"면 이 게임은 성립하지 않는다.

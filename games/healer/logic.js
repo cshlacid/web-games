@@ -264,6 +264,14 @@ function createBattle(config) {
     { def: D.HERO, level: config.heroLevel || 1, stats: heroStats },
     ...party.slice(0, D.PARTY_MAX - 1),
   ]);
+  // **주인공이 설 거리는 들고 온 공격 스킬이 정한다.** 정의의 사거리(30)는 사제의 것이라,
+  // 성기사·성전사가 근접 스킬(심판 14, 방패 강타 16)을 들고 와도 늘 그만큼 떨어져 서서
+  // 싸우는 시간의 3분의 1 가까이 닿지 않았다. 가장 짧은 적 대상 스킬까지 다가가게 한다 —
+  // 회복 스킬은 대상이 아군이라 서는 거리를 정하지 않는다(`ai.wantedMove`가 따로 본다).
+  const reach = skills.map((id) => D.PLAYER_SKILLS[id])
+    .filter((def) => def && (def.targeting === 'enemy' || def.targeting === 'area-enemy') && def.range > 0)
+    .map((def) => def.range);
+  if (reach.length) hero(state).range = Math.min(hero(state).range, Math.min(...reach));
   spawnWave(state, 0);
   return state;
 }
