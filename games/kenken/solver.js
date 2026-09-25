@@ -1,7 +1,7 @@
 'use strict';
 
 // KenKen 풀이. 두 가지에 쓴다 — 굽는 자리에서 판이 찍지 않고 끝까지 풀리는지 보고
-// (`solve`), 힌트가 지금 판에서 사람이 다음으로 확정할 수 있는 칸을 짚는다(`next`).
+// (`solve`), 힌트가 지금 판에서 사람이 새로 알 수 있는 것을 짚는다(`hint`).
 //
 // **찍지 않는다.** 규칙은 참인 것만 이끌어 내므로 끝까지 풀리면 답이 하나뿐이다.
 //
@@ -205,28 +205,73 @@ function solve(puzzle, options = {}) {
   return { solved, values, trials };
 }
 
-// 지금 판에서 다음으로 확정할 수 있는 칸 하나: { cell, digit, why }. 넘겨받는 판에는 틀린
-// 숫자가 없어야 한다(화면이 힌트 전에 짚어 낸다).
-function next(puzzle, values, options = {}) {
+// 힌트 한 걸음. 넣은 숫자와 연필 표시를 지금까지 알아낸 것으로 보고, 거기서 새로 알 수 있는
+// 것 하나를 돌려준다. 쉬운 까닭부터 본다.
+//   칸이 확정되면  { cell, digit, why }
+//   후보만 줄면    { marks: [{ cell, mask }], why } — 연필 표시를 이 값으로 바꾼다
+// 연필 표시가 없는 칸은 모든 숫자가 후보다. 넘겨받는 판에는 틀린 숫자도, 정답을 빠뜨린 연필
+// 표시도 없어야 한다(화면이 힌트 전에 짚어 낸다) — 그래야 줄여 가도 정답이 남는다.
+function hint(puzzle, values, marks) {
   const ctx = context(puzzle);
-  const dom = start(ctx, values);
-  const fixed = Uint8Array.from(values, (v) => (v ? 1 : 0));
-  let tried = false;
-  for (let guard = 0; guard < 10000; guard++) {
-    const found = step(ctx, dom, fixed);
-    if (found === 'bad') return null;
-    if (found && found.cell !== undefined) {
-      if (tried) found.why = { code: 'trial' };
-      return found;
+  const { n, lines } = ctx;
+  const cells = n * n;
+  const empty = (i) => !values[i];
+
+  // 지금 알고 있는 후보. 같은 줄에 넣은 숫자는 연필 표시에 남아 있어도 뺀다.
+  const dom = new Uint16Array(cells);
+  for (let i = 0; i < cells; i++) {
+    if (values[i]) { dom[i] = bit(values[i]); continue; }
+    dom[i] = (marks && marks[i]) || ctx.all;
+    for (const j of ctx.peers[i]) if (values[j]) dom[i] &= ~bit(values[j]);
+  }
+
+  // 1. 후보가 하나뿐인 칸.
+  for (let i = 0; i < cells; i++) {
+    if (empty(i) && popcount(dom[i]) === 1) return { cell: i, digit: onlyDigit(dom[i]), why: { code: 'single' } };
+  }
+
+  // 2. 줄에서 숫자가 들어갈 칸이 하나뿐.
+  for (const line of lines) {
+    for (let d = 1; d <= n; d++) {
+      if (line.some((i) => values[i] === d)) continue;
+      const spots = line.filter((i) => dom[i] & bit(d));
+      if (spots.length === 1) return { cell: spots[0], digit: d, why: { code: 'hidden' } };
     }
-    if (found) continue;
-    if (!options.trial || !trial(ctx, dom)) return null;
-    tried = true;
+  }
+
+  // 3. 케이지. 확정되는 칸이 있으면 그것을, 없으면 후보가 준 칸을 돌려준다.
+  let narrowed = null;
+  for (const cage of puzzle.cages) {
+    const masks = cageMasks(ctx, cage, dom);
+    const changed = [];
+    for (let x = 0; x < cage.cells.length; x++) {
+      const i = cage.cells[x];
+      const next = dom[i] & masks[x];
+      if (!empty(i) || next === dom[i]) continue;
+      if (popcount(next) === 1) return { cell: i, digit: onlyDigit(next), why: { code: 'cage' } };
+      changed.push({ cell: i, mask: next });
+    }
+    if (changed.length && !narrowed) narrowed = { marks: changed, why: { code: 'cageMarks' } };
+  }
+  if (narrowed) return narrowed;
+
+  // 4. 가정: 한 칸에 한 숫자를 넣어 보고 모순이 나면 그 숫자는 빠진다.
+  for (let i = 0; i < cells; i++) {
+    if (!empty(i) || popcount(dom[i]) < 2) continue;
+    for (let d = 1; d <= n; d++) {
+      if (!(dom[i] & bit(d))) continue;
+      const copy = dom.slice();
+      copy[i] = bit(d);
+      if (settle(ctx, copy)) continue;
+      const rest = dom[i] & ~bit(d);
+      if (popcount(rest) === 1) return { cell: i, digit: onlyDigit(rest), why: { code: 'trial' } };
+      return { marks: [{ cell: i, mask: rest }], why: { code: 'trialMarks', digit: d } };
+    }
   }
   return null;
 }
 
-const api = { bit, popcount, context, start, cageMasks, solve, next };
+const api = { bit, popcount, context, start, cageMasks, solve, hint };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 if (typeof window !== 'undefined') window.KenKenSolver = api;

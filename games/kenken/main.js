@@ -335,7 +335,8 @@ function finish() {
   });
 }
 
-// 틀린 숫자가 있으면 먼저 짚고, 없으면 지금 확정할 수 있는 칸 하나를 까닭과 함께 채운다.
+// 틀린 숫자가 있으면 먼저 짚고, 없으면 지금 판에서 새로 알 수 있는 것 하나를 까닭과 함께
+// 알린다. 칸이 확정되면 숫자를 넣고, 후보만 줄면 연필 표시만 고친다.
 // 정답에서 아무 칸이나 골라 주면 "왜 거기인지 알 수 없는 힌트"가 된다.
 function hint() {
   if (game.done) return;
@@ -348,18 +349,31 @@ function hint() {
     toast(t('kenken.wrong'));
     return;
   }
-  const step = S.next(game.puzzle, Array.from(game.values), { trial: true });
+  // 연필 표시도 알아낸 것으로 치고 이어 간다. 정답을 지워 둔 표시가 있으면 그 위에서 줄여 봐야
+  // 정답이 없는 후보만 남으므로 먼저 짚는다.
+  const lost = game.marks.findIndex((m, i) => !game.values[i] && m && !(m & S.bit(sol[i])));
+  if (lost >= 0) {
+    select(lost);
+    Sound.play('conflict');
+    toast(t('kenken.badMarks'));
+    return;
+  }
+  const step = S.hint(game.puzzle, Array.from(game.values), Array.from(game.marks));
   if (!step) { toast(t('kenken.noStep')); return; }
   started();
   game.hinted++;
-  game.selected = step.cell;
-  const node = view.cells[step.cell];
-  node.classList.add('hinted');
-  setTimeout(() => node.classList.remove('hinted'), 900);
   snapshot();
-  put(step.cell, step.digit);
+  const touched = step.marks ? step.marks.map((m) => m.cell) : [step.cell];
+  if (step.marks) for (const { cell, mask } of step.marks) game.marks[cell] = mask;
+  else put(step.cell, step.digit);
+  game.selected = touched[0];
+  for (const i of touched) {
+    const node = view.cells[i];
+    node.classList.add('hinted');
+    setTimeout(() => node.classList.remove('hinted'), 900);
+  }
   Sound.play('hint');
-  toast(t(`kenken.why.${step.why.code}`, { digit: step.digit }));
+  toast(t(`kenken.why.${step.why.code}`, { digit: step.digit || step.why.digit }));
   afterChange();
 }
 
