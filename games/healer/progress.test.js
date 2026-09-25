@@ -159,7 +159,8 @@ const gear = (defId, tier) => Items.make(defId, tier || 0, 3);
   progress.charLevel = D.HERO_JOBS.bishop.need.charLevel;
   check('아래 계열을 안 키우면 못 간다', P.canChangeJob(progress, 'bishop').ok, false);
   check('무엇이 모자란지 알려 준다',
-    P.canChangeJob(progress, 'bishop').reason.includes('사제'), true);
+    P.canChangeJob(progress, 'bishop').reason,
+    { code: 'hl.why.jobLevel', vars: { job: 'healer.job.priest.name', n: D.HERO_JOBS.bishop.need.jobLevel.priest } });
 
   progress.jobs.priest.level = D.HERO_JOBS.bishop.need.jobLevel.priest;
   check('아래 계열을 키우면 갈 수 있다', P.canChangeJob(progress, 'bishop').ok, true);

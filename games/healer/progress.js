@@ -129,16 +129,16 @@ function canChangeJob(progress, jobId) {
   if (progress.job === jobId) return { ok: false, reason: 'hl.why.sameJob' };
   const need = job.need || {};
   if (need.charLevel && progress.charLevel < need.charLevel) {
-    return { ok: false, reason: `캐릭터 레벨 ${need.charLevel} 필요` };
+    return { ok: false, reason: { code: 'hl.why.charLevel', vars: { n: need.charLevel } } };
   }
   if (need.cleared && (progress.cleared | 0) < need.cleared) {
-    return { ok: false, reason: `의뢰 ${need.cleared}건 완료 필요` };
+    return { ok: false, reason: { code: 'hl.why.cleared', vars: { n: need.cleared } } };
   }
   // **상위 계열은 아래 계열을 키운 사람만 간다.** 이것이 "상위"의 뜻이고,
   // 조건이 자료에 있으므로 계열을 더해도 분기가 늘지 않는다.
   for (const [id, level] of Object.entries(need.jobLevel || {})) {
     if (jobLevel(progress, id) < level) {
-      return { ok: false, reason: `${D.heroJob(id).name} 레벨 ${level} 필요` };
+      return { ok: false, reason: { code: 'hl.why.jobLevel', vars: { job: `healer.job.${id}.name`, n: level } } };
     }
   }
   return { ok: true };
@@ -287,7 +287,7 @@ function buyPotion(progress, potionId) {
   const potion = D.POTIONS[potionId];
   if (!potion) return { ok: false, reason: 'hl.why.noSuchPotion' };
   if ((progress.potions[potionId] || 0) >= D.POTION_MAX) {
-    return { ok: false, reason: `${D.POTION_MAX}개까지만 들고 간다` };
+    return { ok: false, reason: { code: 'hl.why.potionMax', vars: { n: D.POTION_MAX } } };
   }
   const paid = spend(progress, D.potionPrice(potionId, progress.charLevel));
   if (!paid.ok) return paid;
