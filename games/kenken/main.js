@@ -29,6 +29,7 @@ const el = {
   digits: document.getElementById('digits'),
   timer: document.getElementById('timer'),
   toast: document.getElementById('toast'),
+  combos: document.getElementById('combos'),
   pencil: document.getElementById('pencil'),
   erase: document.getElementById('erase'),
   undo: document.getElementById('undo'),
@@ -172,11 +173,37 @@ function paint() {
     label.classList.toggle('done', done.has(id));
   });
   view.digits.forEach((button, k) => button.classList.toggle('done', counts[k + 1] >= n));
+  paintCombos();
   el.undo.disabled = !game.history.length;
   el.pencil.setAttribute('aria-pressed', String(pencil));
   for (const button of el.levels.children) {
     button.setAttribute('aria-pressed', String(button.dataset.level === game.level));
   }
+}
+
+// 고른 칸의 케이지 조합. 같은 내용이면 다시 그리지 않는다 — 옆으로 밀어 둔 자리가 칸을
+// 누를 때마다 처음으로 돌아가면 긴 목록을 끝까지 볼 수 없다.
+let combosKey = '';
+function paintCombos() {
+  const id = game.puzzle.cageOf[game.selected];
+  const cage = game.puzzle.cages[id];
+  const key = `${game.code}:${id}:${cage.cells.map((i) => game.values[i]).join('')}`;
+  if (key === combosKey) return;
+  const moved = !key.startsWith(combosKey.slice(0, combosKey.lastIndexOf(':') + 1)) || !combosKey;
+  combosKey = key;
+  const label = document.createElement('span');
+  label.className = 'combos-label';
+  label.textContent = `${cage.target}${OP_SIGN[cage.op]}`;
+  // 남은 조합을 앞에 둔다. 흐린 것이 앞을 차지하면 쓸 만한 조합을 보려고 옆으로 밀어야 한다.
+  const list = R.combos(game.puzzle, id, game.values);
+  const chips = [...list.filter((c) => c.live), ...list.filter((c) => !c.live)].map((combo) => {
+    const chip = document.createElement('span');
+    chip.className = combo.live ? 'combo' : 'combo off';
+    chip.textContent = combo.digits.join(' ');
+    return chip;
+  });
+  el.combos.replaceChildren(label, ...chips);
+  if (moved) el.combos.scrollLeft = 0;
 }
 
 // --- 조작 ---
