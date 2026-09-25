@@ -351,7 +351,9 @@ function throughput(def, stats, skills, level) {
     const hits = many ? POWER.foes : 1;
     const mates = many ? POWER.healed : 1;
     // 동료는 공격력의 배수(`mul`), 주인공은 정액(`damage`)에 마법 공격력을 곱한다.
-    if (skill.mul) hit += (stats.atk * crit * skill.mul * hits) / cycle;
+    // 강화·약화도 `mul`을 들지만 그것은 능력치에 곱하는 배수다(`stat`이 있는 쪽).
+    // 공격으로 세면 음유시인의 전투력이 18%쯤 부풀었다.
+    if (skill.mul && !skill.stat) hit += (stats.atk * crit * skill.mul * hits) / cycle;
     if (skill.damage) hit += (skill.damage * stats.spell * crit * hits) / cycle;
     if (skill.tick) {
       const ticks = skill.duration / (skill.interval || 1);

@@ -564,6 +564,11 @@ const gear = (defId, tier) => Items.make(defId, tier || 0, 3);
   check('시간이 꽉 차면 즉시 시전도 못 낀다',
     D.combatPower(def, stats, busy.concat([quick]), 10, attrs),
     D.combatPower(def, stats, busy, 10, attrs));
+
+  // 강화·약화의 `mul`은 능력치에 곱하는 배수라 공격으로 세지 않는다.
+  const buff = (mul) => ({ id: 'b', kind: 'buff', stat: 'atk', mul, cd: 10, duration: 5, mp: 10 });
+  check('강화의 배수는 공격으로 세지 않는다',
+    D.combatPower(def, stats, [buff(3)], 10, attrs), D.combatPower(def, stats, [buff(1.1)], 10, attrs));
 }
 
 console.log(`${passed}개 통과, ${failed}개 실패`);

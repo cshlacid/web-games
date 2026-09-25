@@ -1327,7 +1327,7 @@ function renderTrust(member) {
   const why = contract.scales
     .filter((scale) => Math.abs(scale.mul - 1) > 0.001)
     .sort((a, b) => Math.abs(b.mul - 1) - Math.abs(a.mul - 1))
-    .map((scale) => `${scale.why} ${scale.mul > 1 ? '+' : '−'}${Math.round(Math.abs(scale.mul - 1) * 100)}%`);
+    .map((scale) => `${scaleWhy(scale.why)} ${scale.mul > 1 ? '+' : '−'}${Math.round(Math.abs(scale.mul - 1) * 100)}%`);
 
   const wage = el('div', 'trust-wage');
   wage.append(icon('coin'));
@@ -1339,6 +1339,22 @@ function renderTrust(member) {
   // 여기 값과 갈린다 — 그래서 적정 레벨을 함께 적는다.
   box.append(text('p', 'pick-sub dim',
     t('hl.feelNote', { feel: contract.feel.name, level: Rep.tasteOf(member) })));
+}
+
+// 보수 배수의 까닭. 로직은 이름이 이미 번역된 것(성향·신뢰도 단계)은 글자로, 평판과
+// 분배 방식은 `{ code, vars }`로 돌려준다 — 둘은 id만 들고 있어 여기서 이름을 찾는다.
+// 그대로 글자로 이으면 `[object Object] +2%`가 된다.
+function scaleWhy(why) {
+  if (!why || typeof why !== 'object') return why;
+  if (why.code === 'hl.hire.rep') {
+    const stage = D.REPUTATION.stages.find((s) => s.id === why.vars.stage);
+    return t(why.code, { stage: stage ? stage.name : why.vars.stage });
+  }
+  if (why.code === 'hl.hire.split') {
+    const method = Loot.METHODS[why.vars.method];
+    return t(why.code, { method: method ? method.name : why.vars.method });
+  }
+  return t(why.code, why.vars);
 }
 
 // 얹어 주기와 선물. **둘 다 신뢰도를 사는 수단이라 한자리에 둔다** — 갈라 두면

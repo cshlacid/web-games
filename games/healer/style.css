@@ -642,10 +642,11 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
    두 줄이 같은 칸을 쓴다. 줄마다 flex로 늘려 두었더니 셋이 남은 적 줄과
    다섯이 선 아군 줄의 초상화 크기가 달랐고, 적 줄을 따로 작게까지 두어
    공격 스킬의 대상 자리인데도 손가락이 빗나갔다. 양쪽 다 최대 다섯이라
-   다섯 칸으로 나눈다 — 빈 칸은 오른쪽에 남는다. */
+   다섯 칸으로 나눈다 — 빈 칸은 오른쪽에 남는다. `1fr`의 최소가 내용 폭이라
+   360px 아래에서 칸이 줄지 않고 화면 밖으로 밀렸다 — 최소를 0으로 둔다. */
 .portraits {
   list-style: none; margin: 0; padding: 0;
-  display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px;
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px;
 }
 .portrait.enemy { border-color: color-mix(in srgb, var(--enemy) 45%, var(--line)); }
 .portrait.enemy .bar span { background: var(--enemy); }
