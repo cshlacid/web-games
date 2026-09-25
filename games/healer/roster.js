@@ -138,7 +138,7 @@ function canChangeSpec(member, spec) {
   if (!specChoices(member).includes(spec)) return { ok: false, reason: 'hl.why.badSpec' };
   if (spec === baseSpecOf(member)) return { ok: false, reason: 'hl.why.sameSpec' };
   if (member.level < D.SPEC_CHANGE_LEVEL) {
-    return { ok: false, reason: `레벨 ${D.SPEC_CHANGE_LEVEL} 필요` };
+    return { ok: false, reason: { code: 'hl.why.specLevel', vars: { n: D.SPEC_CHANGE_LEVEL } } };
   }
   return { ok: true };
 }

@@ -52,6 +52,9 @@ function effectText(def) {
 }
 
 const msg = (v) => {
+  // 로직의 까닭은 열쇠 하나(`'hl.why.noGold'`)이거나 열쇠와 조각(`{ code, vars }`)이다.
+  // 열쇠를 그대로 돌려주면 화면에 열쇠가 찍힌다.
+  if (typeof v === 'string') return /^(hl|healer)\./.test(v) ? t(v) : v;
   if (!v || typeof v !== 'object' || !v.code) return v;
   // 조각이 또 열쇠인 자리가 있다(퀘스트 이름) — 값이 'hl.' 꼴이면 한 번 더 푼다.
   const vars = {};
@@ -238,7 +241,7 @@ function renderRep(box, rep) {
   const head = el('div', 'rep-head');
   head.append(icon('crest'));
   head.append(text('b', null, at.stage.name));
-  head.append(text('span', 'why', `${rep}`));
+  head.append(text('span', 'why', num(rep)));
   box.append(head);
 
   const bar = el('div', 'rep-bar');
@@ -249,7 +252,7 @@ function renderRep(box, rep) {
   box.append(bar);
 
   box.append(text('p', 'rep-note', at.next
-    ? t('hl.repNext', { name: at.next.name, n: at.need - at.have, gap: at.stage.questGap })
+    ? t('hl.repNext', { name: at.next.name, n: num(at.need - at.have), gap: at.stage.questGap })
     : t('hl.repMax', { gap: at.stage.questGap })));
 }
 
@@ -369,7 +372,7 @@ function renderAttrs() {
   // 벗으면 얼마가 빠지는지도 알 수 없다.
   const gear = P.gearAttrs(progress);
   const left = P.freePoints(progress);
-  $('attr-points').textContent = left ? `남은 점수 ${left}` : t('hl.noPoints');
+  $('attr-points').textContent = left ? t('hl.pointsLeft', { n: num(left) }) : t('hl.noPoints');
 
   const list = $('char-attrs');
   list.textContent = '';
@@ -550,7 +553,7 @@ function renderCharacter() {
     kept.append(row);
   }
 
-  $('skill-points').textContent = points ? `남은 점수 ${points}` : t('hl.noPoints');
+  $('skill-points').textContent = points ? t('hl.pointsLeft', { n: num(points) }) : t('hl.noPoints');
   $('skill-open').textContent = `${P.learnedSkills(progress).length} / ${D.heroSkillsOf(progress.job).length}`;
 
   // 갈래와 그 위의 점수 표시는 화면을 다시 그릴 때마다 함께 맞춘다. 점수를 쓰는
@@ -604,7 +607,7 @@ function renderJobs() {
 // 스킬 하나의 시전 시간과 사거리. 아군·적 스킬과 주인공 스킬이 같은 형태로
 // 적혀 있어 한 함수로 쓴다.
 function castLine(def) {
-  const cast = def.cast ? `시전 ${def.cast}초` : t('hl.instant');
+  const cast = def.cast ? t('hl.castTime', { n: def.cast }) : t('hl.instant');
   return def.range ? t('hl.castRange', { cast, range: def.range }) : cast;
 }
 
@@ -621,7 +624,7 @@ function diffSummary(compare) {
       : `${num(Math.round(Math.abs(value) * 100))}%`;
     return `${D.STATS[key].name} ${value > 0 ? '+' : '−'}${size}`;
   });
-  return parts.length ? `지금 낀 것과 ${parts.join(' · ')}` : t('hl.noDiff');
+  return parts.length ? t('hl.vsWorn', { parts: parts.join(' · ') }) : t('hl.noDiff');
 }
 
 // **전투력 증감이 옵션 줄의 결론이다.** "최대 체력 +33 · 회피 +2%"가 나은 것인지
@@ -1905,7 +1908,7 @@ function syncStatus(button, state, unit) {
     const node = icon(st.icon, st.css);
     // 아이콘만으로는 무엇인지 물어볼 곳이 없다. 마우스가 있는 환경에서만
     // 보이지만, 없다고 잃는 것도 없다.
-    node.title = st.name;
+    node.title = msg(st.name);
     box.append(node);
   }
 }
@@ -2402,14 +2405,14 @@ function openResult(state) {
 
   const expList = $('exp-gained');
   expList.textContent = '';
-  expList.append(levelRow(t('hl.charExp', { n: reward.charExp }), app.progress.charLevel, app.progress.charExp,
+  expList.append(levelRow(t('hl.charExp', { n: num(reward.charExp) }), app.progress.charLevel, app.progress.charExp,
     app.progress.charLevel >= D.LEVEL.maxLevel ? 0 : D.LEVEL.charExpTo(app.progress.charLevel)));
   const jobLv = P.jobLevel(app.progress);
   const jobMax = D.jobMaxLevel(app.progress.job);
-  expList.append(levelRow(`${job.name} +${reward.jobExp}`, jobLv, P.jobExpOf(app.progress),
+  expList.append(levelRow(`${job.name} +${num(reward.jobExp)}`, jobLv, P.jobExpOf(app.progress),
     jobLv >= jobMax ? 0 : D.LEVEL.jobExpTo(jobLv)));
 
-  const lines = [t('hl.expBreak', { kills: reward.kills, guild: reward.guild, heal: reward.healExp })];
+  const lines = [t('hl.expBreak', { kills: num(reward.kills), guild: num(reward.guild), heal: num(reward.healExp) })];
   if (gained.charLevels) lines.push(t('hl.charLevelUp', { from: before.char, to: app.progress.charLevel }));
   if (gained.jobLevels) lines.push(t('hl.jobLevelUp', { job: job.name, from: before.job, to: jobLv }));
   if (gained.unlocked.length) {
@@ -2433,7 +2436,7 @@ function openResult(state) {
     const gold = el('li');
     gold.append(icon('coin'));
     gold.append(text('span', null, t('hl.purseLine', { n: num(deal.purse) })));
-    gold.append(text('span', 'why', deal.spent ? `보수 ${deal.spent}` : t('hl.noPay')));
+    gold.append(text('span', 'why', deal.spent ? t('hl.paidLine', { n: num(deal.spent) }) : t('hl.noPay')));
     gold.append(text('span', 'to', t('hl.myCut', { n: num(deal.hero) })));
     guild.append(gold);
 
@@ -2572,7 +2575,7 @@ function renderBattleReport(rows) {
     line.append(text('b', 'stat-value', num(row.dealt)));
     line.append(text('b', 'stat-value', num(row.taken)));
     const heal = text('b', 'stat-value', num(row.healed));
-    if (row.overheal) heal.append(text('small', 'why', ` +${row.overheal}`));
+    if (row.overheal) heal.append(text('small', 'why', ` +${num(row.overheal)}`));
     line.append(heal);
     list.append(line);
   }
