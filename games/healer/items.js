@@ -105,7 +105,9 @@ function adopt(item) {
   if (D.GEAR[item.defId]) {
     copy.affixes = (Array.isArray(item.affixes) ? item.affixes : [])
       .filter((affix) => affix && D.STATS[affix.stat] && Number.isFinite(affix.value))
-      .slice(0, D.AFFIX_COUNT[D.AFFIX_COUNT.length - 1]);
+      // 그 등급의 옵션 수에 치명타·회피 하나가 더 붙을 수 있다(`rollAffixes`). 그 하나를
+      // 빼고 자르던 때는 신화의 다섯째 옵션이 불러올 때마다 사라졌다.
+      .slice(0, D.AFFIX_COUNT[Math.min(tier, D.AFFIX_COUNT.length - 1)] + 1);
   }
   return copy;
 }
