@@ -635,6 +635,28 @@ function gather(state) {
   check('이미 걸린 적은 세지 않는다', AI.chooseSkill(bard, state, null), null);
 }
 
+{
+  // 혼란에 걸린 적 딜러는 "우리 힐러를 치는 적부터"도 뒤집힌 편으로 본다. 원래 편의
+  // 힐러를 치는 아군이 아니라, 새 편(아군)의 힐러를 치는 원래 편을 노려야 한다.
+  const state = battle();
+  gather(state);
+  const scout = enemyOf(state, 'dealer');
+  const shaman = enemyOf(state, 'healer');
+  const orc = enemyOf(state, 'tank');
+  const noa = named(state, '사제 노아');
+  const mira = AI.alive(state, 'ally').find((u) => u.job === 'dealer');
+  mira.targetUid = shaman.uid;
+  orc.targetUid = noa.uid;
+  scout.confusedUntil = state.t + 5;
+  check('혼란에 걸린 딜러는 새 편의 힐러를 치는 쪽을 노린다', AI.chooseTarget(scout, state).uid, orc.uid);
+  // 도발도 같다: 혼란에 걸린 적 탱커가 지켜 줄 쪽은 아군이다.
+  orc.confusedUntil = state.t + 5;
+  scout.confusedUntil = 0;
+  scout.targetUid = noa.uid;
+  const danger = AI.endangered(orc, state);
+  check('혼란에 걸린 탱커는 새 편을 지킨다', danger && danger.mate.side, 'ally');
+}
+
 // --- 동료가 길을 막으면 돌아서 붙는다 -----------------------------------
 //
 // 비켜서기는 세로로만 옮기는데, 같은 편끼리 벌리는 거리(10)가 근접 사거리(7~9)보다

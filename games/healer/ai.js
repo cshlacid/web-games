@@ -58,11 +58,17 @@ function bestBy(unit, list, order) {
 }
 
 const mates = (unit, state) => alive(state, unit.side).filter((u) => u.uid !== unit.uid);
-// 혼란은 편을 뒤집는다. **편을 가르는 자리가 여기 하나뿐이라 여기만 고치면
-// 된다** — 노리는 것도, 붙으러 가는 것도, 스킬을 거는 것도 전부 이 함수를 본다.
+// 혼란은 편을 뒤집는다. **편을 가르는 자리는 이 둘(`foesOf`·`friendsOf`)뿐이다** —
+// 노리는 것도, 붙으러 가는 것도, 지켜 줄 사람을 고르는 것도 전부 이것을 본다. 지킬
+// 사람을 고르는 판단이 제 편을 곧장 보던 때는 혼란에 걸린 적의 셋 중 하나꼴이 여전히
+// 원래 적을 쳤다.
 const confused = (state, unit) => state.t < (unit.confusedUntil || 0);
 const foesOf = (unit, state) =>
   (confused(state, unit) ? mates(unit, state) : alive(state, opposite(unit.side)));
+// 그 눈으로 본 우리 편(자기는 빼고). 지켜 줄 사람을 고르는 판단(도발, "우리 힐러를 치는
+// 적부터")이 이것을 봐야 혼란이 판단 전체를 뒤집는다.
+const friendsOf = (unit, state) =>
+  (confused(state, unit) ? alive(state, opposite(unit.side)) : mates(unit, state));
 
 // 이 편의 탱커. 여럿이면 앞에 선 쪽을 기준으로 본다 — 후열이 붙는 자리이자
 // 어그로를 보는 자리라 최전선이어야 나머지 규칙이 뜻대로 굴러간다.
@@ -75,19 +81,22 @@ function frontTank(state, side) {
 
 // unit을 지금 노리고 있는 반대편. 어그로 판단의 근거라 logic.js가 매 틱 갱신한
 // targetUid를 그대로 쓴다 — 위협도 표 없이 "누가 누구를 보고 있는가"만 본다.
-function attackersOf(state, unit) {
-  return alive(state, opposite(unit.side)).filter((foe) => foe.targetUid === unit.uid);
+// `viewer`를 넘기면 그의 눈으로 본 적(`foesOf`) 가운데서 고른다. 혼란에 걸린 쪽은
+// 편이 뒤집혀 있어, 넘기지 않으면 원래 편을 지키려 원래 적을 친다.
+function attackersOf(state, unit, viewer) {
+  const pool = viewer ? foesOf(viewer, state) : alive(state, opposite(unit.side));
+  return pool.filter((foe) => foe.targetUid === unit.uid);
 }
 
 // 우리 편에서 지금 구해야 할 사람과 그를 치고 있는 적. PULL_ORDER 순으로
 // 힐러 → 원거리 딜러 → 근접 딜러를 보고, 처음 걸리는 쪽을 돌려준다.
 // 탱커는 표에 없다 — 탱커가 맞는 것은 구할 일이 아니라 제 할 일이다.
 function endangered(unit, state) {
-  const ranked = mates(unit, state)
+  const ranked = friendsOf(unit, state)
     .filter((mate) => rankOf(D.PULL_ORDER, mate) < D.PULL_ORDER.length)
     .sort((a, b) => rankOf(D.PULL_ORDER, a) - rankOf(D.PULL_ORDER, b));
   for (const mate of ranked) {
-    const foes = attackersOf(state, mate);
+    const foes = attackersOf(state, mate, unit);
     if (foes.length) return { mate, foes };
   }
   return null;
@@ -121,9 +130,9 @@ function dealerTarget(unit, state) {
   if (!foes.length) return null;
 
   const onHealer = [];
-  for (const mate of alive(state, unit.side)) {
+  for (const mate of friendsOf(unit, state)) {
     if (roleOf(mate) !== 'healer') continue;
-    for (const foe of attackersOf(state, mate)) onHealer.push(foe);
+    for (const foe of attackersOf(state, mate, unit)) onHealer.push(foe);
   }
   if (onHealer.length) return nearest(unit, onHealer);
 
