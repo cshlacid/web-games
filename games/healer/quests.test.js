@@ -356,5 +356,21 @@ function everyQuest(fn) {
   check('생성된 의뢰로 전투가 굴러간다', bad, []);
 }
 
+{
+  // 변형은 평판을 아는 게시판에서, 레벨이 찼을 때만 붙는다. 붙으면 보상이 오른다.
+  const plain = [];
+  const modded = [];
+  for (let seed = 1; seed < 80; seed++) {
+    for (const q of Q.generate(D.MOD_FROM + 4, seed)) plain.push(q);
+    for (const q of Q.generate(D.MOD_FROM + 4, seed, 3)) if (q.mod) modded.push(q);
+    for (const q of Q.generate(D.MOD_FROM - 1, seed, 3)) if (q.mod) plain.push(q);
+  }
+  check('평판을 모르거나 레벨이 낮으면 붙지 않는다', plain.filter((q) => q.mod).length, 0);
+  check('붙는 게시판이 있다', modded.length > 0, true);
+  check('모르는 변형은 없다', modded.every((q) => D.QUEST_MODS[q.mod]), true);
+  const horde = modded.find((q) => q.mod === 'horde');
+  check('대군은 무리가 하나 는다', horde ? horde.desc.vars.waves === horde.waves.length : true, true);
+}
+
 console.log(`${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);

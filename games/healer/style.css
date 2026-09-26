@@ -1233,3 +1233,6 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 /* 모자라거나 깎인 값. 오르는 쪽(.up)과 짝이다. */
 .count.short, .stat-value.short { color: var(--harm); }
 .count.up { color: var(--hp); }
+
+/* 변형 의뢰의 딱지. 보상이 큰 대신 조건이 비틀린 판이라 게시판에서 먼저 눈에 띄어야 한다. */
+.tag.mod { background: color-mix(in srgb, var(--enemy) 18%, transparent); color: var(--enemy); font-weight: 700; }

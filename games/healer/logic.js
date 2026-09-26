@@ -211,8 +211,10 @@ function spawnWave(state, index) {
     // 그 대신 마나를 쓰는 계열은 마나를 되찾는 스킬을 1레벨부터 들고 온다.
     const unit = makeUnit(def, 'enemy', `e${index}_${i}`, x, y, state.quest.level || 1,
       null, null, D.potionsFor(def));
-    // 주인공보다 높은 의뢰는 레벨 차만큼 더 세다(`D.gapMul`).
+    // 주인공보다 높은 의뢰는 레벨 차만큼 더 세다(`D.gapMul`). 격노 변형은 공격력을 더 올린다.
     const up = D.gapMul(def, state.quest.level || 1, state.heroLevel);
+    const mod = D.QUEST_MODS[state.quest.mod];
+    if (mod && mod.atk) up.atk *= mod.atk;
     unit.maxHp = Math.round(unit.maxHp * up.hp);
     unit.hp = unit.maxHp;
     unit.atk *= up.atk;
@@ -1089,10 +1091,13 @@ function march(state, dt) {
 // 마나는 싸우는 동안에도 아주 느리게 돌아온다. 무리 사이의 회복과 달리 여기는
 // 전투 중이라, 이것이 없으면 긴 무리 하나 안에서 마나가 말라 버린다.
 function regenMana(state, dt) {
+  // 메마름 변형은 주인공의 자연 회복만 줄인다 — 마나를 아껴 쓰는 판이다.
+  const mod = D.QUEST_MODS[state.quest.mod];
   for (const unit of state.units) {
     if (unit.dead || !unit.maxMp) continue;
     const int = (unit.attrs && unit.attrs.int) || 0;
-    unit.mp = Math.min(unit.maxMp, unit.mp + int * MANA_REGEN_PER_INT * dt);
+    const rate = mod && mod.heroRegen && unit.uid === HERO_UID ? mod.heroRegen : 1;
+    unit.mp = Math.min(unit.maxMp, unit.mp + int * MANA_REGEN_PER_INT * dt * rate);
   }
 }
 
