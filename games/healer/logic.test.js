@@ -1189,9 +1189,10 @@ function cast(state, skillId, target) {
   check('주교의 마나도 더 먹는다',
     D.PLAYER_SKILLS.mend.mp > D.PLAYER_SKILLS.touch.mp, true);
   check('주교는 점수를 덜 받는다', D.jobMaxLevel('bishop') < D.jobMaxLevel('priest'), true);
-  // 성기사의 회복은 급한 불만 끄는 정도다. 이것이 "보조 힐러"의 뜻이다.
-  check('성기사의 회복이 사제의 절반 아래',
-    D.PLAYER_SKILLS.layHands.heal < D.PLAYER_SKILLS.touch.heal / 2, true);
+  // 성기사의 회복은 사제보다 작다. 이것이 "보조 힐러"의 뜻이다. 한때 절반 아래로 묶었는데,
+  // 힐러만 조작하는 게임에서 성기사로는 이길 수 없게 되어(자동 힐러 L8 46%, 사제 63%) 풀었다.
+  check('성기사의 회복이 사제보다 작다',
+    D.PLAYER_SKILLS.layHands.heal < D.PLAYER_SKILLS.touch.heal * 0.8, true);
   check('도발은 성기사만 들고 온다',
     Object.values(D.PLAYER_SKILLS).filter((def) => def.kind === 'taunt')
       .map((def) => def.job), ['paladin']);
