@@ -1047,6 +1047,12 @@ const UNIT_SKILLS = {
   // **우두머리만 장판을 깐다.** 정예가 광역기를 하나씩 갖게 되면서 우두머리가
   // "정예와 같은 것을 더 세게"뿐이었는데, 그러면 등급이 수치 차이로만 남는다.
   // 발밑에 남아 계속 타는 것이라 후열이 자리를 옮겨야 하고, 그때 대열이 흐트러진다.
+  // **예고된 큰 한 방**(`telegraph`). 길게 모았다가 앞의 적 하나를 크게 친다. 모으는 동안
+  // 화면이 대상을 짚어 준다 — 힐러가 미리 채우거나 막는 것으로 대응하는 자리다. 이것이
+  // 없을 때는 우두머리 판도 "보이는 대로 채운다"뿐이라 판단할 것이 없었다.
+  smash: { id: 'smash', icon: 'smash', name: '분쇄 일격', spec: 'chieftain', cd: 18, mp: 0, kind: 'damage',
+            pct: 0.45, range: 9, cast: 2.6, minLevel: 1, telegraph: 1,
+            desc: '한참 힘을 모았다가 앞의 적을 짓누른다' },
   rupture: { id: 'rupture', icon: 'rupture', name: '대지 가르기', spec: 'chieftain', cd: 16, mp: 30,
             kind: 'zone', tick: 26, interval: 1, duration: 8, radius: 18, range: 30,
             cast: 1.4, minLevel: 1,
@@ -1337,7 +1343,7 @@ const SPEC_SKILLS = {
   ghoul:   ['pounce', 'rend', 'jab', 'trip'],
   // 우두머리 전용. 새 스킬을 만들지 않고 수호와 전사의 무거운 것만 골라 묶었다 —
   // 이 계열이 하는 일은 "이미 있는 것 중 가장 아픈 것"이지 새로운 수단이 아니다.
-  chieftain: ['rupture', 'sweep', 'roar', 'slam', 'shieldSlam', 'crush', 'bash'],
+  chieftain: ['smash', 'rupture', 'sweep', 'roar', 'slam', 'shieldSlam', 'crush', 'bash'],
 };
 
 // 그 유닛이 이 레벨에서 전투에 들고 가는 스킬. 편성 화면과 전투가 같은 것을
@@ -2024,7 +2030,7 @@ const ENEMIES = {
   chief:  { id: 'chief', race: 'orc', rank: 'boss', exp: 210,  name: '오크 우두머리', job: 'tank',   sprite: 'chief',
             hp: 5376, mp: 136, atk: 69, attackCd: 2.0, range: 8,  speed: 14,
            attrs: { str: 100, agi: 6, int: 20, vit: 320 }, growth: 'enemy',
-            armor: 0.62, spec: 'chieftain', always: ['rupture', 'sweep'] },
+            armor: 0.62, spec: 'chieftain', always: ['smash', 'rupture'] },
 };
 
 // **높은 레벨에서는 같은 자리를 다른 적이 채운다.** 계열이 한 번 올라가는 것

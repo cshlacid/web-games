@@ -1987,6 +1987,26 @@ function cast(state, skillId, target) {
   check('왼쪽 끝에서 싸우는 시간은 드물다', left / ticks < 0.1, true);
 }
 
+// --- 우두머리의 예고기 -----------------------------------------------------
+{
+  // 모으기 시작하면 대상을 알리고, 떨어지면 대상 최대 체력의 정해진 비율만큼 친다(방어 무시).
+  const state = battle();
+  const chief = L.createBattle({ quest: { id: 'b', name: 'b', desc: '', scene: 'mine', level: 10,
+    waves: [['chief']], guildReward: { gold: 0, exp: 0 }, drops: [], exp: 0 },
+    party: PARTY, skills: SKILLS, seed: 3 });
+  const boss = chief.units.find((u) => u.defId === 'chief');
+  const tank = chief.units.find((u) => u.side === 'ally' && u.job === 'tank');
+  check('우두머리는 예고기를 늘 든다', boss.skills.some((slot) => slot.id === 'smash'), true);
+  L.startCast(chief, boss, { id: 'smash', targetUid: tank.uid });
+  check('모으기 시작하면 알린다', L.drainEvents(chief).some((e) => e.type === 'telegraph' && e.targetUid === tank.uid), true);
+  tank.hp = tank.maxHp;
+  L.runUnitSkill(chief, boss, { id: 'smash', targetUid: tank.uid });
+  const lost = tank.maxHp - tank.hp;
+  check('대상 최대 체력의 비율만큼 친다',
+    Math.abs(lost - tank.maxHp * D.UNIT_SKILLS.smash.pct) <= tank.maxHp * D.UNIT_SKILLS.smash.pct * 0.6 + 1, true);
+  void state;
+}
+
 // --- 진 판의 까닭과 건너뛰기 --------------------------------------------
 {
   // 주인공이 쓰러지면 남은 판을 한 번에 돌릴 수 있고, 진 판은 까닭을 남긴다.

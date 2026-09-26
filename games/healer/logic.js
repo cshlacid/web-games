@@ -665,7 +665,14 @@ function runUnitSkill(state, unit, choice) {
     addZone(state, unit, def, target.x, target.y, 'damage', over(def.tick));
     return;
   }
-  if (def.kind === 'damage') { applyDamage(state, unit, target, unit.atk * def.mul, true, def.school); return; }
+  // `pct`는 대상 최대 체력에 대한 비율이다(예고기). 공격력 배수로 두면 탱커의 방어에 막혀
+  // 최대 체력의 8%에 그쳐 대비할 까닭이 없었다. 방어는 거르고(나눠 두면 applyDamage가 다시
+  // 곱한다) 강화·약화는 그대로 타게 해, 보호막을 미리 거는 것도 대응이 되게 했다.
+  if (def.kind === 'damage') {
+    const raw = def.pct ? (target.maxHp * def.pct) / target.armor : unit.atk * def.mul;
+    applyDamage(state, unit, target, raw, !def.pct, def.school);
+    return;
+  }
   if (def.kind === 'damage-area') {
     for (const foe of alive(state, AI.opposite(unit.side))) {
       if (dist(foe, target) <= def.radius) applyDamage(state, unit, foe, unit.atk * def.mul, false, def.school);
@@ -737,7 +744,13 @@ function startCast(state, unit, choice) {
 
   if (!def.cast) { runUnitSkill(state, unit, choice); return; }
   unit.cast = { skillId: def.id, name: def.name, targetUid: choice.targetUid,
-    startedAt: state.t, endsAt: state.t + def.cast, player: false };
+    startedAt: state.t, endsAt: state.t + def.cast, player: false, telegraph: Boolean(def.telegraph) };
+  // 예고기는 모으기 시작한 순간을 알린다. 누구에게 떨어지는지 알아야 미리 채운다.
+  if (def.telegraph) {
+    const target = byUid(state, choice.targetUid);
+    emit(state, { type: 'telegraph', uid: unit.uid, targetUid: choice.targetUid,
+      code: 'hl.log.telegraph', vars: { from: unit.name, skill: def.name, to: target ? target.name : '' } });
+  }
 }
 
 function cancelCast(state, unit) {

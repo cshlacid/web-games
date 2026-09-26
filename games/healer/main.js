@@ -1795,6 +1795,7 @@ function syncUnits(state) {
     const cast = unit.cast;
     const bar = node.querySelector('.castbar');
     bar.hidden = !cast || unit.dead;
+    bar.classList.toggle('telegraph', Boolean(cast && cast.telegraph));
     if (cast && !unit.dead) {
       const span = Math.max(0.001, cast.endsAt - cast.startedAt);
       const done = Math.min(1, (state.t - cast.startedAt) / span);
@@ -1916,6 +1917,8 @@ function syncPortraitList(state, id) {
     if (unit.maxMp > 0) mana.firstElementChild.style.width = `${(unit.mp / unit.maxMp) * 100}%`;
     button.classList.toggle('dead', unit.dead);
     button.classList.toggle('casting', Boolean(unit.cast));
+    button.classList.toggle('threat', !unit.dead && state.units.some((foe) => !foe.dead
+      && foe.cast && foe.cast.telegraph && foe.cast.targetUid === unit.uid));
     button.classList.toggle('valid', Boolean(app.aiming) && isValidUnitTarget(state, unit));
     syncStatus(button, state, unit);
   }
@@ -2271,6 +2274,13 @@ function handleEvents(state, events) {
         // 동료가 쓴 스킬은 글자로만 알린다. 소리까지 겹치면 내 조작음이 묻힌다.
         note(msg(event));
       }
+      continue;
+    }
+    // 예고된 큰 한 방을 모으기 시작했다. 소리와 글자로 알리고, 누구에게 떨어지는지는
+    // 초상화가 끝날 때까지 짚는다(`syncPortraitList`).
+    if (event.type === 'telegraph') {
+      note(msg(event));
+      sound.play('danger');
       continue;
     }
     // 기절은 지속 상태라 유닛에 테가 돌지만(syncUnits), 걸린 순간은 글자로도
