@@ -179,7 +179,10 @@ function gainExp(member, exp) {
 
 // 전투가 끝난 뒤 명부 전체를 굴린다. 데려간 쪽은 전부, 데려가지 않은 쪽은
 // 일부만 받는다 — 데려가는 것이 손해가 되면 편성을 고를 이유가 없다.
-function awardExp(members, joinedNames, exp, seed) {
+// **주인공보다 둘 넘게 앞선 동료는 경험치를 덜 받는다**(`heroLevel`, 레벨마다 절반). 동료는
+// 만렙까지 드는 경험치가 주인공의 77%라, 데려간 동료가 주인공 L23에 25~26, L26에 30이었다 —
+// 후반이 저절로 쉬워져 힐러의 성장이 승부를 가르지 못했다. 넘기지 않으면 예전처럼 준다.
+function awardExp(members, joinedNames, exp, seed, heroLevel) {
   const rng = createRng(seed == null ? (Math.random() * 1e9) | 0 : seed);
   const joined = new Set(joinedNames);
   const [lo, hi] = D.LEVEL.idleExpRate;
@@ -187,7 +190,9 @@ function awardExp(members, joinedNames, exp, seed) {
 
   for (const member of members) {
     const here = joined.has(member.name);
-    const share = here ? exp : Math.round(exp * (lo + rng() * (hi - lo)));
+    const ahead = heroLevel ? member.level - heroLevel - 2 : 0;
+    const damp = ahead > 0 ? 0.5 ** ahead : 1;
+    const share = Math.round((here ? exp : exp * (lo + rng() * (hi - lo))) * damp);
     const levels = gainExp(member, share);
     report.push({ name: member.name, joined: here, exp: share, levels });
   }

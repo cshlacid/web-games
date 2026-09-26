@@ -446,5 +446,15 @@ const SEEDS = [1, 5, 77, 4242, 20260825];
     Math.abs(slope(R.redrawCost) - slope(Shop.refreshCost)) < 0.05, true);
 }
 
+{
+  // 주인공보다 둘 넘게 앞선 동료는 레벨마다 절반씩 덜 받는다.
+  const roster = R.create(5);
+  const [a, b] = roster;
+  a.level = 10; b.level = 13;
+  const report = R.awardExp([a, b], [a.name, b.name], 400, 1, 10);
+  check('주인공과 같은 레벨이면 그대로 받는다', report[0].exp, 400);
+  check('셋 앞서면 절반 받는다', report[1].exp, 200);
+}
+
 console.log(`${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);
