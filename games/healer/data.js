@@ -2063,6 +2063,25 @@ const enemyAt = (id, level) => {
   return up && level >= up.at && ENEMIES[up.to] ? up.to : id;
 };
 
+// **레벨 차가 레벨과 상관없이 같은 무게를 갖게 하는 배수.** 능력치가 레벨에 비례해서만 자라,
+// 3레벨 차가 L4에서는 체력 ×1.47인데 L24에서는 ×1.11이었다. 그래서 L14부터는 +5 의뢰도 +0과
+// 승률이 같았고(자동 힐러 75% 대 75%), 보상은 레벨 차를 따라 계속 오르니 늘 +5가 최선이었다.
+// 주인공보다 높은 의뢰의 적은 레벨마다 이만큼씩은 세지도록 모자란 몫을 채운다. 낮은
+// 의뢰는 건드리지 않는다 — 쉬운 판을 더 쉽게 할 까닭이 없다.
+const GAP_STEP = { hp: 1.17, atk: 1.15 };
+
+function gapMul(def, questLevel, heroLevel) {
+  const gap = questLevel - heroLevel;
+  if (!(gap > 0) || !(heroLevel >= 1)) return { hp: 1, atk: 1 };
+  const at = (level) => derive(def, attrsAt(def, level, null));
+  const here = at(heroLevel);
+  const there = at(questLevel);
+  return {
+    hp: Math.max(1, GAP_STEP.hp ** gap / (there.hp / here.hp)),
+    atk: Math.max(1, GAP_STEP.atk ** gap / (there.atk / here.atk)),
+  };
+}
+
 // 동료 이름 조각. 명부에 새 동료가 들어올 때 조합해 쓴다 — 이름이 곧 신원이고,
 // 같은 이름이면 같은 동료라 경험치와 장비가 이어진다.
 //
@@ -2340,7 +2359,7 @@ const SKILL_MAX = 5;   // 전투에 등록할 수 있는 주인공 스킬 수
 const api = {
   FIELD, JOBS, SPECS, RACES, raceOf, raceAttrs, RACE_WEAK, weakOf, schoolMul,
   HEAL_HARM, healHarmOf, potionsFor,
-  MANA_REGEN_PER_INT, POWER, combatPower, ENEMY_UP, enemyAt, MELEE_RANGE, roleOf, ATTACK_ORDER, HEAL_ORDER, PULL_ORDER, LEVEL, ATTRS, ATTR, ATTR_GROWTH, attrsAt, derive, STATS, LOWER_IS_BETTER, TIERS, AFFIX_COUNT, AFFIX_BASE, AFFIX_POOL,
+  MANA_REGEN_PER_INT, POWER, combatPower, ENEMY_UP, enemyAt, GAP_STEP, gapMul, MELEE_RANGE, roleOf, ATTACK_ORDER, HEAL_ORDER, PULL_ORDER, LEVEL, ATTRS, ATTR, ATTR_GROWTH, attrsAt, derive, STATS, LOWER_IS_BETTER, TIERS, AFFIX_COUNT, AFFIX_BASE, AFFIX_POOL,
   tierName, tierFloor, tierRoll, tierCeiling, TIER_POWER, AFFIX_RANGE, SHOP_MAX_TIER,
   RANKS, rankOf,
   SLOTS, GEAR, MATERIALS, REGIONS, NAMES, SPECIAL_POOL, SPECIAL_CHANCE,

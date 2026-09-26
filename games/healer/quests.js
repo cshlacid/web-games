@@ -117,7 +117,11 @@ function bossWave(region, level, rng) {
   const trash = others.filter((id) => D.rankOf(D.ENEMIES[id]).id === 'trash');
   const pool = (trash.length ? trash : others);
   let spent = bosses * THREAT.boss;
-  while (spent < BOSS_BUDGET && wave.length < WAVE_MAX) {
+  // **둘이 나오기 전까지는 쫄을 하나만 데려온다.** 우두머리가 나오기 시작하는 L8~12가 곡선에서
+  // 가장 움푹한 자리였다(알맞은 의뢰를 자동 힐러로 50%, 앞뒤는 80%대). 처음 만나는 우두머리가
+  // 이미 다 자란 무리를 끌고 오면 넘어설 발판이 없다.
+  const budget = level < region.minLevel + 2 + BOSS_STEP ? THREAT.boss + 1 : BOSS_BUDGET;
+  while (spent < budget && wave.length < WAVE_MAX) {
     const id = pick(rng, pool.length ? pool : others);
     wave.push(id);
     spent += threatOf(id);

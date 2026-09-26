@@ -211,6 +211,12 @@ function spawnWave(state, index) {
     // 그 대신 마나를 쓰는 계열은 마나를 되찾는 스킬을 1레벨부터 들고 온다.
     const unit = makeUnit(def, 'enemy', `e${index}_${i}`, x, y, state.quest.level || 1,
       null, null, D.potionsFor(def));
+    // 주인공보다 높은 의뢰는 레벨 차만큼 더 세다(`D.gapMul`).
+    const up = D.gapMul(def, state.quest.level || 1, state.heroLevel);
+    unit.maxHp = Math.round(unit.maxHp * up.hp);
+    unit.hp = unit.maxHp;
+    unit.atk *= up.atk;
+    unit.power *= up.atk;
     // 적에게도 대열의 기준선을 준다. `ai.holdLine`이 편을 가리지 않고 이 값을
     // 보므로, 없으면 아군만 밀리지 않는 규칙이 된다. 무리 사이의 이동(`march`)은
     // 아군만 돌아가므로 여기에 걸리지 않는다.
@@ -249,6 +255,8 @@ function createBattle(config) {
   const state = {
     quest, rng: createRng(config.seed == null ? 1 : config.seed),
     t: 0, waveIndex: -1, nextWaveAt: 0,
+    // 레벨 차 배수의 기준(`D.gapMul`). 주지 않으면 의뢰 레벨로 보아 배수가 없다.
+    heroLevel: config.heroLevel || quest.level || 1,
     // 결과 화면이 패배의 까닭을 적는 데 쓰는 순간들(`lossCauses`).
     story: { manaOut: null, heroDown: null, firstDown: null },
     units: [], zones: [], dots: [],

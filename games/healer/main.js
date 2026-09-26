@@ -2468,7 +2468,7 @@ function openResult(state) {
   // 명부 전체가 자란다. 데려간 쪽은 전부, 남은 쪽은 다른 파티에서 일한 몫만.
   const joinedNames = app.party.map((m) => m.name);
   const roster = Roster.awardExp(app.progress.roster, joinedNames,
-    reward.charExp, (Math.random() * 1e9) | 0);
+    reward.charExp, (Math.random() * 1e9) | 0, app.progress.charLevel);
 
   // **데려간 동료는 약속한 보수를, 남은 동료는 다른 파티에서 번 몫을 받는다.**
   // 받은 돈으로 동료가 제 장비를 갖춘다 — 쓸 데가 없으면 저장본에 숫자만 쌓이고,
