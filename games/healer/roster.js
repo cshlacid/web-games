@@ -245,6 +245,18 @@ function goShopping(member, seed) {
     member.gold -= price;
     return { item, slot: taken.slot, price, previous: taken.previous };
   }
+  // 살 것이 없으면 낀 것을 한 칸 강화한다. 희귀까지 산 뒤에는 지갑이 쌓이기만 했다(후반에
+  // 자주 데려간 동료가 6.6만~9.5만). **레벨 5마다 한 칸까지만** — 막지 않으면 후반 동료가
+  // 지갑만큼 세져 판이 저절로 쉬워진다.
+  const cap = Math.floor(member.level / 5);
+  const worn = gearOf(member).filter((item) => Items.plusOf(item) < cap)
+    .sort((a, b) => Items.plusOf(a) - Items.plusOf(b))[0];
+  if (worn && (member.gold || 0) >= Items.enhancePrice(worn)) {
+    const cost = Items.enhancePrice(worn);
+    member.gold -= cost;
+    worn.plus = Items.plusOf(worn) + 1;
+    return { item: worn, slot: D.GEAR[worn.defId].slot, price: cost, enhanced: worn.plus };
+  }
   return null;
 }
 

@@ -318,6 +318,21 @@ function reforge(progress, itemUid) {
   return { ok: true, cost: paid.cost, before, after: item.affixes };
 }
 
+// 한 칸 강화. 장착 중인 것도 된다 — 재련과 같은 이유다.
+function enhance(progress, itemUid) {
+  const index = findItem(progress, itemUid);
+  const slot = Object.keys(progress.equipped)
+    .find((key) => progress.equipped[key] && progress.equipped[key].uid === itemUid);
+  const item = index >= 0 ? progress.inventory[index] : (slot ? progress.equipped[slot] : null);
+  if (!item) return { ok: false, reason: 'hl.why.noSuchItem' };
+  if (!Items.isGear(item)) return { ok: false, reason: 'hl.why.cannotReforge' };
+  if (Items.plusOf(item) >= Items.PLUS_MAX) return { ok: false, reason: 'hl.why.maxed' };
+  const paid = spend(progress, Items.enhancePrice(item));
+  if (!paid.ok) return paid;
+  item.plus = Items.plusOf(item) + 1;
+  return { ok: true, cost: paid.cost, plus: item.plus };
+}
+
 // 장착 중인 것은 팔 수 없다. 팔리면 다음 전투에 빈손으로 나가는데, 그것을
 // 되돌릴 방법이 없다.
 function sell(progress, itemUid) {
@@ -598,7 +613,7 @@ const api = {
   spend, buyGear, buyPotion, sell, reforge,
   jobEntry, jobLevel, jobExpOf, canChangeJob, changeJob,
   unlockedSkills, learnedSkills, jobSkills, validSkills,
-  skillLevel, skillDef, skillLevels, learnSkill, raiseSkill, junk, sellJunk,
+  skillLevel, skillDef, skillLevels, learnSkill, raiseSkill, junk, sellJunk, enhance,
   earnedSkillPoints, spentSkillPoints, freeSkillPoints,
 };
 

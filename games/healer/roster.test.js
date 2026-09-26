@@ -456,5 +456,19 @@ const SEEDS = [1, 5, 77, 4242, 20260825];
   check('셋 앞서면 절반 받는다', report[1].exp, 200);
 }
 
+{
+  // 살 것이 없으면 지갑으로 낀 것을 강화한다. 레벨 5마다 한 칸까지다.
+  const member = R.create(8)[0];
+  member.level = 10;
+  member.gold = 1e7;
+  for (const slot of Object.keys(member.gear)) member.gear[slot] = null;
+  const worn = Items.make('mail', 5, 1);
+  member.gear[D.GEAR.mail.slot] = worn;
+  let enhanced = 0;
+  for (let i = 0; i < 10; i++) { const deal = R.goShopping(member, 100 + i); if (deal && deal.enhanced) enhanced++; }
+  check('동료도 지갑으로 강화한다', enhanced > 0, true);
+  check('레벨 5마다 한 칸까지', Object.values(member.gear).filter(Boolean).every((it) => Items.plusOf(it) <= 2), true);
+}
+
 console.log(`${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);

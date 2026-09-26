@@ -417,5 +417,19 @@ const SEEDS = [1, 7, 42, 999, 20260825];
     D.STATS.hp.fmt(1234).includes('1,234'), true);
 }
 
+{
+  // 강화는 기본·붙은 옵션을 함께 키우고, 이름에 칸이 붙으며, 저장본을 지나도 남는다.
+  const item = Items.make('staff', 2, 7);
+  const before = Items.stats(item).heal;
+  item.plus = 5;
+  check('강화하면 수치가 커진다', Items.stats(item).heal > before, true);
+  check('칸마다 정해진 만큼', Math.abs(Items.stats(item).heal / before - (1 + Items.PLUS_STEP * 5)) < 1e-9, true);
+  check('이름에 칸이 붙는다', Items.name(item).startsWith('+5 '), true);
+  check('저장본을 지나도 남는다', Items.adopt(JSON.parse(JSON.stringify(item))).plus, 5);
+  check('상한을 넘겨 적어도 잘린다', Items.plusOf({ plus: 99 }), Items.PLUS_MAX);
+  check('칸이 오를수록 비싸다', Items.enhancePrice(item) > Items.enhancePrice(Items.make('staff', 2, 7)), true);
+  check('파는 값에는 얹지 않는다', Items.sellPrice(item), Items.sellPrice(Items.make('staff', 2, 7)));
+}
+
 console.log(`${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);

@@ -833,6 +833,29 @@ function renderShop() {
     reforgeList.append(row);
   }
 
+  const enhanceList = $('shop-enhance');
+  enhanceList.textContent = '';
+  const worn = P.equippedItems(progress).filter((item) => Items.isGear(item));
+  if (!worn.length) enhanceList.append(text('li', 'empty-note', t('hl.noEnhance')));
+  for (const item of worn) {
+    const maxed = Items.plusOf(item) >= Items.PLUS_MAX;
+    const cost = Items.enhancePrice(item);
+    const row = el('li');
+    const button = itemButton(item, {
+      label: maxed ? t('hl.max') : t('hl.enhanceFor', { n: num(cost) }),
+      run: () => {
+        const done = P.enhance(progress, item.uid);
+        sound.play(done.ok ? 'click' : 'deny');
+        if (!done.ok) return;
+        persist();
+        renderShop();
+      },
+    });
+    button.disabled = maxed || progress.gold < cost;
+    row.append(button);
+    enhanceList.append(row);
+  }
+
   // 쓰지 않을 것을 한 번에. 다른 직업의 장비는 선물로 남긴다(`P.junk`).
   const junk = P.junk(progress);
   const junkGold = junk.reduce((sum, item) => sum + Items.sellPrice(item), 0);
@@ -2741,7 +2764,9 @@ function renderRosterReport(report, joined, purses, bought, trustMoves, left) {
     const deal = bought && bought.get(entry.name);
     if (deal) {
       const line = el('li', 'sub-row');
-      line.append(text('span', 'why', t('hl.bought', { name: Items.def(deal.item).name })));
+      line.append(text('span', 'why', deal.enhanced
+        ? t('hl.boughtPlus', { name: Items.name(deal.item) })
+        : t('hl.bought', { name: Items.def(deal.item).name })));
       line.append(text('b', 'stat-value', t('hl.spentGold', { n: num(deal.price) })));
       list.append(line);
     }

@@ -108,6 +108,8 @@ function adopt(item) {
       // 그 등급의 옵션 수에 치명타·회피 하나가 더 붙을 수 있다(`rollAffixes`). 그 하나를
       // 빼고 자르던 때는 신화의 다섯째 옵션이 불러올 때마다 사라졌다.
       .slice(0, D.AFFIX_COUNT[Math.min(tier, D.AFFIX_COUNT.length - 1)] + 1);
+    const plus = plusOf(item);
+    if (plus) copy.plus = plus;
   }
   return copy;
 }
@@ -124,6 +126,14 @@ function stats(item) {
   for (const [key, value] of Object.entries(gear.stats)) out[key] = value * mul;
   for (const affix of item.affixes || []) {
     out[affix.stat] = (out[affix.stat] || 0) + affix.value;
+  }
+  // 강화(`plus`)는 기본 옵션과 붙은 옵션을 함께 키운다. 능력치는 정수로 남긴다 — 화면에
+  // '힘 +7'이라 적고 속으로 7.4를 쓰면 캐릭터 창의 합이 안 맞는다.
+  const grow = 1 + PLUS_STEP * plusOf(item);
+  if (grow !== 1) {
+    for (const key of Object.keys(out)) {
+      out[key] = D.WHOLE_AFFIX.has(key) ? Math.round(out[key] * grow) : out[key] * grow;
+    }
   }
   return out;
 }
@@ -143,7 +153,8 @@ function name(item) {
   const base = def(item);
   if (!base) return '?';
   if (!isGear(item)) return base.name;
-  return `${D.tierName(item.tier)} ${base.name}`;
+  const plus = plusOf(item);
+  return `${plus ? `+${plus} ` : ''}${D.tierName(item.tier)} ${base.name}`;
 }
 
 // 등급 하나. 화면이 색을 입히는 데 쓴다 — 이름만으로는 목록에서 훑어지지 않는다.
@@ -245,6 +256,17 @@ function price(item) {
 
 const sellPrice = (item) => Math.max(1, Math.round(price(item) * SELL_RATE));
 
+// --- 강화 ---------------------------------------------------------------
+//
+// **골드로 장비를 한 칸씩 키운다(+1~+10).** 재련은 옵션을 다시 굴릴 뿐 크기를 못 바꾸고,
+// 장비 수치가 레벨과 무관해 후반에는 희귀 체력 옵션이 최대 체력의 4%에 그쳤다. 그 사이
+// 골드는 주인공에게도 동료에게도 쌓이기만 했다. 등급은 그대로라 "영웅 위는 적에게서만"을
+// 건드리지 않는다. 값은 칸마다 오르고 파는 값에는 얹지 않는다 — 강화하고 팔아 남기는 길을 막는다.
+const PLUS_MAX = 10;
+const PLUS_STEP = 0.07;
+const plusOf = (item) => Math.max(0, Math.min(PLUS_MAX, (item && item.plus) | 0));
+const enhancePrice = (item) => Math.max(1, Math.round(price(item) * 0.35 * (plusOf(item) + 1)));
+
 // --- 재련 ---------------------------------------------------------------
 //
 // **등급과 물건은 그대로 두고 무작위 옵션만 다시 굴린다.** 골드가 진행할수록
@@ -271,7 +293,7 @@ function reforge(item, seed) {
 const api = {
   createRng, seedOf, make, adopt, def, isGear, tier, stats, sum, name, summary, statLine,
   diff, isUpgrade, gainOf, score, quality, price, sellPrice, SELL_RATE,
-  reforge, reforgePrice, REFORGE_RATE,
+  reforge, reforgePrice, REFORGE_RATE, PLUS_MAX, PLUS_STEP, plusOf, enhancePrice,
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
