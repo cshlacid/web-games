@@ -9,6 +9,7 @@ const D = window.HealerData;
 const L = window.HealerLogic;
 const AI = window.HealerAI;
 const Loot = window.HealerLoot;
+const Ach = window.HealerAchievements;
 const P = window.HealerProgress;
 const Q = window.HealerQuests;
 const Items = window.HealerItems;
@@ -189,6 +190,22 @@ for (const button of $('char-tabs').children) {
     openCharPage(button.dataset.page);
     window.scrollTo(0, 0);
   });
+}
+
+function renderAchievements() {
+  const list = $('achievements');
+  list.textContent = '';
+  const got = app.progress.achieved || {};
+  $('ach-count').textContent = `${Ach.count(app.progress)} / ${Ach.LIST.length}`;
+  for (const a of Ach.LIST) {
+    const row = el('li', got[a.id] ? 'done' : '');
+    row.append(icon(got[a.id] ? 'check' : 'lock'));
+    const body = el('div', 'pick-body');
+    body.append(text('b', null, t(`hl.ach.${a.id}.name`)));
+    body.append(text('div', 'pick-sub', t(`hl.ach.${a.id}.desc`)));
+    row.append(body);
+    list.append(row);
+  }
 }
 
 // 아래 탭의 캐릭터에 쓰지 않은 점수 표시.
@@ -424,6 +441,9 @@ function renderAttrs() {
 function renderCharacter() {
   markPoints();
   const progress = app.progress;
+  // 판 밖에서 채워지는 이정표(강화, 친구, 상위 계열)도 여기서 본다.
+  if (Ach.check(progress, null).length) persist();
+  renderAchievements();
   const stats = P.stats(progress);
   const max = progress.charLevel >= D.LEVEL.maxLevel;
 
@@ -2545,6 +2565,16 @@ function openResult(state) {
   if (gained.charLevels) ups.push(t('hl.charLevelUp', { from: before.char, to: app.progress.charLevel }));
   if (gained.jobLevels) ups.push(t('hl.jobLevelUp', { job: job.name, from: before.job, to: jobLv }));
   if (gained.unlocked.length) ups.push(t('hl.newSkills', { list: gained.unlocked.map((def) => def.name).join(', ') }));
+  const earned = Ach.check(app.progress, {
+    won,
+    downs: members.filter((m) => AI.byUid(state, m.id).dead).length,
+    healed: state.stats.healed,
+    overheal: state.stats.overheal,
+    boss: quest.waves.some((wave) => wave.some((id) => D.ENEMIES[id] && D.ENEMIES[id].rank === 'boss')),
+    gap: quest.level - before.char,
+    mod: quest.mod,
+  });
+  if (earned.length) ups.push(t('hl.achNew', { list: earned.map((id) => t(`hl.ach.${id}.name`)).join(', ') }));
   $('levelup').textContent = ups.join(' · ');
   $('levelup').hidden = !ups.length;
   $('to-char').hidden = P.freePoints(app.progress) + P.freeSkillPoints(app.progress) <= 0;

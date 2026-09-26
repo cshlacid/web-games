@@ -88,6 +88,15 @@
           <p class="panel-note" data-i18n="hl.attrNote">캐릭터 레벨이 오를 때마다 점수를 받는다. 한번 넣으면 되돌릴 수 없다.</p>
           <ul class="attrs" id="char-attrs"></ul>
         </div>
+
+        <!-- 업적. 만렙이 가까워지면 할 일이 같은 의뢰의 되풀이뿐이라 목표를 둔다. -->
+        <div class="panel">
+          <div class="panel-head">
+            <h2 data-i18n="hl.achTitle">업적</h2>
+            <span class="count" id="ach-count">0</span>
+          </div>
+          <ul class="achievements" id="achievements"></ul>
+        </div>
       </div>
 
       <div class="char-page" id="char-page-skill" hidden>
@@ -458,6 +467,7 @@
      신뢰도의 수치 규칙은 reputation.js에 있고 hire.js가 그것을 쓴다. -->
 <script src="reputation.js"></script>
 <script src="hire.js"></script>
+<script src="achievements.js"></script>
 <script src="progress.js"></script>
 <script src="quests.js"></script>
 <script src="ai.js"></script>
