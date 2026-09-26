@@ -96,5 +96,27 @@ check('힌트 순서가 아직 안 놓인 칸만 담는다', orderBroken, 0);
   check('풀 수 없는 판은 사람 규칙으로도 못 푼다', S.logicSolve(broken).solved, false);
 }
 
+// --- 힌트 ---
+
+// 사람이 아무 데나 채워 둔 판에서도 힌트만 눌러 끝까지 가고, 짚는 칸은 늘 빈 칸이다.
+{
+  let wrong = 0;
+  let stuck = 0;
+  for (const size of G.SIZES) {
+    const puzzle = G.generate(size, { seed: size * 13 });
+    const b = R.board(puzzle);
+    const marks = Uint8Array.from(b.given);
+    for (let cell = 0; cell < b.n; cell += 3) marks[cell] = puzzle.solution[cell];
+    for (;;) {
+      const next = S.logicSolve(puzzle, marks).order[0];
+      if (next === undefined) { if (marks.includes(R.EMPTY)) stuck++; break; }
+      if (marks[next] !== R.EMPTY) wrong++;
+      marks[next] = puzzle.solution[next];
+    }
+  }
+  check('힌트는 채워 둔 칸에서 이어 끝까지 간다', stuck, 0);
+  check('힌트는 이미 채운 칸을 짚지 않는다', wrong, 0);
+}
+
 console.log(`\n${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);

@@ -80,10 +80,10 @@ function randomArrangement(size, rng) {
 // "찍지 않고 풀리는가"를 본다 — 생성기가 이 판정을 통과한 판만 내보내므로
 // 마지막에 두 칸을 놓고 찍어야 하는 판은 나오지 않는다.
 //
-// 화면의 힌트도 여기서 나온다. `order`는 이 풀이가 왕관을 확정한 순서라, 사람이
-// 다음에 알아낼 수 있는 자리가 곧 그 순서의 앞쪽이다. 정답에서 아무 자리나
-// 집어 주면 "왜 거기인지 알 수 없는 힌트"가 된다.
-function logicSolve(puzzle) {
+// 화면의 힌트도 여기서 나온다. `from`(`{ crowns, marks }`)을 주면 사람이 놓은 왕관과
+// X에서 이어 좁히고, 그때 `order[0]`이 지금 판에서 가장 먼저 알 수 있는 자리다.
+// 정답에서 아무 자리나 집어 주면 "왜 거기인지 알 수 없는 힌트"가 된다.
+function logicSolve(puzzle, from) {
   const size = puzzle.size;
   const n = size * size;
   const regions = puzzle.regions;
@@ -91,6 +91,7 @@ function logicSolve(puzzle) {
   const crowned = new Uint8Array(n);
   const done = { row: new Uint8Array(size), col: new Uint8Array(size), reg: new Uint8Array(size) };
   const order = [];
+  let placed = 0;
 
   const group = {
     row: (k) => { const a = []; for (let c = 0; c < size; c++) a.push(k * size + c); return a; },
@@ -105,6 +106,7 @@ function logicSolve(puzzle) {
     const c = cell % size;
     const g = regions[cell];
     crowned[cell] = 1;
+    placed++;
     order.push(cell);
     done.row[r] = done.col[c] = done.reg[g] = 1;
     for (let i = 0; i < n; i++) {
@@ -116,8 +118,14 @@ function logicSolve(puzzle) {
     }
   }
 
+  if (from) {
+    for (const cell of from.marks) cand[cell] = 0;
+    for (const cell of from.crowns) place(cell);
+    order.length = 0;
+  }
+
   let changed = true;
-  while (changed && order.length < size) {
+  while (changed && placed < size) {
     changed = false;
 
     // 후보가 하나뿐인 행·열·영역. 사람이 가장 먼저 보는 자리다.
@@ -165,7 +173,7 @@ function logicSolve(puzzle) {
     }
   }
 
-  return { solved: order.length === size, order };
+  return { solved: placed === size, order };
 }
 
 // --- 왕관이 둘인 판 ---
@@ -301,7 +309,10 @@ function combinations(list, j) {
 // 8×8은 열에 아홉, 10×10은 절반쯤 풀린다.
 const MAX_GROUP = 3;
 
-function logicSolveMulti(puzzle) {
+// `from`은 하나인 판과 같다. 힌트는 첫 자리만 쓰므로 `first`면 새 왕관이 나오는 대로
+// 멈추고, `deadline`(시각)을 넘기면 가정을 그만두고 빈손으로 돌아간다. 빈 판의 10×10은
+// 첫 왕관까지도 가정을 거듭해 2초 가까이 걸리는 판이 있다 — 폰에서는 더 든다.
+function logicSolveMulti(puzzle, from, { first = false, deadline = Infinity } = {}) {
   const { size, regions } = puzzle;
   const k = puzzle.stars;
   const n = size * size;
@@ -390,13 +401,19 @@ function logicSolveMulti(puzzle) {
   }
 
   const st = { cand: new Uint8Array(n).fill(1), star: new Uint8Array(n), count: 0, order: [] };
+  if (from) {
+    for (const cell of from.marks) st.cand[cell] = 0;
+    for (const cell of from.crowns) place(st, cell);
+    st.order = [];
+  }
   let trials = 0;
   for (;;) {
     if (!settle(st)) return { solved: false, order: st.order, trials, dead: true };
-    if (st.count === size * k) break;
+    if (st.count === size * k || (first && st.order.length)) break;
     let cut = false;
     for (let i = 0; i < n && !cut; i++) {
       if (!st.cand[i]) continue;
+      if (Date.now() > deadline) return { solved: false, order: st.order, trials, late: true };
       const copy = { cand: st.cand.slice(), star: st.star.slice(), count: st.count, order: null };
       if (!place(copy, i) || !settle(copy)) {
         st.cand[i] = 0;
@@ -413,7 +430,11 @@ const Solver = {
   solve: (puzzle, options) => ((puzzle.stars || 1) > 1 ? solveMulti(puzzle, options) : solve(puzzle, options)),
   unique: (puzzle) => ((puzzle.stars || 1) > 1 ? solveMulti(puzzle, { limit: 2 }).count === 1 : unique(puzzle)),
   randomArrangement,
-  logicSolve: (puzzle) => ((puzzle.stars || 1) > 1 ? logicSolveMulti(puzzle) : logicSolve(puzzle)),
+  logicSolve: (puzzle, from) => ((puzzle.stars || 1) > 1 ? logicSolveMulti(puzzle, from) : logicSolve(puzzle, from)),
+  // 힌트: 사람이 놓은 것에서 가장 먼저 알 수 있는 왕관 자리. 못 찾거나 시간이 넘으면
+  // undefined — 부르는 쪽이 구워 둔 풀이 순서로 넘어간다.
+  next: (puzzle, from, deadline) => ((puzzle.stars || 1) > 1
+    ? logicSolveMulti(puzzle, from, { first: true, deadline }) : logicSolve(puzzle, from)).order[0],
   rowCombos, solveMulti, randomArrangementMulti, logicSolveMulti, MAX_GROUP,
 };
 

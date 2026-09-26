@@ -3,6 +3,7 @@
 (function () {
 
 const R = window.QueensRules;
+const S = window.QueensSolver;
 const G = window.QueensGenerator;
 const Icons = window.QueensIcons;
 const Sound = window.QueensSound;
@@ -302,19 +303,28 @@ function clearBoard() {
 }
 
 // 힌트는 어긋난 왕관을 걷어 내고 한 자리를 짚는다. 짚는 자리는 정답에서 아무
-// 데나 고르는 것이 아니라 **생성기가 남긴 논리 풀이 순서의 앞쪽**이다 —
-// 지금 이 판에서 사람이 다음으로 알아낼 수 있는 자리라야 힌트가 배움이 된다.
+// 데나 고르는 것이 아니라 **사람이 놓은 왕관과 X에서 이어 좁혀 가장 먼저 알 수 있는
+// 자리**다 — 지금 이 판에서 사람이 다음으로 알아낼 수 있는 자리라야 힌트가 배움이 된다.
 function hint() {
   if (game.done) return;
   const answer = new Set(R.solutionCells(game.puzzle));
 
   const changes = [];
+  const from = { crowns: [], marks: [] };
   for (let cell = 0; cell < game.board.n; cell++) {
-    if (game.state.marks[cell] === R.CROWN && !answer.has(cell)) changes.push([cell, R.EMPTY]);
+    const now = game.state.marks[cell];
+    if (now === R.CROWN && !answer.has(cell)) changes.push([cell, R.EMPTY]);
+    else if (now === R.CROWN) from.crowns.push(cell);
+    // 정답 자리에 찍힌 X는 좁히기에 넣지 않는다. 넣으면 그 자리를 영영 못 찾는다.
+    else if (now === R.MARK && !answer.has(cell)) from.marks.push(cell);
   }
   const removed = changes.length;
 
-  const next = game.puzzle.order.find((cell) => game.state.marks[cell] !== R.CROWN);
+  // 좁히기가 막힐 일은 없지만(논리로 풀리는 판만 낸다) 막히거나 둘씩 판에서 가정이
+  // 길어지면 구워 둔 풀이 순서에서 집는다. 그 앞이 다 놓였을 때만 짚으므로 역시 지금
+  // 판에서 알아낼 수 있는 자리다.
+  const next = S.next(game.puzzle, from, Date.now() + 300)
+    ?? game.puzzle.order.find((cell) => game.state.marks[cell] !== R.CROWN);
   if (next !== undefined) changes.push([next, R.CROWN]);
 
   apply(changes);

@@ -106,5 +106,28 @@ check('자유 단서는 그 칸을 품는 모든 직사각형',
 check('답이 없는 판은 0을 돌려준다',
   S.solve({ size: 2, clues: [{ cell: 0, area: 3, shape: null }], solution: [] }, { limit: 2 }).count, 0);
 
+// --- 힌트 ---
+
+// 사람이 아무 조각이나 놓아 둔 판에서도 힌트만 눌러 끝까지 가고, 놓는 조각은 늘 아직
+// 놓이지 않은 정답 조각이다.
+{
+  const key = (rect) => `${rect.r},${rect.c},${rect.w},${rect.h}`;
+  let wrong = 0;
+  let stuck = 0;
+  for (const size of G.SIZES) {
+    const puzzle = G.generate(size, { seed: size * 17 });
+    const answer = new Set(puzzle.solution.map(key));
+    let placed = puzzle.solution.filter((_, i) => i % 3 === 1);
+    for (;;) {
+      const next = S.logicSolve(puzzle, placed).order[0];
+      if (!next) { if (placed.length < puzzle.solution.length) stuck++; break; }
+      if (!answer.has(key(next)) || placed.some((rect) => key(rect) === key(next))) wrong++;
+      placed = placed.concat([next]);
+    }
+  }
+  check('힌트는 놓아 둔 조각에서 이어 끝까지 간다', stuck, 0);
+  check('힌트는 놓이지 않은 정답 조각만 놓는다', wrong, 0);
+}
+
 console.log(`\n${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);

@@ -3,6 +3,7 @@
 (function () {
 
 const R = window.PatchesRules;
+const S = window.PatchesSolver;
 const G = window.PatchesGenerator;
 const Icons = window.PatchesIcons;
 const Sound = window.PatchesSound;
@@ -300,8 +301,8 @@ function clearBoard() {
 }
 
 // 힌트는 어긋난 조각을 걷어 내고 한 조각을 놓아 준다. 놓는 조각은 정답에서 아무
-// 거나 고르는 것이 아니라 **생성기가 남긴 논리 풀이 순서의 앞쪽**이다 — 지금 이
-// 판에서 사람이 다음으로 알아낼 수 있는 조각이라야 힌트가 배움이 된다.
+// 거나 고르는 것이 아니라 **사람이 놓은 조각에서 이어 좁혀 가장 먼저 알 수 있는
+// 조각**이다 — 지금 이 판에서 사람이 다음으로 알아낼 수 있는 조각이라야 힌트가 배움이 된다.
 function hint() {
   if (game.done) return;
   const answer = new Set(game.puzzle.solution.map(key));
@@ -312,7 +313,9 @@ function hint() {
   restore(kept);
 
   const placed = new Set(kept.map(key));
-  const next = game.puzzle.order.find((rect) => !placed.has(key(rect)));
+  // 좁히기가 막힐 일은 없지만(논리로 풀리는 판만 낸다) 막히면 풀이 순서에서 집는다.
+  const next = S.logicSolve(game.puzzle, kept).order[0]
+    || game.puzzle.order.find((rect) => !placed.has(key(rect)));
   if (next) R.add(game.board, game.state, next);
 
   game.hinted++;
