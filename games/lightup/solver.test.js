@@ -101,6 +101,7 @@ function count(puzzle, limit) {
   // 구운 판처럼 만든 판: 힌트만 받아 가도 끝까지 가서 만든 답에 닿는다.
   let tried = 0;
   let reached = 0;
+  let long = 0;
   for (let seed = 1; tried < 8 && seed < 200; seed++) {
     const one = B.make('hard', seed);
     if (!one) continue;
@@ -110,11 +111,38 @@ function count(puzzle, limit) {
     for (let guard = 0; guard < 300; guard++) {
       const step = S.next(puzzle, state, { trial: true });
       if (!step) break;
+      if (step.why.steps > S.SHORT_TRIAL) long++;
       for (const i of step.cells) state[i] = step.value;
     }
     if (state.every((v, i) => (v === S.BULB) === !!one.bulbs[i])) reached++;
   }
   check('힌트만으로 만든 답에 닿는다', [tried, reached], [8, 8]);
+  check('힌트의 가정은 모두 짧다', long, 0);
+}
+
+{
+  // 가정은 가장 빨리 막히는 것을 고른다. 한 걸음 만에 막히는 가정이 있는 판에서 두 걸음
+  // 짜리를 주면 안 된다. 긴 가정을 허락한 풀이로 판을 만들어 본다.
+  let tried = 0;
+  let shallow = 0;
+  for (let seed = 1; tried < 20 && seed < 400; seed++) {
+    const one = B.make('hard', seed);
+    if (!one) continue;
+    const puzzle = R.parse(10, 10, one.code);
+    const state = fresh(puzzle);
+    for (let guard = 0; guard < 300; guard++) {
+      const step = S.next(puzzle, state, { trial: true });
+      if (!step) break;
+      if (step.why.steps) {
+        tried++;
+        // 같은 자리에서 한 걸음 더 짧은 가정이 없는지 직접 훑는다.
+        const shorter = S.next(puzzle, state, { trial: true, limit: step.why.steps - 1 });
+        if (!shorter) shallow++;
+      }
+      for (const i of step.cells) state[i] = step.value;
+    }
+  }
+  check('가정은 가장 빨리 막히는 것이다', shallow, tried);
 }
 
 console.log(`${passed}개 통과, ${failed}개 실패`);
