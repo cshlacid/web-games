@@ -560,6 +560,13 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
    해당하는 유닛이 하나도 없다 — `main.js`가 이동 중인 아군을 오른쪽 걷기로
    고정하는 것이 그 일을 대신한다. */
 .unit.dead .castbar { display: none; }
+/* 예고된 큰 한 방은 굵고 붉게. 보통 시전과 같은 막대면 무엇을 대비해야 하는지 안 읽힌다. */
+.unit .castbar.telegraph { height: 6px; }
+.unit .castbar.telegraph span { background: var(--enemy); }
+/* 그 한 방이 떨어질 아군 초상화. */
+.portrait.threat { outline: 2px solid var(--enemy); outline-offset: 1px; animation: threat 0.6s ease-in-out infinite alternate; }
+@keyframes threat { from { outline-color: var(--enemy); } to { outline-color: transparent; } }
+@media (prefers-reduced-motion: reduce) { .portrait.threat { animation: none; } }
 .unit.low .hpbar span { background: var(--hp-low); }
 
 /* 기절. 굳어 있는 동안 그림이 살짝 기울고 노란 테가 돈다 — 화면에서 "지금 저것은
