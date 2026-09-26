@@ -162,5 +162,38 @@ check('둘인 판: 논리 풀이가 끝낸 판은 해가 하나다', multiLogicW
 }
 check('7×7에는 둘씩 놓는 배치가 없다', S.randomArrangementMulti(7, 2, rng), null);
 
+// --- 힌트 ---
+
+// 사람이 아무 데나 놓아 둔 왕관과 X에서도 힌트만 눌러 끝까지 가고, 짚는 자리는 늘
+// 아직 비어 있는 정답 자리다. 둘씩 판도 같다.
+{
+  let wrong = 0;
+  let stuck = 0;
+  const puzzles = [G.generate(8, { seed: 5 }), G.pickDouble(8, -1, () => 0)];
+  for (const puzzle of puzzles) {
+    const answer = R.solutionCells(puzzle);
+    const inAnswer = new Set(answer);
+    const from = { crowns: answer.filter((_, i) => i % 3 === 1), marks: [] };
+    for (let cell = 0; cell < puzzle.size * puzzle.size; cell += 5) {
+      if (!inAnswer.has(cell)) from.marks.push(cell);
+    }
+    for (;;) {
+      const next = S.next(puzzle, from);
+      if (next === undefined) { if (from.crowns.length < answer.length) stuck++; break; }
+      if (!inAnswer.has(next) || from.crowns.includes(next)) wrong++;
+      from.crowns.push(next);
+    }
+  }
+  check('힌트는 놓아 둔 왕관에서 이어 끝까지 간다', stuck, 0);
+  check('힌트는 비어 있는 정답 자리만 짚는다', wrong, 0);
+}
+
+{
+  // 시간이 넘으면 빈손으로 돌아가 부르는 쪽이 구워 둔 순서로 넘어간다. 첫 왕관까지
+  // 가정이 필요한 판이라야 한다(10×10의 세 번째 판).
+  const puzzle = G.pickDouble(10, -1, () => 2.5 / require('./doubles.js').DOUBLES[10].length);
+  check('시간이 넘으면 힌트를 포기한다', S.next(puzzle, { crowns: [], marks: [] }, 0), undefined);
+}
+
 console.log(`\n${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);

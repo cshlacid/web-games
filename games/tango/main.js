@@ -3,6 +3,7 @@
 (function () {
 
 const R = window.TangoRules;
+const S = window.TangoSolver;
 const G = window.TangoGenerator;
 const Icons = window.TangoIcons;
 const Sound = window.TangoSound;
@@ -309,12 +310,15 @@ function clearBoard() {
 }
 
 // 힌트는 어긋난 칸을 걷어 내고 한 칸을 채운다. 채우는 칸은 정답에서 아무 데나
-// 고르는 것이 아니라 **생성기가 남긴 논리 풀이 순서의 앞쪽**이다 — 지금 이
-// 판에서 사람이 다음으로 알아낼 수 있는 칸이라야 힌트가 배움이 된다.
+// 고르는 것이 아니라 **사람이 채운 칸에서 이어 좁혀 가장 먼저 알 수 있는 칸**이다 —
+// 지금 이 판에서 사람이 다음으로 알아낼 수 있는 칸이라야 힌트가 배움이 된다.
 function hint() {
   if (game.done) return;
   const solution = game.puzzle.solution;
-  const next = game.puzzle.order.find((cell) => game.state.marks[cell] !== solution[cell]);
+  const kept = Uint8Array.from(game.state.marks, (now, cell) => (now === solution[cell] ? now : R.EMPTY));
+  // 좁히기가 막힐 일은 없지만(논리로 풀리는 판만 낸다) 막히면 풀이 순서에서 집는다.
+  const next = S.logicSolve(game.puzzle, kept).order[0]
+    ?? game.puzzle.order.find((cell) => game.state.marks[cell] !== solution[cell]);
 
   const changes = [];
   for (let cell = 0; cell < game.board.n; cell++) {

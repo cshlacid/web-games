@@ -115,8 +115,7 @@ function unique(puzzle) {
 // "찍지 않고 풀리는가"를 본다 — 생성기가 이 판정을 통과한 판만 내보내므로 마지막에
 // 두 자리를 놓고 찍어야 하는 판은 나오지 않는다.
 //
-// 화면의 힌트도 여기서 나온다. `order`는 이 풀이가 조각을 확정한 순서라, 사람이
-// 다음에 알아낼 수 있는 조각이 곧 그 순서의 앞쪽이다.
+// 화면의 힌트도 여기서 나온다. `order`는 이 풀이가 조각을 확정한 순서다.
 //
 // 쓰는 규칙은 넷이고 모두 시카쿠를 손으로 풀 때 쓰는 것들이다.
 //   - 어떤 칸을 덮을 수 있는 조각이 하나뿐이면 그 조각이 답이다
@@ -124,13 +123,17 @@ function unique(puzzle) {
 //   - 어떤 칸을 덮을 수 있는 조각이 전부 한 단서의 것이면 그 칸은 그 단서 차지다
 //   - 한 단서의 남은 조각이 모두 덮는 칸도 그 단서 차지다
 // 뒤의 둘은 조각을 놓지는 않지만 남의 후보를 지워, 앞의 둘이 걸리게 만든다.
-function logicSolve(puzzle) {
+//
+// `from`(조각 목록)을 주면 빈 판 대신 그 조각들을 놓고 시작한다. 힌트가 사람이 놓은
+// 조각에서 이어 좁히는 데 쓴다 — `order[0]`이 지금 판에서 가장 먼저 알 수 있는 조각이다.
+function logicSolve(puzzle, from) {
   const { n, rects, spans } = prepare(puzzle);
   const count = puzzle.clues.length;
   const cover = new Int32Array(n).fill(-1);
   const owned = new Int32Array(n).fill(-1);
   const placed = new Uint8Array(count);
   const order = [];
+  let done = 0;
 
   puzzle.clues.forEach((clue, i) => { owned[clue.cell] = i; });
 
@@ -142,11 +145,23 @@ function logicSolve(puzzle) {
   function put(ci, ri) {
     for (const cell of spans[ci][ri]) { cover[cell] = ci; owned[cell] = ci; }
     placed[ci] = 1;
+    done++;
     order.push(rects[ci][ri]);
   }
 
+  if (from) {
+    const same = (a, c) => a.r === c.r && a.c === c.c && a.w === c.w && a.h === c.h;
+    for (const rect of from) {
+      rects.forEach((list, ci) => {
+        const ri = list.findIndex((mine) => same(mine, rect));
+        if (ri >= 0 && !placed[ci]) put(ci, ri);
+      });
+    }
+    order.length = 0;
+  }
+
   let changed = true;
-  while (changed && order.length < count) {
+  while (changed && done < count) {
     changed = false;
     for (let ci = 0; ci < count; ci++) {
       if (!placed[ci]) alive[ci] = alive[ci].filter((ri) => usable(ci, ri));
@@ -192,7 +207,7 @@ function logicSolve(puzzle) {
     }
   }
 
-  return { solved: order.length === count, order };
+  return { solved: done === count, order };
 }
 
 const Solver = { rectsForClue, prepare, solve, unique, logicSolve };

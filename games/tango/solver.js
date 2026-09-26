@@ -114,13 +114,15 @@ function lineOptions(b, marks, cells) {
   return out;
 }
 
-function logicSolve(puzzle) {
+// `from`을 주면 빈 판 대신 그 칸들에서 시작한다. 힌트가 사람이 채운 칸에서 이어
+// 좁히는 데 쓴다 — `order[0]`이 지금 판에서 가장 먼저 알 수 있는 칸이다.
+function logicSolve(puzzle, from) {
   const b = R.board(puzzle);
-  const marks = Uint8Array.from(b.given);
+  const marks = Uint8Array.from(from || b.given);
   const size = b.size;
   const half = size / 2;
-  // 미리 놓인 칸은 순서에 넣지 않는다. 힌트는 **사람이 다음으로 알아낼 수 있는
-  // 칸**을 짚어야 하고, 처음부터 놓여 있던 칸은 알아낼 것이 없다.
+  // 미리 놓인 칸(과 `from`에 이미 있는 칸)은 순서에 넣지 않는다. 힌트는 **사람이
+  // 다음으로 알아낼 수 있는 칸**을 짚어야 하고, 이미 놓인 칸은 알아낼 것이 없다.
   const order = [];
   let broken = false;
 
