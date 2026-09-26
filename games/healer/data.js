@@ -1623,7 +1623,7 @@ const PLAYER_SKILLS = {
   purify: shared('purify', {
     job: 'bishop', unlock: 3, range: 40, cast: 0.8, type: '개별 대상', targeting: 'ally',
     mp: 24, cd: 12, heal: 90, cleanse: 1,
-    desc: '회복하면서 걸려 있는 약화를 걷어낸다. 이것만 할 수 있는 계열이다.',
+    desc: '회복하면서 걸려 있는 약화와 지속 피해를 걷어낸다. 이것만 할 수 있는 계열이다.',
   }),
   meditate: shared('meditate', {
     job: 'bishop', unlock: 3, range: 0, cast: 2.0, type: '마나 회복', targeting: 'self',

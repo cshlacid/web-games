@@ -928,6 +928,11 @@ function resolvePlayerSkill(state, def, spot) {
     // 만드는 자리가 아니라 지우는 자리를 따로 두지 않고, 걸린 목록에서 강화가
     // 아닌 것만 뺀다 — 강화까지 지우면 아군의 노래가 정화에 끊긴다.
     if (def.cleanse && unit && unit.auras) unit.auras = unit.auras.filter((aura) => aura.buff);
+    // 피 흘리기·저주 같은 지속 피해도 걷어낸다. 약화만 걷던 때는 적이 거는 것 대부분이
+    // 도트라(베기·주술·찢기·짓이기기) 정화를 들고 갈 까닭이 없었다. 지속 회복은 남긴다.
+    if (def.cleanse && unit) {
+      state.dots = state.dots.filter((dot) => dot.targetUid !== unit.uid || dot.kind !== 'damage');
+    }
     applyHeal(state, caster, unit, heal(def.heal));
   }
   else if (def.targeting === 'ally') addDot(state, caster, unit, def, 'heal', heal(def.tick));

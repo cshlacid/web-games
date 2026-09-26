@@ -1178,6 +1178,14 @@ function cast(state, skillId, target) {
   tank.hp = tank.maxHp - 300;
   cast(state, 'purify', { uid: tank.uid });
   check('약화를 걷어낸다', tank.auras.map((a) => a.skillId), ['holyShield']);
+  // 지속 피해도 걷어내고 지속 회복은 남긴다.
+  L.addDot(state, null, tank, D.UNIT_SKILLS.gash, 'damage', 20);
+  L.addDot(state, null, tank, D.UNIT_SKILLS.renew, 'heal', 20);
+  L.hero(state).mp = L.hero(state).maxMp;
+  L.skillSlot(state, 'purify').readyAt = 0;
+  L.hero(state).cast = null;
+  cast(state, 'purify', { uid: tank.uid });
+  check('지속 피해를 걷어낸다', state.dots.filter((d) => d.targetUid === tank.uid).map((d) => d.kind), ['heal']);
   check('회복도 함께 들어간다', tank.hp > tank.maxHp - 300, true);
 }
 
