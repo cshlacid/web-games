@@ -12,6 +12,7 @@
 const node = typeof module !== 'undefined' && module.exports;
 const D = node ? require('./data.js') : root.HealerData;
 const Items = node ? require('./items.js') : root.HealerItems;
+const Ach = node ? require('./achievements.js') : root.HealerAchievements;
 const Roster = node ? require('./roster.js') : root.HealerRoster;
 // 분배 방식이 여기 저장되므로, 아는 방식인지도 여기서 본다 — 화면이 걸러 주기를
 // 기다리면 저장본을 손댄 값이 그대로 전투로 넘어간다.
@@ -43,6 +44,9 @@ function create() {
     // 인덱스를 가리키면 아이템 하나가 빠질 때마다 장착이 엉뚱한 것으로 바뀐다.
     equipped: { weapon: null, armor: null, trinket: null },
     inventory: [],
+    // 얻은 업적과 깬 적이 있는 변형(`achievements.js`).
+    achieved: {},
+    modsCleared: [],
     // 주인공이 들고 갈 물약. 동료는 직업에 따라 자동으로 들고 가지만(roster.js),
     // 주인공 것은 사서 채운다.
     potions: { mana: 3, health: 1 },
@@ -594,6 +598,9 @@ function load() {
   progress.lootMethod = Loot.METHODS[saved.lootMethod] ? saved.lootMethod : Loot.DEFAULT;
 
   progress.roster = Roster.adopt(saved.roster);
+  progress.achieved = Ach.adopt(saved.achieved);
+  progress.modsCleared = (Array.isArray(saved.modsCleared) ? saved.modsCleared : [])
+    .filter((id) => D.QUEST_MODS[id]);
   progress.rep = Math.max(0, Math.min(D.REPUTATION.max, saved.rep | 0));
   progress.charLevel = Math.max(1, Math.min(D.LEVEL.maxLevel, progress.charLevel | 0));
   progress.gold = Math.max(0, progress.gold | 0);

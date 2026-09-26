@@ -1236,3 +1236,8 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 
 /* 변형 의뢰의 딱지. 보상이 큰 대신 조건이 비틀린 판이라 게시판에서 먼저 눈에 띄어야 한다. */
 .tag.mod { background: color-mix(in srgb, var(--enemy) 18%, transparent); color: var(--enemy); font-weight: 700; }
+
+.achievements { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.achievements li { display: flex; gap: 10px; align-items: flex-start; opacity: 0.55; }
+.achievements li.done { opacity: 1; }
+.achievements li.done .ico-box { color: var(--kind-mend); }
