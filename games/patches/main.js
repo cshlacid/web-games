@@ -300,9 +300,20 @@ function clearBoard() {
   paint();
 }
 
-// 힌트는 어긋난 조각을 걷어 내고 한 조각을 놓아 준다. 놓는 조각은 정답에서 아무
-// 거나 고르는 것이 아니라 **사람이 놓은 조각에서 이어 좁혀 가장 먼저 알 수 있는
-// 조각**이다 — 지금 이 판에서 사람이 다음으로 알아낼 수 있는 조각이라야 힌트가 배움이 된다.
+// 힌트는 어긋난 조각이 있으면 그것만 걷어 내고, 없으면 **사람이 놓은 조각에서 한 번에 볼
+// 수 있는 조각 하나**를 놓으며 근거가 된 칸이나 숫자를 밝힌다(`solver.js`의 `step`). 끝까지
+// 좁힌 뒤의 조각을 주면 그 사이의 "이 칸은 이 숫자 차지"가 가려진다 — 이 게임에는 그것을
+// 남길 표시가 없다.
+// 힌트의 근거가 된 칸을 잠깐 밝힌다. 조각 색이 칠해진 뒤라 테두리로 짚는다.
+function flash(cells) {
+  for (const cell of cells) {
+    const box = game.cells[cell];
+    if (!box) continue;
+    box.classList.add('hinted');
+    setTimeout(() => box.classList.remove('hinted'), 1600);
+  }
+}
+
 function hint() {
   if (game.done) return;
   const answer = new Set(game.puzzle.solution.map(key));
@@ -312,19 +323,25 @@ function hint() {
   const removed = game.state.patches.length - kept.length;
   restore(kept);
 
-  const placed = new Set(kept.map(key));
-  // 좁히기가 막힐 일은 없지만(논리로 풀리는 판만 낸다) 막히면 풀이 순서에서 집는다.
-  const next = S.logicSolve(game.puzzle, kept).order[0]
-    || game.puzzle.order.find((rect) => !placed.has(key(rect)));
-  if (next) R.add(game.board, game.state, next);
+  // 걷어 낸 것이 있으면 그 번에는 걷기만 한다. 걷고 곧바로 놓으면 무엇이 틀렸는지가 묻힌다.
+  let text = t('patches.hintCleared', { count: removed });
+  if (!removed) {
+    const placed = new Set(kept.map(key));
+    // 막힐 일은 없지만(논리로 풀리는 판만 낸다) 막히면 풀이 순서에서 집는다.
+    const step = S.step(game.puzzle, kept);
+    const next = step ? step.rect : game.puzzle.order.find((rect) => !placed.has(key(rect)));
+    if (next) R.add(game.board, game.state, next);
+    text = step && step.why.code !== 'order'
+      ? t(`patches.why.${step.why.code === 'owned' ? `owned.${step.why.via}` : step.why.code}`)
+      : t('patches.hintPlaced');
+    if (step) flash(step.cells);
+  }
 
   game.hinted++;
   startClock();
   Sound.play('hint');
   paint();
-  toast(removed
-    ? t('patches.hintCleared', { count: removed })
-    : t('patches.hintPlaced'));
+  toast(text);
   finishIfDone();
 }
 
