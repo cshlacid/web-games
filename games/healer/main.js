@@ -191,6 +191,13 @@ for (const button of $('char-tabs').children) {
   });
 }
 
+// 아래 탭의 캐릭터에 쓰지 않은 점수 표시.
+function markPoints() {
+  const left = P.freePoints(app.progress) + P.freeSkillPoints(app.progress);
+  const button = $('tabbar').querySelector('[data-tab="character"]');
+  if (button) button.classList.toggle('has-point', left > 0);
+}
+
 function openHome(tab) {
   if (tab) app.tab = tab;
   $('tab-quest').hidden = app.tab !== 'quest';
@@ -198,6 +205,7 @@ function openHome(tab) {
   for (const button of $('tabbar').children) {
     button.setAttribute('aria-pressed', String(button.dataset.tab === app.tab));
   }
+  markPoints();
   $('tab-shop').hidden = app.tab !== 'shop';
   if (app.tab === 'quest') renderQuests();
   else if (app.tab === 'shop') renderShop();
@@ -413,6 +421,7 @@ function renderAttrs() {
 }
 
 function renderCharacter() {
+  markPoints();
   const progress = app.progress;
   const stats = P.stats(progress);
   const max = progress.charLevel >= D.LEVEL.maxLevel;
@@ -529,6 +538,8 @@ function renderCharacter() {
         const spent = known ? P.raiseSkill(progress, base.id) : P.learnSkill(progress, base.id);
         sound.play(spent.ok ? 'click' : 'deny');
         if (!spent.ok) return;
+        // 새로 배운 것이 등록 칸에 들어갔다(`P.learnSkill`). 화면이 들고 있는 것도 맞춘다.
+        if (!known) app.skills = progress.skills.slice();
         persist();
         renderCharacter();
       });
@@ -2327,9 +2338,18 @@ function loop(now) {
   syncSkillbar(state);
   syncReach(state);
   syncScene(state);
+  $('skip').hidden = !(state.status === 'fighting' && L.hero(state).dead);
 
   if (state.status !== 'fighting') finishBattle(state);
 }
+
+$('skip').addEventListener('click', () => {
+  const state = app.battle;
+  if (!state || state.status !== 'fighting') return;
+  sound.play('click');
+  // 남은 판을 한 번에 돌린다. 끝을 알리는 이벤트는 남아 다음 프레임이 소리와 결과를 맡는다.
+  L.finish(state);
+});
 
 function startBattle() {
   field.querySelectorAll('.unit, .zone, .float, .pulse').forEach((node) => node.remove());
@@ -2462,13 +2482,23 @@ function openResult(state) {
   expList.append(levelRow(`${job.name} +${num(reward.jobExp)}`, jobLv, P.jobExpOf(app.progress),
     jobLv >= jobMax ? 0 : D.LEVEL.jobExpTo(jobLv)));
 
-  const lines = [t('hl.expBreak', { kills: num(reward.kills), guild: num(reward.guild), heal: num(reward.healExp) })];
-  if (gained.charLevels) lines.push(t('hl.charLevelUp', { from: before.char, to: app.progress.charLevel }));
-  if (gained.jobLevels) lines.push(t('hl.jobLevelUp', { job: job.name, from: before.job, to: jobLv }));
-  if (gained.unlocked.length) {
-    lines.push(t('hl.newSkills', { list: gained.unlocked.map((def) => def.name).join(', ') }));
+  $('exp-note').textContent = t('hl.expBreak', { kills: num(reward.kills), guild: num(reward.guild), heal: num(reward.healExp) });
+
+  // 레벨이 오른 것은 크게 알린다. 점수가 남았으면 캐릭터로 가는 단추를 띄운다.
+  const ups = [];
+  if (gained.charLevels) ups.push(t('hl.charLevelUp', { from: before.char, to: app.progress.charLevel }));
+  if (gained.jobLevels) ups.push(t('hl.jobLevelUp', { job: job.name, from: before.job, to: jobLv }));
+  if (gained.unlocked.length) ups.push(t('hl.newSkills', { list: gained.unlocked.map((def) => def.name).join(', ') }));
+  $('levelup').textContent = ups.join(' · ');
+  $('levelup').hidden = !ups.length;
+  $('to-char').hidden = P.freePoints(app.progress) + P.freeSkillPoints(app.progress) <= 0;
+
+  const causes = L.lossCauses(state);
+  $('cause-panel').hidden = !causes.length;
+  $('causes').textContent = '';
+  for (const cause of causes) {
+    $('causes').append(text('li', cause.tip ? 'tip' : null, msg(cause)));
   }
-  $('exp-note').textContent = lines.join(' · ');
 
   $('guild-panel').hidden = !won;
   $('drop-panel').hidden = !won;
@@ -2756,6 +2786,11 @@ $('retry').addEventListener('click', () => {
     return;
   }
   startBattle();
+});
+
+$('to-char').addEventListener('click', () => {
+  sound.play('click');
+  openHome('character');
 });
 
 $('to-quests').addEventListener('click', () => {

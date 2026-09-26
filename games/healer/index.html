@@ -258,12 +258,22 @@
     <!-- 첫 전투에서만 뜨는 안내. 도움말을 열지 않고 들어온 사람이 스킬 → 대상의 조작과
          "적이 힐러를 노린다"를 모른 채 첫 판을 지는 일이 있었다. -->
     <p class="coach" id="coach" role="status" aria-live="polite" hidden></p>
+    <!-- 주인공이 쓰러진 뒤에는 조작할 것이 없어 1분 넘게 지켜보기만 했다. -->
+    <button class="btn" id="skip" type="button" hidden data-i18n="hl.skip">결과 보기</button>
   </section>
 
   <!-- 결과: 경험치·보상 분배·장착 -->
   <section class="screen" id="screen-result" hidden>
     <p class="verdict" id="verdict"></p>
     <p class="verdict-note" id="verdict-note"></p>
+    <!-- 레벨이 오른 것과 새로 열린 것. 경험치 패널 아래 작은 글씨로만 두었더니 지나쳤다. -->
+    <p class="levelup" id="levelup" hidden></p>
+
+    <!-- 진 판의 까닭과 다음에 해 볼 것. 숫자 표만으로는 무엇을 바꿔야 하는지 알 수 없다. -->
+    <div class="panel" id="cause-panel" hidden>
+      <div class="panel-head"><h2 data-i18n="hl.causeTitle">왜 졌나</h2></div>
+      <ul class="causes" id="causes"></ul>
+    </div>
 
     <!-- 전투 리포트. 전투 중에는 체력 막대로만 보이고 끝나면 그것도 사라져,
          누구를 다음에 데려갈지 판단할 근거가 남지 않는다. -->
@@ -317,6 +327,7 @@
 
     <div class="result-actions">
       <button class="btn" id="retry" type="button" data-i18n="hl.retry">다시 도전</button>
+      <button class="btn" id="to-char" type="button" hidden data-i18n="hl.toChar">점수 쓰러 가기</button>
       <button class="btn primary" id="to-quests" type="button" data-i18n="hl.toQuests">게시판으로</button>
     </div>
   </section>

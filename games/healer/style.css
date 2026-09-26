@@ -643,6 +643,24 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
   font-size: 14px; font-weight: 600; line-height: 1.45; text-align: center;
 }
 .coach[hidden] { display: none; }
+#skip[hidden] { display: none; }
+.levelup {
+  margin: 0; padding: 10px 12px; border-radius: 10px; text-align: center;
+  font-size: 16px; font-weight: 800; line-height: 1.45;
+  background: color-mix(in srgb, var(--kind-mend) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--kind-mend) 50%, transparent);
+}
+.levelup[hidden] { display: none; }
+.causes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 14px; line-height: 1.45; }
+.causes .tip { color: var(--muted); }
+.causes .tip::before { content: '→ '; }
+/* 쓰지 않은 점수가 있으면 아래 탭의 캐릭터에도 점을 단다. 캐릭터 안의 갈래에만 달면
+   들어가 보기 전에는 모른다. */
+.tab { position: relative; }
+.tab.has-point .tab-icon::after {
+  content: ''; position: absolute; top: 6px; margin-left: 16px;
+  width: 7px; height: 7px; border-radius: 50%; background: var(--kind-mend);
+}
 
 /* 초상화. 범위 스킬의 기준점을 동료로 잡는 통로이자 공격 스킬의 대상 자리라
    (기획서 8.1) 전투 중 가장 자주 눌리는 곳이다 — 손가락이 닿는 크기를 지킨다.

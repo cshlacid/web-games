@@ -600,5 +600,19 @@ const gear = (defId, tier) => Items.make(defId, tier || 0, 3);
     D.combatPower(def, stats, [buff(3)], 10, attrs), D.combatPower(def, stats, [buff(1.1)], 10, attrs));
 }
 
+{
+  // 새로 배운 스킬은 등록 칸이 비어 있으면 곧바로 들어간다. 가득 차 있으면 그대로다.
+  const progress = P.create();
+  progress.jobs[progress.job].level = 6;
+  progress.skills = [];
+  const first = D.heroSkillsOf(progress.job).find((def) => def.unlock <= 6 && !P.skillLevel(progress, def.id));
+  P.learnSkill(progress, first.id);
+  check('배운 스킬이 등록된다', progress.skills.includes(first.id), true);
+  progress.skills = ['a', 'b', 'c', 'd', 'e'];
+  const next = D.heroSkillsOf(progress.job).find((def) => def.unlock <= 6 && !P.skillLevel(progress, def.id));
+  P.learnSkill(progress, next.id);
+  check('칸이 차 있으면 넣지 않는다', progress.skills.length, D.SKILL_MAX);
+}
+
 console.log(`${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);
