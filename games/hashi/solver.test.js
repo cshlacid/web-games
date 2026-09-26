@@ -113,5 +113,30 @@ function check(name, actual, expected) {
   check('남은 한 자리를 짚는다', S.next(b, state), { id: gap, count: made.answer[gap] });
 }
 
+{
+  // 한 걸음은 섬 하나로 보인다 — 빈 판과 일부 놓은 판에서 힌트만으로 끝까지 가고, 판 전체를
+  // 좁히는 쪽(`deep`)으로 넘어가지 않으며, 정답을 넘는 다리를 놓지 않는다.
+  let deep = 0;
+  let over = 0;
+  let stuck = 0;
+  for (const size of Object.keys(G.SIZES).map(Number)) {
+    for (const partial of [false, true]) {
+      const made = G.generate(size + 7, size);
+      const b = R.board(made.puzzle);
+      const state = b.links.map((_, i) => (partial && i % 4 === 0 ? made.answer[i] : 0));
+      for (let guard = 0; guard < 400 && !R.isDone(b, state); guard++) {
+        const step = S.step(b, state);
+        if (!step) break;
+        if (step.why.code === 'deep') deep++;
+        if (step.count > made.answer[step.id] || step.count <= state[step.id]) over++;
+        state[step.id] = step.count;
+      }
+      if (!R.isDone(b, state)) stuck++;
+    }
+  }
+  check('힌트는 섬 하나로 끝까지 간다', [deep, stuck], [0, 0]);
+  check('힌트는 정답을 넘지 않고 늘 더 놓는다', over, 0);
+}
+
 console.log(`${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);

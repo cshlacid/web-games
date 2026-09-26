@@ -150,6 +150,7 @@ h1 {
    고른 것인지 다 채운 것인지 갈리지 않는다. */
 .island.picked { stroke: var(--pick); stroke-width: 5; }
 .island.near { stroke: var(--pick); stroke-dasharray: 4 4; }
+.island.hinted { stroke: var(--pick); stroke-width: 6; }
 .guide.hot { stroke: var(--pick); stroke-dasharray: 0 9; }
 
 .count {
