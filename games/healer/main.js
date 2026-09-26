@@ -55,6 +55,9 @@ const msg = (v) => {
   // 로직의 까닭은 열쇠 하나(`'hl.why.noGold'`)이거나 열쇠와 조각(`{ code, vars }`)이다.
   // 열쇠를 그대로 돌려주면 화면에 열쇠가 찍힌다.
   if (typeof v === 'string') return /^(hl|healer)\./.test(v) ? t(v) : v;
+  // 열쇠 없이 글자만 든 이벤트(동료의 시전, 무리 이동)는 그 글자를 쓴다. 이벤트를 통째로
+  // 돌려주면 로그에 `[object Object]`가 찍혔다.
+  if (v && typeof v === 'object' && !v.code && v.text != null) return msg(v.text);
   if (!v || typeof v !== 'object' || !v.code) return v;
   // 조각이 또 열쇠인 자리가 있다(퀘스트 이름) — 값이 'hl.' 꼴이면 한 번 더 푼다.
   const vars = {};
@@ -2058,7 +2061,36 @@ function isValidUnitTarget(state, unit) {
   return AI.dist(L.hero(state), unit) <= def.range;
 }
 
+// --- 첫 전투 안내 -------------------------------------------------------
+
+// 한 번 끝까지 본 사람에게는 다시 띄우지 않는다. 진행이 아니라 이 기기에서 본 적이
+// 있는가라 저장본이 아니라 따로 둔다 — 저장본에 넣으면 판이 바뀌어 저장본을 버릴 때
+// 다시 뜬다.
+const COACH_KEY = 'web-games.healer.coached';
+let coachStep = null;
+let coachTimer = 0;
+
+function coach(step) {
+  clearTimeout(coachTimer);
+  coachStep = step;
+  const node = $('coach');
+  node.hidden = !step;
+  if (!step) return;
+  node.textContent = t(`hl.coach.${step}`);
+  if (step === 'watch') {
+    try { localStorage.setItem(COACH_KEY, '1'); } catch { /* 무시 */ }
+    coachTimer = setTimeout(() => coach(null), 9000);
+  }
+}
+
+function startCoach() {
+  let seen = false;
+  try { seen = localStorage.getItem(COACH_KEY) === '1'; } catch { /* 무시 */ }
+  coach(seen ? null : 'skill');
+}
+
 function setAiming(skillId) {
+  if (skillId && coachStep === 'skill') coach('target');
   app.aiming = skillId;
   const def = skillId ? heroSkill(skillId) : null;
   field.classList.toggle('aiming', Boolean(skillId));
@@ -2113,6 +2145,7 @@ function cast(skillId, target) {
     return;
   }
   setAiming(null);
+  if (coachStep === 'target') coach('watch');
   if (def.mana) sound.play('mana');
   else if (def.targeting === 'enemy' || def.targeting === 'area-enemy') sound.play('strike');
   else if (def.radius && def.tick) sound.play('zone');
@@ -2328,6 +2361,7 @@ function startBattle() {
   app.contracts = partyContracts();
 
   setAiming(null);
+  startCoach();
   app.danger = false;
   $('hero-bars').classList.remove('danger');
   $('field').classList.remove('danger');
@@ -2641,7 +2675,7 @@ function renderRosterReport(report, joined, purses, bought, trustMoves, left) {
       line.append(text('span', 'why',
         t('hl.trustParts', { list: move.parts.map((part) => msg(part.why)).join(' · ') })));
       const shown = text('b', `stat-value ${move.delta >= 0 ? 'up' : 'short'}`,
-        `${move.delta > 0 ? '+' : ''}${move.delta} → ${move.after}`);
+        `${move.after} (${move.delta > 0 ? '+' : ''}${move.delta})`);
       // 단계가 넘어간 것은 따로 알린다 — 관계가 끊어지면 다음 의뢰에서 아예
       // 응하지 않으므로, 조용히 넘어가면 편성 화면에서 처음 알게 된다.
       if (move.moved) shown.append(text('small', 'why', ` ${move.stage.name}`));

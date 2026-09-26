@@ -146,7 +146,7 @@ function trustDelta(member, quest, outcome) {
   const parts = [];
 
   if (outcome.won) {
-    parts.push({ why: { code: 'hl.rep.cleared', vars: { feel: feel.id } }, delta: feel.trust });
+    parts.push({ why: { code: 'hl.rep.cleared', vars: { feel: `healer.feel.${feel.id}.name` } }, delta: feel.trust });
   } else {
     // 애초에 무리한 일이었다면 덜 깎인다. 벅찬 줄 알고 따라나선 것이라 실패도
     // 절반은 제 판단이다.
