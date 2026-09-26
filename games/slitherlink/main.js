@@ -439,7 +439,7 @@ el.clear.addEventListener('click', () => {
 function hint() {
   if (game.done) return;
   const trial = game.level === 'hard';
-  if (!game.solution) game.solution = S.solve(game.puzzle, { trial }).edges;
+  if (!game.solution) game.solution = S.solve(game.puzzle, { trial, limit: Infinity }).edges;
   const sol = game.solution;
   const group = [];
   let removed = 0;
@@ -449,7 +449,8 @@ function hint() {
     if (wrong && set(e, R.EMPTY, group)) removed++;
   }
 
-  const step = S.next(game.puzzle, game.edges, { trial });
+  // 걷어 낸 것이 있으면 그 번에는 걷기만 한다. 걷고 곧바로 채우면 무엇이 틀렸는지가 묻힌다.
+  const step = removed ? null : S.next(game.puzzle, game.edges, { trial });
   const lines = [];
   if (removed) lines.push(t('slitherlink.hintCleared', { count: removed }));
   if (step) {

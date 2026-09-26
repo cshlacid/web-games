@@ -87,5 +87,29 @@ const lines = (edges) => Array.from(edges, (v) => (v === R.LINE ? 1 : 0)).join('
   }
 }
 
+{
+  // 어려움: 가정을 받아 가며 힌트만으로 끝까지 가고, 그 가정은 모두 짧다(SHORT_TRIAL 안).
+  let reached = 0;
+  let long = 0;
+  let tried = 0;
+  for (let seed = 1; tried < 4; seed++) {
+    const one = B.make('hard', seed);
+    if (!B.accept('hard', one)) continue;
+    tried++;
+    const size = B.LEVELS.hard.size;
+    const puzzle = R.parse(size, size, one.code);
+    const edges = new Uint8Array(R.geometry(size, size).edgeCount);
+    for (let guard = 0; guard < 2000; guard++) {
+      const step = S.next(puzzle, edges, { trial: true });
+      if (!step) break;
+      if (step.why.steps > S.SHORT_TRIAL) long++;
+      for (const e of step.edges) edges[e] = step.value;
+    }
+    if (lines(edges) === lines(one.answer)) reached++;
+  }
+  check('어려움: 힌트만으로 끝까지 간다', reached, 4);
+  check('어려움: 힌트의 가정은 모두 짧다', long, 0);
+}
+
 console.log(`${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);
