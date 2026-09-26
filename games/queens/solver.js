@@ -80,10 +80,8 @@ function randomArrangement(size, rng) {
 // "찍지 않고 풀리는가"를 본다 — 생성기가 이 판정을 통과한 판만 내보내므로
 // 마지막에 두 칸을 놓고 찍어야 하는 판은 나오지 않는다.
 //
-// 화면의 힌트도 여기서 나온다. `from`(`{ crowns, marks }`)을 주면 사람이 놓은 왕관과
-// X에서 이어 좁히고, 그때 `order[0]`이 지금 판에서 가장 먼저 알 수 있는 자리다.
-// 정답에서 아무 자리나 집어 주면 "왜 거기인지 알 수 없는 힌트"가 된다.
-function logicSolve(puzzle, from) {
+// `order`는 이 풀이가 왕관을 확정한 순서다. 화면의 힌트는 이것이 아니라 `step`을 쓴다.
+function logicSolve(puzzle) {
   const size = puzzle.size;
   const n = size * size;
   const regions = puzzle.regions;
@@ -91,7 +89,6 @@ function logicSolve(puzzle, from) {
   const crowned = new Uint8Array(n);
   const done = { row: new Uint8Array(size), col: new Uint8Array(size), reg: new Uint8Array(size) };
   const order = [];
-  let placed = 0;
 
   const group = {
     row: (k) => { const a = []; for (let c = 0; c < size; c++) a.push(k * size + c); return a; },
@@ -106,7 +103,6 @@ function logicSolve(puzzle, from) {
     const c = cell % size;
     const g = regions[cell];
     crowned[cell] = 1;
-    placed++;
     order.push(cell);
     done.row[r] = done.col[c] = done.reg[g] = 1;
     for (let i = 0; i < n; i++) {
@@ -118,14 +114,8 @@ function logicSolve(puzzle, from) {
     }
   }
 
-  if (from) {
-    for (const cell of from.marks) cand[cell] = 0;
-    for (const cell of from.crowns) place(cell);
-    order.length = 0;
-  }
-
   let changed = true;
-  while (changed && placed < size) {
+  while (changed && order.length < size) {
     changed = false;
 
     // 후보가 하나뿐인 행·열·영역. 사람이 가장 먼저 보는 자리다.
@@ -173,7 +163,7 @@ function logicSolve(puzzle, from) {
     }
   }
 
-  return { solved: placed === size, order };
+  return { solved: order.length === size, order };
 }
 
 // --- 왕관이 둘인 판 ---
@@ -309,10 +299,7 @@ function combinations(list, j) {
 // 8×8은 열에 아홉, 10×10은 절반쯤 풀린다.
 const MAX_GROUP = 3;
 
-// `from`은 하나인 판과 같다. 힌트는 첫 자리만 쓰므로 `first`면 새 왕관이 나오는 대로
-// 멈추고, `deadline`(시각)을 넘기면 가정을 그만두고 빈손으로 돌아간다. 빈 판의 10×10은
-// 첫 왕관까지도 가정을 거듭해 2초 가까이 걸리는 판이 있다 — 폰에서는 더 든다.
-function logicSolveMulti(puzzle, from, { first = false, deadline = Infinity } = {}) {
+function logicSolveMulti(puzzle) {
   const { size, regions } = puzzle;
   const k = puzzle.stars;
   const n = size * size;
@@ -401,19 +388,13 @@ function logicSolveMulti(puzzle, from, { first = false, deadline = Infinity } = 
   }
 
   const st = { cand: new Uint8Array(n).fill(1), star: new Uint8Array(n), count: 0, order: [] };
-  if (from) {
-    for (const cell of from.marks) st.cand[cell] = 0;
-    for (const cell of from.crowns) place(st, cell);
-    st.order = [];
-  }
   let trials = 0;
   for (;;) {
     if (!settle(st)) return { solved: false, order: st.order, trials, dead: true };
-    if (st.count === size * k || (first && st.order.length)) break;
+    if (st.count === size * k) break;
     let cut = false;
     for (let i = 0; i < n && !cut; i++) {
       if (!st.cand[i]) continue;
-      if (Date.now() > deadline) return { solved: false, order: st.order, trials, late: true };
       const copy = { cand: st.cand.slice(), star: st.star.slice(), count: st.count, order: null };
       if (!place(copy, i) || !settle(copy)) {
         st.cand[i] = 0;
@@ -426,16 +407,147 @@ function logicSolveMulti(puzzle, from, { first = false, deadline = Infinity } = 
   return { solved: st.count === size * k, order: st.order, trials };
 }
 
+// 힌트 한 걸음. 사람이 놓은 왕관과 X에서 시작해, **사람이 한 번에 볼 수 있는 것 하나**를
+// 돌려준다 — 왕관이 정해지면 `{ crowns }`, 후보만 줄면 X를 찍을 `{ marks }`, 근거는
+// `why`, 판에서 밝힐 칸은 `cells`. 끝까지 좁힌 뒤 처음 정해진 왕관을 주면 안 된다.
+// 둘씩 판에서 그 사이에 가정이 아홉 번 끼어 있는 것을 실제로 받았는데, 사람에게는
+// 판 한가운데 왕관이 뚝 떨어진 것으로 보였다.
+//
+// 왕관 자신과 이웃, 다 찬 줄·영역의 나머지는 X가 없어도 아는 것으로 치고 짚지 않는다.
+// 규칙은 `logicSolveMulti`와 같은 순서(1 → 2 → 3 → 4)로, 쉬운 것부터 본다. 하나인 판도
+// 같은 길로 간다 — 왕관 수만 다르다. 모순이면 null.
+function step(puzzle, from) {
+  const { size, regions } = puzzle;
+  const k = puzzle.stars || 1;
+  const n = size * size;
+  const units = [];
+  for (let r = 0; r < size; r++) units.push({ kind: 'row', cells: Array.from({ length: size }, (_, c) => r * size + c) });
+  for (let c = 0; c < size; c++) units.push({ kind: 'col', cells: Array.from({ length: size }, (_, r) => r * size + c) });
+  for (let g = 0; g < size; g++) {
+    const cells = [];
+    for (let i = 0; i < n; i++) if (regions[i] === g) cells.push(i);
+    units.push({ kind: 'reg', cells });
+  }
+  const rows = units.slice(0, size);
+  const cols = units.slice(size, 2 * size);
+  const regs = units.slice(2 * size);
+  const pens = [
+    [regs, rows, (i) => Math.floor(i / size)], [regs, cols, (i) => i % size],
+    [rows, regs, (i) => regions[i]], [cols, regs, (i) => regions[i]],
+  ];
+
+  const need = (st, unit) => k - unit.cells.reduce((sum, i) => sum + st.star[i], 0);
+  const open = (st, unit) => unit.cells.filter((i) => st.cand[i]);
+
+  // X 없이도 아는 것. 모순이면 false.
+  function obvious(st) {
+    for (let i = 0; i < n; i++) {
+      if (!st.star[i]) continue;
+      for (let j = 0; j < n; j++) {
+        if (!R.adjacent(size, i, j)) continue;
+        // 줄의 남은 두 칸이 서로 닿으면 규칙 1이 둘을 함께 놓는다. 그 모순은 여기서 잡힌다.
+        if (j !== i && st.star[j]) return false;
+        st.cand[j] = 0;
+      }
+    }
+    for (const unit of units) {
+      const nd = need(st, unit);
+      if (nd < 0) return false;
+      if (nd === 0) for (const i of unit.cells) st.cand[i] = 0;
+    }
+    return true;
+  }
+
+  // 규칙 1~3에서 새로 알 수 있는 것 하나. 모순이면 { dead: true }.
+  function find(st) {
+    for (const unit of units) {
+      const nd = need(st, unit);
+      const op = open(st, unit);
+      if (op.length < nd) return { dead: true, cells: unit.cells };
+      if (nd > 0 && op.length === nd) {
+        return { crowns: op, why: { code: 'only', unit: unit.kind }, cells: unit.cells };
+      }
+    }
+    for (const unit of units) {
+      const nd = need(st, unit);
+      if (nd < 2) continue;
+      const op = open(st, unit);
+      const out = op.filter((i) => op.filter((j) => j !== i && !R.adjacent(size, i, j)).length < nd - 1);
+      if (out.length) return { marks: out, why: { code: 'apart', unit: unit.kind }, cells: unit.cells };
+    }
+    for (let j = 1; j <= MAX_GROUP; j++) {
+      for (const [inner, outer, key] of pens) {
+        const live = inner.filter((unit) => need(st, unit) > 0);
+        if (live.length < j) continue;
+        for (const group of combinations(live, j)) {
+          const cells = group.flatMap((unit) => open(st, unit));
+          const targets = [...new Set(cells.map(key))].map((x) => outer[x]);
+          const wanted = group.reduce((sum, unit) => sum + need(st, unit), 0);
+          const room = targets.reduce((sum, unit) => sum + need(st, unit), 0);
+          if (wanted > room) return { dead: true, cells: group.flatMap((unit) => unit.cells) };
+          if (wanted !== room) continue;
+          const inside = new Set(cells);
+          const out = targets.flatMap((unit) => open(st, unit)).filter((i) => !inside.has(i));
+          if (out.length) {
+            return {
+              marks: out,
+              why: { code: 'pen', count: j, from: group[0].kind, to: targets[0].kind },
+              cells: group.flatMap((unit) => unit.cells),
+            };
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  function apply(st, found) {
+    if (found.crowns) for (const i of found.crowns) { st.star[i] = 1; st.cand[i] = 0; }
+    else for (const i of found.marks) st.cand[i] = 0;
+  }
+
+  // 규칙 1~3을 더 나올 것이 없을 때까지. 모순이면 몇 걸음 만에 어디서 막혔는지를
+  // 돌려준다(`{ steps, cells }`), 아니면 null.
+  function settle(st) {
+    for (let steps = 1; ; steps++) {
+      if (!obvious(st)) return { steps, cells: [] };
+      const found = find(st);
+      if (!found) return null;
+      if (found.dead) return { steps, cells: found.cells };
+      apply(st, found);
+    }
+  }
+
+  const st = { cand: new Uint8Array(n).fill(1), star: new Uint8Array(n) };
+  for (const i of from.marks) st.cand[i] = 0;
+  for (const i of from.crowns) { st.star[i] = 1; st.cand[i] = 0; }
+  if (!obvious(st)) return null;
+  const found = find(st);
+  if (found) return found.dead ? null : found;
+
+  // 4. 가정: 놓아 보고 1~3을 돌려 막히면 그 칸은 아니다. 한 칸씩만 짚되 **가장 빨리
+  //    막히는 칸**을 고르고 막히는 줄·영역을 함께 밝힌다. 처음 걸린 칸을 주면 열 걸음
+  //    넘게 따라가야 막히는 것이 나와, 사람이 머리로 따라갈 수 없다.
+  let best = null;
+  for (let i = 0; i < n; i++) {
+    if (!st.cand[i]) continue;
+    const copy = { cand: st.cand.slice(), star: st.star.slice() };
+    copy.star[i] = 1;
+    copy.cand[i] = 0;
+    const dead = settle(copy);
+    if (dead && (!best || dead.steps < best.steps)) best = { ...dead, cell: i };
+    if (best && best.steps === 1) break;
+  }
+  if (!best) return null;
+  return { marks: [best.cell], why: { code: 'trial', steps: best.steps }, cells: [best.cell, ...best.cells] };
+}
+
 const Solver = {
   solve: (puzzle, options) => ((puzzle.stars || 1) > 1 ? solveMulti(puzzle, options) : solve(puzzle, options)),
   unique: (puzzle) => ((puzzle.stars || 1) > 1 ? solveMulti(puzzle, { limit: 2 }).count === 1 : unique(puzzle)),
   randomArrangement,
-  logicSolve: (puzzle, from) => ((puzzle.stars || 1) > 1 ? logicSolveMulti(puzzle, from) : logicSolve(puzzle, from)),
-  // 힌트: 사람이 놓은 것에서 가장 먼저 알 수 있는 왕관 자리. 못 찾거나 시간이 넘으면
-  // undefined — 부르는 쪽이 구워 둔 풀이 순서로 넘어간다.
-  next: (puzzle, from, deadline) => ((puzzle.stars || 1) > 1
-    ? logicSolveMulti(puzzle, from, { first: true, deadline }) : logicSolve(puzzle, from)).order[0],
-  rowCombos, solveMulti, randomArrangementMulti, logicSolveMulti, MAX_GROUP,
+  logicSolve: (puzzle) => ((puzzle.stars || 1) > 1 ? logicSolveMulti(puzzle) : logicSolve(puzzle)),
+  rowCombos, solveMulti, randomArrangementMulti, logicSolveMulti, MAX_GROUP, step,
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = Solver;
