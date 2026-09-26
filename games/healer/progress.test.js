@@ -626,5 +626,19 @@ const gear = (defId, tier) => Items.make(defId, tier || 0, 3);
   check('판 값이 들어온다', progress.gold - before, sold.gold);
 }
 
+{
+  // 낀 장비를 골드로 한 칸 강화한다. 상한에서는 멈춘다.
+  const progress = P.create();
+  progress.equipped.weapon = Items.make('staff', 1, 3);
+  progress.gold = 1e6;
+  const done = P.enhance(progress, progress.equipped.weapon.uid);
+  check('강화된다', [done.ok, progress.equipped.weapon.plus], [true, 1]);
+  progress.equipped.weapon.plus = Items.PLUS_MAX;
+  check('상한에서는 멈춘다', P.enhance(progress, progress.equipped.weapon.uid).ok, false);
+  progress.gold = 0;
+  progress.equipped.weapon.plus = 0;
+  check('골드가 모자라면 못 한다', P.enhance(progress, progress.equipped.weapon.uid).ok, false);
+}
+
 console.log(`${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);
