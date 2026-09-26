@@ -17,7 +17,7 @@
       'hashi.rule6': '<b>점선이 다리를 놓을 수 있는 자리</b>입니다. 그 위를 누를 때마다 <b>없음 → 하나 → 둘 → 없음</b>으로 돕니다.',
       'hashi.rule7': '<b>섬을 누르고 이어질 섬을 눌러도</b> 같은 자리가 돕니다. 고른 섬에서 이을 수 있는 섬은 테두리로 알려 줍니다 — 다리가 교차하는 자리처럼 누르기 애매한 곳에 쓰세요.',
       'hashi.rule8': '<b>이 게임의 모든 판은 답이 하나뿐이고, 찍지 않고 논리로만 풀립니다.</b>',
-      'hashi.rule9': '<b>힌트</b>는 어긋난 다리를 치우거나 다음 한 자리를 놓아 줍니다. 힌트를 쓴 판은 최고 기록에 넣지 않습니다.'
+      'hashi.rule9': '<b>힌트</b>는 어긋난 다리를 치우거나, 지금 놓인 다리로 알아낼 수 있는 한 자리를 놓아 줍니다. 힌트를 쓴 판은 최고 기록에 넣지 않습니다.'
     },
     en: {
       'meta.desc': 'Draw bridges to match the number on each island and join them all into one',
@@ -35,7 +35,7 @@
       'hashi.rule6': 'A <b>dashed line marks a place a bridge can go</b>. Tapping it cycles <b>none → one → two → none</b>.',
       'hashi.rule7': '<b>Tapping an island and then another</b> cycles the same spot. Islands you can reach from the selected one are outlined — handy where bridges cross and tapping is fiddly.',
       'hashi.rule8': '<b>Every board here has exactly one solution and is solvable by logic alone.</b>',
-      'hashi.rule9': 'A <b>Hint</b> clears a wrong bridge or places the next one. Boards solved with hints are not recorded.'
+      'hashi.rule9': 'A <b>Hint</b> clears a wrong bridge or places one that can be worked out from the bridges already placed. Boards solved with hints are not recorded.'
     },
     ja: {
       'meta.desc': '島に書かれた数だけ橋をかけ、すべての島をひとつにつなぐパズル',
@@ -53,7 +53,7 @@
       'hashi.rule6': '<b>点線が橋をかけられる場所</b>です。押すたびに<b>なし → 一本 → 二本 → なし</b>と変わります。',
       'hashi.rule7': '<b>島を押してからつなぐ島を押しても</b>同じ場所が変わります。選んだ島からつなげる島は縁取りで示します — 橋が交差して押しにくい所でどうぞ。',
       'hashi.rule8': '<b>この盤はすべて答えがひとつだけで、当てずっぽう抜きに論理だけで解けます。</b>',
-      'hashi.rule9': '<b>ヒント</b>はずれた橋を片づけるか、次の一本をかけます。ヒントを使った盤はベスト記録に入れません。'
+      'hashi.rule9': '<b>ヒント</b>はずれた橋を片づけるか、いまかかっている橋から導ける一か所に橋をかけます。ヒントを使った盤はベスト記録に入れません。'
     },
     'zh-CN': {
       'meta.desc': '按岛上的数字架桥，把所有岛连成一片',
@@ -71,7 +71,7 @@
       'hashi.rule6': '<b>虚线就是可以架桥的位置</b>。每点一次按<b>无 → 一座 → 两座 → 无</b>循环。',
       'hashi.rule7': '<b>先点一个岛再点另一个</b>，同样会切换那个位置。从选中的岛能连到的岛会有描边 —— 桥交叉、不好点的地方可以这样用。',
       'hashi.rule8': '<b>这里的每一盘都只有一个答案，而且只靠推理就能解开。</b>',
-      'hashi.rule9': '<b>提示</b>会清掉架错的桥，或架好下一座。用过提示的盘面不计入最好成绩。'
+      'hashi.rule9': '<b>提示</b>会清掉架错的桥，或根据已架好的桥推出一处并架上。用过提示的盘面不计入最好成绩。'
     },
     'zh-TW': {
       'meta.desc': '按島上的數字架橋，把所有島連成一片',
@@ -89,7 +89,7 @@
       'hashi.rule6': '<b>虛線就是可以架橋的位置</b>。每點一次按<b>無 → 一座 → 兩座 → 無</b>循環。',
       'hashi.rule7': '<b>先點一個島再點另一個</b>，同樣會切換那個位置。從選中的島能連到的島會有描邊 —— 橋交叉、不好點的地方可以這樣用。',
       'hashi.rule8': '<b>這裡的每一盤都只有一個答案，而且只靠推理就能解開。</b>',
-      'hashi.rule9': '<b>提示</b>會清掉架錯的橋，或架好下一座。用過提示的盤面不計入最佳成績。'
+      'hashi.rule9': '<b>提示</b>會清掉架錯的橋，或根據已架好的橋推出一處並架上。用過提示的盤面不計入最佳成績。'
     },
     es: {
       'meta.desc': 'Tiende puentes según el número de cada isla y únelas todas en una sola red',
@@ -107,7 +107,7 @@
       'hashi.rule6': 'La <b>línea de puntos marca dónde cabe un puente</b>. Al tocarla alterna <b>ninguno → uno → dos → ninguno</b>.',
       'hashi.rule7': '<b>Tocar una isla y luego otra</b> alterna ese mismo sitio. Las islas alcanzables desde la seleccionada quedan resaltadas: útil donde los puentes se cruzan y cuesta acertar.',
       'hashi.rule8': '<b>Todos los tableros tienen una única solución y salen solo con lógica.</b>',
-      'hashi.rule9': 'Una <b>Pista</b> retira un puente mal puesto o coloca el siguiente. Los tableros con pistas no cuentan para el récord.'
+      'hashi.rule9': 'Una <b>Pista</b> retira un puente mal puesto o coloca uno que se deduce de los puentes ya puestos. Los tableros con pistas no cuentan para el récord.'
     }
   });
 })();

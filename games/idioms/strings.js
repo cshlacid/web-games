@@ -21,7 +21,7 @@
       'idioms.rule5': '찾은 성어를 <b>톡 누르면</b> 지워집니다.',
       'idioms.rule6': '<b>이 게임의 모든 판은 덮는 방법이 하나뿐입니다.</b> 다 덮었다면 그게 정답입니다.',
       'idioms.rule7': '<b>흔히 쓰는 성어만</b> 나옵니다. 찾은 성어의 뜻은 판 아래에 차례로 쌓입니다.',
-      'idioms.rule8': '<b>힌트</b>는 아직 못 찾은 성어 하나를 대신 놓아 줍니다. 힌트를 쓴 판은 최고 기록으로 남기지 않습니다.'
+      'idioms.rule8': '<b>힌트</b>는 틀린 성어를 걷어 내고, 남은 빈 칸만으로 반드시 들어가야 하는 성어 하나를 놓아 줍니다. 힌트를 쓴 판은 최고 기록으로 남기지 않습니다.'
     },
     en: {
       'meta.desc': 'Trace the four-character Korean idioms hidden in the grid until every tile is used',
@@ -37,7 +37,7 @@
       'idioms.rule5': '<b>Tap</b> an idiom you found to take it back.',
       'idioms.rule6': '<b>Every board here can be covered in exactly one way.</b> If you covered it, you solved it.',
       'idioms.rule7': 'Only <b>idioms in common use</b> appear. What each one means is listed under the board as you find it.',
-      'idioms.rule8': 'A <b>hint</b> places one idiom you have not found yet. Boards solved with hints are not recorded.'
+      'idioms.rule8': 'A <b>hint</b> removes wrong idioms and places one that the remaining empty cells force. Boards solved with hints are not recorded.'
     },
     ja: {
       'meta.desc': '格子に隠れた四字熟語を道でつなぎ、すべてのマスを使い切るパズル',
@@ -53,7 +53,7 @@
       'idioms.rule5': '見つけた熟語は<b>軽く押す</b>と取り消せます。',
       'idioms.rule6': '<b>この盤はすべて覆い方がひとつだけです。</b>覆えたならそれが正解です。',
       'idioms.rule7': '<b>よく使う熟語だけ</b>が出ます。意味は見つけるたびに盤の下に並びます。',
-      'idioms.rule8': '<b>ヒント</b>はまだ見つけていない熟語をひとつ置きます。ヒントを使った盤はベスト記録に残しません。'
+      'idioms.rule8': '<b>ヒント</b>は違う熟語を外し、残りの空きマスから必ず入るとわかる熟語をひとつ置きます。ヒントを使った盤はベスト記録に残しません。'
     },
     'zh-CN': {
       'meta.desc': '把格子里藏着的四字成语连成路径，用尽每一格',
@@ -69,7 +69,7 @@
       'idioms.rule5': '<b>点一下</b>已找到的成语就能取消。',
       'idioms.rule6': '<b>这里每个盘面都只有一种覆盖方式。</b>覆盖完就是解开了。',
       'idioms.rule7': '只出<b>常用成语</b>。每找到一个，意思就列在盘面下方。',
-      'idioms.rule8': '<b>提示</b>会替你放上一个还没找到的成语。用过提示的盘面不计入最好成绩。'
+      'idioms.rule8': '<b>提示</b>会清掉放错的成语，并放上一个从剩余空格就能确定的成语。用过提示的盘面不计入最好成绩。'
     },
     'zh-TW': {
       'meta.desc': '把格子裡藏著的四字成語連成路徑，用盡每一格',
@@ -85,7 +85,7 @@
       'idioms.rule5': '<b>點一下</b>已找到的成語就能取消。',
       'idioms.rule6': '<b>這裡每個盤面都只有一種覆蓋方式。</b>覆蓋完就是解開了。',
       'idioms.rule7': '只出<b>常用成語</b>。每找到一個，意思就列在盤面下方。',
-      'idioms.rule8': '<b>提示</b>會替你放上一個還沒找到的成語。用過提示的盤面不計入最好成績。'
+      'idioms.rule8': '<b>提示</b>會清掉放錯的成語，並放上一個從剩餘空格就能確定的成語。用過提示的盤面不計入最好成績。'
     },
     es: {
       'meta.desc': 'Traza los modismos coreanos de cuatro sílabas escondidos en la cuadrícula hasta usar todas las casillas',
@@ -101,7 +101,7 @@
       'idioms.rule5': '<b>Toca</b> un modismo encontrado para deshacerlo.',
       'idioms.rule6': '<b>Todos los tableros aquí se cubren de una sola manera.</b> Si lo cubriste, lo resolviste.',
       'idioms.rule7': 'Solo aparecen <b>modismos de uso corriente</b>. Su significado se va listando bajo el tablero.',
-      'idioms.rule8': 'Una <b>pista</b> coloca un modismo que aún no encontraste. Los tableros resueltos con pistas no se registran.'
+      'idioms.rule8': 'Una <b>pista</b> quita los modismos incorrectos y coloca uno que las casillas vacías restantes obligan. Los tableros resueltos con pistas no se registran.'
     }
   });
 })();
