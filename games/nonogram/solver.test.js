@@ -97,11 +97,13 @@ check('전부 아님이면 null', S.narrow([3], [R.MARK, R.MARK, R.MARK, R.MARK,
     const c = step.at % puzzle.w;
     const row = S.narrow(puzzle.rows[r], R.rowOf(cells, puzzle.w, r));
     const col = S.narrow(puzzle.cols[c], R.colOf(cells, puzzle.w, puzzle.h, c));
-    if (row[c] === R.EMPTY && col[r] === R.EMPTY) far++;
+    // 근거로 댄 줄이 실제로 이 칸을 정해야 한다.
+    const said = step.why && (step.why.line === 'row' ? row[c] : col[r]);
+    if (!said || said === R.EMPTY) far++;
     cells[step.at] = step.state;
   }
   check('힌트만으로 끝까지 가며 틀리지 않는다', [wrong, cells.every((n) => n !== R.EMPTY)], [0, true]);
-  check('힌트는 줄 하나만 보고 알 수 있는 칸이다', far, 0);
+  check('힌트는 근거로 댄 줄 하나만 보고 알 수 있는 칸이다', far, 0);
 }
 
 console.log(`${passed}개 통과, ${failed}개 실패`);

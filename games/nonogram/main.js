@@ -369,7 +369,16 @@ el.hint.addEventListener('click', () => {
   game.hinted = true;
   startClock();
   apply(step.at, step.state);
-  toast(step.state === R.FILL ? t('nonogram.hintFill') : t('nonogram.hintEmpty'));
+  // 근거가 된 줄의 단서를 잠깐 밝힌다. 막혔을 때 정답에서 집은 칸은 근거가 없다.
+  const kind = step.state === R.FILL ? 'Fill' : 'Empty';
+  if (step.why) {
+    const line = (step.why.line === 'row' ? view.rowLines : view.colLines)[step.why.index];
+    line.classList.add('hinted');
+    setTimeout(() => line.classList.remove('hinted'), 2200);
+    toast(t(`nonogram.why.${step.why.line}${kind}`));
+  } else {
+    toast(t(`nonogram.hint${kind}`));
+  }
 });
 
 el.newGame.addEventListener('click', () => { Sound.play('click'); newGame(); });
