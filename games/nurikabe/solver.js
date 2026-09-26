@@ -17,6 +17,11 @@ const UNKNOWN = 0;
 const SEA = 1;
 const LAND = 2;
 
+// 사람이 머리로 따라갈 수 있는 가정의 길이. 놓아 보고 두 걸음 안에 막히는 것까지만
+// 논리로 친다. 그보다 긴 가정이 필요한 판은 "경우의 수를 다 따져 봐야 하는" 판이라
+// 굽지 않는다.
+const SHORT_TRIAL = 2;
+
 function context(puzzle) {
   const { rows, cols, clues } = puzzle;
   return {
@@ -169,17 +174,33 @@ function settle(ctx, cells) {
   }
 }
 
+// 규칙을 몇 번 써서 모순이 나는지. limit 안에 모순이 안 나면 0.
+function refute(ctx, cells, limit) {
+  for (let steps = 1; steps <= limit; steps++) {
+    const found = deduce(ctx, cells);
+    if (found === 'bad') return steps;
+    if (!found) return 0;
+    if (!write(cells, found)) return steps;
+  }
+  return 0;
+}
+
 // 가정 하나: 한 칸을 땅(또는 바다)이라 두고 규칙을 돌려 모순이 나면 반대다.
-function trial(ctx, cells) {
+// **가장 빨리 막히는 것을 고른다.** 처음 걸린 칸을 주면 열 걸음 넘게 따라가야 막히는
+// 것이 나와 사람이 머리로 따라갈 수 없다. limit보다 길게 가야 막히는 것은 없는 셈 친다.
+function trial(ctx, cells, limit = Infinity) {
+  let best = null;
   for (let i = 0; i < ctx.n; i++) {
     if (cells[i] !== UNKNOWN) continue;
     for (const [guess, other, code] of [[LAND, SEA, 'trialSea'], [SEA, LAND, 'trialLand']]) {
       const copy = cells.slice();
       copy[i] = guess;
-      if (!settle(ctx, copy)) return { cells: [i], value: other, why: { code, cell: i } };
+      const steps = refute(ctx, copy, best ? best.why.steps - 1 : limit);
+      if (steps) best = { cells: [i], value: other, why: { code, cell: i, steps } };
+      if (best && best.why.steps === 1) return best;
     }
   }
-  return null;
+  return best;
 }
 
 // 다 정해진 판이 규칙에 맞는지. 규칙 1~6은 섬과 바다의 모양을 다 보지 않으므로 마지막에
@@ -189,7 +210,8 @@ function valid(ctx, cells) {
   return R.inspect(ctx, marks).solved;
 }
 
-// 판을 끝까지 푼다. `trial`이 없으면 가정 없이 규칙만 쓴다.
+// 판을 끝까지 푼다. `trial`이 없으면 가정 없이 규칙만 쓴다. 가정은 짧은 것(SHORT_TRIAL
+// 걸음 안에 막히는 것)만 쓰고, 정답을 얻으려는 화면만 `limit: Infinity`로 끝까지 간다.
 // 결과: { solved, cells, trials } — trials는 가정을 몇 번 썼는지.
 function solve(puzzle, options = {}) {
   const ctx = context(puzzle);
@@ -198,7 +220,7 @@ function solve(puzzle, options = {}) {
   for (;;) {
     if (!settle(ctx, cells)) return { solved: false, cells, trials, broken: true };
     if (!cells.includes(UNKNOWN) || !options.trial) break;
-    const found = trial(ctx, cells);
+    const found = trial(ctx, cells, options.limit ?? SHORT_TRIAL);
     if (!found) break;
     trials++;
     write(cells, found);
@@ -213,11 +235,11 @@ function next(puzzle, cells, options = {}) {
   const ctx = context(puzzle);
   const found = deduce(ctx, cells);
   if (found && found !== 'bad') return found;
-  if (options.trial) return trial(ctx, cells);
+  if (options.trial) return trial(ctx, cells, options.limit ?? Infinity);
   return null;
 }
 
-const api = { UNKNOWN, SEA, LAND, start, context, solve, next };
+const api = { UNKNOWN, SEA, LAND, SHORT_TRIAL, start, context, solve, next };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 if (typeof window !== 'undefined') window.NurikabeSolver = api;
