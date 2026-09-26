@@ -133,5 +133,76 @@ for (const [level, take] of [['easy', 10], ['normal', 5], ['hard', 3]]) {
   check(`${level}: 연필 후보를 줄이는 힌트가 나온다`, narrowing > 0, true);
 }
 
+// 빈 판과 일부를 채운 판에서 힌트만으로 끝까지 가고, 가정은 가장 빨리 막히는 칸을 고르며
+// 모두 짧다(SHORT_TRIAL 안).
+// 가정 힌트가 나올 때마다 모든 칸·숫자를 끝까지 돌려 본 걸음 수의 최솟값과 맞춘다.
+{
+  const set = G.PUZZLES.hard;
+  let reached = 0;
+  let trials = 0;
+  let shortest = 0;
+  let single = 0;
+  let worst = 0;
+  let long = 0;
+  const take = 8;
+  for (let id = 0; id < take; id++) {
+    const puzzle = R.parse(set.size, set.list[id]);
+    const n = set.size;
+    const answer = S.solve(puzzle, { trial: true }).values;
+    // 절반은 빈 판에서, 절반은 몇 칸을 채운 판에서 시작한다.
+    const values = answer.map((v, i) => (id % 2 && i % 5 === id % 5 ? v : 0));
+    const marks = new Array(n * n).fill(0);
+    let ok = true;
+    for (let guard = 0; guard < 2000 && ok && !R.inspect(puzzle, values).solved; guard++) {
+      const t0 = process.hrtime.bigint();
+      const step = S.hint(puzzle, values, marks);
+      worst = Math.max(worst, Number(process.hrtime.bigint() - t0) / 1e6);
+      if (!step) { ok = false; break; }
+      if (step.why.code === 'trial' || step.why.code === 'trialMarks') {
+        trials++;
+        if (step.why.steps > S.SHORT_TRIAL) long++;
+        if (!step.marks || step.marks.length === 1) single++;
+        // 지금 판의 후보에서 모든 가정을 끝까지 돌린 최솟값.
+        const ctx = S.context(puzzle);
+        const dom = new Uint16Array(n * n);
+        for (let i = 0; i < n * n; i++) {
+          if (values[i]) { dom[i] = S.bit(values[i]); continue; }
+          dom[i] = marks[i] || ctx.all;
+          for (const j of ctx.peers[i]) if (values[j]) dom[i] &= ~S.bit(values[j]);
+        }
+        let min = Infinity;
+        for (let i = 0; i < n * n; i++) {
+          if (values[i] || S.popcount(dom[i]) < 2) continue;
+          for (let d = 1; d <= n; d++) {
+            if (!(dom[i] & S.bit(d))) continue;
+            const copy = dom.slice();
+            copy[i] = S.bit(d);
+            const info = { limit: Infinity };
+            if (!S.settle(ctx, copy, info)) min = Math.min(min, info.steps);
+          }
+        }
+        if (step.why.steps === min && step.why.cells.length) shortest++;
+      }
+      if (step.marks) {
+        for (const { cell, mask } of step.marks) {
+          if (!(mask & S.bit(answer[cell])) || values[cell]) ok = false;
+          marks[cell] = mask;
+        }
+      } else if (answer[step.cell] !== step.digit || values[step.cell]) {
+        ok = false;
+      } else {
+        values[step.cell] = step.digit;
+      }
+    }
+    if (ok && R.inspect(puzzle, values).solved) reached++;
+  }
+  check('일부 채운 8×8: 힌트만으로 끝까지', reached, take);
+  check('가정 힌트가 나온다', trials > 0, true);
+  check('가정은 가장 적은 걸음 안에 막히는 것을 고른다', shortest, trials);
+  check('가정 힌트는 칸 하나만 고친다', single, trials);
+  check('가정은 모두 짧다', long, 0);
+  console.log(`  가정 ${trials}번, 힌트 한 번 최악 ${worst.toFixed(1)}ms`);
+}
+
 console.log(`${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);

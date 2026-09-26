@@ -340,7 +340,7 @@ function finish() {
 // 정답에서 아무 칸이나 골라 주면 "왜 거기인지 알 수 없는 힌트"가 된다.
 function hint() {
   if (game.done) return;
-  if (!game.solution) game.solution = S.solve(game.puzzle, { trial: true }).values;
+  if (!game.solution) game.solution = S.solve(game.puzzle, { trial: true, limit: Infinity }).values;
   const sol = game.solution;
   const bad = game.values.findIndex((v, i) => v && v !== sol[i]);
   if (bad >= 0) {
@@ -367,7 +367,8 @@ function hint() {
   if (step.marks) for (const { cell, mask } of step.marks) game.marks[cell] = mask;
   else put(step.cell, step.digit);
   game.selected = touched[0];
-  for (const i of touched) {
+  // 가정이면 넣어 보았을 때 막히는 줄·케이지도 함께 번쩍인다. "어딘가에서 모순"의 어딘가다.
+  for (const i of new Set([...touched, ...(step.why.cells || [])])) {
     const node = view.cells[i];
     node.classList.add('hinted');
     setTimeout(() => node.classList.remove('hinted'), 900);
