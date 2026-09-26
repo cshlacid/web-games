@@ -176,5 +176,43 @@ check('쉬움은 단수만으로 풀린다',
   S.solveLogically(easy.puzzle, ['nakedSingle', 'hiddenSingle']).solved, true);
 check('쉬움은 단서가 넉넉하다', easy.givens >= G.LEVELS.easy.minGivens, true);
 
+// --- 힌트 ---
+
+// 힌트만 눌러 가도 끝까지 가고, 넣는 숫자는 정답이며 연필로 남긴 후보는 정답을 지우지
+// 않는다. 어려운 판에서는 후보만 지우는 걸음도 나와야 한다 — 속으로 거치지 않고 판에
+// 남긴다는 뜻이다. 사람이 적어 둔 연필(정답을 품은)에서 시작해도 같다.
+for (const level of ['easy', 'medium', 'hard']) {
+  let stuck = 0;
+  let wrong = 0;
+  let narrowing = 0;
+  for (let i = 0; i < 4; i++) {
+    const made = G.generate(level, { seed: i * 131 + 7 });
+    const solution = [...made.solution].map(Number);
+    const values = [...made.puzzle].map((ch) => (ch >= '1' && ch <= '9' ? Number(ch) : 0));
+    const marks = new Uint16Array(81);
+    // 절반은 몇 칸에 정답을 품은 연필을 적어 두고 시작한다.
+    if (i % 2) for (let k = 0; k < 81; k += 7) if (!values[k]) marks[k] = S.bitOf(solution[k]) | S.bitOf(solution[(k + 1) % 81]);
+    for (let guard = 0; guard < 400 && values.includes(0); guard++) {
+      const step = S.nextStep(values.map((v) => v || '.').join(''), marks);
+      if (!step) { stuck++; break; }
+      if (step.kind === 'place') {
+        if (step.digit !== solution[step.index]) wrong++;
+        values[step.index] = step.digit;
+        marks[step.index] = 0;
+      } else {
+        narrowing++;
+        for (const { index, mask } of step.marks) {
+          if (!(mask & S.bitOf(solution[index]))) wrong++;
+          marks[index] = mask;
+        }
+      }
+    }
+    if (values.includes(0)) stuck++;
+  }
+  check(`${level}: 힌트만으로 끝까지 간다`, stuck, 0);
+  check(`${level}: 힌트는 정답을 어기지 않는다`, wrong, 0);
+  if (level === 'hard') check('hard: 후보만 줄이는 걸음이 판에 남는다', narrowing > 0, true);
+}
+
 console.log(`${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);
