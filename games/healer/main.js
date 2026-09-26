@@ -313,6 +313,7 @@ function renderQuests() {
     // 전리품 목록은 미리 알 수 없다 — 쓰러뜨린 적에게서 굴려진다. 게시판이
     // 말할 수 있는 것은 어떤 적이 나오는가까지다.
     meta.append(text('span', `tag rank-${quest.rank}`, t('hl.rankAppears', { rank: D.RANKS[quest.rank].name })));
+    if (quest.mod) meta.prepend(modTag(quest.mod));
     button.append(meta);
 
     button.addEventListener('click', () => {
@@ -990,8 +991,17 @@ function renderBrief() {
     t('hl.questLine', { scene: t('hl.scene.' + quest.scene), n: quest.waves.length })
     + t('hl.questPayout', { exp: num(quest.guildReward.exp), gold: num(quest.guildReward.gold) })));
   const meta = el('div', 'quest-meta');
+  if (quest.mod) meta.append(modTag(quest.mod));
   for (const label of enemyCounts(quest)) meta.append(text('span', 'tag', label));
   brief.append(meta);
+  if (quest.mod) brief.append(text('p', 'panel-note', t(`hl.mod.${quest.mod}.desc`)));
+}
+
+// 변형 딱지. 이름만으로는 무엇이 달라지는지 모르므로 설명을 곁에 둔다(게시판은 title, 편성은 한 줄).
+function modTag(id) {
+  const tag = text('span', 'tag mod', t(`hl.mod.${id}.name`));
+  tag.title = t(`hl.mod.${id}.desc`);
+  return tag;
 }
 
 // --- 보수와 계약 ----------------------------------------------------------

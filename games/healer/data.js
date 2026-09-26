@@ -2063,6 +2063,16 @@ const enemyAt = (id, level) => {
   return up && level >= up.at && ENEMIES[up.to] ? up.to : id;
 };
 
+// **변형 의뢰.** 만렙이 가까워지면 같은 지역·같은 적을 되풀이할 뿐이라, 조건을 비틀고 보상을
+// 올린 의뢰를 섞는다. 새 그림 없이 판의 모양을 바꾸는 자리다. `reward`는 길드 보상에 곱한다.
+// 평판을 아는 게시판에서만 붙는다 — 난이도 확인처럼 평판을 모르는 자리는 맨판을 재야 한다.
+const QUEST_MODS = {
+  fury:  { id: 'fury',  name: '격노', atk: 1.25, reward: 1.4 },
+  drain: { id: 'drain', name: '메마름', heroRegen: 0.4, reward: 1.3 },
+  horde: { id: 'horde', name: '대군', extraWave: true, reward: 1.35 },
+};
+const MOD_FROM = 12;
+
 // **레벨 차가 레벨과 상관없이 같은 무게를 갖게 하는 배수.** 능력치가 레벨에 비례해서만 자라,
 // 3레벨 차가 L4에서는 체력 ×1.47인데 L24에서는 ×1.11이었다. 그래서 L14부터는 +5 의뢰도 +0과
 // 승률이 같았고(자동 힐러 75% 대 75%), 보상은 레벨 차를 따라 계속 오르니 늘 +5가 최선이었다.
@@ -2359,7 +2369,7 @@ const SKILL_MAX = 5;   // 전투에 등록할 수 있는 주인공 스킬 수
 const api = {
   FIELD, JOBS, SPECS, RACES, raceOf, raceAttrs, RACE_WEAK, weakOf, schoolMul,
   HEAL_HARM, healHarmOf, potionsFor,
-  MANA_REGEN_PER_INT, POWER, combatPower, ENEMY_UP, enemyAt, GAP_STEP, gapMul, MELEE_RANGE, roleOf, ATTACK_ORDER, HEAL_ORDER, PULL_ORDER, LEVEL, ATTRS, ATTR, ATTR_GROWTH, attrsAt, derive, STATS, LOWER_IS_BETTER, TIERS, AFFIX_COUNT, AFFIX_BASE, AFFIX_POOL,
+  MANA_REGEN_PER_INT, POWER, combatPower, ENEMY_UP, enemyAt, GAP_STEP, gapMul, QUEST_MODS, MOD_FROM, MELEE_RANGE, roleOf, ATTACK_ORDER, HEAL_ORDER, PULL_ORDER, LEVEL, ATTRS, ATTR, ATTR_GROWTH, attrsAt, derive, STATS, LOWER_IS_BETTER, TIERS, AFFIX_COUNT, AFFIX_BASE, AFFIX_POOL,
   tierName, tierFloor, tierRoll, tierCeiling, TIER_POWER, AFFIX_RANGE, SHOP_MAX_TIER,
   RANKS, rankOf,
   SLOTS, GEAR, MATERIALS, REGIONS, NAMES, SPECIAL_POOL, SPECIAL_CHANCE,

@@ -237,8 +237,33 @@ function generate(playerLevel, seed, gap) {
     const level = Math.max(1, playerLevel + off);
     quests.push(makeQuest(rng, level, i));
   }
+  if (gap != null && playerLevel >= D.MOD_FROM) addMod(quests, seed);
   // 쉬운 것부터 보여 준다. 게시판을 훑을 때 고르는 기준이 레벨이기 때문이다.
   return quests.sort((a, b) => a.level - b.level);
+}
+
+// 게시판의 하나에 변형을 붙인다(`D.QUEST_MODS`). 맨판의 난수를 건드리지 않으려고 따로 굴린다 —
+// 같은 씨앗이면 변형이 붙기 전과 같은 의뢰가 나와야 저장된 게시판이 흔들리지 않는다.
+function addMod(quests, seed) {
+  const rng = createRng(((seed >>> 0) ^ 0x5bd1e995) >>> 0);
+  if (rng() > 0.6) return;
+  const quest = pick(rng, quests);
+  const mod = pick(rng, Object.values(D.QUEST_MODS));
+  quest.mod = mod.id;
+  if (mod.extraWave) {
+    const region = D.REGIONS[quest.region];
+    const more = buildWaves(region, quest.level, rng);
+    quest.waves.splice(quest.waves.length - (quest.waves.length > 1 ? 1 : 0), 0, more[more.length - 1]);
+    const value = questValue(quest.waves, quest.level);
+    quest.guildReward = {
+      gold: Math.round((60 + value * 1.6) * D.PARTY_MAX),
+      exp: Math.round(value * 0.45),
+    };
+    quest.exp = value;
+    quest.desc.vars.waves = quest.waves.length;
+  }
+  quest.guildReward.gold = Math.round(quest.guildReward.gold * mod.reward);
+  quest.guildReward.exp = Math.round(quest.guildReward.exp * mod.reward);
 }
 
 // --- 동료 후보 ----------------------------------------------------------

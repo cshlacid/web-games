@@ -1996,6 +1996,20 @@ function cast(state, skillId, target) {
   check('왼쪽 끝에서 싸우는 시간은 드물다', left / ticks < 0.1, true);
 }
 
+// --- 변형 의뢰 -----------------------------------------------------------
+{
+  const base = battle();
+  const fury = battle({ quest: Object.assign(quest(), { mod: 'fury' }) });
+  const foe = (state) => state.units.find((u) => u.side === 'enemy');
+  check('격노는 적 공격력을 올린다',
+    Math.abs(foe(fury).atk / foe(base).atk - D.QUEST_MODS.fury.atk) < 1e-9, true);
+  const dry = battle({ quest: Object.assign(quest(), { mod: 'drain' }) });
+  const wet = battle();
+  for (const state of [dry, wet]) { L.hero(state).mp = 0; state.units.forEach((u) => { if (u.side === 'enemy') u.dead = true; }); }
+  L.step(dry, 1); L.step(wet, 1);
+  check('메마름은 주인공 마나 회복을 줄인다', L.hero(dry).mp < L.hero(wet).mp, true);
+}
+
 // --- 우두머리의 예고기 -----------------------------------------------------
 {
   // 모으기 시작하면 대상을 알리고, 떨어지면 대상 최대 체력의 정해진 비율만큼 친다(방어 무시).
