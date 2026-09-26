@@ -83,5 +83,26 @@ check('전부 아님이면 null', S.narrow([3], [R.MARK, R.MARK, R.MARK, R.MARK,
   check('다 푼 판에는 힌트가 없다', S.nextCell(puzzle, full), null);
 }
 
+// 힌트만 눌러 가도 끝까지 가고, 짚는 칸은 늘 그 칸의 가로줄이나 세로줄 하나만 보고
+// 알 수 있는 칸이다 — 판 전체를 몇 단계 앞서 좁힌 칸이 아니다.
+{
+  const G = require('./generator.js');
+  const puzzle = G.generate(3, 10);
+  const cells = R.newState(puzzle);
+  let wrong = 0;
+  let far = 0;
+  for (let step = S.nextCell(puzzle, cells); step; step = S.nextCell(puzzle, cells)) {
+    if ((step.state === R.FILL) !== (puzzle.answer[step.at] === 1)) wrong++;
+    const r = Math.floor(step.at / puzzle.w);
+    const c = step.at % puzzle.w;
+    const row = S.narrow(puzzle.rows[r], R.rowOf(cells, puzzle.w, r));
+    const col = S.narrow(puzzle.cols[c], R.colOf(cells, puzzle.w, puzzle.h, c));
+    if (row[c] === R.EMPTY && col[r] === R.EMPTY) far++;
+    cells[step.at] = step.state;
+  }
+  check('힌트만으로 끝까지 가며 틀리지 않는다', [wrong, cells.every((n) => n !== R.EMPTY)], [0, true]);
+  check('힌트는 줄 하나만 보고 알 수 있는 칸이다', far, 0);
+}
+
 console.log(`${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);

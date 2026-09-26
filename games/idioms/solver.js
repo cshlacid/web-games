@@ -88,7 +88,38 @@ function count(puzzle, words, options = {}) {
   return { count: found, over, solution: first };
 }
 
-const Solver = { allPaths, count };
+// 힌트. **지금 비어 있는 칸만 보고** 반드시 들어가야 하는 성어 하나를 찾는다. 빈 칸은
+// 모두 어떤 성어로든 덮여야 하므로, 한 칸을 덮을 수 있는 길이 하나뿐이면 그것이다.
+// 그런 칸이 없으면 한 수 앞을 본다 — 놓는 순간 다른 빈 칸을 덮을 길이 하나도 안
+// 남는 후보를 빼고 다시 센다. 정답의 앞쪽 성어를 주면 지금 판으로는 왜 그것인지
+// 알 수 없다. 놓인 성어가 모두 정답이라고 보므로 어긋난 것은 부르는 쪽이 먼저 걷는다.
+function next(b, state) {
+  const used = new Set(state.found.map((entry) => entry.word));
+  const open = [];
+  for (let cell = 0; cell < b.n; cell++) {
+    if (!b.walls.has(cell) && state.cover[cell] === -1) open.push(cell);
+  }
+  const paths = allPaths(b.size, b.walls).filter((path) => {
+    if (path.some((cell) => state.cover[cell] !== -1)) return false;
+    const word = R.wordOf(b, path);
+    return b.dict.has(word) && !used.has(word);
+  });
+
+  function forced(list) {
+    for (const cell of open) {
+      const covering = list.filter((path) => path.includes(cell));
+      if (covering.length === 1) return covering[0];
+    }
+    return null;
+  }
+
+  const clash = (a, c) => a.some((cell) => c.includes(cell)) || R.wordOf(b, a) === R.wordOf(b, c);
+  const path = forced(paths) || forced(paths.filter((mine) => open.every((cell) =>
+    mine.includes(cell) || paths.some((other) => other.includes(cell) && !clash(mine, other)))));
+  return path && { word: R.wordOf(b, path), path };
+}
+
+const Solver = { allPaths, count, next };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = Solver;
 if (typeof window !== 'undefined') window.IdiomsSolver = Solver;

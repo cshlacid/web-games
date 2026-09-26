@@ -85,5 +85,33 @@ function check(name, actual, expected) {
   check('숫자를 흔들면 유일해가 깨진다', S.count(b, 3) === 1, false);
 }
 
+// --- 힌트 ---
+{
+  // 힌트만 눌러 가도 끝까지 가고, 짚는 자리는 늘 정답을 넘지 않는다.
+  const made = G.generate(5, 9);
+  const b = R.board(made.puzzle);
+  const state = b.links.map(() => 0);
+  let steps = 0;
+  let over = false;
+  for (let step = S.next(b, state); step; step = S.next(b, state)) {
+    if (step.count > made.answer[step.id]) over = true;
+    state[step.id] = step.count;
+    steps++;
+  }
+  check('힌트는 정답을 넘는 다리를 놓지 않는다', over, false);
+  check('힌트만으로 끝까지 간다', R.isDone(b, state), true);
+  check('힌트는 한 번에 한 자리씩이다', steps > 1, true);
+}
+
+{
+  // 사람이 놓아 둔 다리에서 이어 간다 — 이미 놓인 자리는 다시 짚지 않는다.
+  const made = G.generate(6, 9);
+  const b = R.board(made.puzzle);
+  const state = made.answer.slice();
+  const gap = state.findIndex((v) => v > 0);
+  state[gap] = 0;
+  check('남은 한 자리를 짚는다', S.next(b, state), { id: gap, count: made.answer[gap] });
+}
+
 console.log(`${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);

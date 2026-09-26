@@ -3,6 +3,7 @@
 (function () {
 
 const R = window.IdiomsRules;
+const S = window.IdiomsSolver;
 const G = window.IdiomsGenerator;
 // 성어는 언어마다 다르다. 뿌리가 한문 고전이라 겹치는 것이 많지만 칸에 들어가는
 // 글자가 그 나라의 것이라 판을 나눠 쓸 수 없다(`words.js`).
@@ -290,20 +291,24 @@ function clearBoard() {
   paint();
 }
 
-// 힌트는 아직 못 찾은 성어 하나를 대신 놓아 준다. 정답에서 고르되 **아직 자리가
-// 비어 있는 것**만 놓으므로, 사람이 엉뚱한 자리에 놓아 둔 성어가 있으면 먼저
-// 걷어 낸다.
+// 힌트는 아직 못 찾은 성어 하나를 대신 놓아 준다. 정답에 없는 성어를 먼저 걷어 내고,
+// **지금 빈 칸만으로 반드시 들어가야 하는 것**을 고른다(`solver.js`의 `next`).
+// 정답의 앞쪽 성어를 주면 지금 판으로는 왜 그것인지 알 수 없다.
 function hint() {
   if (game.done) return;
   const state = game.state;
-  const next = game.puzzle.solution.find((entry) =>
+  const answer = new Set(game.puzzle.solution.map((entry) => entry.word + entry.path.join()));
+  let removed = 0;
+  for (const entry of state.found.slice()) {
+    if (answer.has(entry.word + entry.path.join())) continue;
+    R.removeAt(game.board, state, entry.path[0]);
+    removed++;
+  }
+  // 찾지 못할 일은 없어야 하지만(답이 하나뿐인 판) 막히면 정답에서 하나를 집는다.
+  const next = S.next(game.board, state) || game.puzzle.solution.find((entry) =>
     !state.found.some((got) => got.word === entry.word));
   if (!next) return;
 
-  let removed = 0;
-  for (const cell of next.path) {
-    if (state.cover[cell] !== -1) { R.removeAt(game.board, state, cell); removed++; }
-  }
   R.commit(game.board, state, next.path);
   game.draft = [];
   game.hinted++;
