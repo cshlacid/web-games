@@ -1492,7 +1492,7 @@ const PLAYER_SKILLS = {
   // 동료의 후렴은 같은 것이라, 다른 그림을 주면 다른 기술로 보인다.
   chord: shared('chord', {
     job: 'bard', unlock: 1, range: 38, cast: 0.8, type: '개별 대상', targeting: 'ally',
-    mp: 12, cd: 1.6, heal: 84,
+    mp: 12, cd: 1.6, heal: 100,
     desc: '동료 하나를 회복한다. 사제의 손길보다 작다.',
   }),
   refrain: shared('refrain', {
@@ -1512,7 +1512,7 @@ const PLAYER_SKILLS = {
   }),
   serenade: shared('serenade', {
     job: 'bard', unlock: 3, range: 38, cast: 0, type: '도트', targeting: 'ally',
-    mp: 18, cd: 7, tick: 24, interval: 1, duration: 8,
+    mp: 18, cd: 7, tick: 28, interval: 1, duration: 8,
     desc: '동료 하나에게 걸어 두면 시간을 두고 회복된다.',
   }),
   // **주인공 쪽도 혼란이다.** 이름·아이콘·종류는 동료 표에서 물려받고 수치만
@@ -1549,7 +1549,7 @@ const PLAYER_SKILLS = {
   }),
   layHands: shared('layHands', {
     job: 'paladin', unlock: 1, range: 30, cast: 0.6, type: '개별 대상', targeting: 'ally',
-    mp: 14, cd: 2.2, heal: 64,
+    mp: 14, cd: 2.2, heal: 100,
     desc: '동료 하나를 조금 회복한다. 사제의 손길보다 훨씬 작다.',
   }),
   taunt: shared('taunt', {
@@ -1569,7 +1569,7 @@ const PLAYER_SKILLS = {
   }),
   radiance: shared('radiance', {
     job: 'paladin', unlock: 4, range: 32, cast: 1.2, type: '범위', targeting: 'area-ally',
-    mp: 26, cd: 9, heal: 48, radius: 18,
+    mp: 26, cd: 9, heal: 62, radius: 18,
     desc: '기준점 주변의 아군을 조금씩 회복한다.',
   }),
   hammer: shared('hammer', {
@@ -1607,7 +1607,7 @@ const PLAYER_SKILLS = {
   // 다른 그림을 주면 다른 계통으로 보인다.
   mend: shared('mend', {
     job: 'bishop', unlock: 1, range: 40, cast: 1.0, type: '개별 대상', targeting: 'ally',
-    mp: 20, cd: 1.6, heal: 150,
+    mp: 17, cd: 1.6, heal: 165,
     desc: '동료 하나를 크게 회복한다. 사제의 손길보다 세고 마나를 더 먹는다.',
   }),
   renew: shared('renew', {
@@ -1617,7 +1617,7 @@ const PLAYER_SKILLS = {
   }),
   wave: shared('wave', {
     job: 'bishop', unlock: 2, range: 46, cast: 1.6, type: '범위', targeting: 'area-ally',
-    mp: 38, cd: 8, heal: 96, radius: 22,
+    mp: 34, cd: 8, heal: 96, radius: 22,
     desc: '기준점 주변의 아군을 한 번에 크게 회복한다.',
   }),
   purify: shared('purify', {
@@ -1637,7 +1637,7 @@ const PLAYER_SKILLS = {
   }),
   greaterMend: shared('greaterMend', {
     job: 'bishop', unlock: 5, range: 40, cast: 2.2, type: '개별 대상', targeting: 'ally',
-    mp: 48, cd: 6, heal: 280,
+    mp: 40, cd: 6, heal: 280,
     desc: '오래 외워 한 명을 크게 되살린다. 마나를 많이 먹는다.',
   }),
   judgement: shared('judgement', {
@@ -1671,8 +1671,16 @@ const PLAYER_SKILLS = {
     mp: 0, cd: 26, mana: 84,
     desc: '숨을 고르며 자신의 마나를 되찾는다.',
   }),
+  // **성전사의 즉발 회복.** 이것이 없을 때 이 계열의 회복은 지속 회복 하나뿐이라 회복 총량이
+  // 사제의 10분의 1이었고, 손을 놓은 것과 승률이 같았다(L22 6%). 힐러 게임에서 힐러로 쓸 수
+  // 없는 계열이 되어 있었다. 동료 표에 짝이 없어 주인공에게만 있다.
+  warPrayer: {
+    id: 'warPrayer', job: 'crusader', unlock: 1, kind: 'heal', range: 30, cast: 0.6, name: '전장의 기도',
+    type: '개별 대상', targeting: 'ally', mp: 18, cd: 2.0, heal: 200, icon: 'warPrayer',
+    desc: '싸우는 틈에 짧게 빌어 동료 하나를 채운다.',
+  },
   blessing: shared('blessing', {
-    job: 'crusader', unlock: 3, range: 32, cast: 0.8, type: '도트', targeting: 'ally',
+    job: 'crusader', unlock: 2, range: 32, cast: 0.8, type: '도트', targeting: 'ally',
     mp: 28, cd: 8, tick: 34, interval: 1, duration: 8,
     desc: '동료 하나에게 걸어 두면 시간을 두고 회복된다.',
   }),
