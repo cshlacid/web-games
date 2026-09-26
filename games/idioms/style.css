@@ -232,6 +232,7 @@ h1 {
 /* 긋는 중인 길. 아직 성어가 아니므로 색을 주지 않고 테두리로만 표시한다. */
 .cell.draft { box-shadow: inset 0 0 0 3px var(--edge); z-index: 2; }
 .cell.bad { animation: shake 0.3s ease-in-out; }
+.cell.hinted { box-shadow: inset 0 0 0 3px var(--bad); z-index: 2; }
 
 @keyframes shake {
   0%, 100% { transform: translateX(0); }

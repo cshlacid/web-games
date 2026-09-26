@@ -105,5 +105,31 @@ function count(puzzle, limit) {
   check('힌트만으로 만든 답에 닿는다', [tried, reached], [8, 8]);
 }
 
+{
+  // 구워 둔 어려움 판: 힌트만으로 끝까지 가고, 가정은 모두 짧으며 가장 빨리 막히는 것이다.
+  global.window = global.window || {};
+  const P = require('./puzzles.js');
+  const set = (P.PUZZLES || P).hard;
+  let long = 0;
+  let deeper = 0;
+  let solved = 0;
+  const take = 4;
+  for (const code of set.list.slice(0, take)) {
+    const puzzle = R.parse(set.size, set.size, code);
+    const cells = fresh(puzzle);
+    for (let guard = 0; guard < 400; guard++) {
+      const step = S.next(puzzle, cells, { trial: true });
+      if (!step) break;
+      if (step.why.steps > S.SHORT_TRIAL) long++;
+      if (step.why.steps && S.next(puzzle, cells, { trial: true, limit: step.why.steps - 1 })) deeper++;
+      for (const i of step.cells) cells[i] = step.value;
+    }
+    if (!cells.includes(S.UNKNOWN)) solved++;
+  }
+  check('어려움: 힌트만으로 끝까지 간다', solved, take);
+  check('어려움: 힌트의 가정은 모두 짧다', long, 0);
+  check('어려움: 가정은 가장 빨리 막히는 것이다', deeper, 0);
+}
+
 console.log(`${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);

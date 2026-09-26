@@ -188,7 +188,43 @@ function next(b, state) {
   return id === undefined ? null : { id, count: d.lo[id] };
 }
 
-const Solver = { bounds, propagate, count, solve, logicSolve, closedTooSoon, next };
+// 힌트 한 걸음. **섬 하나만 보고** 더 놓아야 하는 다리를 찾는다. `next`는 판 전체를
+// 좁힌 뒤 처음 오른 자리를 주는데, 그 사이에 다른 섬들의 윗값을 줄이는 단계가 여럿 숨어
+// 있을 수 있다. 이 게임에는 "여기엔 다리 없음"을 남길 표시가 없어 그 단계를 판에 적을
+// 수 없으므로, 한 걸음을 섬 하나로 볼 수 있는 범위로 좁힌다.
+//
+// 자리마다 놓을 수 있는 최대는 누구나 바로 아는 것만 쓴다 — 놓인 다리와 엇갈리면 0, 양쪽
+// 섬의 남은 수, 둘, 그리고 같은 1끼리·2끼리는 이으면 둘만 닫힌다(섬이 셋 이상일 때). 섬의
+// 남은 수가 다른 자리의 여유를 다 합쳐도 모자라면 이 자리에 그만큼 더 놓는다.
+// 돌려주는 것: { id, count, island, why: { code } }. 섬 하나로 안 보이면 `next`로 넘어간다.
+function step(b, state) {
+  const used = b.islands.map((island) => b.linksOf[island.id].reduce((sum, li) => sum + state[li], 0));
+  const hi = b.links.map((link) => {
+    if (b.crossing[link.id].some((other) => state[other] > 0)) return state[link.id];
+    const a = b.islands[link.a];
+    const c = b.islands[link.b];
+    let top = Math.min(MAX, state[link.id] + Math.min(a.need - used[a.id], c.need - used[c.id]));
+    if (b.islands.length > 2 && a.need === c.need && a.need <= MAX) top = Math.min(top, a.need - 1);
+    return Math.max(top, state[link.id]);
+  });
+  for (const island of b.islands) {
+    const rest = island.need - used[island.id];
+    if (rest <= 0) continue;
+    const mine = b.linksOf[island.id];
+    const open = mine.filter((li) => hi[li] > state[li]);
+    const room = open.reduce((sum, li) => sum + hi[li] - state[li], 0);
+    for (const li of open) {
+      const must = rest - (room - (hi[li] - state[li]));
+      if (must <= 0) continue;
+      const code = open.length === 1 ? 'only' : 'short';
+      return { id: li, count: state[li] + must, island: island.id, why: { code } };
+    }
+  }
+  const deep = next(b, state);
+  return deep && { ...deep, island: -1, why: { code: 'deep' } };
+}
+
+const Solver = { bounds, propagate, count, solve, logicSolve, closedTooSoon, next, step };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = Solver;
 if (typeof window !== 'undefined') window.HashiSolver = Solver;

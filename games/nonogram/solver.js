@@ -119,13 +119,13 @@ function nextCell(puzzle, cells) {
     const before = R.rowOf(known, puzzle.w, r);
     const after = narrow(puzzle.rows[r], before);
     const c = after ? after.findIndex((n, i) => n !== R.EMPTY && cells[r * puzzle.w + i] === R.EMPTY) : -1;
-    if (c >= 0) return { at: r * puzzle.w + c, state: after[c] };
+    if (c >= 0) return { at: r * puzzle.w + c, state: after[c], why: { line: 'row', index: r } };
   }
   for (let c = 0; c < puzzle.w; c++) {
     const before = R.colOf(known, puzzle.w, puzzle.h, c);
     const after = narrow(puzzle.cols[c], before);
     const r = after ? after.findIndex((n, i) => n !== R.EMPTY && cells[i * puzzle.w + c] === R.EMPTY) : -1;
-    if (r >= 0) return { at: r * puzzle.w + c, state: after[r] };
+    if (r >= 0) return { at: r * puzzle.w + c, state: after[r], why: { line: 'col', index: c } };
   }
   // 좁히기가 더 못 나가면 정답에서 한 칸 집는다(있어서는 안 되지만 막히지는 않게).
   for (let i = 0; i < cells.length; i++) {

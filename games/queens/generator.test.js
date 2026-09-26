@@ -87,7 +87,7 @@ check('지원하지 않는 크기는 거절한다', (() => {
 // 나머지는 굽는 자리에서 이미 통과한 것이고, 여기서는 자료가 깨지지 않았는지를 본다.
 {
   const D = require('./doubles.js').DOUBLES;
-  const bad = { count: 0, shape: 0, oversized: 0, notUnique: 0, solution: 0, order: 0, logic: 0 };
+  const bad = { count: 0, shape: 0, oversized: 0, notUnique: 0, solution: 0, order: 0, logic: 0, long: 0 };
   for (const size of G.DOUBLE_SIZES) {
     if (!D[size] || D[size].length !== 60) bad.count++;
     D[size].forEach((code, id) => {
@@ -101,6 +101,7 @@ check('지원하지 않는 크기는 거절한다', (() => {
       if (!R.validate(puzzle, cells).done) bad.solution++;
       if (puzzle.order.length !== size * 2) bad.order++;
       if (id < 2 && !S.logicSolve(puzzle).solved) bad.logic++;
+      if (id < 2 && S.longestTrial(puzzle) > S.SHORT_TRIAL) bad.long++;
     });
   }
   check('둘인 판 자료: 크기마다 60판', bad.count, 0);
@@ -110,6 +111,7 @@ check('지원하지 않는 크기는 거절한다', (() => {
   check('둘인 판 자료: 정답이 실제로 답이다', bad.solution, 0);
   check('둘인 판 자료: 힌트 순서에 왕관이 다 있다', bad.order, 0);
   check('둘인 판 자료: 찍지 않고 풀린다(앞의 두 판씩)', bad.logic, 0);
+  check('둘인 판 자료: 가정은 모두 짧다(앞의 두 판씩)', bad.long, 0);
 
   const first = G.pickDouble(9, -1, () => 0);
   check('방금 푼 판은 건너뛴다', G.pickDouble(9, first.id, () => 0).id !== first.id, true);

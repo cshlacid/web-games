@@ -20,6 +20,11 @@
 const R = typeof require === 'function' ? require('./rules.js') : window.SlitherRules;
 const { EMPTY, LINE, CROSS } = R;
 
+// 사람이 머리로 따라갈 수 있는 가정의 길이. 놓아 보고 두 걸음 안에 막히는 것까지만
+// 논리로 친다. 그보다 긴 가정이 필요한 판은 "경우의 수를 다 따져 봐야 하는" 판이라
+// 굽지 않는다.
+const SHORT_TRIAL = 2;
+
 function context(puzzle) {
   return { geo: R.geometry(puzzle.rows, puzzle.cols), clues: puzzle.clues };
 }
@@ -214,13 +219,59 @@ function breaks(ctx, edges, e, value) {
   return !settle(ctx, copy);
 }
 
-function trialRule(ctx, edges) {
+// 처음 걸린 가정. 끝까지 따라가 보는 것이라 사람의 수순이 아니고, 짧은 가정이 없을 때
+// 화면이 정답을 얻거나 힌트가 막히지 않게 하는 마지막 길로만 쓴다.
+function anyTrial(ctx, edges) {
   for (let e = 0; e < ctx.geo.edgeCount; e++) {
     if (edges[e] !== EMPTY) continue;
     if (breaks(ctx, edges, e, LINE)) return { edges: [e], value: CROSS, why: { code: 'trialCross', edge: e } };
     if (breaks(ctx, edges, e, CROSS)) return { edges: [e], value: LINE, why: { code: 'trialLine', edge: e } };
   }
   return null;
+}
+
+// 규칙 하나를 한 번. `settle`은 바뀐 변 둘레를 몰아서 돌려 빠르지만 몇 걸음인지 셀 수
+// 없어, 가정의 길이를 잴 때는 이것을 한 번씩 부른다. 모순이면 'bad'.
+function oneStep(ctx, edges) {
+  for (let cell = 0; cell < ctx.geo.cellCount; cell++) {
+    const found = cellRule(ctx, edges, cell);
+    if (found) return found;
+  }
+  for (let v = 0; v < ctx.geo.vertexCount; v++) {
+    const found = vertexRule(ctx, edges, v);
+    if (found) return found;
+  }
+  const loop = loopRule(ctx, edges, true);
+  if (loop === 'bad') return 'bad';
+  return loop.length ? loop[0] : null;
+}
+
+// 규칙을 몇 번 써서 모순이 나는지. limit 안에 모순이 안 나면 0.
+function refute(ctx, edges, limit) {
+  for (let steps = 1; steps <= limit; steps++) {
+    const found = oneStep(ctx, edges);
+    if (found === 'bad') return steps;
+    if (!found) return 0;
+    if (!write(edges, found, null)) return steps;
+  }
+  return 0;
+}
+
+// 짧은 가정. 한 변을 선(또는 X)이라 두고 limit 걸음 안에 모순이 나면 반대다. **가장
+// 빨리 막히는 것을 고른다** — 처음 걸린 변을 주면 한참 따라가야 막히는 것이 나온다.
+function trialRule(ctx, edges, limit = SHORT_TRIAL) {
+  let best = null;
+  for (let e = 0; e < ctx.geo.edgeCount; e++) {
+    if (edges[e] !== EMPTY) continue;
+    for (const [guess, other, code] of [[LINE, CROSS, 'trialCross'], [CROSS, LINE, 'trialLine']]) {
+      const copy = edges.slice();
+      copy[e] = guess;
+      const steps = refute(ctx, copy, best ? best.why.steps - 1 : limit);
+      if (steps) best = { edges: [e], value: other, why: { code, edge: e, steps } };
+      if (best && best.why.steps === 1) return best;
+    }
+  }
+  return best;
 }
 
 // 판을 끝까지 푼다. `trial`이 없으면 가정 없이 규칙만 쓴다.
@@ -233,7 +284,10 @@ function solve(puzzle, options = {}) {
     if (!settle(ctx, edges)) return { solved: false, edges, trials, broken: true };
     if (!edges.includes(EMPTY)) break;
     if (!options.trial) break;
-    const found = trialRule(ctx, edges);
+    // 짧은 가정만 쓴다. 정답을 얻으려는 화면만 `limit: Infinity`로 끝까지 간다.
+    const found = options.limit === Infinity
+      ? trialRule(ctx, edges) || anyTrial(ctx, edges)
+      : trialRule(ctx, edges, options.limit ?? SHORT_TRIAL);
     if (!found) break;
     trials++;
     write(edges, found, null);
@@ -259,11 +313,11 @@ function next(puzzle, edges, options = {}) {
   }
   const loop = loopRule(ctx, edges, true);
   if (loop !== 'bad' && loop.length) return loop[0];
-  if (options.trial) return trialRule(ctx, edges);
+  if (options.trial) return trialRule(ctx, edges) || anyTrial(ctx, edges);
   return null;
 }
 
-const api = { solve, next, settle, context };
+const api = { SHORT_TRIAL, solve, next, settle, context };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 if (typeof window !== 'undefined') window.SlitherSolver = api;

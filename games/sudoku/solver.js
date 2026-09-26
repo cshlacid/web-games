@@ -291,29 +291,44 @@ function solveLogically(puzzle, allowed = TECHNIQUE_NAMES) {
 }
 
 /**
- * 지금 판에서 논리적으로 확정할 수 있는 다음 한 칸. 힌트가 "정답을 슬쩍 보여주는
- * 것"이 아니라 "지금 무엇을 근거로 어디를 채울 수 있는지"가 되게 하려는 것이라,
- * 채울 칸과 함께 그 근거가 된 기법 이름을 돌려준다.
+ * 힌트 한 걸음. 넣은 숫자와 **연필 표시**(있으면 그 칸의 후보로 친다)에서 시작해 기법을
+ * 쉬운 순서로 하나씩 보고, 처음 새로 알게 된 것 하나에서 멈춘다.
+ *   - 칸이 확정되면 { kind: 'place', index, digit, technique }
+ *   - 후보만 줄면 { kind: 'marks', marks: [{ index, mask }], removed: [숫자...], technique }
+ * 예전 힌트는 후보만 지우는 기법(짝·X-Wing 같은)을 속으로 거친 뒤 처음 확정된
+ * 칸을 주어 그 사이가 가려졌다 — 사람에게는 이유 없이 떨어진 숫자로 보였다. 후보를
+ * 지운 결과는 화면이 연필로 남기고, 다음 힌트는 그것을 아는 것으로 치고 이어 간다.
+ * 연필이 정답을 지워 두었는지는 부르는 쪽이 먼저 걸러야 한다. 모순이면 null.
  */
-function nextPlacement(puzzle, allowed = TECHNIQUE_NAMES) {
+function nextStep(puzzle, marks, allowed = TECHNIQUE_NAMES) {
   const state = typeof puzzle === 'string' ? fromString(puzzle) : cloneState(puzzle);
   if (state.broken) return null;
-  const techniques = TECHNIQUES.filter((t) => allowed.includes(t.name));
-  const before = state.values.slice();
-
-  while (!state.broken) {
-    let progressed = false;
-    for (const technique of techniques) {
-      if (!technique.run(state)) continue;
-      progressed = true;
-      for (let i = 0; i < CELLS; i++) {
-        if (!before[i] && state.values[i]) {
-          return { index: i, digit: state.values[i], technique: technique.name };
-        }
-      }
-      break;
+  if (marks) {
+    for (let i = 0; i < CELLS; i++) {
+      if (state.values[i] || !marks[i]) continue;
+      state.cands[i] &= marks[i];
+      if (!state.cands[i]) return null;
     }
-    if (!progressed) return null;
+  }
+  for (const technique of TECHNIQUES.filter((t) => allowed.includes(t.name))) {
+    const after = cloneState(state);
+    if (!technique.run(after)) continue;
+    if (after.broken) return null;
+    for (let i = 0; i < CELLS; i++) {
+      if (!state.values[i] && after.values[i]) {
+        return { kind: 'place', index: i, digit: after.values[i], technique: technique.name };
+      }
+    }
+    const changed = [];
+    let removed = 0;
+    for (let i = 0; i < CELLS; i++) {
+      if (state.values[i] || after.cands[i] === state.cands[i]) continue;
+      changed.push({ index: i, mask: after.cands[i] });
+      removed |= state.cands[i] & ~after.cands[i];
+    }
+    const digits = [];
+    for (let d = 1; d <= 9; d++) if (removed & bitOf(d)) digits.push(d);
+    return { kind: 'marks', marks: changed, removed: digits, technique: technique.name };
   }
   return null;
 }
@@ -364,7 +379,7 @@ const Solver = {
   TECHNIQUES, TECHNIQUE_NAMES,
   emptyState, cloneState, fromString, toString, isComplete,
   assign, eliminate, popcount, bitOf, digitOf,
-  solveLogically, hardestTechnique, nextPlacement, countSolutions,
+  solveLogically, hardestTechnique, nextStep, countSolutions,
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = Solver;

@@ -247,20 +247,45 @@
       }
     }
 
-    const step = S.nextPlacement(boardString());
+    // 연필 표시도 알아낸 것으로 치고 이어 간다. 정답을 지워 둔 표시가 있으면 그 위에서
+    // 줄여 봐야 정답이 없는 후보만 남으므로 먼저 짚는다.
+    for (let i = 0; i < 81; i++) {
+      if (!state.values[i] && state.marks[i] && !(state.marks[i] & S.bitOf(Number(state.solution[i])))) {
+        state.selected = i;
+        render();
+        Sound.play('conflict');
+        toast(t('sudoku.badMarks'));
+        return;
+      }
+    }
+
+    const step = S.nextStep(boardString(), state.marks);
     if (!step) { toast(t('sudoku.noStep')); return; }
 
     snapshot();
-    state.values[step.index] = step.digit;
-    state.marks[step.index] = 0;
-    for (const peer of S.PEERS[step.index]) state.marks[peer] &= ~S.bitOf(step.digit);
-    state.selected = step.index;
+    const touched = [];
+    if (step.kind === 'place') {
+      state.values[step.index] = step.digit;
+      state.marks[step.index] = 0;
+      for (const peer of S.PEERS[step.index]) state.marks[peer] &= ~S.bitOf(step.digit);
+      touched.push(step.index);
+    } else {
+      // 후보만 줄었으면 연필로 남긴다. 화면에 남지 않으면 다음 힌트가 같은 걸음을 다시
+      // 짚어 힌트를 눌러도 제자리인 것처럼 보인다.
+      for (const { index, mask } of step.marks) {
+        state.marks[index] = mask;
+        touched.push(index);
+      }
+    }
+    state.selected = touched[0];
 
-    cells[step.index].dataset.hinted = '1';
-    setTimeout(() => { delete cells[step.index].dataset.hinted; render(); }, 900);
+    for (const i of touched) cells[i].dataset.hinted = '1';
+    setTimeout(() => { for (const i of touched) delete cells[i].dataset.hinted; render(); }, 900);
 
     Sound.play('hint');
-    toast(`${step.digit} — ${techniqueLabel(step.technique)}`);
+    toast(step.kind === 'place'
+      ? `${step.digit} — ${techniqueLabel(step.technique)}`
+      : t('sudoku.hintMarks', { technique: techniqueLabel(step.technique), digits: step.removed.join(', ') }));
     afterChange();
   }
 

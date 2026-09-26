@@ -160,6 +160,7 @@ h1 {
 /* 다 맞춘 줄은 숫자를 흐린다. 남은 줄만 눈에 들어오게 하려는 것이고, 이 게임에서
    "어디까지 했나"의 절반은 이 표시로 읽힌다. */
 .clue-line.done span { opacity: 0.3; }
+.clue-line.hinted span { color: var(--accent); font-weight: 700; opacity: 1; }
 
 .cells {
   display: grid;

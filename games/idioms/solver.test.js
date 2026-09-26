@@ -94,6 +94,7 @@ check('솔버가 찾은 답이 생성기가 눕힌 것과 같다', notSame, 0);
 // 힌트만 눌러 가도 끝까지 가고, 짚는 성어는 늘 정답 안에 있다.
 let hintStuck = 0;
 let hintWrong = 0;
+let hintNoWhy = 0;
 for (const size of G.SIZES) {
   for (let i = 0; i < 6; i++) {
     const puzzle = G.generate(size, { seed: size * 37 + i });
@@ -104,12 +105,14 @@ for (const size of G.SIZES) {
       const step = S.next(b, state);
       if (!step) { hintStuck++; break; }
       if (!answer.has(step.word + step.path.join())) hintWrong++;
+      if (!step.why || !step.path.includes(step.why.cell)) hintNoWhy++;
       R.commit(b, state, step.path);
     }
   }
 }
 check('힌트는 지금 판만으로 끝까지 간다', hintStuck, 0);
 check('힌트는 정답에 있는 성어만 짚는다', hintWrong, 0);
+check('힌트는 근거가 된 칸을 함께 준다', hintNoWhy, 0);
 
 console.log(`\n${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);

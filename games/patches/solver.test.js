@@ -129,5 +129,32 @@ check('답이 없는 판은 0을 돌려준다',
   check('힌트는 놓이지 않은 정답 조각만 놓는다', wrong, 0);
 }
 
+// 힌트만 눌러 가도 정답 조각만 놓이고, 근거로 밝힐 칸을 늘 함께 준다. 차지를 쓰는 걸음도
+// 나오되 드물다 — 대부분은 차지 없이 한 번에 보인다.
+{
+  const key = (rect) => `${rect.r},${rect.c},${rect.w},${rect.h}`;
+  let owned = 0;
+  let plain = 0;
+  let unlit = 0;
+  let wrong = 0;
+  for (const size of G.SIZES) {
+    const puzzle = G.generate(size, { seed: size * 23 });
+    const answer = new Set(puzzle.solution.map(key));
+    let placed = [];
+    while (placed.length < puzzle.solution.length) {
+      const step = S.step(puzzle, placed);
+      if (!step) break;
+      if (!answer.has(key(step.rect))) wrong++;
+      if (step.why.code !== 'order' && !step.cells.length) unlit++;
+      if (step.why.code === 'owned') owned++;
+      if (step.why.code === 'cell' || step.why.code === 'clue') plain++;
+      placed = placed.concat([step.rect]);
+    }
+  }
+  check('힌트는 정답 조각만 놓는다', wrong, 0);
+  check('힌트는 근거가 된 칸을 밝힌다', unlit, 0);
+  check('대부분은 차지 없이 한 번에 보인다', plain > owned * 3, true);
+}
+
 console.log(`\n${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);

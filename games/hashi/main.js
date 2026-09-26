@@ -53,6 +53,9 @@ let clock = null;
 // 고른 섬. 섬을 누르고 이어질 섬을 누르는 길을 함께 둔다 — 두 통로가 교차하는 자리는
 // 거리로 고르면 어느 쪽인지 애매해서, 섬 두 개로 가리키는 편이 확실하다.
 let picked = null;
+// 힌트의 근거가 된 섬. 안내 문구가 떠 있는 동안만 밝힌다.
+let hinted = null;
+let hintTimer = null;
 
 function svg(name, attrs, cls) {
   const node = document.createElementNS(NS, name);
@@ -241,6 +244,7 @@ function paintPick() {
     let cls = node.done ? 'island done' : 'island';
     if (island.id === picked) cls += ' picked';
     else if (partners.has(island.id)) cls += ' near';
+    if (island.id === hinted) cls += ' hinted';
     node.circle.setAttribute('class', cls);
   }
 
@@ -419,15 +423,15 @@ el.clear.addEventListener('click', () => {
   paint();
 });
 
-// 어긋난 다리를 먼저 치우고, 없으면 지금 놓인 다리에서 알아낼 수 있는 한 자리를 놓아
-// 준다. 잘못 놓은 것을 그대로 둔 채 한 자리를 더해 주면 판이 더 꼬인다.
+// 어긋난 다리를 먼저 치우고, 없으면 **섬 하나만 보고** 더 놓아야 하는 다리를 놓으며 그 섬을
+// 밝힌다(`solver.js`의 `step`). 잘못 놓은 것을 그대로 둔 채 한 자리를 더해 주면 판이 더 꼬인다.
 el.hint.addEventListener('click', () => {
   const { board, state, answer } = game;
   const wrong = board.links.find((l) => state[l.id] > answer[l.id]);
   // 좁히기가 막힐 일은 없지만(논리로 풀리는 판만 낸다) 막히면 정답에서 한 자리를 집는다.
   const missing = board.links.find((l) => state[l.id] < answer[l.id]);
   const step = wrong ? null
-    : S.next(board, state) || (missing && { id: missing.id, count: answer[missing.id] });
+    : S.step(board, state) || (missing && { id: missing.id, count: answer[missing.id], island: -1, why: {} });
   if (!wrong && !step) return;
 
   push();
@@ -436,7 +440,13 @@ el.hint.addEventListener('click', () => {
   else game.state[step.id] = step.count;
   startClock();
   Sound.play('hint');
-  toast(wrong ? t('hashi.hintCleared') : t('hashi.hintPlaced'));
+  if (step && step.island >= 0) {
+    hinted = step.island;
+    clearTimeout(hintTimer);
+    hintTimer = setTimeout(() => { hinted = null; paintPick(); }, 1800);
+  }
+  toast(wrong ? t('hashi.hintCleared')
+    : t(step.why.code === 'only' || step.why.code === 'short' ? `hashi.why.${step.why.code}` : 'hashi.hintPlaced'));
   paint();
   if (R.isDone(board, game.state)) finish();
 });

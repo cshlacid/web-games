@@ -15,6 +15,11 @@ const UNKNOWN = 0;
 const BULB = 1;
 const NONE = 2;
 
+// 사람이 머리로 따라갈 수 있는 가정의 길이. 놓아 보고 두 걸음 안에 막히는 것까지만
+// 논리로 친다. 그보다 긴 가정이 필요한 판은 "경우의 수를 다 따져 봐야 하는" 판이라
+// 굽지 않는다.
+const SHORT_TRIAL = 2;
+
 function context(puzzle) {
   return { puzzle, cells: puzzle.cells, geo: R.geometry(puzzle) };
 }
@@ -88,17 +93,33 @@ function settle(ctx, state) {
   }
 }
 
+// 규칙을 몇 번 써서 모순이 나는지. limit 안에 모순이 안 나면 0.
+function refute(ctx, state, limit) {
+  for (let steps = 1; steps <= limit; steps++) {
+    const found = deduce(ctx, state);
+    if (found === 'bad') return steps;
+    if (!found) return 0;
+    if (!write(state, found)) return steps;
+  }
+  return 0;
+}
+
 // 가정 하나: 한 칸에 전구를 놓아(또는 비워) 보고 규칙을 돌려 모순이 나면 반대다.
-function trial(ctx, state) {
+// **가장 빨리 막히는 것을 고른다.** 처음 걸린 칸을 주면 열 걸음 넘게 따라가야 막히는
+// 것이 나와 사람이 머리로 따라갈 수 없다. limit보다 길게 가야 막히는 것은 없는 셈 친다.
+function trial(ctx, state, limit = Infinity) {
+  let best = null;
   for (let i = 0; i < ctx.geo.n; i++) {
     if (ctx.cells[i] !== R.OPEN || state[i] !== UNKNOWN) continue;
     for (const [guess, other, code] of [[BULB, NONE, 'trialNone'], [NONE, BULB, 'trialBulb']]) {
       const copy = state.slice();
       copy[i] = guess;
-      if (!settle(ctx, copy)) return { cells: [i], value: other, why: { code, cell: i } };
+      const steps = refute(ctx, copy, best ? best.why.steps - 1 : limit);
+      if (steps) best = { cells: [i], value: other, why: { code, cell: i, steps } };
+      if (best && best.why.steps === 1) return best;
     }
   }
-  return null;
+  return best;
 }
 
 // 판이 다 풀렸는지. 빛을 받은 칸은 규칙 2가 모두 "전구 아님"으로 정하므로, 끝난 판에는
@@ -108,7 +129,8 @@ function finished(ctx, state) {
   return R.inspect(ctx.puzzle, marks).solved;
 }
 
-// 판을 끝까지 푼다. `trial`이 없으면 가정 없이 규칙만 쓴다.
+// 판을 끝까지 푼다. `trial`이 없으면 가정 없이 규칙만 쓴다. 가정은 짧은 것(SHORT_TRIAL
+// 걸음 안에 막히는 것)만 쓰고, 정답을 얻으려는 화면만 `limit: Infinity`로 끝까지 간다.
 // 결과: { solved, state, trials } — trials는 가정을 몇 번 썼는지.
 function solve(puzzle, options = {}) {
   const ctx = context(puzzle);
@@ -117,7 +139,7 @@ function solve(puzzle, options = {}) {
   for (;;) {
     if (!settle(ctx, state)) return { solved: false, state, trials, broken: true };
     if (finished(ctx, state) || !options.trial) break;
-    const found = trial(ctx, state);
+    const found = trial(ctx, state, options.limit ?? SHORT_TRIAL);
     if (!found) break;
     trials++;
     write(state, found);
@@ -131,11 +153,11 @@ function next(puzzle, state, options = {}) {
   const ctx = context(puzzle);
   const found = deduce(ctx, state);
   if (found && found !== 'bad') return found;
-  if (options.trial && !finished(ctx, state)) return trial(ctx, state);
+  if (options.trial && !finished(ctx, state)) return trial(ctx, state, options.limit ?? Infinity);
   return null;
 }
 
-const api = { UNKNOWN, BULB, NONE, context, start, solve, next };
+const api = { UNKNOWN, BULB, NONE, SHORT_TRIAL, context, start, solve, next };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 if (typeof window !== 'undefined') window.LightUpSolver = api;
