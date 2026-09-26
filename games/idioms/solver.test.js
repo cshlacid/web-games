@@ -89,5 +89,27 @@ for (const size of G.SIZES) {
 check('생성기 판은 답이 하나뿐', notUnique, 0);
 check('솔버가 찾은 답이 생성기가 눕힌 것과 같다', notSame, 0);
 
+// --- 힌트 ---
+
+// 힌트만 눌러 가도 끝까지 가고, 짚는 성어는 늘 정답 안에 있다.
+let hintStuck = 0;
+let hintWrong = 0;
+for (const size of G.SIZES) {
+  for (let i = 0; i < 6; i++) {
+    const puzzle = G.generate(size, { seed: size * 37 + i });
+    const b = R.board(puzzle, W.WORDS);
+    const state = R.newState(b);
+    const answer = new Set(puzzle.solution.map((entry) => entry.word + entry.path.join()));
+    while (!R.isDone(b, state)) {
+      const step = S.next(b, state);
+      if (!step) { hintStuck++; break; }
+      if (!answer.has(step.word + step.path.join())) hintWrong++;
+      R.commit(b, state, step.path);
+    }
+  }
+}
+check('힌트는 지금 판만으로 끝까지 간다', hintStuck, 0);
+check('힌트는 정답에 있는 성어만 짚는다', hintWrong, 0);
+
 console.log(`\n${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);

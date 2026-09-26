@@ -16,8 +16,9 @@ function bounds(b) {
   return { lo: b.links.map(() => 0), hi: b.links.map(() => MAX) };
 }
 
-// 좁힐 수 있는 만큼 좁힌다. 모순이 보이면 false.
-function propagate(b, d) {
+// 좁힐 수 있는 만큼 좁힌다. 모순이 보이면 false. `raised`를 주면 아랫값이 오른
+// 자리를 오른 순서대로 적는다 — 힌트가 가장 먼저 알 수 있는 자리를 고르는 데 쓴다.
+function propagate(b, d, raised) {
   const { lo, hi } = d;
   let moved = true;
   while (moved) {
@@ -45,6 +46,7 @@ function propagate(b, d) {
         if (need > lo[li]) {
           if (need > hi[li]) return false;
           lo[li] = need; moved = true;
+          if (raised) raised.push(li);
         }
         // 나머지가 이미 채운 만큼을 빼면 이 자리에 놓을 수 있는 최대가 나온다.
         const room = island.need - (sumLo - lo[li]);
@@ -174,7 +176,19 @@ function logicSolve(b) {
   return R.isDone(b, state) ? state : null;
 }
 
-const Solver = { bounds, propagate, count, solve, logicSolve, closedTooSoon };
+// 힌트. **사람이 놓은 다리를 아랫값으로 삼아** 이어 좁히고, 그중 가장 먼저 더 놓아야
+// 한다고 드러난 자리를 돌려준다. 정답에서 아무 자리나 골라 주면 지금 판으로는 왜
+// 거기인지 알 수 없는 힌트가 된다. 놓인 다리가 정답을 넘지 않는다고 보므로, 넘는
+// 것은 부르는 쪽이 먼저 걷어 낸다.
+function next(b, state) {
+  const d = { lo: state.slice(), hi: b.links.map(() => MAX) };
+  const raised = [];
+  if (!propagate(b, d, raised)) return null;
+  const id = raised.find((li) => d.lo[li] > state[li]);
+  return id === undefined ? null : { id, count: d.lo[id] };
+}
+
+const Solver = { bounds, propagate, count, solve, logicSolve, closedTooSoon, next };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = Solver;
 if (typeof window !== 'undefined') window.HashiSolver = Solver;

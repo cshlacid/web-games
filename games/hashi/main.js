@@ -419,18 +419,21 @@ el.clear.addEventListener('click', () => {
   paint();
 });
 
-// 어긋난 다리를 먼저 치우고, 없으면 다음 한 자리를 놓아 준다. 잘못 놓은 것을 그대로
-// 둔 채 정답 한 자리를 더해 주면 판이 더 꼬인다.
+// 어긋난 다리를 먼저 치우고, 없으면 지금 놓인 다리에서 알아낼 수 있는 한 자리를 놓아
+// 준다. 잘못 놓은 것을 그대로 둔 채 한 자리를 더해 주면 판이 더 꼬인다.
 el.hint.addEventListener('click', () => {
   const { board, state, answer } = game;
   const wrong = board.links.find((l) => state[l.id] > answer[l.id]);
+  // 좁히기가 막힐 일은 없지만(논리로 풀리는 판만 낸다) 막히면 정답에서 한 자리를 집는다.
   const missing = board.links.find((l) => state[l.id] < answer[l.id]);
-  const link = wrong || missing;
-  if (!link) return;
+  const step = wrong ? null
+    : S.next(board, state) || (missing && { id: missing.id, count: answer[missing.id] });
+  if (!wrong && !step) return;
 
   push();
   game.hinted = true;
-  game.state[link.id] = answer[link.id];
+  if (wrong) game.state[wrong.id] = answer[wrong.id];
+  else game.state[step.id] = step.count;
   startClock();
   Sound.play('hint');
   toast(wrong ? t('hashi.hintCleared') : t('hashi.hintPlaced'));

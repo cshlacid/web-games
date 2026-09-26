@@ -113,10 +113,19 @@ function nextCell(puzzle, cells) {
   // 사람이 잘못 칠한 칸이 섞여 있으면 좁히기가 막힌다. 아는 것만 넘긴다.
   const known = cells.map((n, i) => (n !== R.EMPTY && n !== (puzzle.answer[i] ? R.FILL : R.MARK)
     ? R.EMPTY : n));
-  const after = logicSolve(puzzle, known);
-  if (!after) return null;
-  for (let i = 0; i < after.length; i++) {
-    if (cells[i] === R.EMPTY && after[i] !== R.EMPTY) return { at: i, state: after[i] };
+  // 판 전체를 끝까지 좁힌 뒤 아무 칸이나 고르면 몇 단계를 건너뛴 칸이 나온다. 지금
+  // 판에서 **줄 하나만 보고** 알 수 있는 칸을 고른다.
+  for (let r = 0; r < puzzle.h; r++) {
+    const before = R.rowOf(known, puzzle.w, r);
+    const after = narrow(puzzle.rows[r], before);
+    const c = after ? after.findIndex((n, i) => n !== R.EMPTY && cells[r * puzzle.w + i] === R.EMPTY) : -1;
+    if (c >= 0) return { at: r * puzzle.w + c, state: after[c] };
+  }
+  for (let c = 0; c < puzzle.w; c++) {
+    const before = R.colOf(known, puzzle.w, puzzle.h, c);
+    const after = narrow(puzzle.cols[c], before);
+    const r = after ? after.findIndex((n, i) => n !== R.EMPTY && cells[i * puzzle.w + c] === R.EMPTY) : -1;
+    if (r >= 0) return { at: r * puzzle.w + c, state: after[r] };
   }
   // 좁히기가 더 못 나가면 정답에서 한 칸 집는다(있어서는 안 되지만 막히지는 않게).
   for (let i = 0; i < cells.length; i++) {
