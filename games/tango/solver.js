@@ -114,15 +114,13 @@ function lineOptions(b, marks, cells) {
   return out;
 }
 
-// `from`을 주면 빈 판 대신 그 칸들에서 시작한다. 힌트가 사람이 채운 칸에서 이어
-// 좁히는 데 쓴다 — `order[0]`이 지금 판에서 가장 먼저 알 수 있는 칸이다.
-function logicSolve(puzzle, from) {
+function logicSolve(puzzle) {
   const b = R.board(puzzle);
-  const marks = Uint8Array.from(from || b.given);
+  const marks = Uint8Array.from(b.given);
   const size = b.size;
   const half = size / 2;
-  // 미리 놓인 칸(과 `from`에 이미 있는 칸)은 순서에 넣지 않는다. 힌트는 **사람이
-  // 다음으로 알아낼 수 있는 칸**을 짚어야 하고, 이미 놓인 칸은 알아낼 것이 없다.
+  // 미리 놓인 칸은 순서에 넣지 않는다. 힌트가 막혔을 때 이 순서로 넘어가는데, 처음부터
+  // 놓여 있던 칸은 알아낼 것이 없다.
   const order = [];
   let broken = false;
 
@@ -214,7 +212,71 @@ function logicSolve(puzzle, from) {
   return { solved, marks: Array.from(marks), order };
 }
 
-const Solver = { solve, logicSolve, lineOptions };
+// 힌트 한 번. `logicSolve`와 같은 규칙을 같은 차례로 보되 **지금 판만 보고** 처음
+// 걸린 규칙 하나에서 멈추고, 그 근거를 `why`로 돌려준다. `logicSolve`의 `order[0]`도
+// 지금 판에서 나온 칸이지만 어느 규칙이 낳았는지를 버리므로 따로 둔다.
+//
+// 돌려주는 것: { put: [[칸, 값]...], cells: 밝힐 칸, why: { code, ... } }. 못 찾으면 null.
+// 근거 하나로 한꺼번에 정해지는 칸(반씩과 줄 따지기)은 **한 번에 다 채운다** — 서로에게
+// 기대지 않는 같은 추론이라 하나씩 나눠 주면 같은 문장이 여러 번 되풀이될 뿐이다.
+function step(puzzle, from) {
+  const b = R.board(puzzle);
+  const marks = Uint8Array.from(from || b.given);
+  const size = b.size;
+  const half = size / 2;
+  const kind = (line) => (line < size ? 'row' : 'col');
+
+  for (const link of b.links) {
+    const a = marks[link.a];
+    const c = marks[link.b];
+    if ((a === R.EMPTY) === (c === R.EMPTY)) continue;
+    const [known, cell] = a === R.EMPTY ? [link.b, link.a] : [link.a, link.b];
+    const value = link.same ? marks[known] : R.other(marks[known]);
+    return { put: [[cell, value]], cells: [known, cell], why: { code: link.same ? 'same' : 'diff' } };
+  }
+
+  for (let line = 0; line < R.lineCount(size); line++) {
+    const cells = R.lineCells(size, line);
+    for (let i = 0; i + 2 < size; i++) {
+      const trio = cells.slice(i, i + 3);
+      const v = trio.map((cell) => marks[cell]);
+      const at = v.indexOf(R.EMPTY);
+      if (at < 0 || v.lastIndexOf(R.EMPTY) !== at) continue;
+      const known = v.filter((x) => x !== R.EMPTY);
+      if (known[0] !== known[1]) continue;
+      // 빈칸이 가운데면 "둘 사이", 끝이면 "둘 옆"이다. 사람에게는 다른 모양으로 보인다.
+      const code = at === 1 ? 'gap' : 'pair';
+      return { put: [[trio[at], R.other(known[0])]], cells: trio, why: { code, line: kind(line), index: line % size } };
+    }
+  }
+
+  for (let line = 0; line < R.lineCount(size); line++) {
+    const cells = R.lineCells(size, line);
+    const suns = cells.filter((cell) => marks[cell] === R.SUN).length;
+    const moons = cells.filter((cell) => marks[cell] === R.MOON).length;
+    if (suns !== half && moons !== half) continue;
+    const rest = suns === half ? R.MOON : R.SUN;
+    const put = cells.filter((cell) => marks[cell] === R.EMPTY).map((cell) => [cell, rest]);
+    if (!put.length) continue;
+    return { put, cells, why: { code: 'half', line: kind(line), index: line % size } };
+  }
+
+  for (let line = 0; line < R.lineCount(size); line++) {
+    const cells = R.lineCells(size, line);
+    const options = lineOptions(b, marks, cells);
+    if (options.length === 0) return null;
+    const put = [];
+    for (let i = 0; i < size; i++) {
+      if (marks[cells[i]] !== R.EMPTY) continue;
+      const first = options[0][i];
+      if (options.every((option) => option[i] === first)) put.push([cells[i], first]);
+    }
+    if (put.length) return { put, cells, why: { code: 'scan', line: kind(line), index: line % size } };
+  }
+  return null;
+}
+
+const Solver = { solve, logicSolve, lineOptions, step };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = Solver;
 if (typeof window !== 'undefined') window.TangoSolver = Solver;

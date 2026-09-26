@@ -309,33 +309,52 @@ function clearBoard() {
   paint();
 }
 
-// 힌트는 어긋난 칸을 걷어 내고 한 칸을 채운다. 채우는 칸은 정답에서 아무 데나
-// 고르는 것이 아니라 **사람이 채운 칸에서 이어 좁혀 가장 먼저 알 수 있는 칸**이다 —
-// 지금 이 판에서 사람이 다음으로 알아낼 수 있는 칸이라야 힌트가 배움이 된다.
+// 힌트는 어긋난 칸을 걷어 내고 한 걸음을 채운다. 채우는 칸은 정답에서 아무 데나
+// 고르는 것이 아니라 **사람이 채운 칸만 보고 규칙 하나로 알 수 있는 칸**이고, 그
+// 규칙과 근거가 된 칸(묶음·셋·줄)을 함께 밝혀 알린다 — 왜 거기인지 따라갈 수 있어야
+// 힌트가 배움이 된다.
 function hint() {
   if (game.done) return;
   const solution = game.puzzle.solution;
   const kept = Uint8Array.from(game.state.marks, (now, cell) => (now === solution[cell] ? now : R.EMPTY));
-  // 좁히기가 막힐 일은 없지만(논리로 풀리는 판만 낸다) 막히면 풀이 순서에서 집는다.
-  const next = S.logicSolve(game.puzzle, kept).order[0]
-    ?? game.puzzle.order.find((cell) => game.state.marks[cell] !== solution[cell]);
 
   const changes = [];
   for (let cell = 0; cell < game.board.n; cell++) {
-    if (cell === next) continue;
     const now = game.state.marks[cell];
     if (now !== R.EMPTY && now !== solution[cell]) changes.push([cell, R.EMPTY]);
   }
   const removed = changes.length;
-  if (next !== undefined) changes.push([next, solution[next]]);
+
+  let text;
+  let lit = null;
+  if (removed) {
+    // 틀린 칸 위에서 좁혀 봐야 틀린 것이 나온다. 걷는 것만으로 한 번을 쓴다.
+    text = t('tango.hintCleared', { count: removed });
+    lit = new Set(changes.map(([cell]) => cell));
+  } else {
+    const found = S.step(game.puzzle, kept);
+    if (found) {
+      changes.push(...found.put);
+      const why = found.why;
+      text = t(`tango.why.${why.line ? `${why.code}.${why.line}` : why.code}`);
+      lit = new Set(found.cells);
+    } else {
+      // 좁히기가 막힐 일은 없지만(논리로 풀리는 판만 낸다) 막히면 풀이 순서에서 집는다.
+      const next = game.puzzle.order.find((cell) => game.state.marks[cell] !== solution[cell]);
+      if (next === undefined) return;
+      changes.push([next, solution[next]]);
+      text = t('tango.hintPlaced');
+      lit = new Set([next]);
+    }
+  }
 
   apply(changes);
   game.hinted++;
-  game.lit = next === undefined ? null : new Set([next]);
+  game.lit = lit;
   startClock();
   Sound.play('hint');
   paint();
-  toast(removed ? t('tango.hintCleared', { count: removed }) : t('tango.hintPlaced'));
+  toast(text);
   finishIfDone();
 }
 

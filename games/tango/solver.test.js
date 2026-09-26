@@ -98,24 +98,39 @@ check('힌트 순서가 아직 안 놓인 칸만 담는다', orderBroken, 0);
 
 // --- 힌트 ---
 
-// 사람이 아무 데나 채워 둔 판에서도 힌트만 눌러 끝까지 가고, 짚는 칸은 늘 빈 칸이다.
+// 빈 판에서도, 사람이 아무 데나 채워 둔 판에서도 힌트만 눌러 끝까지 가고, 채우는 칸은
+// 늘 빈 칸이며 정답과 같다. 근거가 된 칸은 채우는 칸을 품는다.
 {
   let wrong = 0;
   let stuck = 0;
+  let loose = 0;
   for (const size of G.SIZES) {
-    const puzzle = G.generate(size, { seed: size * 13 });
-    const b = R.board(puzzle);
-    const marks = Uint8Array.from(b.given);
-    for (let cell = 0; cell < b.n; cell += 3) marks[cell] = puzzle.solution[cell];
-    for (;;) {
-      const next = S.logicSolve(puzzle, marks).order[0];
-      if (next === undefined) { if (marks.includes(R.EMPTY)) stuck++; break; }
-      if (marks[next] !== R.EMPTY) wrong++;
-      marks[next] = puzzle.solution[next];
+    for (const partial of [false, true]) {
+      const puzzle = G.generate(size, { seed: size * 13 });
+      const b = R.board(puzzle);
+      const marks = Uint8Array.from(b.given);
+      if (partial) for (let cell = 0; cell < b.n; cell += 3) marks[cell] = puzzle.solution[cell];
+      while (marks.includes(R.EMPTY)) {
+        const found = S.step(puzzle, marks);
+        if (!found) { stuck++; break; }
+        for (const [cell, value] of found.put) {
+          if (marks[cell] !== R.EMPTY || value !== puzzle.solution[cell]) wrong++;
+          if (!found.cells.includes(cell)) loose++;
+          marks[cell] = value;
+        }
+      }
     }
   }
-  check('힌트는 채워 둔 칸에서 이어 끝까지 간다', stuck, 0);
-  check('힌트는 이미 채운 칸을 짚지 않는다', wrong, 0);
+  check('힌트만으로 끝까지 간다', stuck, 0);
+  check('힌트는 빈 칸에 정답만 채운다', wrong, 0);
+  check('힌트가 밝히는 칸은 채우는 칸을 품는다', loose, 0);
+}
+
+{
+  // 한 걸음이다 — 묶음 하나가 정하는 칸이 있으면 줄을 통째로 따지기 전에 그것을 준다.
+  const puzzle = G.generate(6, { seed: 3 });
+  const found = S.step(puzzle, Uint8Array.from(R.board(puzzle).given));
+  check('첫 힌트는 한 칸 또는 한 줄 안이다', found.put.length <= 6, true);
 }
 
 console.log(`\n${passed}개 통과, ${failed}개 실패`);
