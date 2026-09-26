@@ -189,11 +189,30 @@ check('7×7에는 둘씩 놓는 배치가 없다', S.randomArrangementMulti(7, 2
 }
 
 {
-  // 한 번에 한 걸음이다. 첫 힌트가 판 전체를 끝까지 좁힌 뒤의 왕관이면 안 된다 —
-  // 이 판은 첫 왕관까지 가정이 여러 번 필요해 첫 힌트는 X여야 한다.
-  const puzzle = G.pickDouble(10, -1, () => 2.5 / require('./doubles.js').DOUBLES[10].length);
-  const step = S.step(puzzle, { crowns: [], marks: [] });
-  check('가정이 필요한 자리에서는 X 하나만 찍는다', [step.why.code, step.marks.length], ['trial', 1]);
+  // 한 번에 한 걸음이다 — 가정이 필요한 자리에서는 X 하나만 찍고, 그 가정은 짧다.
+  // 구워 둔 10×10 앞의 몇 판을 힌트로만 풀어 본다.
+  const D = require('./doubles.js').DOUBLES;
+  let trials = 0;
+  let wide = 0;
+  let long = 0;
+  for (const code of D[10].slice(0, 3)) {
+    const puzzle = G.decodeDouble(10, code);
+    const from = { crowns: [], marks: [] };
+    while (from.crowns.length < 20) {
+      const step = S.step(puzzle, from);
+      if (!step) break;
+      if (step.why.code === 'trial') {
+        trials++;
+        if (step.marks.length !== 1) wide++;
+        if (step.why.steps > S.SHORT_TRIAL) long++;
+      }
+      if (step.crowns) from.crowns.push(...step.crowns);
+      else from.marks.push(...step.marks);
+    }
+  }
+  check('가정이 필요한 자리가 있다', trials > 0, true);
+  check('가정은 X 하나만 찍는다', wide, 0);
+  check('가정은 짧다', long, 0);
 }
 
 console.log(`\n${passed}개 통과, ${failed}개 실패`);

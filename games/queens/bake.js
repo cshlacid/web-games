@@ -7,6 +7,7 @@
 (function () {
 
 const G = require('./generator.js');
+const S = require('./solver.js');
 
 const COUNT = 60;
 
@@ -17,6 +18,8 @@ for (const size of G.DOUBLE_SIZES) {
   for (let seed = 1; list.length < COUNT; seed++) {
     const puzzle = G.generateDouble(size, { seed: size * 10000 + seed });
     if (!puzzle) continue;
+    // 긴 가정이 필요한 판은 버린다(solver.js의 SHORT_TRIAL). 10×10은 열에 하나꼴로 남는다.
+    if (S.longestTrial(puzzle) > S.SHORT_TRIAL) continue;
     const code = G.encodeDouble(puzzle);
     if (!list.includes(code)) list.push(code);
   }

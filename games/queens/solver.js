@@ -542,12 +542,35 @@ function step(puzzle, from) {
   return { marks: [best.cell], why: { code: 'trial', steps: best.steps }, cells: [best.cell, ...best.cells] };
 }
 
+// 사람이 머리로 따라갈 수 있는 가정의 길이. 놓아 보고 두 걸음 안에 막히는 것까지만
+// 논리로 치고, 그보다 긴 가정이 필요한 판은 내보내지 않는다 — "경우의 수를 다 따져
+// 봐야 하는" 판이다. 둘씩 판에서 가정을 아예 막으면 9×9·10×10은 한 판도 남지 않는다.
+const SHORT_TRIAL = 2;
+
+// 힌트만 눌러 빈 판에서 끝까지 가 보고, 그동안 쓴 가장 긴 가정의 걸음 수(가정이 없으면
+// 0)를 돌려준다. 끝까지 못 가면 Infinity. 판을 거르는 잣대다 — 힌트와 같은 길을 밟으므로
+// 이 값이 SHORT_TRIAL 이하면 힌트도 그보다 긴 가정을 내놓지 않는다.
+function longestTrial(puzzle) {
+  const k = puzzle.stars || 1;
+  const from = { crowns: [], marks: [] };
+  let longest = 0;
+  while (from.crowns.length < puzzle.size * k) {
+    const found = step(puzzle, from);
+    if (!found) return Infinity;
+    if (found.why.code === 'trial') longest = Math.max(longest, found.why.steps);
+    if (found.crowns) from.crowns.push(...found.crowns);
+    else from.marks.push(...found.marks);
+  }
+  return longest;
+}
+
 const Solver = {
   solve: (puzzle, options) => ((puzzle.stars || 1) > 1 ? solveMulti(puzzle, options) : solve(puzzle, options)),
   unique: (puzzle) => ((puzzle.stars || 1) > 1 ? solveMulti(puzzle, { limit: 2 }).count === 1 : unique(puzzle)),
   randomArrangement,
   logicSolve: (puzzle) => ((puzzle.stars || 1) > 1 ? logicSolveMulti(puzzle) : logicSolve(puzzle)),
   rowCombos, solveMulti, randomArrangementMulti, logicSolveMulti, MAX_GROUP, step,
+  SHORT_TRIAL, longestTrial,
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = Solver;
