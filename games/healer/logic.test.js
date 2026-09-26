@@ -2072,7 +2072,9 @@ function cast(state, skillId, target) {
       const found = candidates.find((m) => R.jobOf(m) === job && !party.includes(m));
       if (found) party.push(found);
     }
-    for (const member of party) member.level = quest.level;
+    // 동료는 주인공과 같은 레벨이다. 의뢰 레벨에 맞추면 "벅찬 의뢰"가 주인공만 뒤처진 판이
+    // 되어, 벅찰수록 오히려 쉬워 보였다(맨몸 L10에서 +3 63% 대 +0 44%).
+    for (const member of party) member.level = playerLevel;
 
     const state = L.createBattle({
       quest,
@@ -2117,7 +2119,9 @@ function cast(state, skillId, target) {
   // 난이도 표시가 거짓말이 된다. 위 자동 힐러는 사람보다 서투르므로 실제로는
   // 이보다 잘 나온다.
   const hard = rate(6, 9, true);
-  check('벅찬 의뢰는 힐이 들어가도 만만치 않다', hard >= 0.3 && hard <= 0.9, true);
+  // 하한은 동료 레벨을 주인공에 맞춘 뒤로 다시 잡았다(0.3 → 0.15). 그전 잣대는 동료가
+  // 의뢰 레벨이라 벅찬 의뢰가 실제보다 쉬웠고, 바로잡고 재니 21%였다.
+  check('벅찬 의뢰는 힐이 들어가도 만만치 않다', hard >= 0.15 && hard <= 0.9, true);
 
   // 어느 레벨에서든 힐이 들어간 쪽이 더 많이 이겨야 한다. 이 게임에서 플레이어가
   // 하는 일이 그것뿐이다.
