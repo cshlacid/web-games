@@ -1472,7 +1472,7 @@ const PLAYER_SKILLS = {
     desc: '기준점 주변의 아군을 한 번에 회복한다.',
   },
   sanctuary: {
-    id: 'sanctuary', job: 'priest', unlock: 6, kind: 'heal-area', range: 48, cast: 2.0, name: '생명의 성역', type: '장판', targeting: 'area-ally',
+    id: 'sanctuary', job: 'priest', unlock: 9, kind: 'heal-area', range: 48, cast: 2.0, name: '생명의 성역', type: '장판', targeting: 'area-ally',
     mp: 38, cd: 20, tick: 22, interval: 1, duration: 10, radius: 21, icon: 'sanctuary',
     desc: '바닥에 남는 장판. 안에 서 있는 아군이 계속 회복된다.',
   },
@@ -1524,12 +1524,12 @@ const PLAYER_SKILLS = {
     desc: '기준점 주변 적이 잠시 서로를 친다.',
   }),
   echo: shared('echo', {
-    job: 'bard', unlock: 5, range: 30, cast: 1.6, type: '광역 마나', targeting: 'area-ally',
+    job: 'bard', unlock: 8, range: 30, cast: 1.6, type: '광역 마나', targeting: 'area-ally',
     mp: 16, cd: 26, mana: 26, radius: 22,
     desc: '기준점 주변 아군의 마나를 함께 채운다.',
   }),
   finale: shared('finale', {
-    job: 'bard', unlock: 6, range: 40, cast: 1.2, type: '개별 대상', targeting: 'enemy',
+    job: 'bard', unlock: 11, range: 40, cast: 1.2, type: '개별 대상', targeting: 'enemy',
     mp: 22, cd: 12, damage: 96,
     desc: '적 하나를 노래로 내리친다.',
   }),
@@ -1578,7 +1578,7 @@ const PLAYER_SKILLS = {
     desc: '기준점 주변의 적을 한 번에 내리친다.',
   }),
   devotion: shared('devotion', {
-    job: 'paladin', unlock: 6, range: 24, cast: 1.4, type: '광역 강화', targeting: 'area-ally',
+    job: 'paladin', unlock: 9, range: 24, cast: 1.4, type: '광역 강화', targeting: 'area-ally',
     mp: 30, cd: 24, stat: 'armor', mul: 0.9, duration: 10, radius: 20,
     desc: '기준점 주변 아군이 받는 피해를 함께 줄인다.',
   }),
@@ -1592,7 +1592,7 @@ const PLAYER_SKILLS = {
     desc: '적 하나를 태운다. 어그로를 끌 수 있다.',
   }),
   pyre: shared('pyre', {
-    job: 'paladin', unlock: 6, range: 30, cast: 1.8, type: '장판', targeting: 'area-enemy',
+    job: 'paladin', unlock: 12, range: 30, cast: 1.8, type: '장판', targeting: 'area-enemy',
     mp: 34, cd: 18, tick: 26, interval: 1, duration: 8, radius: 18,
     desc: '바닥에 남는 장판. 안에 선 적이 계속 탄다.',
   }),
@@ -1636,12 +1636,12 @@ const PLAYER_SKILLS = {
     desc: '적 하나를 벌한다. 시간을 두고 깎인다.',
   }),
   greaterMend: shared('greaterMend', {
-    job: 'bishop', unlock: 5, range: 40, cast: 2.2, type: '개별 대상', targeting: 'ally',
+    job: 'bishop', unlock: 8, range: 40, cast: 2.2, type: '개별 대상', targeting: 'ally',
     mp: 40, cd: 6, heal: 280,
     desc: '오래 외워 한 명을 크게 되살린다. 마나를 많이 먹는다.',
   }),
   judgement: shared('judgement', {
-    job: 'bishop', unlock: 5, range: 42, cast: 1.4, type: '광역', targeting: 'area-enemy',
+    job: 'bishop', unlock: 11, range: 42, cast: 1.4, type: '광역', targeting: 'area-enemy',
     mp: 30, cd: 12, damage: 120, radius: 16,
     desc: '기준점 주변의 적에게 벌을 내린다.',
   }),
@@ -1690,12 +1690,12 @@ const PLAYER_SKILLS = {
     desc: '붙은 적을 가시로 계속 찌른다.',
   }),
   quake: shared('quake', {
-    job: 'crusader', unlock: 5, range: 20, cast: 1.0, type: '광역', targeting: 'area-enemy',
+    job: 'crusader', unlock: 8, range: 20, cast: 1.0, type: '광역', targeting: 'area-enemy',
     mp: 34, cd: 14, damage: 110, radius: 20,
     desc: '땅을 굴러 주변의 적을 함께 때린다.',
   }),
   shieldSlam: shared('shieldSlam', {
-    job: 'crusader', unlock: 5, range: 16, cast: 0, type: '기절', targeting: 'enemy',
+    job: 'crusader', unlock: 11, range: 16, cast: 0, type: '기절', targeting: 'enemy',
     mp: 26, cd: 14, damage: 100, duration: 1.6, knock: 8,
     desc: '방패로 밀쳐 굳힌다. 뒤로 밀려나고 외우던 것이 끊긴다.',
   }),
@@ -1736,12 +1736,12 @@ const PLAYER_SKILLS = {
     desc: '기준점 주변의 적이 받는 피해를 크게 늘린다.',
   },
   ovation: {
-    id: 'ovation', job: 'laureate', unlock: 5, kind: 'buff-area', range: 30, cast: 1.2, name: '갈채', type: '광역 강화', targeting: 'area-ally',
+    id: 'ovation', job: 'laureate', unlock: 8, kind: 'buff-area', range: 30, cast: 1.2, name: '갈채', type: '광역 강화', targeting: 'area-ally',
     mp: 32, cd: 26, stat: 'heal', mul: 1.3, duration: 12, radius: 26, icon: 'ovation',
     desc: '주변 아군의 회복량을 올린다. 자신과 동료 힐러가 함께 세진다.',
   },
   saga: {
-    id: 'saga', job: 'laureate', unlock: 5, kind: 'damage', range: 42, cast: 1.4, name: '무훈시', type: '개별 대상', targeting: 'enemy',
+    id: 'saga', job: 'laureate', unlock: 11, kind: 'damage', range: 42, cast: 1.4, name: '무훈시', type: '개별 대상', targeting: 'enemy',
     mp: 30, cd: 11, damage: 180, icon: 'saga',
     desc: '적 하나의 최후를 노래한다.',
   },
