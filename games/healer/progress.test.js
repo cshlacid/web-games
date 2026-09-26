@@ -614,5 +614,17 @@ const gear = (defId, tier) => Items.make(defId, tier || 0, 3);
   check('칸이 차 있으면 넣지 않는다', progress.skills.length, D.SKILL_MAX);
 }
 
+{
+  // 쓰지 않을 물건만 한 번에 판다. 다른 직업의 장비는 선물로 남긴다.
+  const progress = P.create();
+  progress.equipped.weapon = Items.make('staff', 3, 1);
+  progress.inventory = [Items.make('staff', 0, 2), Items.make('staff', 0, 3), Items.make('mail', 0, 4)];
+  const before = progress.gold;
+  const sold = P.sellJunk(progress);
+  check('못한 힐러 장비를 판다', sold.count, 2);
+  check('다른 직업 장비는 남긴다', progress.inventory.map((item) => item.defId), ['mail']);
+  check('판 값이 들어온다', progress.gold - before, sold.gold);
+}
+
 console.log(`${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);

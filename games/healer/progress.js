@@ -330,6 +330,25 @@ function sell(progress, itemUid) {
   return { ok: true, gold };
 }
 
+// 쓰지 않을 물건: 주인공이 입을 수 있는데(힐러 장비·직업 무관) 지금 낀 것보다 못한 것.
+// **다른 직업의 장비는 남긴다** — 주인공은 못 입어도 동료에게 선물하면 신뢰도가 오른다.
+// 한 판에 0.6개씩 쌓여 만렙 즈음엔 22~56개였는데, 하나씩 팔 수밖에 없었다.
+function junk(progress) {
+  return progress.inventory.filter((item) => {
+    const def = D.GEAR[item.defId];
+    if (!def || (def.job && def.job !== D.HERO.job)) return false;
+    const seen = compare(progress, item);
+    return seen && !seen.upgrade;
+  });
+}
+
+function sellJunk(progress) {
+  let gold = 0;
+  const list = junk(progress);
+  for (const item of list) gold += sell(progress, item.uid).gold || 0;
+  return { ok: true, count: list.length, gold };
+}
+
 function unequip(progress, slot) {
   const item = progress.equipped[slot];
   if (!item) return { ok: false, reason: 'hl.why.empty' };
@@ -579,7 +598,7 @@ const api = {
   spend, buyGear, buyPotion, sell, reforge,
   jobEntry, jobLevel, jobExpOf, canChangeJob, changeJob,
   unlockedSkills, learnedSkills, jobSkills, validSkills,
-  skillLevel, skillDef, skillLevels, learnSkill, raiseSkill,
+  skillLevel, skillDef, skillLevels, learnSkill, raiseSkill, junk, sellJunk,
   earnedSkillPoints, spentSkillPoints, freeSkillPoints,
 };
 
