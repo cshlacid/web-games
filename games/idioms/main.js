@@ -217,6 +217,14 @@ function cellAt(x, y) {
   return Number(cell.dataset.cell);
 }
 
+// 힌트의 근거가 된 칸을 잠깐 밝힌다. 성어의 색이 칠해진 뒤라 테두리로 짚는다.
+function flash(cell) {
+  const node = game.cells[cell];
+  if (!node) return;
+  node.classList.add('hinted');
+  setTimeout(() => node.classList.remove('hinted'), 1600);
+}
+
 function shake(cell) {
   const node = game.cells[cell];
   if (!node) return;
@@ -291,9 +299,9 @@ function clearBoard() {
   paint();
 }
 
-// 힌트는 아직 못 찾은 성어 하나를 대신 놓아 준다. 정답에 없는 성어를 먼저 걷어 내고,
-// **지금 빈 칸만으로 반드시 들어가야 하는 것**을 고른다(`solver.js`의 `next`).
-// 정답의 앞쪽 성어를 주면 지금 판으로는 왜 그것인지 알 수 없다.
+// 힌트는 정답에 없는 성어가 있으면 그것만 걷어 내고, 없으면 **지금 빈 칸만으로 반드시
+// 들어가야 하는 성어** 하나를 놓으며 근거가 된 칸을 밝힌다(`solver.js`의 `next`). 정답의
+// 앞쪽 성어를 주면 지금 판으로는 왜 그것인지 알 수 없다.
 function hint() {
   if (game.done) return;
   const state = game.state;
@@ -303,6 +311,16 @@ function hint() {
     if (answer.has(entry.word + entry.path.join())) continue;
     R.removeAt(game.board, state, entry.path[0]);
     removed++;
+  }
+  // 틀린 성어를 걷는 것만으로 한 번을 쓴다. 걷고 곧바로 놓으면 무엇이 틀렸는지가 묻힌다.
+  if (removed) {
+    game.draft = [];
+    game.hinted++;
+    startClock();
+    Sound.play('hint');
+    paint();
+    toast(t('idioms.hintCleared', { count: removed }));
+    return;
   }
   // 찾지 못할 일은 없어야 하지만(답이 하나뿐인 판) 막히면 정답에서 하나를 집는다.
   const next = S.next(game.board, state) || game.puzzle.solution.find((entry) =>
@@ -315,9 +333,11 @@ function hint() {
   startClock();
   Sound.play('hint');
   paint();
-  // 성어와 뜻은 사전이 아니라 자료에서 온다(`words.js`). 앞에 붙는 안내만 옮긴다.
+  if (next.why) flash(next.why.cell);
+  // 성어와 뜻은 사전이 아니라 자료에서 온다(`words.js`). 까닭 문장만 옮긴다 — 문장
+  // 사이 빈칸도 언어마다 달라 사전이 정한다.
   const line = `${next.word} — ${W.MEANING[next.word] || ''}`;
-  toast(removed ? `${t('idioms.hintCleared', { count: removed })} ${line}` : line);
+  toast(next.why ? t(`idioms.why.${next.why.code}`, { line }) : line);
   finishIfDone();
 }
 

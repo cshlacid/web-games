@@ -108,15 +108,17 @@ function next(b, state) {
   function forced(list) {
     for (const cell of open) {
       const covering = list.filter((path) => path.includes(cell));
-      if (covering.length === 1) return covering[0];
+      if (covering.length === 1) return { path: covering[0], cell };
     }
     return null;
   }
 
   const clash = (a, c) => a.some((cell) => c.includes(cell)) || R.wordOf(b, a) === R.wordOf(b, c);
-  const path = forced(paths) || forced(paths.filter((mine) => open.every((cell) =>
+  const first = forced(paths);
+  if (first) return { word: R.wordOf(b, first.path), path: first.path, why: { code: 'only', cell: first.cell } };
+  const ahead = forced(paths.filter((mine) => open.every((cell) =>
     mine.includes(cell) || paths.some((other) => other.includes(cell) && !clash(mine, other)))));
-  return path && { word: R.wordOf(b, path), path };
+  return ahead && { word: R.wordOf(b, ahead.path), path: ahead.path, why: { code: 'ahead', cell: ahead.cell } };
 }
 
 const Solver = { allPaths, count, next };
