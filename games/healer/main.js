@@ -833,6 +833,12 @@ function renderShop() {
     reforgeList.append(row);
   }
 
+  // 쓰지 않을 것을 한 번에. 다른 직업의 장비는 선물로 남긴다(`P.junk`).
+  const junk = P.junk(progress);
+  const junkGold = junk.reduce((sum, item) => sum + Items.sellPrice(item), 0);
+  $('sell-junk').hidden = junk.length < 2;
+  $('sell-junk').textContent = t('hl.sellJunk', { n: junk.length, gold: num(junkGold) });
+
   const sellList = $('shop-sell');
   sellList.textContent = '';
   $('sell-count').textContent = String(progress.inventory.length);
@@ -853,6 +859,13 @@ function renderShop() {
     sellList.append(row);
   }
 }
+
+$('sell-junk').addEventListener('click', () => {
+  sound.play('click');
+  P.sellJunk(app.progress);
+  persist();
+  renderShop();
+});
 
 $('shop-refresh').addEventListener('click', () => {
   const paid = P.spend(app.progress, Shop.refreshCost(app.progress.charLevel));
