@@ -249,6 +249,8 @@ function createBattle(config) {
   const state = {
     quest, rng: createRng(config.seed == null ? 1 : config.seed),
     t: 0, waveIndex: -1, nextWaveAt: 0,
+    // 결과 화면이 패배의 까닭을 적는 데 쓰는 순간들(`lossCauses`).
+    story: { manaOut: null, heroDown: null, firstDown: null },
     units: [], zones: [], dots: [],
     // 배경이 지금까지 흘러간 거리. 무리 사이에만 늘고, 화면이 이 값으로 배경을 민다.
     scroll: 0, marching: false,
@@ -456,6 +458,13 @@ function applyHeal(state, source, target, raw) {
 function kill(state, unit) {
   unit.dead = true;
   state.stats.deaths += unit.side === 'ally' ? 1 : 0;
+  // 진 판의 결과 화면이 "왜 졌는가"를 적는 재료. 누가 언제 쓰러졌는지는 이벤트로만
+  // 흘러가 끝난 뒤에는 남지 않는다.
+  if (unit.side === 'ally') {
+    const mark = { name: unit.name, t: state.t, wave: state.waveIndex };
+    if (unit.uid === HERO_UID) state.story.heroDown = mark;
+    else if (!state.story.firstDown) state.story.firstDown = mark;
+  }
   // 죽은 유닛에게 걸린 장판·도트는 남겨 두면 부활 없는 이 게임에서 영원히 헛돈다.
   state.dots = state.dots.filter((dot) => dot.targetUid !== unit.uid);
   emit(state, { type: 'death', uid: unit.uid, side: unit.side, code: 'hl.log.down', vars: { name: unit.name } });
@@ -1067,6 +1076,7 @@ function step(state, dt) {
   updateDots(state);
   updateAuras(state);
   regenMana(state, dt);
+  noteManaOut(state);
 
   if (state.marching) {
     march(state, dt);
@@ -1153,6 +1163,57 @@ function dropsOf(state) {
   return drops;
 }
 
+// 남은 전투를 한 번에 돌린다. 주인공이 쓰러진 뒤에는 조작할 것이 없는데 1분 넘게 지켜봐야
+// 했다. 결과는 끝까지 지켜본 것과 같다 — 같은 걸음으로 돌리고 화면만 건너뛴다.
+// 끝나지 않는 판을 막으려 몇 분에서 끊는다.
+function finish(state, limit = 600) {
+  const until = state.t + limit;
+  while (state.status === 'fighting' && state.t < until) {
+    // 지나가는 걸음의 이벤트는 버리고 마지막 걸음 것만 남긴다 — 끝을 알리는 이벤트(소리)는
+    // 화면이 받아야 한다.
+    state.events.length = 0;
+    step(state, TICK);
+  }
+  return state.status;
+}
+
+// 가장 싼 등록 스킬도 못 쓰게 된 첫 순간. 물약을 마셔 다시 차도 처음 바닥난 때를 남긴다 —
+// 까닭으로 읽을 것은 "언제부터 손이 묶였나"다.
+function noteManaOut(state) {
+  if (state.story.manaOut || state.status !== 'fighting') return;
+  const caster = hero(state);
+  if (!caster || caster.dead) return;
+  const costs = state.skills.map((slot) => playerSkill(state, slot.id)).filter((def) => def && def.mp > 0)
+    .map((def) => def.mp);
+  if (costs.length && caster.mp < Math.min(...costs)) {
+    state.story.manaOut = { t: state.t, wave: state.waveIndex, potions: state.potions.mana || 0 };
+  }
+}
+
+// 진 판의 까닭과 다음에 해 볼 것. 결과 화면이 숫자 표만 보여 주면 무엇을 바꿔야 하는지
+// 알 수 없다. 문장은 화면이 엮는다(`{ code, vars }`).
+function lossCauses(state) {
+  if (state.status !== 'lost') return [];
+  const { manaOut, heroDown, firstDown } = state.story;
+  const waves = state.quest.waves.length;
+  const at = (mark) => ({ t: Math.round(mark.t), wave: mark.wave + 1, waves });
+  const out = [];
+  if (manaOut) out.push({ code: 'hl.cause.manaOut', vars: at(manaOut) });
+  if (heroDown) out.push({ code: 'hl.cause.heroDown', vars: at(heroDown) });
+  if (firstDown && (!heroDown || firstDown.t < heroDown.t)) {
+    out.push({ code: 'hl.cause.firstDown', vars: Object.assign({ name: firstDown.name }, at(firstDown)) });
+  }
+  // 다음에 해 볼 것. 먼저 무너진 쪽을 본다.
+  const tips = [];
+  if (manaOut && (!heroDown || manaOut.t < heroDown.t)) {
+    tips.push(manaOut.potions > 0 ? 'hl.tip.drinkMana' : 'hl.tip.buyMana');
+  }
+  if (heroDown) tips.push('hl.tip.selfCare');
+  if (!state.units.some((u) => u.side === 'ally' && u.job === 'tank')) tips.push('hl.tip.bringTank');
+  for (const code of tips.slice(0, 2)) out.push({ code, tip: true });
+  return out;
+}
+
 function rewardOf(state) {
   const won = state.status === 'won';
   const kills = state.units
@@ -1190,7 +1251,7 @@ function battleReport(state) {
 }
 
 const api = {
-  HERO_UID, TICK, WAVE_GAP, MARCH_SPEED, MARCH_RECOVER, MARCH_RECOVER_MP, MANA_REGEN_PER_INT,
+  HERO_UID, TICK, WAVE_GAP, lossCauses, finish, MARCH_SPEED, MARCH_RECOVER, MARCH_RECOVER_MP, MANA_REGEN_PER_INT,
   rewardOf, dropsOf, battleReport,
   createRng, createBattle, advance, step, drainEvents,
   castSkill, playerSkill, usePotion, drink, magicPowerOf, rollCrit, applyDamage, applyHeal, addDot, addZone, addAura,

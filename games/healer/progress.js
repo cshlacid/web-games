@@ -438,6 +438,10 @@ function spendSkill(progress, id, learning) {
   if (freeSkillPoints(progress) <= 0) return { ok: false, reason: 'hl.why.noPoints' };
   if (!progress.learned) progress.learned = {};
   progress.learned[id] = level + 1;
+  // 새로 배운 것은 등록 칸이 비어 있으면 곧바로 넣는다. 등록은 편성 화면 아래쪽에 있어,
+  // 배우고도 등록하지 않은 채 전투에 들어가 "배운 스킬이 없다"고 여기는 일이 있었다.
+  if (learning && Array.isArray(progress.skills) && progress.skills.length < D.SKILL_MAX
+    && !progress.skills.includes(id)) progress.skills.push(id);
   return { ok: true, level: progress.learned[id], left: freeSkillPoints(progress) };
 }
 

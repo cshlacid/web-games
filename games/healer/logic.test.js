@@ -1987,6 +1987,26 @@ function cast(state, skillId, target) {
   check('왼쪽 끝에서 싸우는 시간은 드물다', left / ticks < 0.1, true);
 }
 
+// --- 진 판의 까닭과 건너뛰기 --------------------------------------------
+{
+  // 주인공이 쓰러지면 남은 판을 한 번에 돌릴 수 있고, 진 판은 까닭을 남긴다.
+  const state = battle({ skills: ['touch'] });
+  L.hero(state).hp = 1;
+  L.hero(state).mp = 0;
+  run(state, 20);
+  check('주인공이 쓰러진 순간이 남는다', Boolean(state.story.heroDown), L.hero(state).dead);
+  check('마나가 바닥난 순간이 남는다', Boolean(state.story.manaOut), true);
+  const status = L.finish(state);
+  check('남은 판을 한 번에 끝낸다', status !== 'fighting', true);
+  check('끝을 알리는 이벤트는 남는다', L.drainEvents(state).some((e) => e.type === 'end'), true);
+  if (status === 'lost') {
+    const causes = L.lossCauses(state);
+    check('진 판에는 까닭이 붙는다', causes.some((c) => c.code === 'hl.cause.heroDown'), true);
+    check('다음에 해 볼 것은 둘까지', causes.filter((c) => c.tip).length <= 2, true);
+  }
+  check('이긴 판에는 까닭이 없다', L.lossCauses(Object.assign({}, state, { status: 'won' })), []);
+}
+
 // --- 주인공이 설 거리 ---------------------------------------------------
 {
   // 근접 공격 스킬을 든 주인공(성기사의 심판)은 그 사거리까지 다가선다. 회복만 든
