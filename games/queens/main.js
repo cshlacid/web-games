@@ -302,39 +302,63 @@ function clearBoard() {
   paint();
 }
 
-// 힌트는 어긋난 왕관을 걷어 내고 한 자리를 짚는다. 짚는 자리는 정답에서 아무
-// 데나 고르는 것이 아니라 **사람이 놓은 왕관과 X에서 이어 좁혀 가장 먼저 알 수 있는
-// 자리**다 — 지금 이 판에서 사람이 다음으로 알아낼 수 있는 자리라야 힌트가 배움이 된다.
+// 힌트는 어긋난 표시가 있으면 그것만 걷어 내고, 없으면 지금 판에서 한 번에 볼 수 있는
+// 것 하나를 까닭과 함께 짚는다(`solver.js`의 `step`). 왕관이 정해지면 놓고, 후보만 줄면
+// X를 찍는다. 끝까지 좁힌 뒤 처음 정해진 왕관을 놓아 주면, 그 사이의 단계가 가려져
+// 판 한가운데 왕관이 뚝 떨어진 것처럼 보인다.
+// 문장이 줄·영역마다 따로다 — 언어마다 "행/열/영역"에 붙는 말이 달라 끼워 넣을 수 없다.
+function whyKey(why) {
+  if (why.code === 'pen') return `pen.${why.from}.${why.to}`;
+  return why.unit ? `${why.code}.${why.unit}` : why.code;
+}
+
 function hint() {
   if (game.done) return;
   const answer = new Set(R.solutionCells(game.puzzle));
 
-  const changes = [];
+  const wrong = [];
   const from = { crowns: [], marks: [] };
   for (let cell = 0; cell < game.board.n; cell++) {
     const now = game.state.marks[cell];
-    if (now === R.CROWN && !answer.has(cell)) changes.push([cell, R.EMPTY]);
+    if ((now === R.CROWN && !answer.has(cell)) || (now === R.MARK && answer.has(cell))) {
+      wrong.push([cell, R.EMPTY]);
+    }
     else if (now === R.CROWN) from.crowns.push(cell);
-    // 정답 자리에 찍힌 X는 좁히기에 넣지 않는다. 넣으면 그 자리를 영영 못 찾는다.
-    else if (now === R.MARK && !answer.has(cell)) from.marks.push(cell);
+    else if (now === R.MARK) from.marks.push(cell);
   }
-  const removed = changes.length;
 
-  // 좁히기가 막힐 일은 없지만(논리로 풀리는 판만 낸다) 막히거나 둘씩 판에서 가정이
-  // 길어지면 구워 둔 풀이 순서에서 집는다. 그 앞이 다 놓였을 때만 짚으므로 역시 지금
-  // 판에서 알아낼 수 있는 자리다.
-  const next = S.next(game.puzzle, from, Date.now() + 300)
-    ?? game.puzzle.order.find((cell) => game.state.marks[cell] !== R.CROWN);
-  if (next !== undefined) changes.push([next, R.CROWN]);
+  const changes = wrong;
+  let text;
+  let lit = null;
+  if (wrong.length) {
+    // 틀린 표시 위에서 좁혀 봐야 틀린 것이 나온다. 걷는 것만으로 한 번을 쓴다.
+    text = t('queens.hintCleared', { count: wrong.length });
+    lit = new Set(wrong.map(([cell]) => cell));
+  } else {
+    const step = S.step(game.puzzle, from);
+    if (step) {
+      if (step.crowns) for (const cell of step.crowns) changes.push([cell, R.CROWN]);
+      else for (const cell of step.marks) changes.push([cell, R.MARK]);
+      text = t(`queens.why.${whyKey(step.why)}`);
+      lit = new Set(step.cells);
+    } else {
+      // 좁히기가 막힐 일은 없지만(논리로 풀리는 판만 낸다) 막히면 풀이 순서에서 집는다.
+      // 그 앞이 다 놓였을 때만 짚으므로 역시 지금 판에서 알아낼 수 있는 자리다.
+      const next = game.puzzle.order.find((cell) => game.state.marks[cell] !== R.CROWN);
+      if (next === undefined) return;
+      changes.push([next, R.CROWN]);
+      text = t('queens.hintPlaced');
+      lit = new Set(game.board.regionCells[game.board.regions[next]]);
+    }
+  }
 
   apply(changes);
   game.hinted++;
-  game.lit = next === undefined ? null
-    : new Set(game.board.regionCells[game.board.regions[next]]);
+  game.lit = lit;
   startClock();
   Sound.play('hint');
   paint();
-  toast(removed ? t('queens.hintCleared', { count: removed }) : t('queens.hintPlaced'));
+  toast(text);
   finishIfDone();
 }
 

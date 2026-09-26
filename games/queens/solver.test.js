@@ -164,12 +164,12 @@ check('7×7에는 둘씩 놓는 배치가 없다', S.randomArrangementMulti(7, 2
 
 // --- 힌트 ---
 
-// 사람이 아무 데나 놓아 둔 왕관과 X에서도 힌트만 눌러 끝까지 가고, 짚는 자리는 늘
-// 아직 비어 있는 정답 자리다. 둘씩 판도 같다.
+// 힌트만 눌러 가도 끝까지 가고, 왕관은 늘 정답 자리에, X는 늘 정답이 아닌 자리에 놓는다.
+// 사람이 아무 데나 놓아 둔 왕관과 X에서 시작해도 같다. 둘씩 판도 같다.
 {
   let wrong = 0;
   let stuck = 0;
-  const puzzles = [G.generate(8, { seed: 5 }), G.pickDouble(8, -1, () => 0)];
+  const puzzles = [G.generate(8, { seed: 5 }), G.pickDouble(8, -1, () => 0), G.pickDouble(10, -1, () => 0.5)];
   for (const puzzle of puzzles) {
     const answer = R.solutionCells(puzzle);
     const inAnswer = new Set(answer);
@@ -177,22 +177,23 @@ check('7×7에는 둘씩 놓는 배치가 없다', S.randomArrangementMulti(7, 2
     for (let cell = 0; cell < puzzle.size * puzzle.size; cell += 5) {
       if (!inAnswer.has(cell)) from.marks.push(cell);
     }
-    for (;;) {
-      const next = S.next(puzzle, from);
-      if (next === undefined) { if (from.crowns.length < answer.length) stuck++; break; }
-      if (!inAnswer.has(next) || from.crowns.includes(next)) wrong++;
-      from.crowns.push(next);
+    while (from.crowns.length < answer.length) {
+      const step = S.step(puzzle, from);
+      if (!step) { stuck++; break; }
+      for (const cell of step.crowns || []) { if (!inAnswer.has(cell)) wrong++; from.crowns.push(cell); }
+      for (const cell of step.marks || []) { if (inAnswer.has(cell)) wrong++; from.marks.push(cell); }
     }
   }
-  check('힌트는 놓아 둔 왕관에서 이어 끝까지 간다', stuck, 0);
-  check('힌트는 비어 있는 정답 자리만 짚는다', wrong, 0);
+  check('힌트는 놓아 둔 것에서 이어 끝까지 간다', stuck, 0);
+  check('힌트는 틀린 것을 짚지 않는다', wrong, 0);
 }
 
 {
-  // 시간이 넘으면 빈손으로 돌아가 부르는 쪽이 구워 둔 순서로 넘어간다. 첫 왕관까지
-  // 가정이 필요한 판이라야 한다(10×10의 세 번째 판).
+  // 한 번에 한 걸음이다. 첫 힌트가 판 전체를 끝까지 좁힌 뒤의 왕관이면 안 된다 —
+  // 이 판은 첫 왕관까지 가정이 여러 번 필요해 첫 힌트는 X여야 한다.
   const puzzle = G.pickDouble(10, -1, () => 2.5 / require('./doubles.js').DOUBLES[10].length);
-  check('시간이 넘으면 힌트를 포기한다', S.next(puzzle, { crowns: [], marks: [] }, 0), undefined);
+  const step = S.step(puzzle, { crowns: [], marks: [] });
+  check('가정이 필요한 자리에서는 X 하나만 찍는다', [step.why.code, step.marks.length], ['trial', 1]);
 }
 
 console.log(`\n${passed}개 통과, ${failed}개 실패`);
