@@ -6,7 +6,9 @@
 // 서클은 판 밖에서만 오른다. 판 안에서 오르게 하면 한 판이 1서클부터 다시 쌓는
 // 반복이 되어, "회귀할수록 강해진다"가 판 밖에 남지 않는다.
 (function () {
-  const Runes = typeof module !== 'undefined' && module.exports ? require('./runes.js') : window.ArchmageRunes;
+  const node = typeof module !== 'undefined' && module.exports;
+  const Runes = node ? require('./runes.js') : window.ArchmageRunes;
+  const Gear = node ? require('./gear.js') : window.ArchmageGear;
 
   const MAX_CIRCLE = 9;
   const VERSION = 2;
@@ -18,7 +20,10 @@
   // 보스를 쓰러뜨린 수로 연다 — 밤이 서클과 따로 이어지게 되면서, 서클의 밤을 넘기는
   // 조건을 보스를 잡는 조건으로 바꿨다.
   function fresh() {
-    return { v: VERSION, circle: 1, mana: 0, night: 1, bosses: {}, grimoire: {}, runs: 0, best: {} };
+    return {
+      v: VERSION, circle: 1, mana: 0, night: 1, bosses: {}, grimoire: {}, runs: 0, best: {},
+      gold: 0, items: [], equipped: {}, nextUid: 1,
+    };
   }
 
   function parse(text) {
@@ -37,6 +42,10 @@
       grimoire: obj(raw.grimoire),
       runs: clampInt(raw.runs, 0, 1e9, 0),
       best: raw.v === VERSION ? obj(raw.best) : {},
+      gold: clampInt(raw.gold, 0, 1e9, 0),
+      items: Array.isArray(raw.items) ? raw.items.filter(validItem) : [],
+      equipped: obj(raw.equipped),
+      nextUid: clampInt(raw.nextUid, 1, 1e9, 1),
     };
   }
 
@@ -45,7 +54,17 @@
     return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : d;
   }
 
+  const validItem = (it) => it && Gear.SLOTS.indexOf(it.slot) >= 0 && it.rarity >= 0 && it.rarity < Gear.RARITIES && it.level >= 1;
+
   const bossCount = (save) => Object.keys(save.bosses).length;
+
+  // 한 판에서 버는 금화. 장비 강화와 상점에 쓴다. 잡은 수가 가장 크다 — 마나(버틴 시간)와
+  // 결을 달리해, 오래 버티는 판과 많이 쓸어 담는 판이 서로 다른 것을 벌게 했다.
+  function goldFor(result) {
+    const base = Math.floor(result.kills / 4 + result.t / 3);
+    const win = result.won ? 30 + 10 * result.night : 0;
+    return Math.floor((base + win) * (1 + 0.1 * (result.night - 1)));
+  }
 
   // 한 판에서 버는 마나. 버틴 시간이 가장 크고, 넘기면 밤의 깊이만큼 얹는다 — 지더라도
   // 오래 버틴 판이 돌파에 다가가게 해야 회귀가 헛걸음이 아니다.
@@ -56,10 +75,15 @@
     return Math.floor((time + kills + win) * (1 + 0.05 * (result.night - 1)));
   }
 
-  // 판이 끝났을 때. 새로 기록한 마법의 열쇠와 번 마나, 새로 열린 밤을 돌려준다.
-  function settle(save, result) {
+  // 판이 끝났을 때. 새로 기록한 마법의 열쇠와 번 마나·금화, 얻은 장비, 새로 열린 밤을
+  // 돌려준다. 보스의 밤을 넘기면 장비가 반드시, 보통 밤은 네 판에 한 번꼴로 나온다.
+  function settle(save, result, rng) {
     const gained = manaFor(result);
     save.mana += gained;
+    const gold = goldFor(result);
+    save.gold += gold;
+    const drops = [];
+    if (result.won && rng && (result.boss || rng() < 0.25)) drops.push(Gear.give(save, Gear.nightDrop(result.night, result.boss, rng)));
     save.runs += 1;
     const found = [];
     for (const key of result.formed) {
@@ -74,7 +98,7 @@
     }
     const prev = save.best[result.night] || 0;
     if (result.t > prev) save.best[result.night] = Math.floor(result.t);
-    return { gained, found, opened };
+    return { gained, gold, drops, found, opened };
   }
 
   // 돌파는 보스를 지금 서클 수만큼 쓰러뜨렸고 마나가 모자라지 않을 때.
@@ -106,7 +130,7 @@
     return { found, total: keys.length, specialFound, special };
   }
 
-  const api = { MAX_CIRCLE, BREAK_COST, fresh, parse, manaFor, settle, breakCheck, breakthrough, grimoireCount, bossCount };
+  const api = { MAX_CIRCLE, BREAK_COST, fresh, parse, manaFor, goldFor, settle, breakCheck, breakthrough, grimoireCount, bossCount };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else window.ArchmageMeta = api;
 })();
