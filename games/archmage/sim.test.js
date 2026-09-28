@@ -243,7 +243,9 @@ function engrave(state, id, ci) {
     S.step(st, 1 / 60);
     S.drain(st);
   }
-  check('한 판이 오류 없이 끝까지 돈다', st.t > 60, true);
+  // 크게 원만 그리는 손이라 보석을 못 주워 일찍 질 수도 있다. 보는 것은 제시에 막히지
+  // 않고 승패까지 가는지다.
+  check('한 판이 오류 없이 끝까지 돈다', guard < 100000 && (!!st.over || st.t >= st.duration + 60), true);
   check('한 판 시뮬레이션이 5초 안', Date.now() - t0 < 5000, true);
 }
 
