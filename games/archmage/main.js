@@ -134,6 +134,8 @@
   const A = window.ArchmageArt;
   const FRAMES = A.FRAMES;
   const sprites = {};
+  // 주인공 그림은 파일이라 늦게 도착할 수 있다. 오면 찍어 둔 것을 다시 찍는다.
+  if (A.MAGE.img && !A.MAGE.img.complete) A.MAGE.img.addEventListener('load', () => { buildSprites(); lobbyArt = null; });
   function offscreen(w, h, draw) {
     const scale = dpr * k * 1.5;
     const c = document.createElement('canvas');
@@ -658,7 +660,9 @@
     ctx.drawImage(m, cx - mw / 2, fy - A.MAGE.foot * 2.6 + breathe, mw, mh);
     ctx.globalCompositeOperation = 'lighter';
     ctx.globalAlpha = 0.6 + 0.3 * Math.sin(clock * 3);
-    A.glow(ctx, cx - mw / 2 + 31.8 * 2.6, fy - (A.MAGE.foot - 6.8) * 2.6 + breathe, 34, '#b99bff', 0.8);
+    A.glow(ctx, cx - mw / 2 + A.MAGE.crystal[0] * 2.6, fy - (A.MAGE.foot - A.MAGE.crystal[1]) * 2.6 + breathe, 34, '#b99bff', 0.8);
+    ctx.globalAlpha = 0.5 + 0.3 * Math.sin(clock * 9) * Math.sin(clock * 5.3);
+    A.glow(ctx, cx - mw / 2 + A.MAGE.flame[0] * 2.6, fy - (A.MAGE.foot - A.MAGE.flame[1]) * 2.6 + breathe, 26, '#a47bff', 0.8);
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
     drawAmbient();
@@ -745,8 +749,12 @@
     ctx.restore();
     // 지팡이 끝의 수정이 빛난다.
     ctx.globalCompositeOperation = 'lighter';
+    const M = A.MAGE;
     ctx.globalAlpha = 0.55 + 0.25 * Math.sin(clock * 4);
-    glowAt('arcane', p.x + p.face * 11.8, top + 6.8, 20);
+    glowAt('arcane', p.x + p.face * (M.crystal[0] - M.box[0] / 2), top + M.crystal[1], 20);
+    // 앞손의 마력이 흔들린다. 그림에 든 불꽃은 멈춰 있어 빛으로 살린다.
+    ctx.globalAlpha = 0.45 + 0.3 * Math.sin(clock * 9) * Math.sin(clock * 5.3);
+    glowAt('arcane', p.x + p.face * (M.flame[0] - M.box[0] / 2), top + M.flame[1], 16);
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
   }
