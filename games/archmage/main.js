@@ -658,7 +658,7 @@
     ctx.drawImage(m, cx - mw / 2, fy - A.MAGE.foot * 2.6 + breathe, mw, mh);
     ctx.globalCompositeOperation = 'lighter';
     ctx.globalAlpha = 0.6 + 0.3 * Math.sin(clock * 3);
-    A.glow(ctx, cx - mw / 2 + 32.8 * 2.6, fy - (A.MAGE.foot - 7.3) * 2.6 + breathe, 34, '#b99bff', 0.8);
+    A.glow(ctx, cx - mw / 2 + 31.8 * 2.6, fy - (A.MAGE.foot - 6.8) * 2.6 + breathe, 34, '#b99bff', 0.8);
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
     drawAmbient();
@@ -746,7 +746,7 @@
     // 지팡이 끝의 수정이 빛난다.
     ctx.globalCompositeOperation = 'lighter';
     ctx.globalAlpha = 0.55 + 0.25 * Math.sin(clock * 4);
-    glowAt('arcane', p.x + p.face * 12.8, top + 7.3, 20);
+    glowAt('arcane', p.x + p.face * 11.8, top + 6.8, 20);
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
   }
