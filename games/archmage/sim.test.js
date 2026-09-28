@@ -230,11 +230,20 @@ for (const [el, name] of [['fire', '메테오'], ['water', '해일'], ['wind', '
   check('1분 전에는 포위가 없다', ev.some((e) => e.type === 'burst'), false);
 }
 {
-  const st = S.create({ circle: 1, seed: 1 });
+  const st = S.create({ circle: 1, night: 1, seed: 1 });
   engrave(st, 'fire', 0);
   st.t = st.duration - 0.01;
   const ev = run(st, 0.1);
-  check('밤이 끝나면 사도가 온다', ev.some((e) => e.type === 'boss'), true);
+  check('보통 밤은 끝까지 버티면 넘긴다', [st.over, ev.some((e) => e.type === 'boss')], ['won', false]);
+}
+check('다섯 번째 밤마다 보스의 밤', [1, 4, 5, 9, 10].map(S.isBossNight), [false, false, true, false, true]);
+check('밤은 길어지다 10분에서 멈춘다', [S.nightLength(1), S.nightLength(100)], [180, 600]);
+{
+  const st = S.create({ circle: 1, night: 5, seed: 1 });
+  engrave(st, 'fire', 0);
+  st.t = st.duration - 0.01;
+  const ev = run(st, 0.1);
+  check('보스의 밤이 끝나면 사도가 온다', ev.some((e) => e.type === 'boss') && !st.over, true);
   st.boss.hp = 1;
   st.boss.x = st.player.x + 60;
   st.boss.y = st.player.y;
@@ -262,10 +271,10 @@ for (const [el, name] of [['fire', '메테오'], ['water', '해일'], ['wind', '
 }
 
 // --- 같은 세계 ---
-// 적이 오는 차례는 서클로만 정해진다. 회귀자가 미래를 아는 근거라 깨지면 안 된다.
+// 적이 오는 차례는 몇 번째 밤인지로만 정해진다. 회귀자가 미래를 아는 근거라 깨지면 안 된다.
 {
-  const a = S.create({ circle: 2, seed: 1 });
-  const b = S.create({ circle: 2, seed: 999 });
+  const a = S.create({ circle: 2, night: 3, seed: 1 });
+  const b = S.create({ circle: 5, night: 3, seed: 999 });
   engrave(a, 'fire', 0);
   engrave(b, 'fire', 0);
   a.foes = []; b.foes = [];
@@ -276,7 +285,7 @@ for (const [el, name] of [['fire', '메테오'], ['water', '해일'], ['wind', '
   }
   for (const f of a.foes) sa.push(f.type);
   for (const f of b.foes) sb.push(f.type);
-  check('룬 운이 달라도 같은 서클의 밤은 같은 적이 온다', sa.slice(0, 12), sb.slice(0, 12));
+  check('룬 운과 서클이 달라도 같은 밤은 같은 적이 온다', sa.slice(0, 12), sb.slice(0, 12));
 }
 {
   const a = S.create({ circle: 1, seed: 3 });
