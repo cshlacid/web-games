@@ -225,6 +225,7 @@
     sprites.mage_ = whiteOf(sprites.mage);
     for (const e of ELEMENTS) sprites['glow-' + e] = glowSprite(I.COLORS[e], 40);
     sprites['glow-arcane'] = glowSprite(I.COLORS.arcane, 40);
+    sprites['glow-leech'] = glowSprite(I.COLORS.leech, 40);
     sprites.gem = offscreen(12, 12, (g) => {
       g.fillStyle = hexA('#8fe9ff', 0.35); g.beginPath(); g.arc(6, 6, 6, 0, Math.PI * 2); g.fill();
       g.fillStyle = '#bff4ff'; g.beginPath(); g.moveTo(6, 1.5); g.lineTo(10, 6); g.lineTo(6, 10.5); g.lineTo(2, 6); g.closePath(); g.fill();
@@ -442,6 +443,14 @@
   }
 
   function drawMageAt(p) {
+    // 흡혈로 생명력이 차오르는 동안 몸이 붉게 빛난다. 숫자를 띄우면 수십 번씩 겹친다.
+    if (p.healed > 0) {
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = Math.min(1, p.healed * 4) * 0.8;
+      glowAt('leech', p.x, p.y - 6, 44);
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+    }
     const sp = p.inv > 0 && ((clock * 20) | 0) % 2 ? sprites.mage_ : sprites.mage;
     const bob = p.moving ? Math.abs(Math.sin(clock * 10)) * -2 : Math.sin(clock * 2) * 0.6;
     ctx.save();
@@ -733,6 +742,7 @@
     if (spell.dur) parts.push(T('stat.dur') + ' ' + T('stat.sec', { n: spell.dur.toFixed(1) }));
     const count = spell.count + (spell.kind === 'orbit' ? 2 : 3) * spell.omni;
     if (count > 1) parts.push(T('stat.count') + ' ' + count);
+    if (spell.leech) parts.push(T('stat.leech', { n: Math.round(spell.leech * 100) }));
     return parts.join(' · ');
   }
 

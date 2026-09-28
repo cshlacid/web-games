@@ -37,6 +37,9 @@
   const CIRCLE_UNLOCK = [1, 4, 10];
   const ECHO_GAP = 0.35;
   const ECHO_MULT = 0.6;
+  // 흡혈로 되찾는 생명력의 초당 한도. 범위 마법이 수십 마리를 한꺼번에 치므로 한도가
+  // 없으면 흡혈 하나로 죽지 않게 된다.
+  const LEECH_RATE = 6;
 
   function rng(seed) {
     // 1, 2, 3처럼 붙은 씨앗은 첫 값들이 서로 닮아 나온다. 한 번 섞어서 쓴다.
@@ -60,7 +63,7 @@
       world: rng(0x9e3779b9 ^ circle),
       fate: rng(seed),
       t: 0, duration: nightLength(circle),
-      player: { x: 0, y: 0, hp: PLAYER.hp, maxHp: PLAYER.hp, r: PLAYER.r, inv: 0, face: 1 },
+      player: { x: 0, y: 0, hp: PLAYER.hp, maxHp: PLAYER.hp, r: PLAYER.r, inv: 0, face: 1, leechLeft: LEECH_RATE, healed: 0 },
       input: { x: 0, y: 0 },
       foes: [], gems: [], shots: [], orbits: [], zones: [], echoes: [],
       circles: [0, 1, 2].map(() => ({ runes: [], spell: null, cd: 0, active: 0 })),
@@ -199,6 +202,8 @@
     if (Math.abs(x) > 0.1) p.face = x > 0 ? 1 : -1;
     p.moving = len > 0.1;
     if (p.inv > 0) p.inv -= dt;
+    p.leechLeft = Math.min(LEECH_RATE, p.leechLeft + LEECH_RATE * dt);
+    if (p.healed > 0) p.healed -= dt;
   }
 
   function foeScale(state) {
@@ -396,12 +401,12 @@
   function fire(state, ci, s, mult) {
     const p = state.player;
     const dmg = s.dmg * mult;
-    const common = { ci, el: s.primary, dmg, slow: s.slow, burn: s.burn, knock: s.knock, chain: s.chain, homing: s.homing };
+    const common = { ci, el: s.primary, dmg, slow: s.slow, burn: s.burn, knock: s.knock, chain: s.chain, leech: s.leech };
     if (s.kind === 'orbit') {
       const count = s.count + 2 * s.omni;
       state.orbits.push(Object.assign({}, common, {
         life: s.dur, total: s.dur, count, blade: s.size,
-        radius: 58 + s.size * 1.4 + 18 * s.homing, spin: s.speed, angle: state.fate() * Math.PI * 2,
+        radius: 58 + s.size * 1.4, spin: s.speed, angle: state.fate() * Math.PI * 2,
       }));
       return true;
     }
@@ -433,8 +438,10 @@
 
   function damage(state, f, amount, src) {
     if (f.dead) return;
+    const dealt = Math.min(amount, Math.max(0, f.hp));
     f.hp -= amount;
     if (src) {
+      if (src.leech) leech(state, dealt * src.leech);
       f.flash = 0.08;
       if (src.slow) { f.slow = Math.max(f.slow, src.slow); f.slowT = 1.6; }
       if (src.burn) { f.burn = Math.max(f.burn, src.burn); f.burnT = 2; }
@@ -447,6 +454,15 @@
       }
     }
     if (f.hp <= 0) kill(state, f);
+  }
+
+  function leech(state, amount) {
+    const p = state.player;
+    const heal = Math.min(amount, p.leechLeft, p.maxHp - p.hp);
+    if (heal <= 0) return;
+    p.leechLeft -= heal;
+    p.hp += heal;
+    p.healed = 0.25;
   }
 
   function kill(state, f) {
@@ -474,30 +490,15 @@
       if (!next) break;
       seen.add(next);
       dmg *= 0.75;
-      damage(state, next, dmg, { slow: s.slow, burn: s.burn });
+      damage(state, next, dmg, { slow: s.slow, burn: s.burn, leech: s.leech });
       pts.push({ x: next.x, y: next.y });
       cur = next;
     }
     if (pts.length > 1) state.events.push({ type: 'chain', el: s.el, pts });
   }
 
-  function steer(state, sh, dt) {
-    const t = nearest(state, sh.x, sh.y, 260, sh.hit);
-    if (!t) return;
-    const want = Math.atan2(t.y - sh.y, t.x - sh.x);
-    const cur = Math.atan2(sh.vy, sh.vx);
-    let d = want - cur;
-    while (d > Math.PI) d -= Math.PI * 2;
-    while (d < -Math.PI) d += Math.PI * 2;
-    const turn = Math.max(-1, Math.min(1, d)) * 5 * sh.homing * dt;
-    const a = cur + turn;
-    sh.vx = Math.cos(a) * sh.speed;
-    sh.vy = Math.sin(a) * sh.speed;
-  }
-
   function updateShots(state, dt, grid) {
     for (const sh of state.shots) {
-      if (sh.homing) steer(state, sh, dt);
       sh.x += sh.vx * dt;
       sh.y += sh.vy * dt;
       sh.life -= dt;
@@ -510,7 +511,7 @@
       if (!hitOne) continue;
       if (sh.kind === 'bolt') {
         sh.done = true;
-        const src = { slow: sh.slow, burn: sh.burn, knock: sh.knock, fromX: sh.x, fromY: sh.y };
+        const src = { slow: sh.slow, burn: sh.burn, knock: sh.knock, leech: sh.leech, fromX: sh.x, fromY: sh.y };
         near(grid, sh.x, sh.y, sh.aoe, (f) => damage(state, f, sh.dmg, src));
         state.events.push({ type: 'burst-hit', el: sh.el, x: sh.x, y: sh.y, r: sh.aoe });
         if (sh.chain) chainFrom(state, hitOne, sh, sh.dmg);
@@ -559,19 +560,10 @@
   function updateZones(state, dt, grid) {
     for (const z of state.zones) {
       z.life -= dt;
-      if (z.homing) {
-        const t = nearest(state, z.x, z.y, 240);
-        if (t) {
-          const dx = t.x - z.x, dy = t.y - z.y;
-          const d = Math.hypot(dx, dy) || 1;
-          const v = Math.min(d, 55 * z.homing * dt);
-          z.x += (dx / d) * v; z.y += (dy / d) * v;
-        }
-      }
       z.tick -= dt;
       if (z.tick > 0) continue;
       z.tick = ZONE_TICK;
-      const src = { slow: z.slow, burn: z.burn, knock: z.knock, fromX: z.x, fromY: z.y };
+      const src = { slow: z.slow, burn: z.burn, knock: z.knock, leech: z.leech, fromX: z.x, fromY: z.y };
       let first = null;
       near(grid, z.x, z.y, z.r, (f) => { if (!first) first = f; damage(state, f, z.dmg, src); });
       if (first && z.chain) chainFrom(state, first, z, z.dmg);

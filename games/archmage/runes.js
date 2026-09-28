@@ -41,7 +41,8 @@
     else if (mod === 'echo') s.echo += 1;
     else if (mod === 'focus') { s.dmg *= 1.5; s.size *= 0.8; }
     else if (mod === 'magna') { s.size *= 1.35; s.dmg *= 1.1; s.cd *= 1.1; }
-    else if (mod === 'anima') s.homing += 1;
+    // 흡혈. 맞힌 피해의 일부로 생명력을 되찾는다(한도는 sim.js의 LEECH_RATE).
+    else if (mod === 'anima') s.leech += 0.05;
     else if (mod === 'chrono') { s.cd *= 0.8; s.dur *= 1.3; }
   }
 
@@ -80,7 +81,7 @@
       key: keyOf(counts), primary, counts,
       kind: f.kind, dmg: f.dmg, cd: f.cd, dur: f.dur, size: f.size, speed: f.speed,
       count: f.count, pierce: f.pierce,
-      slow: 0, burn: 0, knock: 0, chain: 0, omni: 0, echo: 0, homing: 0,
+      slow: 0, burn: 0, knock: 0, chain: 0, omni: 0, echo: 0, leech: 0,
       mods: {}, runes: runes.length,
     };
     let skipped = false;
