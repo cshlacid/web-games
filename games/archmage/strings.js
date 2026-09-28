@@ -42,7 +42,10 @@
       'stat.sec': '{n}초',
 
       'am.circle': '{n}서클',
-      'am.circleShort': '{n}서클',
+      // 들어가는 밤은 서클 번호 대신 차례로 부른다. 서수는 언어마다 꼴이 달라 통째로 둔다.
+      'am.night1': '첫 번째 밤', 'am.night2': '두 번째 밤', 'am.night3': '세 번째 밤',
+      'am.night4': '네 번째 밤', 'am.night5': '다섯 번째 밤', 'am.night6': '여섯 번째 밤',
+      'am.night7': '일곱 번째 밤', 'am.night8': '여덟 번째 밤', 'am.night9': '아홉 번째 밤',
       'am.level': 'Lv {n}',
       'am.kills': '처치 {n}',
       'am.boss': '재앙의 사도',
@@ -64,7 +67,7 @@
       'am.mana': '마나 {n}',
       'am.break': '{n}서클 돌파',
       'am.breakCost': '마나 {n}',
-      'am.breakNeedClear': '{n}서클의 밤을 넘겨야 돌파할 수 있습니다',
+      'am.breakNeedClear': '{night}을 넘겨야 돌파할 수 있습니다',
       'am.breakNeedMana': '마나가 {n} 모자랍니다',
       'am.breakMax': '최고 서클입니다',
       'am.breakDone': '[{n}서클에 도달했습니다]',
@@ -78,7 +81,7 @@
 
       'am.lostTitle': '[사망했습니다]',
       'am.lostNote': '회귀합니다…',
-      'am.wonTitle': '[멸망의 밤을 넘겼습니다]',
+      'am.wonTitle': '[{night}을 넘겼습니다]',
       'am.wonNote': '그러나 멸망은 다시 옵니다. 회귀합니다…',
       'am.reportTime': '버틴 시간 {t}',
       'am.reportKills': '처치 {n}',
@@ -99,7 +102,7 @@
       'am.help.r3': '레벨이 오르면 <b>룬 하나를 골라 마법진에 새깁니다.</b> 마법진의 룬 조합이 곧 그 마법이고, 가장 많은 원소가 형태를 정합니다.',
       'am.help.r4': '<b>서클</b>은 마법진 한 칸에 새길 수 있는 룬의 수입니다. 판 밖에서 마나를 모아 돌파합니다.',
       'am.help.r5': '한 번 만든 마법은 <b>마도서</b>에 남아, 다음 회차에 룬을 고를 때 무엇이 될지 알려 줍니다.',
-      'am.help.r6': '밤이 끝나면 <b>재앙의 사도</b>가 옵니다. 쓰러뜨리면 그 서클의 밤을 넘긴 것입니다.',
+      'am.help.r6': '밤이 끝나면 <b>재앙의 사도</b>가 옵니다. 쓰러뜨리면 그 밤을 넘긴 것이고, 다음 서클로 돌파할 수 있습니다.',
     },
   });
 })();

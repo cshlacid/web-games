@@ -66,6 +66,7 @@
     for (const e of ELEMENTS) n += spell.counts[e];
     return n > 1 ? base + ' ' + ROMAN[n] : base;
   }
+  const nightName = (n) => T('am.night' + n);
   const known = (key) => !!save.grimoire[key] || (mode === 'run' && state.formed.has(key)) || seenThisRun.has(key);
 
   function runesFromKey(key) {
@@ -931,7 +932,7 @@
     const sig = state.circle + '|' + state.level + '|' + state.kills + '|' + time;
     if (sig === hudSig) return;
     hudSig = sig;
-    el.circleChip.textContent = T('am.circleShort', { n: state.circle });
+    el.circleChip.textContent = nightName(state.circle);
     el.levelChip.textContent = T('am.level', { n: state.level });
     el.killsChip.textContent = T('am.kills', { n: state.kills });
     el.timeChip.textContent = time;
@@ -962,12 +963,12 @@
     const b = M.breakCheck(save);
     el.brk.textContent = b.why === 'max' ? T('am.breakMax') : T('am.break', { n: save.circle + 1 }) + ' · ' + T('am.breakCost', { n: b.cost });
     el.brk.disabled = !b.ok;
-    el.breakNote.textContent = b.why === 'clear' ? T('am.breakNeedClear', { n: save.circle })
+    el.breakNote.textContent = b.why === 'clear' ? T('am.breakNeedClear', { night: nightName(save.circle) })
       : b.why === 'mana' ? T('am.breakNeedMana', { n: b.cost - save.mana }) : '';
     if (night > save.circle) night = save.circle;
     let list = '';
     for (let c = 1; c <= save.circle; c++) {
-      list += '<button class="btn small" type="button" data-c="' + c + '" aria-pressed="' + (c === night) + '">' + T('am.circleShort', { n: c }) + '</button>';
+      list += '<button class="btn small" type="button" data-c="' + c + '" aria-pressed="' + (c === night) + '">' + nightName(c) + '</button>';
     }
     el.nightList.innerHTML = list;
     let info = T('am.nightInfo', { m: Math.round(S.nightLength(night) / 60 * 10) / 10, n: night });
@@ -1034,7 +1035,7 @@
     const { gained, found } = M.settle(save, res);
     store();
     const won = res.won;
-    el.resultTitle.textContent = T(won ? 'am.wonTitle' : 'am.lostTitle');
+    el.resultTitle.textContent = T(won ? 'am.wonTitle' : 'am.lostTitle', { night: nightName(res.circle) });
     el.resultNote.textContent = T(won ? 'am.wonNote' : 'am.lostNote');
     el.report.innerHTML = [
       T('am.reportTime', { t: fmt(res.t) }),
