@@ -64,7 +64,12 @@
     const base = T(second ? 'spell.' + spell.primary + '-' + second : 'spell.' + spell.primary);
     let n = 0;
     for (const e of ELEMENTS) n += spell.counts[e];
-    return n > 1 ? base + ' ' + ROMAN[n] : base;
+    const name = n > 1 ? base + ' ' + ROMAN[n] : base;
+    // 수식어가 있으면 이름 앞에 붙인다(연쇄의 대지 균열). 많이 넣은 것부터.
+    const mods = Object.keys(spell.mods || {});
+    if (!mods.length) return name;
+    mods.sort((a, b) => spell.mods[b] - spell.mods[a] || Runes.MODIFIERS.indexOf(a) - Runes.MODIFIERS.indexOf(b));
+    return T('spell.withMods', { mods: mods.map((id) => T('rune.' + id)).join(T('spell.modJoin')), name });
   }
   const nightName = (n) => T('am.night' + n);
   const known = (key) => !!save.grimoire[key] || (mode === 'run' && state.formed.has(key)) || seenThisRun.has(key);
@@ -786,9 +791,10 @@
     if (opt.type === 'erase') return T('desc.erase');
     if (opt.type === 'heal') return T('desc.heal');
     if (Runes.isElement(opt.id)) {
-      return '<b>' + T('desc.primary') + '</b> ' + T('form.' + opt.id) + '<br><b>' + T('desc.added') + '</b> ' + T('trait.' + opt.id);
+      return '<b>' + T('desc.primary') + '</b> ' + T('form.' + opt.id) + '<br><b>' + T('desc.stacked') + '</b> ' + T('stack.' + opt.id) +
+        '<br><b>' + T('desc.added') + '</b> ' + T('trait.' + opt.id);
     }
-    return T('desc.' + opt.id);
+    return T('desc.' + opt.id) + '<br><b>' + T('desc.stacked') + '</b> ' + T('desc.modStack');
   }
 
   function targetsFor(opt) {

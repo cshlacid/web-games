@@ -27,7 +27,10 @@
       'desc.chrono': '쿨타임을 줄이고 유지를 늘린다',
       'desc.erase': '마법진에서 룬 하나를 지운다',
       'desc.heal': '생명력을 40% 되찾는다',
-      'desc.primary': '주원소', 'desc.added': '더하면',
+      'desc.primary': '주원소', 'desc.added': '다른 원소에 더하면', 'desc.stacked': '겹치면',
+      'stack.fire': '탄 수·폭발 피해·폭발 범위', 'stack.water': '창 수·관통·피해',
+      'stack.wind': '칼날 수·유지·피해', 'stack.earth': '지대 넓이·유지·피해',
+      'desc.modStack': '이 효과가 커진다',
 
       'spell.fire': '화염구', 'spell.water': '얼음창', 'spell.wind': '회오리', 'spell.earth': '대지 균열',
       'spell.fire-water': '증기 폭발', 'spell.fire-wind': '화염폭풍', 'spell.fire-earth': '용암탄',
@@ -35,6 +38,7 @@
       'spell.wind-fire': '불꽃 회오리', 'spell.wind-water': '서리 회오리', 'spell.wind-earth': '모래폭풍',
       'spell.earth-fire': '용암 지대', 'spell.earth-water': '늪', 'spell.earth-wind': '흙먼지 지대',
       'spell.none': '시전 안 됨',
+      'spell.withMods': '{mods}의 {name}', 'spell.modJoin': '·',
       'spell.unknown': '???',
       'spell.noElement': '원소가 없어 시전되지 않습니다',
 
