@@ -38,20 +38,32 @@ check('서클에 묶인 옛 저장본은 첫 번째 밤부터', M.parse('{"v":1,
   check('넘기면 다음 밤이 열린다', [won.opened, save.night], [true, 2]);
   M.settle(save, { circle: 1, night: 1, boss: false, won: true, t: 180, kills: 500, formed: [] });
   check('지난 밤을 다시 넘겨도 더 열리지 않는다', save.night, 2);
-  save.mana = 1000;
-  check('보스를 잡지 않으면 돌파할 수 없다', M.breakCheck(save).why, 'boss');
   M.settle(save, { circle: 1, night: 5, boss: true, won: true, t: 250, kills: 900, formed: [] });
   check('보스의 밤을 넘기면 보스를 센다', M.bossCount(save), 1);
   check('보스를 넘긴 밤 다음이 열린다', save.night, 6);
-  save.mana = 10;
-  check('마나가 모자라면 돌파할 수 없다', M.breakCheck(save).why, 'mana');
-  save.mana = 100;
-  check('돌파', M.breakthrough(save), true);
-  check('서클이 오른다', save.circle, 2);
-  check('마나를 낸다', save.mana, 100 - M.BREAK_COST[1]);
   check('최고 기록은 밤마다', save.best[5], 250);
+}
+
+// --- 마력 수련과 돌파 ---
+{
+  const save = M.fresh();
+  save.mana = 0;
+  check('마나가 모자라면 수련할 수 없다', M.trainCheck(save).why, 'mana');
+  check('수련하지 않으면 돌파할 수 없다', M.breakCheck(save).why, 'train');
   save.mana = 1e6;
-  check('2서클 돌파에는 보스 둘', M.breakCheck(save).why, 'boss');
+  check('첫 단계는 마력', M.trainCheck(save).stat, 'dmg');
+  const cost = M.trainCheck(save).cost;
+  check('수련한다', [M.train(save), save.train, save.mana], [true, 1, 1e6 - cost]);
+  for (let i = 1; i < M.TRAIN_STEPS; i++) M.train(save);
+  check('다 채우면 더 수련하지 않는다', M.trainCheck(save).why, 'done');
+  const before = M.training(save);
+  check('열 단계면 다섯 능력이 두 번씩', [+(before.dmg).toFixed(2), before.hp], [0.12, 20]);
+  check('돌파', [M.breakthrough(save), save.circle, save.train], [true, 2, 0]);
+  check('돌파해도 수련한 것은 남는다', M.training(save).hp, 20);
+  check('서클이 오를수록 수련이 비싸다', M.trainCost(5, 0) > M.trainCost(2, 0) * 4, true);
+  const G = require('./gear.js');
+  G.equip(save, G.give(save, { slot: 'robe', rarity: 0, level: 1 }).uid);
+  check('판에 넘기는 힘은 수련과 장비의 합', M.power(save).hp, 40);
 }
 
 {

@@ -12,16 +12,21 @@
 
   const MAX_CIRCLE = 9;
   const VERSION = 2;
-  // 서클 c에서 c+1로 돌파하는 데 드는 마나. 뒤로 갈수록 한 판에 버는 양도 늘어
-  // 대략 두세 판에 한 번 돌파하도록 맞췄다.
-  const BREAK_COST = [0, 60, 180, 400, 750, 1250, 1900, 2800, 4000];
+  // 마력 수련. 서클마다 TRAIN_STEPS 단계를 마나로 수련하고, 다 채우면 다음 서클로 돌파한다.
+  // 단계마다 능력 다섯이 차례로 하나씩 오른다(TRAIN_ORDER). 한 단계의 값은 서클과 상관없이
+  // 같고, 값이 커지는 쪽은 비용이다 — 서클이 오를수록 한 단계가 크게 비싸져, 뒤로 갈수록
+  // 서클 하나가 멀어진다. 1.7제곱일 때는 밤 다섯에 서클 하나씩 따라붙어 밤이 서클을
+  // 앞서는 일이 없었고, 2.2제곱이면 한 서클에 드는 판 수가 두 판에서 열 판 가까이로 는다.
+  const TRAIN_STEPS = 10;
+  const TRAIN_ORDER = ['dmg', 'hp', 'cd', 'speed', 'xp'];
+  const TRAIN_VALUE = { dmg: 0.06, hp: 10, cd: 0.012, speed: 0.015, xp: 0.04 };
+  const trainCost = (circle, step) => Math.round(18 * Math.pow(circle, 2.2) * (1 + 0.12 * step));
 
-  // night는 열려 있는 가장 깊은 밤, bosses는 넘긴 보스의 밤(번호로). 서클 돌파는
-  // 보스를 쓰러뜨린 수로 연다 — 밤이 서클과 따로 이어지게 되면서, 서클의 밤을 넘기는
-  // 조건을 보스를 잡는 조건으로 바꿨다.
+  // night는 열려 있는 가장 깊은 밤, bosses는 넘긴 보스의 밤(번호로), train은 지금 서클에서
+  // 수련한 단계 수.
   function fresh() {
     return {
-      v: VERSION, circle: 1, mana: 0, night: 1, bosses: {}, grimoire: {}, runs: 0, best: {},
+      v: VERSION, circle: 1, train: 0, mana: 0, night: 1, bosses: {}, grimoire: {}, runs: 0, best: {},
       gold: 0, items: [], equipped: {}, nextUid: 1,
     };
   }
@@ -35,6 +40,7 @@
     return {
       v: VERSION,
       circle: clampInt(raw.circle, 1, MAX_CIRCLE, 1),
+      train: clampInt(raw.train, 0, TRAIN_STEPS, 0),
       mana: clampInt(raw.mana, 0, 1e9, 0),
       // 판이 서클에 묶여 있던 저장본(v1)은 밤의 기록이 없어 첫 번째 밤부터 연다.
       night: raw.v === VERSION ? clampInt(raw.night, 1, 1e6, 1) : 1,
@@ -101,21 +107,56 @@
     return { gained, gold, drops, found, opened };
   }
 
-  // 돌파는 보스를 지금 서클 수만큼 쓰러뜨렸고 마나가 모자라지 않을 때.
+  function trainCheck(save) {
+    if (save.train >= TRAIN_STEPS) return { ok: false, why: 'done' };
+    const cost = trainCost(save.circle, save.train);
+    return { ok: save.mana >= cost, why: save.mana >= cost ? null : 'mana', cost, stat: TRAIN_ORDER[totalSteps(save) % TRAIN_ORDER.length] };
+  }
+
+  function train(save) {
+    const check = trainCheck(save);
+    if (!check.ok) return false;
+    save.mana -= check.cost;
+    save.train += 1;
+    return true;
+  }
+
+  // 지금까지 수련한 단계의 합. 서클을 돌파해도 수련한 것은 그대로 남는다.
+  const totalSteps = (save) => (save.circle - 1) * TRAIN_STEPS + save.train;
+
+  // 수련으로 오른 능력. 장비의 것(Gear.loadout)과 같은 꼴이라 둘을 더해 판에 넘긴다.
+  function training(save) {
+    const out = { dmg: 0, hp: 0, cd: 0, xp: 0, regen: 0, speed: 0, el: { fire: 0, water: 0, wind: 0, earth: 0 } };
+    const n = totalSteps(save);
+    for (let k = 0; k < n; k++) {
+      const stat = TRAIN_ORDER[k % TRAIN_ORDER.length];
+      out[stat] += TRAIN_VALUE[stat];
+    }
+    return out;
+  }
+
+  // 판에 넘기는 힘: 수련 + 장비. 쿨타임은 합쳐도 절반까지만 준다.
+  function power(save) {
+    const a = training(save);
+    const b = Gear.loadout(save);
+    const out = { el: {} };
+    for (const k of ['dmg', 'hp', 'cd', 'xp', 'regen', 'speed']) out[k] = a[k] + b[k];
+    for (const e in b.el) out.el[e] = a.el[e] + b.el[e];
+    out.cd = Math.min(0.5, out.cd);
+    return out;
+  }
+
+  // 돌파는 지금 서클의 수련을 다 채웠을 때.
   function breakCheck(save) {
-    const c = save.circle;
-    if (c >= MAX_CIRCLE) return { ok: false, why: 'max' };
-    const bosses = bossCount(save);
-    if (bosses < c) return { ok: false, why: 'boss', cost: BREAK_COST[c], need: c, have: bosses };
-    if (save.mana < BREAK_COST[c]) return { ok: false, why: 'mana', cost: BREAK_COST[c] };
-    return { ok: true, cost: BREAK_COST[c] };
+    if (save.circle >= MAX_CIRCLE) return { ok: false, why: 'max' };
+    if (save.train < TRAIN_STEPS) return { ok: false, why: 'train', need: TRAIN_STEPS, have: save.train };
+    return { ok: true };
   }
 
   function breakthrough(save) {
-    const check = breakCheck(save);
-    if (!check.ok) return false;
-    save.mana -= check.cost;
+    if (!breakCheck(save).ok) return false;
     save.circle += 1;
+    save.train = 0;
     return true;
   }
 
@@ -130,7 +171,10 @@
     return { found, total: keys.length, specialFound, special };
   }
 
-  const api = { MAX_CIRCLE, BREAK_COST, fresh, parse, manaFor, goldFor, settle, breakCheck, breakthrough, grimoireCount, bossCount };
+  const api = {
+    MAX_CIRCLE, TRAIN_STEPS, TRAIN_ORDER, TRAIN_VALUE, trainCost, fresh, parse, manaFor, goldFor, settle,
+    trainCheck, train, training, power, totalSteps, breakCheck, breakthrough, grimoireCount, bossCount,
+  };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else window.ArchmageMeta = api;
 })();
