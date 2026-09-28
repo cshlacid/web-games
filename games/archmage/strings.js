@@ -14,7 +14,7 @@
       'rune.erase': '재각인', 'rune.heal': '회복',
 
       // 원소 룬은 두 줄이다: 주원소일 때의 형태, 더할 때의 성질.
-      'form.fire': '날아가 터지는 탄', 'trait.fire': '피해 증가, 화상',
+      'form.fire': '날아가 터지는 탄', 'trait.fire': '피해·폭발 범위 증가, 화상',
       'form.water': '꿰뚫는 창', 'trait.water': '둔화, 관통 +1',
       'form.wind': '몸 둘레를 도는 칼날', 'trait.wind': '개수 +1, 쿨타임 감소',
       'form.earth': '적 무리에 깔리는 지대', 'trait.earth': '크기·유지 증가, 밀쳐내기',
@@ -38,7 +38,7 @@
       'spell.unknown': '???',
       'spell.noElement': '원소가 없어 시전되지 않습니다',
 
-      'stat.dmg': '피해', 'stat.leech': '흡혈 {n}%', 'stat.cd': '쿨타임', 'stat.dur': '유지', 'stat.count': '개수',
+      'stat.dmg': '피해', 'stat.size': '범위', 'stat.leech': '흡혈 {n}%', 'stat.cd': '쿨타임', 'stat.dur': '유지', 'stat.count': '개수',
       'stat.sec': '{n}초',
 
       'am.circle': '{n}서클',
@@ -69,7 +69,7 @@
       'am.breakMax': '최고 서클입니다',
       'am.breakDone': '[{n}서클에 도달했습니다]',
       'am.pickNight': '들어갈 밤',
-      'am.nightInfo': '{m}분 · 마법진 한 칸에 룬 {n}개',
+      'am.nightInfo': '{m}분 · 마법진마다 룬 구멍 {n}개',
       'am.start': '멸망의 밤으로',
       'am.grimoire': '마도서',
       'am.grimoireCount': '{found} / {total}',

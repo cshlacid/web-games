@@ -77,6 +77,19 @@
     return out;
   }
 
+  // 마법진의 룬 구멍. 서클 수만큼 파 두고 새긴 룬을 끼운다 — 칸이 보이지 않으면
+  // 서클이 무엇을 정하는지, 왜 더 못 넣는지 알아볼 길이 없다.
+  function sockets(runes, cap, mark) {
+    let out = '<span class="sockets">';
+    for (let i = 0; i < cap; i++) {
+      const r = runes[i];
+      if (!r) { out += '<span class="socket"></span>'; continue; }
+      const g = r.grade ? '<span class="grade">+' + r.grade + '</span>' : '';
+      out += '<span class="socket filled' + (mark === i ? ' new' : '') + '" style="--c:' + I.colorOf(r.id) + '">' + I.svg(r.id) + g + '</span>';
+    }
+    return out + '</span>';
+  }
+
   function glyphs(runes, withGrade) {
     return '<span class="glyphs">' + runes.map((r) => {
       const g = withGrade && r.grade ? '<span class="grade">+' + r.grade + '</span>' : '';
@@ -733,16 +746,32 @@
   // --- 룬 고르기 ---
   let pickIndex = -1;
 
-  function statsLine(spell) {
-    if (!spell) return T('spell.noElement');
-    const parts = [
-      T('stat.dmg') + ' ' + Math.round(spell.dmg),
-      T('stat.cd') + ' ' + T('stat.sec', { n: spell.cd.toFixed(1) }),
-    ];
-    if (spell.dur) parts.push(T('stat.dur') + ' ' + T('stat.sec', { n: spell.dur.toFixed(1) }));
-    const count = spell.count + (spell.kind === 'orbit' ? 2 : 3) * spell.omni;
-    if (count > 1) parts.push(T('stat.count') + ' ' + count);
-    if (spell.leech) parts.push(T('stat.leech', { n: Math.round(spell.leech * 100) }));
+  function statsOf(spell) {
+    if (!spell) return null;
+    return {
+      dmg: Math.round(spell.dmg), cd: spell.cd.toFixed(1), dur: spell.dur ? spell.dur.toFixed(1) : null,
+      size: Math.round(spell.size), count: spell.count + (spell.kind === 'orbit' ? 2 : 3) * spell.omni,
+      leech: spell.leech ? Math.round(spell.leech * 100) : null,
+    };
+  }
+
+  // 새기기 전과 뒤. 바뀐 값만 화살표로 잇는다 — 같은 룬을 겹쳤을 때 무엇이 늘었는지가
+  // 이 줄로 보여야 한다.
+  function statsDiff(before, after) {
+    if (!after) return T('spell.noElement');
+    const a = statsOf(after);
+    const b = before && before.kind === after.kind ? statsOf(before) : null;
+    const label = {
+      dmg: (v) => T('stat.dmg') + ' ' + v, cd: (v) => T('stat.cd') + ' ' + T('stat.sec', { n: v }),
+      dur: (v) => T('stat.dur') + ' ' + T('stat.sec', { n: v }), size: (v) => T('stat.size') + ' ' + v,
+      count: (v) => T('stat.count') + ' ' + v, leech: (v) => T('stat.leech', { n: v }),
+    };
+    const parts = [];
+    for (const k of ['dmg', 'cd', 'dur', 'size', 'count', 'leech']) {
+      if (a[k] === null || (k === 'count' && a[k] <= 1 && (!b || b[k] <= 1))) continue;
+      if (b && b[k] !== null && b[k] !== a[k]) parts.push('<b>' + label[k](b[k] + '→' + a[k]) + '</b>');
+      else parts.push(label[k](a[k]));
+    }
     return parts.join(' · ');
   }
 
@@ -806,7 +835,7 @@
           rows.push('<button class="choice" type="button" data-ci="' + ci + '" data-slot="' + slot + '">' +
             '<span class="icon" style="color:' + I.colorOf(r.id) + '">' + I.svg(r.id) + '</span>' +
             '<span><span class="choice-name">' + T('am.slot', { n: ci + 1 }) + ' · ' + T('rune.' + r.id) + '</span>' +
-            '<span class="choice-desc">' + glyphs(pv.runes) + '<span class="arrow">→</span>' + nameFor(pv.spell) + '</span></span></button>');
+            sockets(pv.runes, S.capacity(state)) + '<span class="choice-desc">' + nameFor(pv.spell) + '</span></span></button>');
         });
       }
       el.choices.innerHTML = rows.join('');
@@ -818,17 +847,19 @@
     for (let ci = 0; ci < state.unlocked; ci++) {
       const c = state.circles[ci];
       const pv = S.previewPlace(state, opt.id, ci);
-      const now = c.runes.length ? glyphs(c.runes, true) : '<span class="unknown">' + T('am.empty') + '</span>';
+      const cap = S.capacity(state);
       if (!pv) {
-        rows.push('<button class="choice" type="button" disabled><span class="icon">' + (ci + 1) + '</span>' +
-          '<span><span class="choice-name">' + T('am.slot', { n: ci + 1 }) + '</span>' +
-          '<span class="choice-desc">' + now + ' · ' + T('am.full') + '</span></span></button>');
+        rows.push('<button class="choice target" type="button" disabled><span class="icon">' + (ci + 1) + '</span>' +
+          '<span><span class="choice-name">' + T('am.slot', { n: ci + 1 }) + ' <span class="tag">' + T('am.full') + '</span></span>' +
+          sockets(c.runes, cap) + '</span></button>');
         continue;
       }
-      rows.push('<button class="choice" type="button" data-ci="' + ci + '"><span class="icon">' + (ci + 1) + '</span>' +
+      const mark = pv.mode === 'add' ? pv.runes.length - 1 : pv.runes.findIndex((r) => r.id === opt.id);
+      rows.push('<button class="choice target" type="button" data-ci="' + ci + '"><span class="icon">' + (ci + 1) + '</span>' +
         '<span><span class="choice-name">' + T('am.slot', { n: ci + 1 }) + ' <span class="tag">' + T(pv.mode === 'add' ? 'am.add' : 'am.grade') + '</span></span>' +
-        '<span class="choice-desc">' + now + '<span class="arrow">→</span>' + glyphs(pv.runes, true) + ' ' + nameFor(pv.spell) +
-        '<span class="stats">' + statsLine(pv.spell) + '</span></span></span></button>');
+        sockets(pv.runes, cap, mark) +
+        '<span class="choice-desc">' + nameFor(pv.spell) + '</span>' +
+        '<span class="stats">' + statsDiff(c.spell, pv.spell) + '</span></span></button>');
     }
     el.choices.innerHTML = rows.join('');
   }
@@ -849,11 +880,7 @@
       const i = Number(btn.dataset.i);
       const opt = state.pending.options[i];
       if (opt.type === 'heal') { pickIndex = i; commit(null); return; }
-      // 새길 자리가 하나뿐이면 묻지 않는다. 미리 보기는 카드의 '새 마법' 표시가 맡는다.
-      if (opt.type === 'rune') {
-        const ts = targetsFor(opt);
-        if (ts.length === 1 && state.unlocked === 1) { pickIndex = i; commit(ts[0].ci); return; }
-      }
+      // 자리가 하나뿐이어도 묻는다. 어느 구멍에 끼워지고 무엇이 느는지를 보는 자리다.
       Sound.play('click');
       showTargets(i);
       return;
@@ -873,11 +900,11 @@
     el.slots.innerHTML = state.circles.map((c, ci) => {
       if (ci >= state.unlocked) {
         return '<div class="slot locked"><span class="slot-name">' + T('am.slot', { n: ci + 1 }) + '</span>' +
-          '<span class="slot-sub">' + T('am.locked', { n: S.CIRCLE_UNLOCK[ci] }) + '</span></div>';
+          sockets([], S.capacity(state)) + '<span class="slot-sub">' + T('am.locked', { n: S.CIRCLE_UNLOCK[ci] }) + '</span></div>';
       }
       const name = c.spell ? (known(c.spell.key) || mode === 'run' ? spellName(c.spell) : T('spell.unknown')) : T('am.empty');
       return '<div class="slot" data-ci="' + ci + '"><span class="slot-name">' + name + '</span>' +
-        (c.runes.length ? glyphs(c.runes, true) : '<span class="slot-sub">' + T('am.slot', { n: ci + 1 }) + '</span>') +
+        sockets(c.runes, S.capacity(state)) +
         '<span class="bar"></span></div>';
     }).join('');
   }
@@ -945,7 +972,7 @@
     el.nightList.innerHTML = list;
     let info = T('am.nightInfo', { m: Math.round(S.nightLength(night) / 60 * 10) / 10, n: night });
     if (save.best[night]) info += ' · ' + T('am.best', { t: fmt(save.best[night]) });
-    el.nightInfo.textContent = info;
+    el.nightInfo.innerHTML = sockets([], night) + '<br>' + info;
     const g = M.grimoireCount(save, save.circle);
     el.grimoireCount.textContent = T('am.grimoireCount', g);
     const keys = Runes.allKeys(save.circle).filter((key) => save.grimoire[key]);

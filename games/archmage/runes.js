@@ -28,7 +28,7 @@
   // 형태를 정한 첫 룬을 뺀 원소 룬 하나하나가 더하는 성질. 주원소를 더 넣어도 붙으므로
   // 불만 셋이면 불의 성질이 두 번 붙는다 — 순수 마법이 따로 규칙 없이 강해지는 길이다.
   function applyTrait(s, el) {
-    if (el === 'fire') { s.dmg *= 1.3; s.burn += 5; }
+    if (el === 'fire') { s.dmg *= 1.25; s.size *= 1.1; s.burn += 5; }
     else if (el === 'water') { s.slow = Math.min(0.7, s.slow + 0.25); s.pierce += 1; }
     else if (el === 'wind') { s.count += 1; s.cd *= 0.88; }
     else if (el === 'earth') { s.size *= 1.22; s.dur *= 1.3; s.knock += 40; }
@@ -96,11 +96,18 @@
       s.mods[r.id] = (s.mods[r.id] || 0) + 1;
       applyModifier(s, r.id);
     }
-    // 같은 룬을 다시 얻어 올린 등급. 칸을 쓰지 않는 성장이라 조합과 따로 센다.
+    // 같은 룬을 다시 얻어 올린 등급. 칸을 쓰지 않는 대신 그 룬의 성질이 한 번 더
+    // 붙는다 — 바람이면 개수가, 땅이면 범위가 는다. 피해만 올리면 강해진 것이 화면에
+    // 보이지 않는다.
     let grade = 0;
-    for (const r of runes) grade += r.grade || 0;
+    for (const r of runes) {
+      for (let g = 0; g < (r.grade || 0); g++) {
+        if (isElement(r.id)) applyTrait(s, r.id);
+        else applyModifier(s, r.id);
+      }
+      grade += r.grade || 0;
+    }
     s.grade = grade;
-    s.dmg *= 1 + 0.15 * grade;
     s.cd = Math.max(0.25, s.cd);
     return s;
   }

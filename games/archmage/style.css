@@ -184,6 +184,42 @@ h1 {
 
 .report { list-style: none; margin: 0; padding: 0; font-size: 13px; line-height: 1.7; font-variant-numeric: tabular-nums; }
 
+/* --- 룬 구멍 ---
+   빈 구멍은 판 속으로 파인 듯 안쪽 그늘을, 끼운 룬은 제 색으로 빛나게 둔다. */
+.sockets { display: flex; flex-wrap: wrap; gap: 4px; margin: 3px 0; }
+.socket {
+  position: relative; width: 24px; height: 24px; border-radius: 50%; flex: none;
+  display: grid; place-items: center;
+  border: 1.5px dashed var(--line);
+  background: rgba(20, 16, 40, 0.08);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.25);
+}
+.socket.filled {
+  border: 1.5px solid var(--c);
+  color: var(--c);
+  background: radial-gradient(circle, color-mix(in srgb, var(--c) 28%, transparent), transparent 75%);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--c) 45%, transparent);
+}
+.socket .glyph { width: 15px; height: 15px; }
+.socket .grade {
+  position: absolute; right: -6px; top: -6px;
+  font-size: 9px; font-weight: 800; line-height: 1; padding: 1px 3px; border-radius: 6px;
+  background: var(--gold); color: #fff;
+}
+/* 방금 끼울 자리. 무엇이 어디로 들어가는지 눈이 먼저 찾게 한다. */
+.socket.new { animation: socket-in 0.9s ease-in-out infinite alternate; }
+@keyframes socket-in {
+  from { box-shadow: 0 0 2px var(--c); }
+  to { box-shadow: 0 0 12px var(--c), 0 0 2px var(--c) inset; }
+}
+@media (prefers-reduced-motion: reduce) { .socket.new { animation: none; box-shadow: 0 0 10px var(--c); } }
+.choice.target .sockets { margin: 5px 0 3px; }
+.stats b { color: var(--fg); font-weight: 700; }
+.night-pick .sockets { justify-content: center; margin: 2px 0 4px; }
+.slot .sockets { gap: 3px; }
+.slot .socket { width: 20px; height: 20px; }
+.slot .socket .glyph { width: 12px; height: 12px; }
+
 /* --- 마법진 셋 --- */
 .slots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .slot {
@@ -194,8 +230,6 @@ h1 {
 .slot.locked { opacity: 0.45; }
 .slot-name { font-size: 11.5px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .slot-sub { font-size: 10.5px; color: var(--muted); }
-.slot .glyphs .glyph { width: 14px; height: 14px; }
-.slot .grade { font-size: 9px; font-weight: 800; color: var(--gold); margin-left: -1px; vertical-align: super; }
 /* 쿨타임 막대. 유지 중에는 꽉 차 빛나고, 쿨타임 동안 다시 차오른다. */
 .slot .bar { position: absolute; left: 0; bottom: 0; height: 3px; width: calc(var(--fill, 0) * 100%); background: var(--arcane); opacity: 0.8; }
 .slot.active .bar { box-shadow: 0 0 6px var(--arcane); opacity: 1; }
