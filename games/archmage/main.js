@@ -975,50 +975,76 @@
     el.levelup.hidden = false;
   }
 
+  // 자리 고르기. 마법진 셋을 늘 그대로 보여 주고 **구멍을 눌러** 고른다 — 빈 구멍은
+  // 새기기, 같은 룬이 끼워진 구멍은 강화, 재각인이면 끼워진 구멍은 제거. 목록으로 풀어
+  // 두었을 때는 마법진이 몇 개이고 어디가 비었는지가 한눈에 들어오지 않았다.
+  let picked = null;
+
+  function actionFor(opt, ci, slot) {
+    if (ci >= state.unlocked) return null;
+    const r = state.circles[ci].runes[slot];
+    if (opt.type === 'erase') return r ? { kind: 'erase', target: { ci, slot } } : null;
+    // 빈 구멍은 첫째만 누를 수 있다. 룬 묶음은 순서를 따지지 않아 늘 앞부터 채워진다.
+    if (!r) return slot === state.circles[ci].runes.length && S.placeModes(state, opt.id, ci).includes('add') ? { kind: 'add', target: { ci, mode: 'add' } } : null;
+    if (r.id === opt.id) return { kind: 'grade', target: { ci, mode: 'grade', slot } };
+    return null;
+  }
+
   function showTargets(i) {
-    const opt = state.pending.options[i];
     pickIndex = i;
+    picked = null;
+    const opt = state.pending.options[i];
     el.levelActions.hidden = false;
-    if (opt.type === 'erase') {
-      el.levelTitle.textContent = T('am.pickErase');
-      el.levelNote.textContent = T('desc.erase');
-      const rows = [];
-      for (let ci = 0; ci < state.unlocked; ci++) {
-        state.circles[ci].runes.forEach((r, slot) => {
-          const pv = S.previewErase(state, ci, slot);
-          rows.push('<button class="choice" type="button" data-ci="' + ci + '" data-slot="' + slot + '">' +
-            '<span class="icon" style="color:' + I.colorOf(r.id) + '">' + I.svg(r.id) + '</span>' +
-            '<span><span class="choice-name">' + T('am.slot', { n: ci + 1 }) + ' · ' + T('rune.' + r.id) + '</span>' +
-            sockets(pv.runes, S.capacity(state)) + '<span class="choice-desc">' + nameFor(pv.spell) + '</span></span></button>');
-        });
-      }
-      el.choices.innerHTML = rows.join('');
-      return;
+    el.levelTitle.textContent = T(opt.type === 'erase' ? 'am.pickErase' : 'am.pickCircle');
+    el.levelNote.innerHTML = opt.type === 'erase' ? T('am.tapErase') : T('rune.' + opt.id) + ' · ' + T('am.tapSocket');
+    renderTargets();
+  }
+
+  function socketButton(opt, ci, slot) {
+    const r = state.circles[ci].runes[slot];
+    const act = actionFor(opt, ci, slot);
+    const sel = picked && picked.ci === ci && picked.slot === slot;
+    let cls = 'socket' + (act ? ' can' : '');
+    let color = r ? r.id : null;
+    let inner = '';
+    if (r) {
+      cls += ' filled';
+      const g = r.grade + (sel && act.kind === 'grade' ? 1 : 0);
+      inner = I.svg(r.id) + (g ? '<span class="grade">+' + g + '</span>' : '');
+      if (sel && act.kind === 'erase') cls += ' removing';
+    } else if (sel) {
+      cls += ' filled ghost';
+      color = opt.id;
+      inner = I.svg(opt.id);
     }
-    el.levelTitle.textContent = T('am.pickCircle');
-    el.levelNote.innerHTML = T('rune.' + opt.id);
-    const rows = [];
+    if (sel) cls += ' new';
+    return '<button type="button" class="' + cls + '"' + (color ? ' style="--c:' + I.colorOf(color) + '"' : '') +
+      ' data-ci="' + ci + '" data-slot="' + slot + '"' + (act ? '' : ' disabled') + '>' + inner + '</button>';
+  }
+
+  function renderTargets() {
+    const opt = state.pending.options[pickIndex];
     const cap = S.capacity(state);
-    for (let ci = 0; ci < state.unlocked; ci++) {
+    let html = '';
+    for (let ci = 0; ci < 3; ci++) {
       const c = state.circles[ci];
-      const modes = S.placeModes(state, opt.id, ci);
-      if (!modes.length) {
-        rows.push('<button class="choice target" type="button" disabled><span class="icon">' + (ci + 1) + '</span>' +
-          '<span><span class="choice-name">' + T('am.slot', { n: ci + 1 }) + ' <span class="tag">' + T('am.full') + '</span></span>' +
-          sockets(c.runes, cap) + '</span></button>');
-        continue;
-      }
-      for (const mode of modes) {
-        const pv = S.previewPlace(state, opt.id, ci, mode);
-        const mark = pv.mode === 'add' ? pv.runes.length - 1 : pv.runes.findIndex((r) => r.id === opt.id);
-        rows.push('<button class="choice target" type="button" data-ci="' + ci + '" data-mode="' + mode + '"><span class="icon">' + (ci + 1) + '</span>' +
-          '<span><span class="choice-name">' + T('am.slot', { n: ci + 1 }) + ' <span class="tag">' + T(pv.mode === 'add' ? 'am.add' : 'am.grade') + '</span></span>' +
-          sockets(pv.runes, cap, mark) +
-          '<span class="choice-desc">' + nameFor(pv.spell) + '</span>' +
-          '<span class="stats">' + statsDiff(c.spell, pv.spell) + '</span></span></button>');
-      }
+      const locked = ci >= state.unlocked;
+      let row = '';
+      for (let slot = 0; slot < cap; slot++) row += socketButton(opt, ci, slot);
+      const name = locked ? T('am.locked', { n: S.CIRCLE_UNLOCK[ci] }) : c.spell ? spellName(c.spell) : T('am.empty');
+      html += '<div class="circle-panel' + (locked ? ' locked' : '') + '"><div class="cp-head"><b>' + T('am.slot', { n: ci + 1 }) +
+        '</b><span>' + name + '</span></div><div class="sockets big">' + row + '</div></div>';
     }
-    el.choices.innerHTML = rows.join('');
+    if (picked) {
+      const act = actionFor(opt, picked.ci, picked.slot);
+      const c = state.circles[picked.ci];
+      const pv = act.kind === 'erase' ? S.previewErase(state, picked.ci, picked.slot)
+        : S.previewPlace(state, opt.id, picked.ci, act.target.mode, picked.slot);
+      html += '<div class="preview"><div><span class="tag">' + T('am.' + act.kind) + '</span> ' + nameFor(pv.spell) +
+        '<span class="stats">' + statsDiff(c.spell, pv.spell) + '</span></div>' +
+        '<button class="btn" type="button" data-confirm="1">' + T('am.confirm') + '</button></div>';
+    }
+    el.choices.innerHTML = html;
   }
 
   function commit(target) {
@@ -1043,8 +1069,13 @@
       return;
     }
     const opt = state.pending.options[pickIndex];
-    if (opt.type === 'erase') commit({ ci: Number(btn.dataset.ci), slot: Number(btn.dataset.slot) });
-    else commit({ ci: Number(btn.dataset.ci), mode: btn.dataset.mode });
+    if (btn.dataset.confirm) { commit(actionFor(opt, picked.ci, picked.slot).target); return; }
+    const ci = Number(btn.dataset.ci), slot = Number(btn.dataset.slot);
+    // 고른 구멍을 한 번 더 누르면 바로 새긴다.
+    if (picked && picked.ci === ci && picked.slot === slot) { commit(actionFor(opt, ci, slot).target); return; }
+    picked = { ci, slot };
+    Sound.play('click');
+    renderTargets();
   });
   el.levelBack.addEventListener('click', () => { Sound.play('click'); showLevelUp(); });
 

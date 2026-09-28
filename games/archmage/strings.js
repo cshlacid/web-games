@@ -87,7 +87,10 @@
 
       'am.levelTitle': '[전생의 기억이 떠오릅니다]',
       'am.levelNote': '룬 하나를 고르십시오',
-      'am.pickCircle': '[어느 마법진에 새기시겠습니까?]',
+      'am.pickCircle': '[어느 구멍에 새기시겠습니까?]',
+      'am.tapSocket': '빈 구멍은 새기기, 같은 룬이 끼워진 구멍은 강화',
+      'am.tapErase': '지울 룬이 끼워진 구멍을 누르십시오',
+      'am.erase': '제거', 'am.confirm': '확인',
       'am.pickErase': '[지울 룬을 고르십시오]',
       'am.add': '새기기', 'am.grade': '강화',
       'am.full': '빈 칸 없음',

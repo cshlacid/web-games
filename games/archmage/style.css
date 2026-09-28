@@ -233,3 +233,29 @@ h1 {
 /* 쿨타임 막대. 유지 중에는 꽉 차 빛나고, 쿨타임 동안 다시 차오른다. */
 .slot .bar { position: absolute; left: 0; bottom: 0; height: 3px; width: calc(var(--fill, 0) * 100%); background: var(--arcane); opacity: 0.8; }
 .slot.active .bar { box-shadow: 0 0 6px var(--arcane); opacity: 1; }
+
+/* --- 구멍을 눌러 고르기 ---
+   마법진 셋을 늘 그대로 두고, 누를 수 있는 구멍만 보라 테두리로 드러낸다. */
+.circle-panel {
+  border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px;
+  display: flex; flex-direction: column; gap: 6px; text-align: left;
+}
+.circle-panel.locked { opacity: 0.45; }
+.cp-head { display: flex; align-items: baseline; gap: 8px; font-size: 13px; }
+.cp-head span { color: var(--muted); font-size: 12px; }
+.sockets.big { gap: 7px; margin: 0; }
+.sockets.big .socket { width: 36px; height: 36px; }
+.sockets.big .socket .glyph { width: 20px; height: 20px; }
+button.socket { padding: 0; font: inherit; color: inherit; cursor: pointer; appearance: none; -webkit-appearance: none; }
+button.socket:disabled { cursor: default; opacity: 0.4; }
+button.socket.filled:disabled { opacity: 0.55; }
+.socket.can { border-color: var(--arcane); border-style: solid; }
+.socket.filled.can { border-color: var(--c); }
+.socket.ghost .glyph { opacity: 0.75; }
+.socket.removing { opacity: 0.3; box-shadow: none; }
+.preview {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  border-top: 1px solid var(--line); padding-top: 8px; text-align: left; font-size: 13px;
+}
+
+.preview .btn { flex: none; white-space: nowrap; }

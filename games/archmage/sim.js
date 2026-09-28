@@ -136,12 +136,14 @@
     state.pending = { options, level: state.level };
   }
 
-  function previewPlace(state, id, ci, want) {
+  // slot은 강화할 구멍이다. 같은 룬이 여럿 끼워져 있으면 사람이 누른 그 구멍을 올린다.
+  function previewPlace(state, id, ci, want, slot) {
     const modes = placeModes(state, id, ci);
     const mode = want || modes[0];
     if (!mode || modes.indexOf(mode) < 0) return null;
     const runes = state.circles[ci].runes.map((r) => ({ id: r.id, grade: r.grade }));
     if (mode === 'add') runes.push({ id, grade: 0 });
+    else if (slot !== undefined && runes[slot] && runes[slot].id === id) runes[slot].grade += 1;
     else runes.find((r) => r.id === id).grade += 1;
     return { mode, runes, spell: compose(runes) };
   }
@@ -159,7 +161,7 @@
     if (!opt) return false;
     if (opt.type === 'rune') {
       const ci = typeof target === 'object' && target ? target.ci : target;
-      const p = previewPlace(state, opt.id, ci, target && target.mode);
+      const p = previewPlace(state, opt.id, ci, target && target.mode, target && target.slot);
       if (!p) return false;
       setRunes(state, ci, p.runes);
     } else if (opt.type === 'erase') {
