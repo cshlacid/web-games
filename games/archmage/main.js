@@ -132,7 +132,7 @@
   // --- 그림 ---
   // 캐릭터·적·소품은 art.js가 긋고, 여기서는 판을 열 때 한 번 찍어 두고 찍어 쓴다.
   const A = window.ArchmageArt;
-  const FRAMES = 4;
+  const FRAMES = A.FRAMES;
   const sprites = {};
   function offscreen(w, h, draw) {
     const scale = dpr * k * 1.5;
@@ -658,14 +658,14 @@
     ctx.drawImage(m, cx - mw / 2, fy - A.MAGE.foot * 2.6 + breathe, mw, mh);
     ctx.globalCompositeOperation = 'lighter';
     ctx.globalAlpha = 0.6 + 0.3 * Math.sin(clock * 3);
-    A.glow(ctx, cx - mw / 2 + 30 * 2.6, fy - (A.MAGE.foot - 8) * 2.6 + breathe, 34, '#b99bff', 0.8);
+    A.glow(ctx, cx - mw / 2 + 32.8 * 2.6, fy - (A.MAGE.foot - 7.3) * 2.6 + breathe, 34, '#b99bff', 0.8);
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
     drawAmbient();
   }
 
   // 걸음 빠르기. 늑대는 달리고 골렘은 쿵쿵 걷는다.
-  const FOE_ANIM = { slime: 6, goblin: 9, wolf: 13, wraith: 5, golem: 5, boss: 4 };
+  const FOE_ANIM = { slime: 8, goblin: 13, wolf: 19, wraith: 7, golem: 7, boss: 6 };
 
   function drawFoe(f, p) {
     const def = A.FOES[f.type];
@@ -732,7 +732,7 @@
       ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = 'source-over';
     }
-    const fr = p.moving ? ((clock * 10) | 0) % FRAMES : 0;
+    const fr = p.moving ? ((clock * 14) | 0) % FRAMES : 0;
     const blink = p.inv > 0 && ((clock * 20) | 0) % 2;
     const sp = sprites.mage[fr];
     const breathe = p.moving ? 0 : Math.sin(clock * 2.2) * 0.6;
@@ -746,7 +746,7 @@
     // 지팡이 끝의 수정이 빛난다.
     ctx.globalCompositeOperation = 'lighter';
     ctx.globalAlpha = 0.55 + 0.25 * Math.sin(clock * 4);
-    glowAt('arcane', p.x + p.face * 12, top + 8, 20);
+    glowAt('arcane', p.x + p.face * 12.8, top + 7.3, 20);
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
   }
