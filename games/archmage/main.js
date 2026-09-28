@@ -936,7 +936,9 @@
     if (opt.type === 'erase') return T('desc.erase');
     if (opt.type === 'heal') return T('desc.heal');
     if (Runes.isElement(opt.id)) {
-      return '<b>' + T('desc.primary') + '</b> ' + T('form.' + opt.id) + '<br><b>' + T('desc.tier') + '</b> ' + T('tier.' + opt.id) +
+      // 여럿 새기면 무엇이 되는지는 알려 주지 않는다. 조합은 찾아내는 것이고, 찾은 것은
+      // 마도서가 자리를 고를 때 보여 준다.
+      return '<b>' + T('desc.primary') + '</b> ' + T('form.' + opt.id) +
         '<br><b>' + T('desc.stacked') + '</b> ' + T('stack.' + opt.id) +
         '<br><b>' + T('desc.added') + '</b> ' + T('trait.' + opt.id);
     }
