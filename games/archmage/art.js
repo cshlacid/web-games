@@ -1,7 +1,7 @@
 'use strict';
 
-// 캐릭터·적·소품·바닥 그림. 모두 캔버스에 코드로 긋고, main.js가 판을 열 때 한 번
-// 찍어 두고(offscreen) 프레임마다 찍어 쓴다. 매 프레임 도형으로 그으면 적 수백 마리를
+// 캐릭터·적·소품·바닥 그림. 주인공만 그림 파일(mage.png)이고 나머지는 캔버스에 코드로
+// 긋는다. main.js가 판을 열 때 한 번 찍어 두고(offscreen) 프레임마다 찍어 쓴다. 매 프레임 도형으로 그으면 적 수백 마리를
 // 폰이 버티지 못한다.
 //
 // 그림체는 치비 비율(큰 머리·큰 눈) + 실루엣 외곽선 + 빛깔이 옮겨 가는 세 톤 음영이다.
@@ -173,120 +173,37 @@
   const cycle = (f) => (f / FRAMES) * TAU;
 
   // --- 대마법사 ---
-  // 흑발에 보랏빛으로 빛나는 눈의 젊은 회귀자. 정면에 가까운 얼굴, 끝이 뒤로 꺾인 고깔모자,
-  // 금테 남빛 로브와 안이 진홍인 망토. 오른손에 수정 지팡이, 왼손에는 보랏빛 마력을 모은다.
-  // 처음 그린 것은 은발 단발이 할머니처럼 보였고, 반쯤 돌린 얼굴에서 두 눈 크기가 달라
-  // 어색했으며, 모자 챙이 쟁반처럼 얼굴을 덮었다.
+  // 흑발에 보랏빛 눈의 젊은 회귀자. 그림은 Canva에서 그린 시안 한 장(mage.png, 배경을 지운
+  // 180×200)이고, 걷기 여섯 프레임은 그 한 장을 조각내 코드로 움직여 얻는다. 그림 생성은 같은
+  // 캐릭터를 여섯 번 똑같이 그려 주지 않아 프레임마다 얼굴과 옷이 달라지기 때문이다.
+  // 두 발이 번갈아 들리며 앞뒤로 엇갈리고, 보폭이 벌어질 때 몸이 내려앉고, 마도서는 따로 뜬다.
+  // 몸을 올리지 않고 내리는 것은 몸이 발을 덮는 순서라서다 — 올리면 허리와 발 사이가 벌어진다.
+  // 이 그림은 지팡이를 뒷손(화면 왼쪽)에, 마력을 앞손에 든다.
+  const MAGE_IMG = typeof Image === 'undefined' ? null : new Image();
+  if (MAGE_IMG) MAGE_IMG.src = 'mage.png';
+  const MS = 0.28; // 그림 한 픽셀이 판에서 차지하는 크기
+  // 조각은 그림 픽셀로 [x, y, 너비, 높이]. 발은 망토 자락과 앞자락 금테 아래만 떼어야 들렸을
+  // 때 옷이 함께 뜯겨 나가지 않는다.
+  const BOOK = [136, 46, 44, 60];
+  const LEG_B = [46, 174, 40, 26];
+  const LEG_F = [86, 174, 30, 26];
   function mage(g, f) {
-    const t = cycle(f), w = Math.sin(t), bob = -Math.abs(Math.sin(t)) * 1.2;
-    shadow(g, 20, 49, 12, 3.2);
-    // 떠 다니는 마도서(몸 뒤)
-    const by = 22 + Math.sin(t + 1) * 1.4;
-    const book = (g) => { g.moveTo(3.5, by - 3); g.lineTo(8.5, by - 4.2); g.lineTo(9.3, by + 2.2); g.lineTo(4.3, by + 3.6); g.closePath(); };
-    glow(g, 6.4, by, 7, '#b99bff', 0.3);
-    outline(g, [book], 1.8);
-    part(g, book, '#6a2a8c', { shade: 0.7, hi: 0.5, detail: (g) => { g.fillStyle = '#e6c067'; g.fillRect(7.9, by - 4.6, 1.1, 9); g.fillStyle = '#ffe9a8'; g.beginPath(); g.arc(6.2, by, 0.9, 0, TAU); g.fill(); } });
-
-    g.save(); g.translate(0, bob);
-    const lift = (s) => Math.max(0, s) * 1.6;
-    const bootB = (g) => { g.roundRect(14 - w * 1.6, 43 - lift(-w), 5.6, 5, 2); };
-    const bootF = (g) => { g.moveTo(20.5 + w * 1.6, 43 - lift(w)); g.lineTo(25 + w * 1.6, 43 - lift(w)); g.quadraticCurveTo(27.3 + w * 1.6, 45.5 - lift(w), 26.8 + w * 1.6, 48 - lift(w)); g.lineTo(20.5 + w * 1.6, 48 - lift(w)); g.closePath(); };
-    const sw = w * 1.5;
-    const cape = (g) => { g.moveTo(14, 29); g.quadraticCurveTo(8.5 - sw, 36, 7 - sw, 45.5); g.quadraticCurveTo(10.5, 44.2, 12.5, 46.5); g.lineTo(20, 31); g.closePath(); };
-    const robe = (g) => { g.moveTo(14.5, 29); g.quadraticCurveTo(12, 37, 11.5, 45.5); g.quadraticCurveTo(20, 47.8, 28.8, 45.2); g.quadraticCurveTo(28, 37, 25.5, 29); g.quadraticCurveTo(20, 27.4, 14.5, 29); g.closePath(); };
-    const armL = (g) => { g.moveTo(15, 30); g.quadraticCurveTo(11, 31.5, 9.8, 36.5); g.lineTo(13.2, 38); g.quadraticCurveTo(14.5, 34.5, 16.5, 33); g.closePath(); };
-    const armR = (g) => { g.moveTo(24.5, 30); g.quadraticCurveTo(29, 31, 30.8, 35.8); g.lineTo(27.4, 37.6); g.quadraticCurveTo(25.5, 35, 23.5, 33.5); g.closePath(); };
-    const handL = (g) => { g.ellipse(11.4, 38.1, 2.1, 2, 0, 0, TAU); };
-    const handR = (g) => { g.ellipse(31.3, 36.6, 2.2, 2.1, 0, 0, TAU); };
-    const hairBack = (g) => { g.moveTo(11.2, 18); g.quadraticCurveTo(10.5, 24, 12, 27.5); g.lineTo(14, 25.8); g.lineTo(14.5, 28.5); g.lineTo(26, 28.5); g.lineTo(26.5, 25.8); g.lineTo(28.3, 27.5); g.quadraticCurveTo(29.8, 23.5, 28.8, 18); g.closePath(); };
-    const face = (g) => { g.moveTo(12.4, 19.5); g.quadraticCurveTo(12.6, 25.8, 16.4, 28.1); g.quadraticCurveTo(20.2, 30, 24, 28.1); g.quadraticCurveTo(27.8, 25.8, 27.8, 19.5); g.quadraticCurveTo(20, 12.8, 12.4, 19.5); g.closePath(); };
-    const tip = -w * 1;
-    const cone = (g) => { g.moveTo(13.8, 13.8); g.quadraticCurveTo(16, 8, 19.5, 5); g.quadraticCurveTo(14 + tip, 2.2, 8.5 + tip, 4.2); g.quadraticCurveTo(14, -0.6, 22, 1.8); g.quadraticCurveTo(25.5, 6, 26.6, 13.4); g.closePath(); };
-    const brim = (g) => { g.ellipse(20.2, 14.3, 11.6, 2.9, -0.05, 0, TAU); };
-    const sx = 31.5 + w * 0.4;
-    const staff = (g) => { g.moveTo(sx - 1.3, 48); g.lineTo(sx - 0.3, 12.5); g.lineTo(sx + 1.1, 12.5); g.lineTo(sx + 0.2, 48); g.closePath(); };
-    const frame = (g) => { g.moveTo(sx - 3.8, 12); g.quadraticCurveTo(sx - 5.3, 4.8, sx + 0.3, 1.8); g.quadraticCurveTo(sx - 2.4, 5.8, sx - 1.8, 11); g.lineTo(sx + 2.3, 11); g.quadraticCurveTo(sx + 4.7, 8.6, sx + 4.3, 5.3); g.quadraticCurveTo(sx + 6.2, 8.6, sx + 3.3, 13); g.closePath(); };
-
-    outline(g, [cape, bootB, bootF, armL, robe, hairBack, face, cone, brim, staff, frame, armR, handL, handR], 2.3);
-    part(g, cape, '#9b2346', { hi: 0.6 });
-    part(g, bootB, '#3f2a2a', { hi: 0.4 });
-    part(g, bootF, '#5e3b2c', { hi: 0.5, detail: (g) => { g.fillStyle = '#e6c067'; g.fillRect(20.5 + w * 1.6, 44.3 - lift(w), 5, 0.9); } });
-    part(g, armL, '#3d3199', { hi: 0.5 });
-    part(g, robe, '#4636b0', {
-      detail: (g, c) => {
-        // 앞자락과 금테
-        g.fillStyle = c.lo; g.beginPath(); g.moveTo(20, 34); g.lineTo(21.8, 47); g.lineTo(18.4, 47); g.closePath(); g.fill();
-        g.fillStyle = '#e6c067';
-        g.fillRect(19.3, 30, 1.3, 16);
-        g.beginPath(); g.moveTo(10.5, 43.3); g.quadraticCurveTo(20, 45.8, 30, 43); g.lineTo(30, 45.3); g.quadraticCurveTo(20, 48.2, 10.5, 45.7); g.closePath(); g.fill();
-        // 허리띠와 버클
-        g.fillStyle = '#221947'; g.fillRect(10, 35, 21, 2.2);
-        g.fillStyle = '#ffe39a'; g.beginPath(); g.arc(20, 36.1, 1.7, 0, TAU); g.fill();
-        g.fillStyle = '#b99bff'; g.beginPath(); g.arc(20, 36.1, 0.9, 0, TAU); g.fill();
-        // 옷 주름
-        g.strokeStyle = c.lo; g.lineWidth = 0.7;
-        g.beginPath(); g.moveTo(15.5, 38.5); g.quadraticCurveTo(14.6, 42, 15, 45); g.moveTo(25, 38.5); g.quadraticCurveTo(25.6, 42, 25.2, 45); g.stroke();
-      },
-    });
-    // 높은 옷깃
-    const collar = (g) => { g.moveTo(15, 28.4); g.quadraticCurveTo(20, 31.6, 25, 28.4); g.lineTo(24.4, 30.8); g.quadraticCurveTo(20, 33.2, 15.6, 30.8); g.closePath(); };
-    part(g, collar, '#e6c067', { shade: 0.6, hi: 0.4 });
-    part(g, hairBack, '#262a48', { shade: 1.2, hi: 0.5 });
-    part(g, face, '#fbdcc8', {
-      shade: 0.9, hi: 0.6,
-      detail: (g) => {
-        g.fillStyle = 'rgba(60,30,110,0.28)'; g.beginPath(); g.ellipse(20, 16.8, 9.5, 3.2, 0, 0, TAU); g.fill();
-        g.fillStyle = 'rgba(255,120,140,0.32)'; g.beginPath(); g.ellipse(15.6, 25.4, 1.7, 0.9, 0, 0, TAU); g.ellipse(25.2, 25.4, 1.7, 0.9, 0, 0, TAU); g.fill();
-      },
-    });
-    bigEye(g, 16.9, 22.2, 1.95, 2.65, '#9b6bff', { look: 0.6 });
-    bigEye(g, 23.4, 22.2, 1.95, 2.65, '#9b6bff', { look: 0.6 });
-    // 눈썹과 입: 담담하게 굳은 입매
-    g.strokeStyle = '#262a48'; g.lineWidth = 0.8; g.lineCap = 'round';
-    g.beginPath(); g.moveTo(15, 18.6); g.lineTo(18.4, 18.9); g.moveTo(21.9, 18.9); g.lineTo(25.3, 18.5); g.stroke();
-    g.strokeStyle = '#8a4a52'; g.lineWidth = 0.7;
-    g.beginPath(); g.moveTo(19.3, 26.3); g.quadraticCurveTo(20.3, 26.8, 21.3, 26.2); g.stroke();
-    // 앞머리: 오른쪽으로 쓸린 흑발 다발과 양옆 옆머리
-    const bangs = (g) => { g.moveTo(11.5, 16.5); g.quadraticCurveTo(20, 12.5, 28.8, 16.5); g.lineTo(28.8, 21); g.lineTo(27, 18.6); g.lineTo(25.6, 21.2); g.lineTo(23.9, 18.2); g.lineTo(21.9, 20.4); g.lineTo(20.6, 17.6); g.lineTo(18.4, 20.8); g.lineTo(17.3, 17.8); g.lineTo(15, 21); g.lineTo(14.2, 18.4); g.lineTo(12, 22); g.closePath(); };
-    const lockL = (g) => { g.moveTo(12.3, 18); g.quadraticCurveTo(10.8, 22.5, 12.6, 27.2); g.lineTo(13.8, 24.2); g.quadraticCurveTo(13.4, 21, 14.2, 18.5); g.closePath(); };
-    const lockR = (g) => { g.moveTo(27.7, 18); g.quadraticCurveTo(29.2, 22.5, 27.4, 27.2); g.lineTo(26.2, 24.2); g.quadraticCurveTo(26.6, 21, 25.8, 18.5); g.closePath(); };
-    for (const hp of [bangs, lockL, lockR]) part(g, hp, '#2e3358', {
-      shade: 0.9, hi: 0.7,
-      detail: (g) => { g.strokeStyle = 'rgba(170,150,255,0.55)'; g.lineWidth = 0.6; g.beginPath(); g.moveTo(16, 15.4); g.quadraticCurveTo(20, 14, 24.5, 15.4); g.stroke(); },
-    });
-    // 모자
-    part(g, brim, '#2e2a86', { shade: 1, hi: 0.6, detail: (g, c) => { g.fillStyle = c.deep; g.beginPath(); g.ellipse(20.6, 15.4, 10.4, 1.5, -0.05, 0, TAU); g.fill(); } });
-    part(g, cone, '#2e2a86', {
-      detail: (g, c) => {
-        g.fillStyle = c.deep; g.beginPath(); g.moveTo(22.5, 3.5); g.quadraticCurveTo(25.2, 8, 26.2, 13.5); g.lineTo(23.4, 13.5); g.quadraticCurveTo(23.4, 8, 21.5, 4); g.fill();
-        g.fillStyle = '#e6c067'; g.beginPath(); g.moveTo(14.1, 11.2); g.quadraticCurveTo(20, 10, 26.2, 11); g.lineTo(26.6, 13.6); g.quadraticCurveTo(20, 12.5, 13.8, 13.9); g.closePath(); g.fill();
-        g.fillStyle = 'rgba(230,192,103,0.85)';
-        for (const [x, y] of [[17.5, 7.5], [21.2, 5], [16, 10]]) { g.beginPath(); g.arc(x, y, 0.5, 0, TAU); g.fill(); }
-      },
-    });
-    glow(g, 22.8, 12.4, 3.6, '#c4a4ff', 0.6);
-    g.fillStyle = INK; g.beginPath(); g.moveTo(22.8, 10.4); g.lineTo(24.5, 12.4); g.lineTo(22.8, 14.4); g.lineTo(21.1, 12.4); g.closePath(); g.fill();
-    g.fillStyle = '#d6c2ff'; g.beginPath(); g.moveTo(22.8, 11.1); g.lineTo(23.9, 12.4); g.lineTo(22.8, 13.7); g.lineTo(21.7, 12.4); g.closePath(); g.fill();
-    // 지팡이
-    part(g, staff, '#6b4526', { shade: 0.7, hi: 0.4, detail: (g) => { g.fillStyle = '#e6c067'; g.fillRect(sx - 2, 15.5, 4, 1.1); g.fillRect(sx - 2, 27, 4, 1); } });
-    part(g, frame, '#e0b451', { shade: 0.6, hi: 0.4 });
-    glow(g, sx + 0.3, 6.8, 9, '#b99bff', 0.75);
-    g.fillStyle = INK; g.beginPath(); g.arc(sx + 0.3, 6.8, 3.2, 0, TAU); g.fill();
-    const orb = g.createRadialGradient(sx - 0.6, 5.8, 0.3, sx + 0.3, 6.8, 2.7);
-    orb.addColorStop(0, '#ffffff'); orb.addColorStop(0.45, '#d9c8ff'); orb.addColorStop(1, '#7a52e8');
-    g.fillStyle = orb; g.beginPath(); g.arc(sx + 0.3, 6.8, 2.6, 0, TAU); g.fill();
-    part(g, armR, '#4636b0', { detail: (g) => { g.fillStyle = '#e6c067'; g.beginPath(); g.moveTo(30.9, 35.6); g.lineTo(27.3, 37.5); g.lineTo(26.9, 36.5); g.lineTo(30.4, 34.6); g.closePath(); g.fill(); } });
-    part(g, handR, '#fbdcc8', { shade: 0.6, hi: 0.3 });
-    part(g, handL, '#fbdcc8', { shade: 0.6, hi: 0.3 });
-    // 왼손에 모은 마력: 흔들리는 보랏빛 불꽃
-    const fl = Math.sin(t * 2) * 0.6;
-    glow(g, 11, 37.5, 7.5, '#a47bff', 0.75);
-    const flame = (g) => { g.moveTo(11 + fl, 31.8); g.quadraticCurveTo(14.4, 35.5, 13.3, 38.8); g.quadraticCurveTo(12.2, 41, 11, 41); g.quadraticCurveTo(8.6, 41, 8.4, 38.4); g.quadraticCurveTo(8.4, 35.8, 11 + fl, 31.8); g.closePath(); };
-    g.beginPath(); flame(g);
-    const fg = g.createLinearGradient(0, 32, 0, 41); fg.addColorStop(0, 'rgba(160,110,255,0.2)'); fg.addColorStop(0.5, '#a47bff'); fg.addColorStop(1, '#e9dcff');
-    g.fillStyle = fg; g.fill();
-    g.fillStyle = '#fff'; g.beginPath(); g.ellipse(11, 38.8, 1.2, 1.7, 0, 0, TAU); g.fill();
+    const t = cycle(f), w = Math.sin(t);
+    shadow(g, 23, 55, 13, 3.4);
+    if (!MAGE_IMG || !MAGE_IMG.complete || !MAGE_IMG.naturalWidth) return;
+    const piece = (r, dx, dy) => g.drawImage(MAGE_IMG, r[0], r[1], r[2], r[3], r[0] * MS + dx, r[1] * MS + dy, r[2] * MS, r[3] * MS);
+    const lift = (s) => -Math.max(0, s) * 1.5;
+    piece(LEG_B, -w * 1.2, lift(-w));
+    piece(LEG_F, w * 1.2, lift(w));
+    const dip = Math.abs(w) * 0.9;
+    g.save();
+    g.beginPath();
+    g.rect(0, 0, MAGE_IMG.width * MS, MAGE_IMG.height * MS);
+    for (const r of [BOOK, LEG_B, LEG_F]) g.rect(r[0] * MS, r[1] * MS, r[2] * MS, r[3] * MS);
+    g.clip('evenodd');
+    g.drawImage(MAGE_IMG, 0, dip, MAGE_IMG.width * MS, MAGE_IMG.height * MS);
     g.restore();
+    piece(BOOK, 0, dip * 0.5 + Math.sin(t + 1) * 1.4);
   }
 
   // --- 슬라임 ---
@@ -643,7 +560,8 @@
     golem: { draw: golem, box: [48, 46], foot: 43 },
     boss: { draw: boss, box: [92, 92], foot: 88 },
   };
-  const MAGE = { draw: mage, box: [40, 52], foot: 49 };
+  // crystal·flame은 지팡이 수정과 손의 마력이 있는 자리다. 화면이 그 자리에 빛을 얹는다.
+  const MAGE = { draw: mage, box: [51, 56], foot: 55, img: MAGE_IMG, crystal: [4.5, 12.6], flame: [34.2, 31.4] };
 
 
   // --- 소품 ---
