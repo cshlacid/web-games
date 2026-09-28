@@ -337,3 +337,12 @@ button.socket.filled:disabled { opacity: 0.55; }
 }
 .item-card p { margin: 0; font-size: 14px; }
 .item-head { display: flex; align-items: center; gap: 12px; }
+
+/* 수련 단계. 다 찬 칸은 보라로 채우고, 다음 칸만 테두리를 밝힌다. */
+.train-dots { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; width: 100%; }
+.train-dot {
+  aspect-ratio: 1; display: grid; place-items: center; border-radius: 50%;
+  border: 1.5px dashed var(--line); font-size: 11px; font-weight: 800; color: var(--muted);
+}
+.train-dot.done { border: 0; background: var(--arcane); color: #fff; }
+.train-dot.next { border: 2px solid var(--arcane); color: var(--arcane); }

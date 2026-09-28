@@ -62,9 +62,12 @@
   // 오는 보스를 쓰러뜨려야 넘긴다.
   const BOSS_EVERY = 5;
   const isBossNight = (night) => night % BOSS_EVERY === 0;
-  // 밤의 깊이. 적의 체력·수·피해가 이것으로 는다. 다섯 밤이 한 서클쯤의 값이다 — 보스를
-  // 하나 잡을 때마다 서클 하나를 돌파할 수 있으므로 그 걸음에 맞췄다.
+  // 밤의 깊이. 적의 체력·수·피해가 이것으로 는다. 다섯 밤이 한 서클쯤의 값이다.
   const depthOf = (night) => (night - 1) / BOSS_EVERY;
+  // 깊이 하나마다 적과 보스의 체력이 곱으로 는다. 수련과 장비가 곱으로 쌓이는데 적을
+  // 깊이에 비례해서만 키웠더니, 가장 깊은 밤을 계속 두드리는 봇이 마흔 밤을 한 번도 지지
+  // 않았다. 이 값에서 그 봇이 네 판에 한 번꼴로 진다.
+  const DEPTH_GROWTH = 1.5;
   // 레벨이 오를 때마다 다음까지가 빠르게 멀어진다. 처음 곡선(3 + 1.6L + 0.05L²)은
   // 1서클 한 판에 서른 번 넘게 올라 고르는 화면이 너무 자주 끊었다.
   const xpNext = (level) => Math.floor(5 + level * 2 + level * level * 0.2);
@@ -260,7 +263,7 @@
     // 깊이의 몫은 그 밤이 깊을수록 커진다. 처음부터 다 걸면 구멍이 비어 있는 초반에
     // 깊은 밤일수록 레벨 하나 올리기도 버거워진다.
     const frac = Math.min(1, state.t / state.duration);
-    return (1 + state.depth * (0.3 + 0.6 * frac)) * (1 + 1.8 * frac);
+    return (1 + state.depth * (0.3 + 0.6 * frac)) * (1 + 1.8 * frac) * Math.pow(DEPTH_GROWTH, state.depth);
   }
 
   function addFoe(state, type, angle, dist) {
@@ -270,7 +273,7 @@
     const foe = {
       id: state.nextId++, type,
       x: p.x + Math.cos(angle) * dist, y: p.y + Math.sin(angle) * dist,
-      hp, maxHp: hp, r: def.r, speed: def.speed, dmg: def.dmg * (1 + 0.2 * state.depth),
+      hp, maxHp: hp, r: def.r, speed: def.speed, dmg: def.dmg * (1 + 0.5 * state.depth),
       slowT: 0, slow: 0, burnT: 0, burn: 0, kx: 0, ky: 0, flash: 0, dead: false,
       phase: state.world() * Math.PI * 2,
     };
@@ -328,7 +331,7 @@
     if (state.bossNight && !state.bossSpawned && state.t >= state.duration) {
       state.bossSpawned = true;
       const boss = addFoe(state, 'boss', state.world() * Math.PI * 2, SPAWN_RING);
-      boss.hp = boss.maxHp = FOES.boss.hp * (1 + 0.6 * state.depth);
+      boss.hp = boss.maxHp = FOES.boss.hp * (1 + 0.6 * state.depth) * Math.pow(DEPTH_GROWTH, state.depth);
       boss.charge = 0;
       boss.chargeCd = 4;
       state.boss = boss;

@@ -1246,13 +1246,31 @@
     return n;
   }
 
+  const statLine = (stat, v) => T('gear.stat.' + stat, { v: stat === 'hp' ? Math.round(v) : stat === 'regen' ? v.toFixed(1) : +(v * 100).toFixed(1) });
+
   function renderForgeTab() {
     const b = M.breakCheck(save);
-    const note = b.why === 'boss' ? T('am.breakNeedBoss', { n: b.need, have: b.have })
-      : b.why === 'mana' ? T('am.breakNeedMana', { n: b.cost - save.mana }) : '';
-    const breakLabel = b.why === 'max' ? T('am.breakMax') : T('am.break', { n: save.circle + 1 }) + ' · ' + T('am.breakCost', { n: b.cost });
+    const t = M.trainCheck(save);
+    const note = b.why === 'train' ? T('forge.needTrain', { have: b.have, n: b.need }) : '';
+    const breakLabel = b.why === 'max' ? T('am.breakMax') : T('am.break', { n: save.circle + 1 });
     const m = mergeable();
+    // 이 서클의 수련 단계. 다 찬 칸, 다음 칸, 남은 칸.
+    let dots = '';
+    for (let i = 0; i < M.TRAIN_STEPS; i++) {
+      const stat = M.TRAIN_ORDER[((save.circle - 1) * M.TRAIN_STEPS + i) % M.TRAIN_ORDER.length];
+      dots += '<span class="train-dot' + (i < save.train ? ' done' : i === save.train ? ' next' : '') + '" title="' + T('train.' + stat) + '">' +
+        T('train.short.' + stat) + '</span>';
+    }
+    const trained = M.training(save);
+    const sum = M.TRAIN_ORDER.filter((k) => trained[k]).map((k) => '<li>' + statLine(k, trained[k]) + '</li>').join('');
+    const trainBtn = t.why === 'done' ? T('forge.trainDone')
+      : T('forge.train', { stat: T('train.' + t.stat), v: statLine(t.stat, M.TRAIN_VALUE[t.stat]) }) + ' · ' + T('am.breakCost', { n: t.cost });
     return html([
+      '<div class="forge-card"><p class="label">', T('forge.trainTitle', { n: save.circle }), '</p><p class="sheet-note small">', T('forge.trainNote'), '</p>',
+      '<div class="train-dots">', dots, '</div>',
+      '<button class="btn" type="button" data-act="train"', t.ok ? '' : ' disabled', '>', trainBtn, '</button>',
+      t.why === 'mana' ? '<p class="sheet-note small">' + T('am.breakNeedMana', { n: t.cost - save.mana }) + '</p>' : '',
+      sum ? '<ul class="gear-sum">' + sum + '</ul>' : '', '</div>',
       '<div class="forge-card"><p class="label">', T('forge.circleTitle'), '</p><p class="sheet-note small">', T('forge.circleNote'), '</p>',
       '<button class="btn" type="button" data-act="break"', b.ok ? '' : ' disabled', '>', breakLabel, '</button>',
       '<p class="sheet-note small">', note, '</p></div>',
@@ -1354,7 +1372,12 @@
     }
     const act = b.dataset.act;
     if (act === 'start') startRun();
-    else if (act === 'break') {
+    else if (act === 'train') {
+      if (!M.train(save)) return;
+      store();
+      Sound.play('engrave');
+      renderLobby();
+    } else if (act === 'break') {
       if (!M.breakthrough(save)) return;
       store();
       Sound.play('unlock');
@@ -1406,7 +1429,7 @@
   function startRun() {
     mode = 'run';
     seenThisRun = new Set();
-    state = S.create({ circle: save.circle, night, gear: G.loadout(save), seed: (Date.now() ^ (Math.random() * 1e9)) >>> 0 });
+    state = S.create({ circle: save.circle, night, gear: M.power(save), seed: (Date.now() ^ (Math.random() * 1e9)) >>> 0 });
     if (state.bossNight) alert(T('am.bossNightAlert'), 2400);
     fx = [];
     acc = 0;
