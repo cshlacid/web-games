@@ -45,8 +45,8 @@ check('서클은 범위 안으로', M.parse('{"circle":42}').circle, 9);
 {
   const save = M.fresh();
   save.grimoire = { fire1: { run: 1 }, 'fire1-wind1': { run: 1 }, fire3: { run: 2 } };
-  check('마도서는 그 서클까지에서 센다', M.grimoireCount(save, 2), { found: 2, total: 14 });
-  check('서클이 오르면 분모가 는다', M.grimoireCount(save, 3), { found: 3, total: 34 });
+  check('마도서는 그 서클까지에서 센다', M.grimoireCount(save, 2), { found: 2, total: 14, specialFound: 1, special: 10 });
+  check('서클이 오르면 분모가 는다', M.grimoireCount(save, 3), { found: 3, total: 34, specialFound: 2, special: 18 });
 }
 
 {

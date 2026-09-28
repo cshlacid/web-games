@@ -65,11 +65,13 @@
     for (const e of ELEMENTS) n += spell.counts[e];
     // 같은 원소를 여럿 새겨 단계가 오르면 그 단계의 이름을 쓴다(메테오, 해일). 로마
     // 숫자는 이름이 보여 주는 것보다 원소가 더 들었을 때만 붙인다.
-    const shown = Math.min(3, spell.tier);
-    const base = spell.tier >= 2 ? T('spell.' + spell.primary + '.' + shown)
-      : T(second ? 'spell.' + spell.primary + '-' + second : 'spell.' + spell.primary);
-    const plain = spell.tier >= 2 ? shown : 1;
-    const name = n > plain ? base + ' ' + ROMAN[n] : base;
+    let name;
+    if (spell.recipe) name = T('recipe.' + spell.key);
+    else {
+      const base = spell.form >= 2 ? T('spell.' + spell.primary + '.' + spell.form)
+        : T(second ? 'spell.' + spell.primary + '-' + second : 'spell.' + spell.primary);
+      name = n > spell.form ? base + ' ' + ROMAN[n] : base;
+    }
     // 수식어가 있으면 이름 앞에 붙인다(연쇄의 대지 균열). 많이 넣은 것부터.
     const mods = Object.keys(spell.mods || {});
     if (!mods.length) return name;
@@ -348,17 +350,25 @@
         fx.push({ kind: 'ring', x: ev.x, y: ev.y, r: ev.r, el: ev.el, t: 0, life: 0.3 });
         sound('hit', null, 60);
       } else if (ev.type === 'impact') {
-        fx.push({ kind: 'ring', x: ev.x, y: ev.y, r: ev.r, el: ev.el, t: 0, life: 0.45 });
-        shake = Math.max(shake, 3);
-        sound('cast', 'earth', 80);
+        if (ev.sub === 'bolt') {
+          fx.push({ kind: 'bolt', x: ev.x, y: ev.y, r: ev.r, el: ev.el, t: 0, life: 0.22, seed: Math.random() * 1000 });
+          sound('hit', null, 50);
+        } else {
+          fx.push({ kind: 'ring', x: ev.x, y: ev.y, r: ev.r, el: ev.el, t: 0, life: 0.45 });
+          shake = Math.max(shake, ev.sub === 'ice' ? 1 : 3);
+          sound('cast', ev.sub === 'ice' ? 'water' : 'earth', 80);
+        }
+      } else if (ev.type === 'aura') {
+        if (ev.screen) { fx.push({ kind: 'flash', el: ev.el, t: 0, life: 0.35 }); shake = Math.max(shake, 4); }
+        else if (fx.length < 400) fx.push({ kind: 'ring', x: ev.x, y: ev.y, r: ev.r, el: ev.el, t: 0, life: 0.3 });
+        sound('cast', ev.el, 150);
       } else if (ev.type === 'shock') {
         fx.push({ kind: 'ring', x: ev.x, y: ev.y, r: ev.r, el: ev.el, t: 0, life: 0.3 });
       } else if (ev.type === 'quake') {
         fx.push({ kind: 'ring', x: ev.x, y: ev.y, r: ev.r, el: 'earth', t: 0, life: 0.45 });
+        if (ev.screen) fx.push({ kind: 'flash', el: 'earth', t: 0, life: 0.35 });
         shake = Math.max(shake, 4);
         sound('cast', 'earth', 120);
-      } else if (ev.type === 'chain') {
-        fx.push({ kind: 'chain', pts: ev.pts, el: ev.el, t: 0, life: 0.18, seed: Math.random() * 1000 });
       } else if (ev.type === 'kill') {
         if (fx.length < 400) fx.push({ kind: 'puff', x: ev.x, y: ev.y, foe: ev.foe, t: 0, life: 0.35 });
         sound('kill', null, 45);
@@ -421,6 +431,9 @@
     // 지대
     for (const z of state.zones) drawZone(z);
     for (const q of state.quakes) drawQuake(q, p);
+    ctx.globalCompositeOperation = 'lighter';
+    for (const a of state.auras) drawAura(a, p);
+    ctx.globalCompositeOperation = 'source-over';
     for (const m of state.meteors) drawMeteorMark(m);
 
     // 보석
@@ -472,7 +485,7 @@
       ctx.drawImage(sp.img, f.x - w / 2, f.y - h / 2 - 4 + bob, w, h);
     }
     if (f.slow > 0) {
-      ctx.fillStyle = 'rgba(120,200,255,0.25)';
+      ctx.fillStyle = f.slow >= 0.95 ? 'rgba(170,225,255,0.55)' : 'rgba(120,200,255,0.25)';
       ctx.beginPath(); ctx.arc(f.x, f.y, f.r + 2, 0, Math.PI * 2); ctx.fill();
     }
     if (f.burn > 0 && ((clock * 20 + f.phase) | 0) % 3 === 0) {
@@ -560,10 +573,11 @@
     const blades = S.orbitBlades(o, p);
     ctx.strokeStyle = hexA(I.colorOf(o.el), 0.25);
     ctx.lineWidth = o.blade * 0.8;
-    ctx.beginPath(); ctx.arc(p.x, p.y, S.orbitRadius(o), 0, Math.PI * 2); ctx.stroke();
+    const oc = o.cx !== undefined ? { x: o.cx, y: o.cy } : p;
+    ctx.beginPath(); ctx.arc(oc.x, oc.y, S.orbitRadius(o), 0, Math.PI * 2); ctx.stroke();
     for (const b of blades) {
       glowAt(o.el, b.x, b.y, o.blade * 3.4);
-      const a = Math.atan2(b.y - p.y, b.x - p.x) + Math.PI / 2;
+      const a = Math.atan2(b.y - oc.y, b.x - oc.x) + Math.PI / 2;
       ctx.strokeStyle = hexA(I.colorOf(o.el), 0.9);
       ctx.lineWidth = 2.5;
       ctx.beginPath(); ctx.arc(b.x, b.y, o.blade * 0.9, a - 0.9, a + 0.9); ctx.stroke();
@@ -610,13 +624,51 @@
     ctx.beginPath(); ctx.arc(m.x, m.y, m.r, 0, Math.PI * 2); ctx.stroke();
   }
 
+  // 떨어지는 것. 운석·얼음·바위는 비스듬히 떨어지고, 번개는 떨어지는 대신 곧바로 친다.
   function drawMeteor(m) {
     const t = 1 - m.delay / m.total;
+    if (m.sub === 'bolt') return;
     const h = 260 * (1 - t);
     const x = m.x + h * 0.55, y = m.y - h;
+    if (m.sub === 'ice') {
+      ctx.strokeStyle = hexA(I.COLORS.water, 0.9);
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + 10, y - 22); ctx.stroke();
+      glowAt('water', x, y, 20);
+      return;
+    }
+    if (m.sub === 'rock') {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.fillStyle = '#7a6a55';
+      ctx.beginPath(); ctx.arc(x, y, m.r * 0.35, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#a8957a';
+      ctx.beginPath(); ctx.arc(x - m.r * 0.1, y - m.r * 0.1, m.r * 0.18, 0, Math.PI * 2); ctx.fill();
+      ctx.globalCompositeOperation = 'lighter';
+      return;
+    }
     glowAt(m.el, x, y, 34 + m.r * 0.3);
     glowAt(m.el, x + 14, y - 26, 20);
     glowAt(m.el, x + 26, y - 50, 12);
+  }
+
+  function drawAura(a, p) {
+    if (a.screen) return;
+    const fade = Math.min(1, a.life / 0.3, (a.total - a.life) / 0.2 + 0.2);
+    const color = I.colorOf(a.el);
+    ctx.globalAlpha = fade;
+    const grad = ctx.createRadialGradient(p.x, p.y, a.r * 0.2, p.x, p.y, a.r);
+    grad.addColorStop(0, hexA(color, 0));
+    grad.addColorStop(0.8, hexA(color, 0.12));
+    grad.addColorStop(1, hexA(color, 0.35));
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(p.x, p.y, a.r, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = hexA(color, 0.7);
+    ctx.lineWidth = 2;
+    ctx.setLineDash([10, 8]);
+    ctx.lineDashOffset = (a.pull ? 1 : -1) * clock * 60;
+    ctx.beginPath(); ctx.arc(p.x, p.y, a.r * (0.92 + 0.05 * Math.sin(clock * 5)), 0, Math.PI * 2); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
   }
 
   function drawWave(w) {
@@ -676,23 +728,29 @@
       ctx.lineWidth = 3 * (1 - t) + 0.5;
       ctx.beginPath(); ctx.arc(f.x, f.y, f.r * (0.4 + t * 0.7), 0, Math.PI * 2); ctx.stroke();
       ctx.globalAlpha = 1;
-    } else if (f.kind === 'chain') {
+    } else if (f.kind === 'bolt') {
+      // 하늘에서 내리꽂는 번개. 맞은 자리 위로 꺾이는 줄 하나.
       ctx.globalAlpha = 1 - t;
-      ctx.strokeStyle = '#e6dcff';
-      ctx.lineWidth = 1.6;
+      ctx.strokeStyle = '#eaf6ff';
+      ctx.lineWidth = 2.2;
       const rand = S.rng(f.seed | 0);
       ctx.beginPath();
-      for (let i = 0; i < f.pts.length - 1; i++) {
-        const a = f.pts[i], b = f.pts[i + 1];
-        ctx.moveTo(a.x, a.y);
-        for (let j = 1; j <= 4; j++) {
-          const u = j / 4;
-          const jit = j === 4 ? 0 : 9;
-          ctx.lineTo(a.x + (b.x - a.x) * u + (rand() - 0.5) * jit, a.y + (b.y - a.y) * u + (rand() - 0.5) * jit);
-        }
+      let x = f.x + (rand() - 0.5) * 40, y = f.y - 320;
+      ctx.moveTo(x, y);
+      for (let j = 1; j <= 6; j++) {
+        const u = j / 6;
+        x = f.x + (rand() - 0.5) * 26 * (1 - u);
+        y = f.y - 320 * (1 - u);
+        ctx.lineTo(x, y);
       }
       ctx.stroke();
-      for (const q of f.pts) glowAt('arcane', q.x, q.y, 18);
+      glowAt(f.el, f.x, f.y, f.r * 2.4);
+      ctx.globalAlpha = 1;
+    } else if (f.kind === 'flash') {
+      // 화면 전체를 치는 마법. 한 번 번쩍여 무엇이 쳤는지 알린다.
+      ctx.globalAlpha = (1 - t) * 0.35;
+      ctx.fillStyle = I.colorOf(f.el);
+      ctx.fillRect(p.x - 700, p.y - 700, 1400, 1400);
       ctx.globalAlpha = 1;
     } else if (f.kind === 'cast') {
       ctx.globalAlpha = (1 - t) * 0.8;
@@ -888,8 +946,7 @@
   function targetsFor(opt) {
     const out = [];
     for (let ci = 0; ci < state.unlocked; ci++) {
-      const pv = S.previewPlace(state, opt.id, ci);
-      if (pv) out.push({ ci, pv });
+      for (const mode of S.placeModes(state, opt.id, ci)) out.push({ ci, mode, pv: S.previewPlace(state, opt.id, ci, mode) });
     }
     return out;
   }
@@ -939,22 +996,25 @@
     el.levelTitle.textContent = T('am.pickCircle');
     el.levelNote.innerHTML = T('rune.' + opt.id);
     const rows = [];
+    const cap = S.capacity(state);
     for (let ci = 0; ci < state.unlocked; ci++) {
       const c = state.circles[ci];
-      const pv = S.previewPlace(state, opt.id, ci);
-      const cap = S.capacity(state);
-      if (!pv) {
+      const modes = S.placeModes(state, opt.id, ci);
+      if (!modes.length) {
         rows.push('<button class="choice target" type="button" disabled><span class="icon">' + (ci + 1) + '</span>' +
           '<span><span class="choice-name">' + T('am.slot', { n: ci + 1 }) + ' <span class="tag">' + T('am.full') + '</span></span>' +
           sockets(c.runes, cap) + '</span></button>');
         continue;
       }
-      const mark = pv.mode === 'add' ? pv.runes.length - 1 : pv.runes.findIndex((r) => r.id === opt.id);
-      rows.push('<button class="choice target" type="button" data-ci="' + ci + '"><span class="icon">' + (ci + 1) + '</span>' +
-        '<span><span class="choice-name">' + T('am.slot', { n: ci + 1 }) + ' <span class="tag">' + T(pv.mode === 'add' ? 'am.add' : 'am.grade') + '</span></span>' +
-        sockets(pv.runes, cap, mark) +
-        '<span class="choice-desc">' + nameFor(pv.spell) + '</span>' +
-        '<span class="stats">' + statsDiff(c.spell, pv.spell) + '</span></span></button>');
+      for (const mode of modes) {
+        const pv = S.previewPlace(state, opt.id, ci, mode);
+        const mark = pv.mode === 'add' ? pv.runes.length - 1 : pv.runes.findIndex((r) => r.id === opt.id);
+        rows.push('<button class="choice target" type="button" data-ci="' + ci + '" data-mode="' + mode + '"><span class="icon">' + (ci + 1) + '</span>' +
+          '<span><span class="choice-name">' + T('am.slot', { n: ci + 1 }) + ' <span class="tag">' + T(pv.mode === 'add' ? 'am.add' : 'am.grade') + '</span></span>' +
+          sockets(pv.runes, cap, mark) +
+          '<span class="choice-desc">' + nameFor(pv.spell) + '</span>' +
+          '<span class="stats">' + statsDiff(c.spell, pv.spell) + '</span></span></button>');
+      }
     }
     el.choices.innerHTML = rows.join('');
   }
@@ -982,7 +1042,7 @@
     }
     const opt = state.pending.options[pickIndex];
     if (opt.type === 'erase') commit({ ci: Number(btn.dataset.ci), slot: Number(btn.dataset.slot) });
-    else commit(Number(btn.dataset.ci));
+    else commit({ ci: Number(btn.dataset.ci), mode: btn.dataset.mode });
   });
   el.levelBack.addEventListener('click', () => { Sound.play('click'); showLevelUp(); });
 
@@ -1069,12 +1129,13 @@
     if (save.best[night]) info += ' · ' + T('am.best', { t: fmt(save.best[night]) });
     el.nightInfo.innerHTML = sockets([], night) + '<br>' + info;
     const g = M.grimoireCount(save, save.circle);
-    el.grimoireCount.textContent = T('am.grimoireCount', g);
+    el.grimoireCount.textContent = T('am.grimoireCount', g) + ' · ' + T('am.specialCount', { found: g.specialFound, total: g.special });
     const keys = Runes.allKeys(save.circle).filter((key) => save.grimoire[key]);
     el.grimoireList.innerHTML = keys.length
       ? keys.map((key) => {
         const runes = runesFromKey(key);
-        return '<li>' + glyphs(runes) + ' ' + spellName(Runes.compose(runes)) + '</li>';
+        const tag = Runes.isSpecial(key) ? ' <span class="tag">' + T('am.special') + '</span>' : '';
+        return '<li>' + glyphs(runes) + ' ' + spellName(Runes.compose(runes)) + tag + '</li>';
       }).join('')
       : '<li class="sheet-note">' + T('am.grimoireNone') + '</li>';
   }
