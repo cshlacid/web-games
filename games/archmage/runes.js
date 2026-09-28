@@ -25,6 +25,38 @@
     earth: { kind: 'zone', dmg: 9, cd: 3.4, dur: 2.4, size: 46, speed: 0, count: 1, pierce: 0 },
   };
 
+  // 같은 원소를 구멍에 여럿 새기면 마법 자체가 바뀐다(단계). 등급처럼 수치만 오르면
+  // 물+물+물이 물+수식어+수식어에 등급을 올린 것보다 약해 보여, 구멍을 같은 원소로
+  // 채울 까닭이 없었다. 2단계는 원래 형태에 새 동작을 얹고, 3단계부터는 다른 마법이 된다.
+  const TIERS = {
+    fire: {
+      // 터지며 파편이 흩어져 둘레에서 한 번 더 터진다.
+      2: { cluster: true },
+      // 하늘에서 떨어진다. 적이 있는 자리 여러 곳을 한꺼번에 친다.
+      3: { kind: 'meteor', dmg: 44, cd: 2.4, size: 62, count: 2 },
+    },
+    water: {
+      // 맞힌 자리에서 냉기가 퍼져 둘레를 얼린다.
+      2: { nova: true },
+      // 넓은 물결이 밀고 나가며 닿는 것을 모두 밀어낸다.
+      3: { kind: 'wave', dmg: 28, cd: 2.2, size: 64, speed: 250, count: 1, pierce: 0 },
+    },
+    wind: {
+      // 칼날이 도는 반경이 크게 들고 난다.
+      2: { pulse: true },
+      // 회오리가 스스로 적을 찾아다니며 빨아들인다.
+      3: { kind: 'tornado', dmg: 15, cd: 3.0, dur: 3.6, size: 40, speed: 95, count: 2 },
+    },
+    earth: {
+      // 지대가 긁을 때마다 바깥으로 충격파가 번진다.
+      2: { shock: true },
+      // 발밑부터 넓게 땅이 흔들려 둘레를 한꺼번에 치고 묶는다.
+      3: { kind: 'quake', dmg: 30, cd: 3.8, dur: 1.6, size: 170, count: 1 },
+    },
+  };
+  // 단계가 오를 때마다 피해가 이만큼 더 붙는다. 3단계 넘게는 형태가 그대로이고 이것만 는다.
+  const TIER_DMG = 0.8;
+
   // 둘째 이하 원소가 더하는 성질. t는 그 원소 룬의 수에 등급을 더한 것이다.
   function applyTrait(s, el, t) {
     if (!t) return;
@@ -100,19 +132,25 @@
       kind: f.kind, dmg: f.dmg, cd: f.cd, dur: f.dur, size: f.size, speed: f.speed,
       count: f.count, pierce: f.pierce,
       slow: 0, burn: 0, knock: 0, chain: 0, omni: 0, echo: 0, leech: 0,
-      mods: {}, runes: runes.length,
+      mods: {}, runes: runes.length, tier: counts[primary],
     };
-    // 룬마다 수(구멍에 넣은 개수)와 등급을 모은다. 주원소를 구멍에 더 넣은 것도 겹친
-    // 것이라 등급과 똑같이 센다 — 안 그러면 칸을 쓰는 쪽이 등급보다 약해진다.
+    const tiers = TIERS[primary];
+    if (s.tier >= 2) Object.assign(s, tiers[Math.min(3, s.tier)]);
+    s.dmg *= 1 + TIER_DMG * (s.tier - (s.tier >= 3 ? 3 : 1));
+    // 룬마다 수(구멍에 넣은 개수)와 등급을 모은다. 구멍에 더 넣은 주원소는 단계를
+    // 올리는 것에 더해 등급과 똑같이 강화로도 센다 — 같은 원소로 구멍을 채우는 쪽이
+    // 수식어를 넣고 등급을 올리는 쪽보다 분명히 강해야 한다.
     const level = {};
     let grade = 0;
+    let primaryGrade = 0;
     for (const r of runes) {
       level[r.id] = (level[r.id] || 0) + 1 + (r.grade || 0);
       grade += r.grade || 0;
+      if (r.id === primary) primaryGrade += r.grade || 0;
       if (isModifier(r.id)) s.mods[r.id] = (s.mods[r.id] || 0) + 1 + (r.grade || 0);
     }
     for (const el of ELEMENTS) if (el !== primary) applyTrait(s, el, level[el] || 0);
-    empower(s, level[primary] - 1);
+    empower(s, s.tier - 1 + primaryGrade);
     for (const mod of MODIFIERS) applyModifier(s, mod, level[mod] || 0);
     s.grade = grade;
     s.cd = Math.max(0.25, s.cd);
@@ -151,7 +189,7 @@
     return out;
   }
 
-  const api = { ELEMENTS, MODIFIERS, ALL, FORMS, isElement, isModifier, compose, keyOf, countElements, primaryOf, comboCount, allKeys };
+  const api = { ELEMENTS, MODIFIERS, ALL, FORMS, TIERS, isElement, isModifier, compose, keyOf, countElements, primaryOf, comboCount, allKeys };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else window.ArchmageRunes = api;
 })();

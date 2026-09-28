@@ -36,10 +36,17 @@ check('열쇠는 원소 차례로 적는다', R.compose(rs('earth', 'fire', 'fir
 {
   const one = R.compose(rs('fire'));
   const two = R.compose(rs('fire', 'fire'));
-  check('불을 더하면 피해가 는다', two.dmg > one.dmg, true);
-  check('불을 겹치면 탄이 는다', two.count, 2);
+  check('불을 강화하면 탄이 는다', R.compose([{ id: 'fire', grade: 1 }]).count, 2);
+  check('불 둘은 폭염탄(파편)', [two.kind, two.tier, !!two.cluster], ['bolt', 2, true]);
+  check('불 셋은 메테오', R.compose(rs('fire', 'fire', 'fire')).kind, 'meteor');
+  check('물 셋은 해일', R.compose(rs('water', 'water', 'water')).kind, 'wave');
+  check('바람 셋은 토네이도', R.compose(rs('wind', 'wind', 'wind')).kind, 'tornado');
+  check('땅 셋은 지진', R.compose(rs('earth', 'earth', 'earth')).kind, 'quake');
+  check('섞으면 단계는 주원소의 수', R.compose(rs('fire', 'fire', 'wind')).tier, 2);
+  check('넷째부터는 형태는 그대로 피해만 는다', R.compose(rs('fire', 'fire', 'fire', 'fire')).dmg > R.compose(rs('fire', 'fire', 'fire')).dmg, true);
   check('불을 겹쳐도 관통은 붙지 않는다', R.compose([{ id: 'fire', grade: 3 }]).pierce, 0);
-  check('불을 겹치면 폭발이 커진다', two.size > one.size, true);
+  check('불을 강화하면 폭발이 커진다', R.compose([{ id: 'fire', grade: 1 }]).size > one.size, true);
+  check('단계가 오르면 강해진다', two.dmg > one.dmg * 1.5, true);
   check('다른 원소로 더한 불은 화상을 붙인다', R.compose(rs('wind', 'wind', 'fire')).burn > 0, true);
   check('첫 불에는 성질이 붙지 않는다', one.burn, 0);
   check('물을 더하면 둔화', R.compose(rs('fire', 'water')).slow > 0, true);
@@ -93,7 +100,7 @@ check('열쇠는 원소 차례로 적는다', R.compose(rs('earth', 'fire', 'fir
     const s = R.compose(runes);
     (byKind[s.kind] = byKind[s.kind] || []).push(s);
   }
-  check('3서클에서 네 형태가 모두 나온다', Object.keys(byKind).sort(), ['bolt', 'lance', 'orbit', 'zone']);
+  check('3서클에서 기본 넷과 3단계 넷이 모두 나온다', Object.keys(byKind).sort(), ['bolt', 'lance', 'meteor', 'orbit', 'quake', 'tornado', 'wave', 'zone']);
 }
 
 console.log(`${passed}개 통과, ${failed}개 실패`);

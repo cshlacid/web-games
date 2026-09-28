@@ -158,6 +158,23 @@ function engrave(state, id, ci) {
   check('흡혈은 초당 한도를 넘지 않는다', st.player.hp - hp <= 6 + 0.01, true);
 }
 
+// --- 단계 마법 ---
+for (const [el, name] of [['fire', '메테오'], ['water', '해일'], ['wind', '토네이도'], ['earth', '지진']]) {
+  const st = S.create({ circle: 3, seed: 1 });
+  engrave(st, el, 0); engrave(st, el, 0); engrave(st, el, 0);
+  const f = foe(st, 'slime', 90, 20);
+  run(st, 2.5);
+  check(name + '이 적을 친다', f.hp < 1000, true);
+}
+{
+  const st = S.create({ circle: 2, seed: 1 });
+  engrave(st, 'fire', 0); engrave(st, 'fire', 0);
+  foe(st, 'slime', 90, 0);
+  let frag = false;
+  for (let i = 0; i < 90 && !frag; i++) { S.step(st, 1 / 60); S.drain(st); frag = st.shots.some((x) => x.frag); }
+  check('폭염탄은 터지며 파편을 흩는다', frag, true);
+}
+
 // --- 적과 끝 ---
 {
   const st = S.create({ circle: 1, seed: 1 });

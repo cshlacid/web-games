@@ -61,10 +61,15 @@
   function spellName(spell) {
     if (!spell) return T('spell.none');
     const second = secondOf(spell);
-    const base = T(second ? 'spell.' + spell.primary + '-' + second : 'spell.' + spell.primary);
     let n = 0;
     for (const e of ELEMENTS) n += spell.counts[e];
-    const name = n > 1 ? base + ' ' + ROMAN[n] : base;
+    // 같은 원소를 여럿 새겨 단계가 오르면 그 단계의 이름을 쓴다(메테오, 해일). 로마
+    // 숫자는 이름이 보여 주는 것보다 원소가 더 들었을 때만 붙인다.
+    const shown = Math.min(3, spell.tier);
+    const base = spell.tier >= 2 ? T('spell.' + spell.primary + '.' + shown)
+      : T(second ? 'spell.' + spell.primary + '-' + second : 'spell.' + spell.primary);
+    const plain = spell.tier >= 2 ? shown : 1;
+    const name = n > plain ? base + ' ' + ROMAN[n] : base;
     // 수식어가 있으면 이름 앞에 붙인다(연쇄의 대지 균열). 많이 넣은 것부터.
     const mods = Object.keys(spell.mods || {});
     if (!mods.length) return name;
@@ -342,6 +347,16 @@
       } else if (ev.type === 'burst-hit') {
         fx.push({ kind: 'ring', x: ev.x, y: ev.y, r: ev.r, el: ev.el, t: 0, life: 0.3 });
         sound('hit', null, 60);
+      } else if (ev.type === 'impact') {
+        fx.push({ kind: 'ring', x: ev.x, y: ev.y, r: ev.r, el: ev.el, t: 0, life: 0.45 });
+        shake = Math.max(shake, 3);
+        sound('cast', 'earth', 80);
+      } else if (ev.type === 'shock') {
+        fx.push({ kind: 'ring', x: ev.x, y: ev.y, r: ev.r, el: ev.el, t: 0, life: 0.3 });
+      } else if (ev.type === 'quake') {
+        fx.push({ kind: 'ring', x: ev.x, y: ev.y, r: ev.r, el: 'earth', t: 0, life: 0.45 });
+        shake = Math.max(shake, 4);
+        sound('cast', 'earth', 120);
       } else if (ev.type === 'chain') {
         fx.push({ kind: 'chain', pts: ev.pts, el: ev.el, t: 0, life: 0.18, seed: Math.random() * 1000 });
       } else if (ev.type === 'kill') {
@@ -405,6 +420,8 @@
 
     // 지대
     for (const z of state.zones) drawZone(z);
+    for (const q of state.quakes) drawQuake(q, p);
+    for (const m of state.meteors) drawMeteorMark(m);
 
     // 보석
     const gem = sprites.gem;
@@ -426,6 +443,9 @@
     ctx.globalCompositeOperation = 'lighter';
     for (const o of state.orbits) drawOrbit(o, p);
     for (const sh of state.shots) drawShot(sh);
+    for (const w of state.waves) drawWave(w);
+    for (const t of state.tornados) drawTornado(t);
+    for (const m of state.meteors) drawMeteor(m);
     for (const f of fx) drawFx(f, p);
     ctx.globalCompositeOperation = 'source-over';
     for (const f of fx) if (f.kind === 'puff') drawPuff(f);
@@ -520,7 +540,7 @@
 
   function drawShot(sh) {
     if (sh.kind === 'bolt') {
-      glowAt(sh.el, sh.x, sh.y, 26 + sh.aoe * 0.2);
+      glowAt(sh.el, sh.x, sh.y, sh.frag ? 12 : 26 + sh.aoe * 0.2);
       glowAt(sh.el, sh.x - sh.vx * 0.03, sh.y - sh.vy * 0.03, 16);
       glowAt(sh.el, sh.x - sh.vx * 0.06, sh.y - sh.vy * 0.06, 10);
     } else {
@@ -540,7 +560,7 @@
     const blades = S.orbitBlades(o, p);
     ctx.strokeStyle = hexA(I.colorOf(o.el), 0.25);
     ctx.lineWidth = o.blade * 0.8;
-    ctx.beginPath(); ctx.arc(p.x, p.y, o.radius, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(p.x, p.y, S.orbitRadius(o), 0, Math.PI * 2); ctx.stroke();
     for (const b of blades) {
       glowAt(o.el, b.x, b.y, o.blade * 3.4);
       const a = Math.atan2(b.y - p.y, b.x - p.x) + Math.PI / 2;
@@ -577,6 +597,73 @@
       const x = z.x + Math.cos(a) * d, y = z.y + Math.sin(a) * d;
       ctx.beginPath(); ctx.moveTo(x - 3, y + 2); ctx.lineTo(x, y - 8 * (1 - pulse) - 2); ctx.lineTo(x + 3, y + 2); ctx.fill();
     }
+    ctx.globalAlpha = 1;
+  }
+
+  // 떨어질 자리. 미리 보여야 무엇이 떨어지는지 알고, 떨어지기 전의 긴장이 생긴다.
+  function drawMeteorMark(m) {
+    const t = 1 - m.delay / m.total;
+    ctx.fillStyle = hexA(I.colorOf(m.el), 0.08 + 0.18 * t);
+    ctx.beginPath(); ctx.arc(m.x, m.y, m.r * (0.4 + 0.6 * t), 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = hexA(I.colorOf(m.el), 0.6);
+    ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.arc(m.x, m.y, m.r, 0, Math.PI * 2); ctx.stroke();
+  }
+
+  function drawMeteor(m) {
+    const t = 1 - m.delay / m.total;
+    const h = 260 * (1 - t);
+    const x = m.x + h * 0.55, y = m.y - h;
+    glowAt(m.el, x, y, 34 + m.r * 0.3);
+    glowAt(m.el, x + 14, y - 26, 20);
+    glowAt(m.el, x + 26, y - 50, 12);
+  }
+
+  function drawWave(w) {
+    const fade = Math.min(1, w.life / 0.3, (w.total - w.life) / 0.1 + 0.3);
+    const nx = -w.dy, ny = w.dx;
+    ctx.globalAlpha = fade;
+    ctx.strokeStyle = hexA(I.colorOf(w.el), 0.85);
+    ctx.lineCap = 'round';
+    for (let i = 0; i < 3; i++) {
+      const back = i * 9;
+      ctx.lineWidth = 7 - i * 2;
+      ctx.beginPath();
+      ctx.moveTo(w.x - nx * w.w - w.dx * (back + 10), w.y - ny * w.w - w.dy * (back + 10));
+      ctx.quadraticCurveTo(w.x - w.dx * back, w.y - w.dy * back, w.x + nx * w.w - w.dx * (back + 10), w.y + ny * w.w - w.dy * (back + 10));
+      ctx.stroke();
+    }
+    for (let i = -2; i <= 2; i++) glowAt(w.el, w.x + nx * w.w * i * 0.4, w.y + ny * w.w * i * 0.4, 26);
+    ctx.globalAlpha = 1;
+  }
+
+  function drawTornado(t) {
+    const fade = Math.min(1, t.life / 0.3, (t.total - t.life) / 0.2 + 0.2);
+    ctx.globalAlpha = fade;
+    ctx.strokeStyle = hexA(I.colorOf(t.el), 0.75);
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 5; i++) {
+      const rr = t.r * (0.3 + i * 0.18);
+      const a = clock * (7 - i) + i;
+      ctx.beginPath(); ctx.arc(t.x, t.y - i * 5, rr, a, a + 3.6); ctx.stroke();
+    }
+    glowAt(t.el, t.x, t.y, t.r * 1.6);
+    ctx.globalAlpha = 1;
+  }
+
+  function drawQuake(q, p) {
+    const fade = Math.min(1, q.life / 0.3, (q.total - q.life) / 0.2 + 0.2);
+    ctx.globalAlpha = fade * 0.5;
+    ctx.strokeStyle = hexA(I.COLORS.earth, 0.8);
+    ctx.lineWidth = 2;
+    const rand = S.rng(7);
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) {
+      let a = rand() * Math.PI * 2, d = 20;
+      ctx.moveTo(p.x + Math.cos(a) * d, p.y + Math.sin(a) * d);
+      while (d < q.r) { d += 18 + rand() * 14; a += (rand() - 0.5) * 0.5; ctx.lineTo(p.x + Math.cos(a) * d, p.y + Math.sin(a) * d); }
+    }
+    ctx.stroke();
     ctx.globalAlpha = 1;
   }
 
@@ -791,7 +878,8 @@
     if (opt.type === 'erase') return T('desc.erase');
     if (opt.type === 'heal') return T('desc.heal');
     if (Runes.isElement(opt.id)) {
-      return '<b>' + T('desc.primary') + '</b> ' + T('form.' + opt.id) + '<br><b>' + T('desc.stacked') + '</b> ' + T('stack.' + opt.id) +
+      return '<b>' + T('desc.primary') + '</b> ' + T('form.' + opt.id) + '<br><b>' + T('desc.tier') + '</b> ' + T('tier.' + opt.id) +
+        '<br><b>' + T('desc.stacked') + '</b> ' + T('stack.' + opt.id) +
         '<br><b>' + T('desc.added') + '</b> ' + T('trait.' + opt.id);
     }
     return T('desc.' + opt.id) + '<br><b>' + T('desc.stacked') + '</b> ' + T('desc.modStack');
