@@ -37,7 +37,10 @@ check('열쇠는 원소 차례로 적는다', R.compose(rs('earth', 'fire', 'fir
   const one = R.compose(rs('fire'));
   const two = R.compose(rs('fire', 'fire'));
   check('불을 더하면 피해가 는다', two.dmg > one.dmg, true);
-  check('불을 더하면 화상이 붙는다', two.burn > 0, true);
+  check('불을 겹치면 탄이 는다', two.count, 2);
+  check('불을 겹쳐도 관통은 붙지 않는다', R.compose([{ id: 'fire', grade: 3 }]).pierce, 0);
+  check('불을 겹치면 폭발이 커진다', two.size > one.size, true);
+  check('다른 원소로 더한 불은 화상을 붙인다', R.compose(rs('wind', 'wind', 'fire')).burn > 0, true);
   check('첫 불에는 성질이 붙지 않는다', one.burn, 0);
   check('물을 더하면 둔화', R.compose(rs('fire', 'water')).slow > 0, true);
   check('바람을 더하면 개수가 는다', R.compose(rs('fire', 'wind')).count, 2);
@@ -50,6 +53,8 @@ check('열쇠는 원소 차례로 적는다', R.compose(rs('earth', 'fire', 'fir
   check('땅을 겹쳐 올리면 범위가 는다', R.compose([{ id: 'earth', grade: 1 }]).size > R.compose(rs('earth')).size, true);
   check('수식어를 겹쳐 올리면 한 번 더 걸린다', R.compose([{ id: 'fire', grade: 0 }, { id: 'chain', grade: 1 }]).chain, 4);
   check('흡혈', R.compose(rs('fire', 'anima')).leech > 0, true);
+  check('수식어를 올려도 원소 강화는 걸리지 않는다', R.compose([{ id: 'fire', grade: 0 }, { id: 'chain', grade: 3 }]).count, 1);
+  check('물을 겹치면 관통이 는다', R.compose([{ id: 'water', grade: 2 }]).pierce, R.compose(rs('water')).pierce + 2);
   check('수식어 개수를 센다', R.compose(rs('fire', 'echo', 'echo')).mods, { echo: 2 });
   check('등급이 피해를 올린다', R.compose([{ id: 'fire', grade: 2 }]).dmg > one.dmg, true);
 }
