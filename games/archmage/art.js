@@ -174,15 +174,17 @@
 
   // --- 대마법사 ---
   // 흑발에 보랏빛 눈의 젊은 회귀자. 그림은 Canva에서 그린 시안 한 장(mage.png, 배경을 지운
-  // 180×200)이고, 걷기 여섯 프레임은 그 한 장을 조각내 코드로 움직여 얻는다. 그림 생성은 같은
+  // 450×500)이고, 걷기 여섯 프레임은 그 한 장을 조각내 코드로 움직여 얻는다. 그림 생성은 같은
   // 캐릭터를 여섯 번 똑같이 그려 주지 않아 프레임마다 얼굴과 옷이 달라지기 때문이다.
   // 두 발이 번갈아 들리며 앞뒤로 엇갈리고, 보폭이 벌어질 때 몸이 내려앉고, 마도서는 따로 뜬다.
   // 몸을 올리지 않고 내리는 것은 몸이 발을 덮는 순서라서다 — 올리면 허리와 발 사이가 벌어진다.
   // 이 그림은 지팡이를 뒷손(화면 왼쪽)에, 마력을 앞손에 든다.
   const MAGE_IMG = typeof Image === 'undefined' ? null : new Image();
   if (MAGE_IMG) MAGE_IMG.src = 'mage.png';
-  const MS = 0.28; // 그림 한 픽셀이 판에서 차지하는 크기
-  // 조각은 그림 픽셀로 [x, y, 너비, 높이]. 발은 망토 자락과 앞자락 금테 아래만 떼어야 들렸을
+  // 자리는 그림을 180×200으로 본 단위로 적는다. 그림 파일의 해상도를 바꿔도 자리를 다시 재지 않게.
+  const MU = 180;
+  const MS = 0.28; // 한 단위가 판에서 차지하는 크기
+  // 조각은 [x, y, 너비, 높이]. 발은 망토 자락과 앞자락 금테 아래만 떼어야 들렸을
   // 때 옷이 함께 뜯겨 나가지 않는다.
   const BOOK = [136, 46, 44, 60];
   const LEG_B = [46, 174, 40, 26];
@@ -191,17 +193,18 @@
     const t = cycle(f), w = Math.sin(t);
     shadow(g, 23, 55, 13, 3.4);
     if (!MAGE_IMG || !MAGE_IMG.complete || !MAGE_IMG.naturalWidth) return;
-    const piece = (r, dx, dy) => g.drawImage(MAGE_IMG, r[0], r[1], r[2], r[3], r[0] * MS + dx, r[1] * MS + dy, r[2] * MS, r[3] * MS);
+    const u = MAGE_IMG.naturalWidth / MU;
+    const piece = (r, dx, dy) => g.drawImage(MAGE_IMG, r[0] * u, r[1] * u, r[2] * u, r[3] * u, r[0] * MS + dx, r[1] * MS + dy, r[2] * MS, r[3] * MS);
     const lift = (s) => -Math.max(0, s) * 1.5;
     piece(LEG_B, -w * 1.2, lift(-w));
     piece(LEG_F, w * 1.2, lift(w));
     const dip = Math.abs(w) * 0.9;
     g.save();
     g.beginPath();
-    g.rect(0, 0, MAGE_IMG.width * MS, MAGE_IMG.height * MS);
+    g.rect(0, 0, MU * MS, MAGE_IMG.naturalHeight / u * MS);
     for (const r of [BOOK, LEG_B, LEG_F]) g.rect(r[0] * MS, r[1] * MS, r[2] * MS, r[3] * MS);
     g.clip('evenodd');
-    g.drawImage(MAGE_IMG, 0, dip, MAGE_IMG.width * MS, MAGE_IMG.height * MS);
+    g.drawImage(MAGE_IMG, 0, dip, MU * MS, MAGE_IMG.naturalHeight / u * MS);
     g.restore();
     piece(BOOK, 0, dip * 0.5 + Math.sin(t + 1) * 1.4);
   }
