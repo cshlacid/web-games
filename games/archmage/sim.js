@@ -30,7 +30,7 @@
     wolf: { hp: 16, speed: 92, r: 10, dmg: 8, xp: 1, from: 0.3, weight: 3 },
     wraith: { hp: 36, speed: 66, r: 12, dmg: 12, xp: 2, from: 0.5, weight: 2 },
     golem: { hp: 150, speed: 32, r: 18, dmg: 18, xp: 6, from: 0.62, weight: 1 },
-    boss: { hp: 9000, speed: 50, r: 34, dmg: 28, xp: 0 },
+    boss: { hp: 7000, speed: 50, r: 34, dmg: 28, xp: 0 },
   };
 
   // 룬 제시의 무게. 원소가 없으면 마법이 나가지 않으므로 수식어보다 자주 나온다.
@@ -57,7 +57,12 @@
 
   // 서클이 오를수록 밤이 길다. 9서클이면 15분.
   const nightLength = (circle) => 300 + 75 * (circle - 1);
-  const xpNext = (level) => Math.floor(3 + level * 1.6 + level * level * 0.05);
+  // 레벨이 오를 때마다 다음까지가 빠르게 멀어진다. 처음 곡선(3 + 1.6L + 0.05L²)은
+  // 1서클 한 판에 서른 번 넘게 올라 고르는 화면이 너무 자주 끊었다.
+  const xpNext = (level) => Math.floor(5 + level * 2.5 + level * level * 0.3);
+  // 서클마다 오를 수 있는 레벨의 끝. 구멍이 적은 낮은 서클에서 끝없이 오르면 등급만
+  // 쌓여 서클을 올릴 까닭이 흐려진다.
+  const maxLevel = (circle) => 15 + 5 * circle;
 
   function create({ circle = 1, seed = 1 } = {}) {
     const state = {
@@ -225,7 +230,7 @@
     // 서클의 몫은 밤이 깊을수록 커진다. 처음부터 다 걸면 구멍이 비어 있는 초반에
     // 높은 서클일수록 레벨 하나 올리기도 버거워진다.
     const frac = Math.min(1, state.t / state.duration);
-    return (1 + (state.circle - 1) * (0.3 + 0.9 * frac)) * (1 + 3 * frac);
+    return (1 + (state.circle - 1) * (0.3 + 0.7 * frac)) * (1 + 2.2 * frac);
   }
 
   function addFoe(state, type, angle, dist) {
@@ -261,7 +266,7 @@
 
   function spawn(state, dt) {
     const frac = Math.min(1, state.t / state.duration);
-    let rate = (1.6 + 9 * frac) * (1 + 0.25 * (state.circle - 1));
+    let rate = (1.6 + 7 * frac) * (1 + 0.2 * (state.circle - 1));
     if (state.bossSpawned) rate *= 0.4;
     state.spawnAcc += rate * dt;
     while (state.spawnAcc >= 1) {
@@ -272,8 +277,11 @@
     // 1분마다 사방에서 한꺼번에 조여 온다. 고르게만 오면 한자리에서 버티는 것이
     // 정답이 되어 움직일 이유가 없어진다.
     if (state.t >= state.nextBurst && !state.bossSpawned) {
-      const n = 16 + Math.floor(state.nextBurst / 60) * 6;
-      const type = state.nextBurst % 120 === 0 ? 'wolf' : 'slime';
+      // 늑대 포위는 2분의 한 번뿐이다. 4분에도 늑대 마흔 마리를 두르자 레벨이 느려진
+      // 뒤로는 그 한 번에 판이 끝나는 일이 잦았다.
+      const minute = Math.floor(state.nextBurst / 60);
+      const n = 14 + minute * 4;
+      const type = minute === 2 ? 'wolf' : minute % 2 ? 'slime' : 'goblin';
       // 포위에는 틈을 하나 남긴다. 빈틈없이 두르면 빠른 늑대 떼에게는 피할 길이 없다.
       const gap = state.world() * Math.PI * 2;
       for (let i = 0; i < n && state.foes.length < MAX_FOES; i++) {
@@ -285,7 +293,7 @@
     if (!state.bossSpawned && state.t >= state.duration) {
       state.bossSpawned = true;
       const boss = addFoe(state, 'boss', state.world() * Math.PI * 2, SPAWN_RING);
-      boss.hp = boss.maxHp = FOES.boss.hp * (1 + 0.8 * (state.circle - 1));
+      boss.hp = boss.maxHp = FOES.boss.hp * (1 + 0.6 * (state.circle - 1));
       boss.charge = 0;
       boss.chargeCd = 4;
       state.boss = boss;
@@ -961,7 +969,9 @@
   }
 
   function levelUp(state) {
-    while (state.xp >= xpNext(state.level)) {
+    const cap = maxLevel(state.circle);
+    if (state.level >= cap) state.xp = 0;
+    while (state.level < cap && state.xp >= xpNext(state.level)) {
       state.xp -= xpNext(state.level);
       state.level += 1;
       state.queued += 1;
@@ -991,7 +1001,7 @@
   const api = {
     FOES, PLAYER, CIRCLE_UNLOCK, RANGE,
     create, step, choose, drain, summary, previewPlace, previewErase, placeMode, placeModes, orbitBlades, orbitRadius,
-    nightLength, xpNext, capacity, rng,
+    nightLength, xpNext, maxLevel, capacity, rng,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else window.ArchmageSim = api;

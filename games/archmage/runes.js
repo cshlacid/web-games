@@ -23,7 +23,8 @@
     // 처음 값(유지 3초·쿨타임 2.4초)은 다른 원소보다 뚜렷이 약해 쉬는 틈을 줄였다.
     wind: { kind: 'orbit', dmg: 14, cd: 1.6, dur: 3.6, size: 13, speed: 3.6, count: 2, pierce: 0 },
     // 적이 몰린 자리에 깔린다. 느리지만 머무는 동안 계속 긁는다.
-    earth: { kind: 'zone', dmg: 12, cd: 2.4, dur: 2.6, size: 52, speed: 0, count: 1, pierce: 0 },
+    // 지대는 쉬는 틈에 무리가 그대로 걸어 들어온다. 유지를 쿨타임보다 길게 두어 거의 늘 깔려 있게 한다.
+    earth: { kind: 'zone', dmg: 12, cd: 2.0, dur: 3.0, size: 52, speed: 0, count: 1, pierce: 0 },
   };
 
   // 같은 원소를 구멍에 여럿 새기면 마법 자체가 바뀐다(단계). 등급처럼 수치만 오르면
@@ -146,7 +147,7 @@
     if (s.primary === 'fire') { s.count += more; s.dmg *= 1 + 0.35 * n; s.size *= 1 + Math.min(0.8, 0.12 * n); }
     else if (s.primary === 'water') { s.count += more; s.pierce += n; s.dmg *= 1 + 0.3 * n; }
     else if (s.primary === 'wind') { s.count += more; s.dur *= 1 + 0.15 * n; s.dmg *= 1 + 0.3 * n; }
-    else if (s.primary === 'earth') { s.size *= 1 + Math.min(1, 0.15 * n); s.dur *= 1 + 0.2 * n; s.dmg *= 1 + 0.35 * n; }
+    else if (s.primary === 'earth') { s.size *= 1 + Math.min(1, 0.15 * n); s.dur *= 1 + 0.3 * n; s.dmg *= 1 + 0.35 * n; }
   }
 
   // 수식어. l은 그 수식어 룬의 수에 등급을 더한 것이고, 오르면 **그 수식어의 효과만**

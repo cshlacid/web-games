@@ -1087,7 +1087,7 @@
     if (sig === hudSig) return;
     hudSig = sig;
     el.circleChip.textContent = nightName(state.circle);
-    el.levelChip.textContent = T('am.level', { n: state.level });
+    el.levelChip.textContent = T(state.level >= S.maxLevel(state.circle) ? 'am.levelMax' : 'am.level', { n: state.level });
     el.killsChip.textContent = T('am.kills', { n: state.kills });
     el.timeChip.textContent = time;
   }
@@ -1125,7 +1125,7 @@
       list += '<button class="btn small" type="button" data-c="' + c + '" aria-pressed="' + (c === night) + '">' + nightName(c) + '</button>';
     }
     el.nightList.innerHTML = list;
-    let info = T('am.nightInfo', { m: Math.round(S.nightLength(night) / 60 * 10) / 10, n: night });
+    let info = T('am.nightInfo', { m: Math.round(S.nightLength(night) / 60 * 10) / 10, n: night, max: S.maxLevel(night) });
     if (save.best[night]) info += ' · ' + T('am.best', { t: fmt(save.best[night]) });
     el.nightInfo.innerHTML = sockets([], night) + '<br>' + info;
     const g = M.grimoireCount(save, save.circle);
