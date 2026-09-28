@@ -30,7 +30,7 @@
     wolf: { hp: 16, speed: 92, r: 10, dmg: 8, xp: 1, from: 0.3, weight: 3 },
     wraith: { hp: 36, speed: 66, r: 12, dmg: 12, xp: 2, from: 0.5, weight: 2 },
     golem: { hp: 150, speed: 32, r: 18, dmg: 18, xp: 6, from: 0.62, weight: 1 },
-    boss: { hp: 7000, speed: 50, r: 34, dmg: 28, xp: 0 },
+    boss: { hp: 5500, speed: 50, r: 34, dmg: 28, xp: 0 },
   };
 
   // 룬 제시의 무게. 원소가 없으면 마법이 나가지 않으므로 수식어보다 자주 나온다.
@@ -55,11 +55,12 @@
     };
   }
 
-  // 서클이 오를수록 밤이 길다. 9서클이면 15분.
-  const nightLength = (circle) => 300 + 75 * (circle - 1);
+  // 서클이 오를수록 밤이 길다. 1서클 3분, 9서클 10분. 처음의 5분·15분은 폰으로 한 판을
+  // 하기에 길었다.
+  const nightLength = (circle) => Math.round(180 + 52.5 * (circle - 1));
   // 레벨이 오를 때마다 다음까지가 빠르게 멀어진다. 처음 곡선(3 + 1.6L + 0.05L²)은
   // 1서클 한 판에 서른 번 넘게 올라 고르는 화면이 너무 자주 끊었다.
-  const xpNext = (level) => Math.floor(5 + level * 2.5 + level * level * 0.3);
+  const xpNext = (level) => Math.floor(5 + level * 2 + level * level * 0.2);
   // 서클마다 오를 수 있는 레벨의 끝. 구멍이 적은 낮은 서클에서 끝없이 오르면 등급만
   // 쌓여 서클을 올릴 까닭이 흐려진다.
   const maxLevel = (circle) => 15 + 5 * circle;
@@ -230,7 +231,7 @@
     // 서클의 몫은 밤이 깊을수록 커진다. 처음부터 다 걸면 구멍이 비어 있는 초반에
     // 높은 서클일수록 레벨 하나 올리기도 버거워진다.
     const frac = Math.min(1, state.t / state.duration);
-    return (1 + (state.circle - 1) * (0.3 + 0.7 * frac)) * (1 + 2.2 * frac);
+    return (1 + (state.circle - 1) * (0.3 + 0.6 * frac)) * (1 + 1.8 * frac);
   }
 
   function addFoe(state, type, angle, dist) {
@@ -266,7 +267,7 @@
 
   function spawn(state, dt) {
     const frac = Math.min(1, state.t / state.duration);
-    let rate = (1.6 + 7 * frac) * (1 + 0.2 * (state.circle - 1));
+    let rate = (1.8 + 6 * frac) * (1 + 0.2 * (state.circle - 1));
     if (state.bossSpawned) rate *= 0.4;
     state.spawnAcc += rate * dt;
     while (state.spawnAcc >= 1) {
