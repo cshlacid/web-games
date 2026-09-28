@@ -24,6 +24,7 @@
       'game.defense': '길목 지키기',
       'game.metro': '지하철 노선',
       'game.roadworks': '도로공사',
+      'game.archmage': '회귀하는 대마법사',
       'game.sokoban': '소코반',
       'game.slitherlink': '슬리더링크',
       'game.nurikabe': '누리카베',

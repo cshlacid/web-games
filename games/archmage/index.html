@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title data-i18n="game.archmage">회귀하는 대마법사</title>
+<meta name="description" content="회귀하며 룬을 조합해 멸망의 밤을 버틴다" data-i18n-attr="content=meta.desc">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><rect x='1' y='1' width='22' height='22' rx='4' fill='%23191a2c'/><circle cx='12' cy='12' r='8' fill='none' stroke='%23b99bff' stroke-width='1.6'/><path d='M12 5.5 L17.7 15.3 H6.3 Z' fill='none' stroke='%23ff9a5e' stroke-width='1.6' stroke-linejoin='round'/></svg>">
+<link rel="manifest" href="../../manifest.json">
+<link rel="apple-touch-icon" href="../../icons/icon-180.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="회귀하는 대마법사" data-i18n-attr="content=game.archmage">
+<meta name="theme-color" content="#f3f1f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121320" media="(prefers-color-scheme: dark)">
+<link rel="stylesheet" href="../../shared/base.css">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="../../shared/result.css">
+<link rel="stylesheet" href="../../shared/sheet.css">
+<script src="../../shared/analytics.js"></script>
+<script src="../../shared/i18n.js"></script>
+<script src="../../shared/strings.js"></script>
+<script src="strings.js"></script>
+</head>
+<body>
+<main class="app">
+  <header class="head">
+    <div class="title-row">
+      <div class="head-nav">
+        <a class="back" href="../../" data-i18n="ui.back">← 목록</a>
+        <button class="toggle" id="help-open" type="button" aria-pressed="false" data-i18n="ui.help">도움말</button>
+      </div>
+      <h1 data-i18n="game.archmage">회귀하는 대마법사</h1>
+      <div class="head-actions">
+        <button class="toggle sound" id="toggle-bgm" type="button" aria-pressed="true" data-i18n="ui.bgm">BGM</button>
+        <button class="toggle sound" id="toggle-sfx" type="button" aria-pressed="true" data-i18n="ui.sfx">효과음</button>
+      </div>
+    </div>
+    <div class="status">
+      <span class="chip circle" id="circle-chip"></span>
+      <span class="chip" id="level-chip"></span>
+      <span class="chip" id="kills-chip"></span>
+      <span class="chip time" id="time-chip">0:00</span>
+      <button class="toggle pause" id="pause" type="button" aria-pressed="false" data-i18n="am.paused">멈춤</button>
+    </div>
+  </header>
+
+  <div class="board-wrap" id="board-wrap">
+    <canvas class="board" id="board"></canvas>
+    <p class="alert" id="alert" role="status" aria-live="polite"></p>
+
+    <!-- 판을 흐리게 남기고 덮는 안내들. 모양은 shared/result.css의 것을 쓴다. -->
+    <div class="result" id="camp" hidden>
+      <div class="result-card camp-card">
+        <p class="sheet-title sys" id="camp-title"></p>
+        <div class="camp-circle">
+          <svg class="circle-mark" id="circle-mark" viewBox="0 0 100 100" aria-hidden="true"></svg>
+          <div>
+            <p class="camp-big" id="camp-circle"></p>
+            <p class="sheet-note" id="camp-mana"></p>
+          </div>
+        </div>
+        <div class="break-box">
+          <button class="btn" id="break" type="button"></button>
+          <p class="sheet-note small" id="break-note"></p>
+        </div>
+        <div class="night-pick">
+          <p class="label" data-i18n="am.pickNight">들어갈 밤</p>
+          <div class="night-list" id="night-list"></div>
+          <p class="sheet-note small" id="night-info"></p>
+        </div>
+        <details class="grimoire">
+          <summary><span data-i18n="am.grimoire">마도서</span> <b id="grimoire-count"></b></summary>
+          <ul class="grimoire-list" id="grimoire-list"></ul>
+        </details>
+        <div class="sheet-actions">
+          <button class="btn" id="start" type="button" data-i18n="am.start">멸망의 밤으로</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="result" id="levelup" hidden>
+      <div class="result-card level-card">
+        <p class="sheet-title sys" id="level-title"></p>
+        <p class="sheet-note" id="level-note"></p>
+        <div class="choices" id="choices"></div>
+        <div class="sheet-actions" id="level-actions" hidden>
+          <button class="btn ghost small" id="level-back" type="button" data-i18n="am.back">다시 고르기</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="result" id="result" role="status" aria-live="polite" hidden>
+      <div class="result-card">
+        <p class="sheet-title sys" id="result-title"></p>
+        <p class="sheet-note" id="result-note"></p>
+        <ul class="report" id="report"></ul>
+        <div class="sheet-actions">
+          <button class="btn" id="regress" type="button" data-i18n="am.regress">회귀</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="result" id="paused" hidden>
+      <div class="result-card">
+        <p class="sheet-title sys" data-i18n="am.paused">멈춤</p>
+        <div class="sheet-actions">
+          <button class="btn" id="resume" type="button" data-i18n="am.resume">이어 하기</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="slots" id="slots"></div>
+
+  <div class="sheet" id="help" hidden>
+    <p class="sheet-title" data-i18n="ui.rules">규칙</p>
+    <ul class="help-list">
+      <li data-i18n-html="am.help.r1"><b>끌어서 움직입니다.</b> 화면 어디든 누른 채로 밀면 그쪽으로 걷습니다. PC는 WASD나 방향키.</li>
+      <li data-i18n-html="am.help.r2">마법은 <b>마법진이 스스로 시전</b>합니다. 마법진마다 쿨타임과 유지 시간이 있습니다.</li>
+      <li data-i18n-html="am.help.r3">레벨이 오르면 <b>룬 하나를 골라 마법진에 새깁니다.</b> 마법진의 룬 조합이 곧 그 마법이고, 가장 많은 원소가 형태를 정합니다.</li>
+      <li data-i18n-html="am.help.r4"><b>서클</b>은 마법진 한 칸에 새길 수 있는 룬의 수입니다. 판 밖에서 마나를 모아 돌파합니다.</li>
+      <li data-i18n-html="am.help.r5">한 번 만든 마법은 <b>마도서</b>에 남아, 다음 회차에 룬을 고를 때 무엇이 될지 알려 줍니다.</li>
+      <li data-i18n-html="am.help.r6">밤이 끝나면 <b>재앙의 사도</b>가 옵니다. 쓰러뜨리면 그 서클의 밤을 넘긴 것입니다.</li>
+    </ul>
+    <div class="sheet-actions">
+      <button class="btn" id="help-close" type="button" data-i18n="ui.close">닫기</button>
+    </div>
+  </div>
+</main>
+
+<script>SharedI18n.apply();</script>
+<script src="../../shared/base.js"></script>
+<script src="runes.js"></script>
+<script src="sim.js"></script>
+<script src="meta.js"></script>
+<script src="icons.js"></script>
+<script src="../../shared/audio.js"></script>
+<script src="audio.js"></script>
+<script src="../../shared/sheet.js"></script>
+<script src="main.js"></script>
+</body>
+</html>

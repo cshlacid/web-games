@@ -1,0 +1,105 @@
+// 이 게임에만 나오는 문구. 로직은 룬·마법·적을 id로만 들고, 이름과 설명은 여기 있다.
+//
+// 알파라 한국어만 둔다. 사전 엔진이 없는 열쇠를 영어, 한국어 순으로 찾으므로 다른
+// 언어에서도 한국어로 보인다 — 규칙과 이름이 바뀌는 중에 여섯 언어를 같이 고치면
+// 고칠 것이 여섯 배가 된다.
+(function () {
+  SharedI18n.add({
+    ko: {
+      'meta.desc': '회귀하며 룬을 조합해 멸망의 밤을 버틴다',
+
+      'rune.fire': '불', 'rune.water': '물', 'rune.wind': '바람', 'rune.earth': '땅',
+      'rune.chain': '연쇄', 'rune.omni': '전방위', 'rune.echo': '메아리', 'rune.focus': '집중',
+      'rune.magna': '거대', 'rune.anima': '혼', 'rune.chrono': '시간',
+      'rune.erase': '재각인', 'rune.heal': '회복',
+
+      // 원소 룬은 두 줄이다: 주원소일 때의 형태, 더할 때의 성질.
+      'form.fire': '날아가 터지는 탄', 'trait.fire': '피해 증가, 화상',
+      'form.water': '꿰뚫는 창', 'trait.water': '둔화, 관통 +1',
+      'form.wind': '몸 둘레를 도는 칼날', 'trait.wind': '개수 +1, 쿨타임 감소',
+      'form.earth': '적 무리에 깔리는 지대', 'trait.earth': '크기·유지 증가, 밀쳐내기',
+      'desc.chain': '맞은 적에서 둘레의 적으로 번진다',
+      'desc.omni': '사방으로 퍼진다',
+      'desc.echo': '잠시 뒤 한 번 더 시전한다',
+      'desc.focus': '범위를 좁혀 피해를 모은다',
+      'desc.magna': '크게 키운다. 쿨타임이 조금 는다',
+      'desc.anima': '적을 스스로 쫓는다',
+      'desc.chrono': '쿨타임을 줄이고 유지를 늘린다',
+      'desc.erase': '마법진에서 룬 하나를 지운다',
+      'desc.heal': '생명력을 40% 되찾는다',
+      'desc.primary': '주원소', 'desc.added': '더하면',
+
+      'spell.fire': '화염구', 'spell.water': '얼음창', 'spell.wind': '회오리', 'spell.earth': '대지 균열',
+      'spell.fire-water': '증기 폭발', 'spell.fire-wind': '화염폭풍', 'spell.fire-earth': '용암탄',
+      'spell.water-fire': '끓는 창', 'spell.water-wind': '눈보라 창', 'spell.water-earth': '빙하 창',
+      'spell.wind-fire': '불꽃 회오리', 'spell.wind-water': '서리 회오리', 'spell.wind-earth': '모래폭풍',
+      'spell.earth-fire': '용암 지대', 'spell.earth-water': '늪', 'spell.earth-wind': '흙먼지 지대',
+      'spell.none': '시전 안 됨',
+      'spell.unknown': '???',
+      'spell.noElement': '원소가 없어 시전되지 않습니다',
+
+      'stat.dmg': '피해', 'stat.cd': '쿨타임', 'stat.dur': '유지', 'stat.count': '개수',
+      'stat.sec': '{n}초',
+
+      'am.circle': '{n}서클',
+      'am.circleShort': '{n}서클',
+      'am.level': 'Lv {n}',
+      'am.kills': '처치 {n}',
+      'am.boss': '재앙의 사도',
+      'am.slot': '마법진 {n}',
+      'am.locked': 'Lv {n}에 열림',
+      'am.empty': '비어 있음',
+
+      'am.levelTitle': '[전생의 기억이 떠오릅니다]',
+      'am.levelNote': '룬 하나를 고르십시오',
+      'am.pickCircle': '[어느 마법진에 새기시겠습니까?]',
+      'am.pickErase': '[지울 룬을 고르십시오]',
+      'am.add': '새기기', 'am.grade': '강화',
+      'am.full': '빈 칸 없음',
+      'am.back': '다시 고르기',
+      'am.new': '새 마법',
+
+      'am.campTitle': '[{n}회차 회귀]',
+      'am.campFirst': '[멸망의 밤이 다가옵니다]',
+      'am.mana': '마나 {n}',
+      'am.break': '{n}서클 돌파',
+      'am.breakCost': '마나 {n}',
+      'am.breakNeedClear': '{n}서클의 밤을 넘겨야 돌파할 수 있습니다',
+      'am.breakNeedMana': '마나가 {n} 모자랍니다',
+      'am.breakMax': '최고 서클입니다',
+      'am.breakDone': '[{n}서클에 도달했습니다]',
+      'am.pickNight': '들어갈 밤',
+      'am.nightInfo': '{m}분 · 마법진 한 칸에 룬 {n}개',
+      'am.start': '멸망의 밤으로',
+      'am.grimoire': '마도서',
+      'am.grimoireCount': '{found} / {total}',
+      'am.grimoireNone': '아직 기록된 마법이 없습니다',
+      'am.best': '최고 {t}',
+
+      'am.lostTitle': '[사망했습니다]',
+      'am.lostNote': '회귀합니다…',
+      'am.wonTitle': '[멸망의 밤을 넘겼습니다]',
+      'am.wonNote': '그러나 멸망은 다시 옵니다. 회귀합니다…',
+      'am.reportTime': '버틴 시간 {t}',
+      'am.reportKills': '처치 {n}',
+      'am.reportLevel': '레벨 {n}',
+      'am.reportMana': '마나 +{n}',
+      'am.reportFound': '새로 기록한 마법 {n}',
+      'am.regress': '회귀',
+
+      'am.bossAlert': '[재앙의 사도가 나타났습니다]',
+      'am.burstAlert': '[포위됩니다]',
+      'am.unlockAlert': '[마법진 {n}이 열렸습니다]',
+      'am.newSpell': '[새 마법: {name}]',
+      'am.paused': '멈춤',
+      'am.resume': '이어 하기',
+
+      'am.help.r1': '<b>끌어서 움직입니다.</b> 화면 어디든 누른 채로 밀면 그쪽으로 걷습니다. PC는 WASD나 방향키.',
+      'am.help.r2': '마법은 <b>마법진이 스스로 시전</b>합니다. 마법진마다 쿨타임과 유지 시간이 있습니다.',
+      'am.help.r3': '레벨이 오르면 <b>룬 하나를 골라 마법진에 새깁니다.</b> 마법진의 룬 조합이 곧 그 마법이고, 가장 많은 원소가 형태를 정합니다.',
+      'am.help.r4': '<b>서클</b>은 마법진 한 칸에 새길 수 있는 룬의 수입니다. 판 밖에서 마나를 모아 돌파합니다.',
+      'am.help.r5': '한 번 만든 마법은 <b>마도서</b>에 남아, 다음 회차에 룬을 고를 때 무엇이 될지 알려 줍니다.',
+      'am.help.r6': '밤이 끝나면 <b>재앙의 사도</b>가 옵니다. 쓰러뜨리면 그 서클의 밤을 넘긴 것입니다.',
+    },
+  });
+})();

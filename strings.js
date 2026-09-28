@@ -27,6 +27,7 @@
       'desc.defense': '길목에 사람을 세워 적을 막기',
       'desc.metro': '노선을 깔아 도시 키우기',
       'desc.roadworks': '도로를 손봐 차를 흐르게',
+      'desc.archmage': '룬을 조합해 멸망의 밤 버티기',
       'desc.sokoban': '상자를 밀어 제자리에',
       'desc.slitherlink': '숫자만큼 둘러 고리 하나 만들기',
       'desc.nurikabe': '섬만 남기고 바다 칠하기',
