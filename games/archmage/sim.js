@@ -72,13 +72,14 @@
   // 쌓여 서클을 올릴 까닭이 흐려진다.
   const maxLevel = (circle) => 15 + 5 * circle;
 
-  function create({ circle = 1, night = 1, seed = 1 } = {}) {
+  function create({ circle = 1, night = 1, seed = 1, gear = null } = {}) {
+    const g = gear || NO_GEAR;
     const state = {
-      circle, night, seed, depth: depthOf(night), bossNight: isBossNight(night),
+      circle, night, seed, gear: g, depth: depthOf(night), bossNight: isBossNight(night),
       world: rng(0x9e3779b9 ^ night),
       fate: rng(seed),
       t: 0, duration: nightLength(night),
-      player: { x: 0, y: 0, hp: PLAYER.hp, maxHp: PLAYER.hp, r: PLAYER.r, inv: 0, face: 1, leechLeft: LEECH_RATE, healed: 0 },
+      player: { x: 0, y: 0, hp: PLAYER.hp + g.hp, maxHp: PLAYER.hp + g.hp, r: PLAYER.r, inv: 0, face: 1, leechLeft: LEECH_RATE, healed: 0 },
       input: { x: 0, y: 0 },
       foes: [], gems: [], shots: [], orbits: [], zones: [], echoes: [],
       meteors: [], waves: [], tornados: [], quakes: [], rains: [], auras: [],
@@ -93,6 +94,23 @@
     offerNext(state);
     return state;
   }
+
+  // 장비가 없을 때. 장비의 능력은 판 밖(gear.js)에서 모아 이 꼴로 넘어온다.
+  const NO_GEAR = { dmg: 0, hp: 0, cd: 0, xp: 0, regen: 0, speed: 0, el: { fire: 0, water: 0, wind: 0, earth: 0 } };
+
+  // 장비를 마법에 얹는다. 자리를 고를 때 보이는 수치와 실제로 나가는 것이 같아야 하므로
+  // 마법을 만드는 모든 자리(새기기·미리 보기)가 이것을 거친다.
+  function geared(state, spell) {
+    if (!spell) return spell;
+    const g = state.gear;
+    if (spell.parts) spell.parts = spell.parts.map((part) => geared(state, part));
+    else {
+      spell.dmg *= 1 + g.dmg + (g.el[spell.primary] || 0);
+      spell.cd = Math.max(0.25, spell.cd * (1 - g.cd));
+    }
+    return spell;
+  }
+  const make = (state, runes) => geared(state, compose(runes));
 
   // --- 룬 제시와 새기기 ---
 
@@ -152,12 +170,12 @@
     if (mode === 'add') runes.push({ id, grade: 0 });
     else if (slot !== undefined && runes[slot] && runes[slot].id === id) runes[slot].grade += 1;
     else runes.find((r) => r.id === id).grade += 1;
-    return { mode, runes, spell: compose(runes) };
+    return { mode, runes, spell: make(state, runes) };
   }
 
   function previewErase(state, ci, slot) {
     const runes = state.circles[ci].runes.filter((_, i) => i !== slot).map((r) => ({ id: r.id, grade: r.grade }));
-    return { runes, spell: compose(runes) };
+    return { runes, spell: make(state, runes) };
   }
 
   // target: 룬이면 마법진 번호나 { ci, mode }, 재각인이면 { ci, slot }.
@@ -187,7 +205,7 @@
     const c = state.circles[ci];
     const before = c.spell ? c.spell.kind : null;
     c.runes = runes;
-    c.spell = compose(runes);
+    c.spell = make(state, runes);
     // 형태가 바뀌면 지금 떠 있는 것과 어긋나므로 곧바로 새 마법으로 다시 시작한다.
     if (!c.spell || c.spell.kind !== before) { c.cd = 0; c.active = 0; }
     if (c.spell) {
@@ -227,8 +245,10 @@
     let { x, y } = state.input;
     const len = Math.hypot(x, y);
     if (len > 1) { x /= len; y /= len; }
-    p.x += x * PLAYER.speed * dt;
-    p.y += y * PLAYER.speed * dt;
+    const speed = PLAYER.speed * (1 + state.gear.speed);
+    p.x += x * speed * dt;
+    p.y += y * speed * dt;
+    if (state.gear.regen && p.hp > 0) p.hp = Math.min(p.maxHp, p.hp + state.gear.regen * dt);
     if (Math.abs(x) > 0.1) p.face = x > 0 ? 1 : -1;
     p.moving = len > 0.1;
     if (p.inv > 0) p.inv -= dt;
@@ -975,7 +995,7 @@
       const d = Math.sqrt(d2) || 1;
       if (d < p.r + 6) {
         g.taken = true;
-        state.xp += g.v;
+        state.xp += g.v * (1 + state.gear.xp);
         state.events.push({ type: 'gem' });
         continue;
       }

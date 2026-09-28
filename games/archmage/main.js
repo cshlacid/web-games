@@ -6,6 +6,7 @@
   const Runes = window.ArchmageRunes;
   const S = window.ArchmageSim;
   const M = window.ArchmageMeta;
+  const G = window.ArchmageGear;
   const I = window.ArchmageIcons;
   const Sound = window.ArchmageSound;
   const { ELEMENTS } = Runes;
@@ -22,9 +23,8 @@
   const el = {};
   for (const [name, id] of [
     ['wrap', 'board-wrap'], ['canvas', 'board'], ['alert', 'alert'],
-    ['camp', 'camp'], ['campTitle', 'camp-title'], ['circleMark', 'circle-mark'], ['campCircle', 'camp-circle'],
-    ['campMana', 'camp-mana'], ['brk', 'break'], ['breakNote', 'break-note'], ['nightList', 'night-list'],
-    ['nightInfo', 'night-info'], ['grimoireCount', 'grimoire-count'], ['grimoireList', 'grimoire-list'], ['start', 'start'],
+    ['lobby', 'lobby'], ['lobbyBody', 'lobby-body'], ['tabs', 'tabs'], ['itemLayer', 'item-layer'], ['itemCard', 'item-card'],
+    ['status', 'status'], ['purseCircle', 'purse-circle'], ['purseMana', 'purse-mana'], ['purseGold', 'purse-gold'],
     ['levelup', 'levelup'], ['levelTitle', 'level-title'], ['levelNote', 'level-note'], ['choices', 'choices'],
     ['levelActions', 'level-actions'], ['levelBack', 'level-back'],
     ['result', 'result'], ['resultTitle', 'result-title'], ['resultNote', 'result-note'], ['report', 'report'], ['regress', 'regress'],
@@ -1143,89 +1143,287 @@
     return out;
   }
 
-  function renderCamp() {
-    el.campTitle.textContent = save.runs ? T('am.campTitle', { n: save.runs + 1 }) : T('am.campFirst');
-    el.circleMark.innerHTML = circleMarkSvg(save.circle);
-    el.campCircle.textContent = T('am.circle', { n: save.circle });
-    el.campMana.textContent = T('am.mana', { n: save.mana });
-    const b = M.breakCheck(save);
-    el.brk.textContent = b.why === 'max' ? T('am.breakMax') : T('am.break', { n: save.circle + 1 }) + ' · ' + T('am.breakCost', { n: b.cost });
-    el.brk.disabled = !b.ok;
-    el.breakNote.textContent = b.why === 'boss' ? T('am.breakNeedBoss', { n: b.need, have: b.have })
-      : b.why === 'mana' ? T('am.breakNeedMana', { n: b.cost - save.mana }) : '';
+  // --- 로비 ---
+  // 탭 여섯: 출전(밤 고르기)·장비(끼운 것)·가방(가진 것)·강화(서클 돌파·합성)·상점·마도서.
+  // 뱀서류 로비의 차례를 따랐다 — 싸우러 가는 것이 맨 앞, 둘러보는 것이 뒤.
+  let tab = 'night';
+  let openItem = null;
+  let lastDrop = null;
+
+  const html = (strings) => strings.join('');
+  const rarityColor = (r) => I.RARITY[r];
+  function itemName(it) {
+    const base = T('gear.slot.' + it.slot);
+    const el = it.el ? T('gear.el.' + it.el, { name: base }) : base;
+    return T('gear.rarity.' + it.rarity) + ' ' + el;
+  }
+  function statText(it, level) {
+    const one = Object.assign({}, it, { level: level || it.level });
+    const stat = G.STATS[it.slot].stat;
+    const v = G.statValue(one);
+    let out = T('gear.stat.' + stat, { v: stat === 'hp' ? Math.round(v) : stat === 'regen' ? v.toFixed(1) : Math.round(v * 100) });
+    if (it.el) out += ' · ' + T('gear.stat.el', { el: T('rune.' + it.el), v: Math.round(G.elementValue(one) * 100) });
+    return out;
+  }
+  function itemIcon(it, cls) {
+    return '<span class="item-icon ' + (cls || '') + '" style="--r:' + rarityColor(it.rarity) + (it.el ? ';--e:' + I.colorOf(it.el) : '') + '">' +
+      I.svg(it.slot) + '<span class="item-lv">' + it.level + '</span></span>';
+  }
+
+  function renderPurse() {
+    el.purseCircle.textContent = T('am.circle', { n: save.circle });
+    el.purseMana.textContent = save.mana;
+    el.purseGold.textContent = save.gold;
+    for (const b of el.tabs.children) b.setAttribute('aria-pressed', String(b.dataset.tab === tab));
+  }
+
+  function renderNightTab() {
     if (night > save.night) night = save.night;
     // 밤은 끝없이 늘어나므로 열린 것 가운데 가장 깊은 다섯만 보인다. 지난 밤을 다시 하는
-    // 것은 마나를 모으거나 조합을 찾으러 가는 것이라 가까운 밤이면 된다.
+    // 것은 마나·금화를 모으거나 조합을 찾으러 가는 것이라 가까운 밤이면 된다.
     let list = '';
     for (let n = Math.max(1, save.night - 4); n <= save.night; n++) {
       const tag = S.isBossNight(n) ? ' <span class="tag">' + T('am.bossTag') + '</span>' : '';
-      list += '<button class="btn small" type="button" data-c="' + n + '" aria-pressed="' + (n === night) + '">' + nightName(n) + tag + '</button>';
+      list += '<button class="btn small" type="button" data-night="' + n + '" aria-pressed="' + (n === night) + '">' + nightName(n) + tag + '</button>';
     }
-    el.nightList.innerHTML = list;
     let info = T('am.nightInfo', { m: Math.round(S.nightLength(night) / 60 * 10) / 10, n: save.circle, max: S.maxLevel(save.circle) });
     if (S.isBossNight(night)) info = T('am.bossNightInfo') + ' · ' + info;
     if (save.best[night]) info += ' · ' + T('am.best', { t: fmt(save.best[night]) });
-    el.nightInfo.innerHTML = sockets([], save.circle) + '<br>' + info;
+    return html([
+      '<p class="sheet-title sys">', save.runs ? T('am.campTitle', { n: save.runs + 1 }) : T('am.campFirst'), '</p>',
+      '<div class="camp-circle"><svg class="circle-mark" viewBox="0 0 100 100" aria-hidden="true">', circleMarkSvg(save.circle), '</svg>',
+      '<div><p class="camp-big">', T('am.circle', { n: save.circle }), '</p><p class="sheet-note">',
+      T('am.bossProgress', { have: M.bossCount(save) }), '</p></div></div>',
+      '<div class="night-pick"><p class="label">', T('am.pickNight'), '</p><div class="night-list">', list, '</div>',
+      '<p class="sheet-note small">', sockets([], save.circle), '<br>', info, '</p></div>',
+      '<div class="sheet-actions center"><button class="btn big" type="button" data-act="start">', T('am.start'), '</button></div>',
+    ]);
+  }
+
+  function renderGearTab() {
+    const tiles = G.SLOTS.map((slot) => {
+      const it = G.equippedIn(save, slot);
+      if (!it) {
+        return '<button class="gear-tile empty" type="button" data-slot="' + slot + '"><span class="item-icon ghost">' + I.svg(slot) +
+          '</span><span class="gear-name">' + T('gear.slot.' + slot) + '</span><span class="gear-stat">' + T('am.empty') + '</span></button>';
+      }
+      return '<button class="gear-tile" type="button" data-uid="' + it.uid + '">' + itemIcon(it) +
+        '<span class="gear-name" style="color:' + rarityColor(it.rarity) + '">' + itemName(it) + '</span><span class="gear-stat">' + statText(it) + '</span></button>';
+    }).join('');
+    const g = G.loadout(save);
+    const sum = [
+      T('gear.stat.dmg', { v: Math.round(g.dmg * 100) }), T('gear.stat.hp', { v: Math.round(g.hp) }),
+      T('gear.stat.cd', { v: Math.round(g.cd * 100) }), T('gear.stat.xp', { v: Math.round(g.xp * 100) }),
+      T('gear.stat.regen', { v: g.regen.toFixed(1) }), T('gear.stat.speed', { v: Math.round(g.speed * 100) }),
+    ];
+    for (const e of Runes.ELEMENTS) if (g.el[e]) sum.push(T('gear.stat.el', { el: T('rune.' + e), v: Math.round(g.el[e] * 100) }));
+    return html([
+      '<p class="label">', T('am.tab.gear'), '</p><div class="gear-grid">', tiles, '</div>',
+      '<p class="label">', T('gear.total'), '</p><ul class="gear-sum">', sum.map((x) => '<li>' + x + '</li>').join(''), '</ul>',
+    ]);
+  }
+
+  function bagItems() {
+    return save.items.slice().sort((a, b) => b.rarity - a.rarity || G.SLOTS.indexOf(a.slot) - G.SLOTS.indexOf(b.slot) || b.level - a.level);
+  }
+
+  function renderBagTab() {
+    const items = bagItems();
+    const cells = items.map((it) => '<button class="bag-cell' + (G.isEquipped(save, it) ? ' on' : '') + '" type="button" data-uid="' + it.uid + '">' +
+      itemIcon(it) + '</button>').join('');
+    return html([
+      '<p class="label">', T('am.tab.bag'), ' ', items.length, '</p>',
+      items.length ? '<div class="bag-grid">' + cells + '</div>' : '<p class="sheet-note">' + T('gear.bagEmpty') + '</p>',
+      '<p class="sheet-note small">', T('gear.bagNote'), '</p>',
+    ]);
+  }
+
+  function mergeable() {
+    let n = 0;
+    for (const slot of G.SLOTS) {
+      for (let r = 0; r < G.RARITIES - 1; r++) n += Math.floor(save.items.filter((it) => it.slot === slot && it.rarity === r).length / 3);
+    }
+    return n;
+  }
+
+  function renderForgeTab() {
+    const b = M.breakCheck(save);
+    const note = b.why === 'boss' ? T('am.breakNeedBoss', { n: b.need, have: b.have })
+      : b.why === 'mana' ? T('am.breakNeedMana', { n: b.cost - save.mana }) : '';
+    const breakLabel = b.why === 'max' ? T('am.breakMax') : T('am.break', { n: save.circle + 1 }) + ' · ' + T('am.breakCost', { n: b.cost });
+    const m = mergeable();
+    return html([
+      '<div class="forge-card"><p class="label">', T('forge.circleTitle'), '</p><p class="sheet-note small">', T('forge.circleNote'), '</p>',
+      '<button class="btn" type="button" data-act="break"', b.ok ? '' : ' disabled', '>', breakLabel, '</button>',
+      '<p class="sheet-note small">', note, '</p></div>',
+      '<div class="forge-card"><p class="label">', T('forge.mergeTitle'), '</p><p class="sheet-note small">', T('forge.mergeNote'), '</p>',
+      '<button class="btn" type="button" data-act="merge"', m ? '' : ' disabled', '>', T('forge.mergeAll', { n: m }), '</button></div>',
+      '<div class="forge-card"><p class="label">', T('forge.upTitle'), '</p><p class="sheet-note small">', T('forge.upNote'), '</p></div>',
+    ]);
+  }
+
+  function renderShopTab() {
+    const chests = Object.keys(G.CHESTS).map((kind) => {
+      const c = G.CHESTS[kind];
+      let total = 0;
+      for (const w of c.weights) total += w;
+      const odds = c.weights.map((w, r) => (w ? '<span style="color:' + rarityColor(r) + '">' + T('gear.rarity.' + r) + ' ' + Math.round((w / total) * 100) + '%</span>' : ''))
+        .filter(Boolean).join(' · ');
+      return '<div class="shop-card"><span class="item-icon big" style="--r:' + rarityColor(kind === 'fine' ? 3 : 1) + '">' + I.svg('shop') + '</span>' +
+        '<div><p class="shop-name">' + T('shop.' + kind) + '</p><p class="sheet-note small">' + odds + '</p></div>' +
+        '<button class="btn small" type="button" data-chest="' + kind + '"' + (save.gold >= c.cost ? '' : ' disabled') + '>' +
+        '<span class="purse-glyph">' + I.svg('coin') + '</span> ' + c.cost + '</button></div>';
+    }).join('');
+    return html(['<p class="label">', T('am.tab.shop'), '</p>', chests, '<p class="sheet-note small">', T('shop.note'), '</p>']);
+  }
+
+  function renderBookTab() {
     const g = M.grimoireCount(save, save.circle);
-    el.grimoireCount.textContent = T('am.grimoireCount', g) + ' · ' + T('am.specialCount', { found: g.specialFound, total: g.special });
     const keys = Runes.allKeys(save.circle).filter((key) => save.grimoire[key]);
-    el.grimoireList.innerHTML = keys.length
+    const list = keys.length
       ? keys.map((key) => {
         const runes = runesFromKey(key);
         const tag = Runes.isSpecial(key) ? ' <span class="tag">' + T('am.special') + '</span>' : '';
         return '<li>' + glyphs(runes) + ' ' + spellName(Runes.compose(runes)) + tag + '</li>';
       }).join('')
       : '<li class="sheet-note">' + T('am.grimoireNone') + '</li>';
+    return html([
+      '<p class="label">', T('am.grimoire'), ' <b class="count">', T('am.grimoireCount', g), ' · ',
+      T('am.specialCount', { found: g.specialFound, total: g.special }), '</b></p><ul class="grimoire-list">', list, '</ul>',
+    ]);
   }
 
-  el.nightList.addEventListener('click', (ev) => {
-    const btn = ev.target.closest('button');
-    if (!btn) return;
-    night = Number(btn.dataset.c);
+  const TABS = { night: renderNightTab, gear: renderGearTab, bag: renderBagTab, forge: renderForgeTab, shop: renderShopTab, book: renderBookTab };
+
+  function renderLobby() {
+    renderPurse();
+    el.lobbyBody.innerHTML = TABS[tab]();
+    el.lobbyBody.scrollTop = 0;
+    renderItem();
+  }
+
+  // 장비 한 점. 가방·장비 탭에서 눌러 연다. 상점에서 막 얻은 것도 여기로 보여 준다.
+  function renderItem() {
+    const it = openItem ? G.find(save, openItem) : null;
+    el.itemLayer.hidden = !it;
+    if (!it) return;
+    const on = G.isEquipped(save, it);
+    const can = G.canUpgrade(it);
+    const cost = G.upgradeCost(it);
+    const next = can ? '<p class="sheet-note small">' + T('gear.next', { text: statText(it, it.level + 1) }) + '</p>' : '';
+    el.itemCard.innerHTML = html([
+      lastDrop === it.uid ? '<p class="sheet-title sys">' + T('gear.gotTitle') + '</p>' : '',
+      '<div class="item-head">', itemIcon(it, 'big'), '<div><p class="shop-name" style="color:', rarityColor(it.rarity), '">', itemName(it), '</p>',
+      '<p class="sheet-note small">', T('gear.level', { n: it.level, max: G.MAX_LEVEL[it.rarity] }), on ? ' · ' + T('gear.equipped') : '', '</p></div></div>',
+      '<p>', statText(it), '</p>', next,
+      '<div class="sheet-actions wrap">',
+      on ? '<button class="btn ghost" type="button" data-item="off">' + T('gear.unequip') + '</button>'
+        : '<button class="btn" type="button" data-item="on">' + T('gear.equip') + '</button>',
+      '<button class="btn" type="button" data-item="up"', can && save.gold >= cost ? '' : ' disabled', '>',
+      can ? T('gear.upgrade') + ' <span class="purse-glyph">' + I.svg('coin') + '</span> ' + cost : T('gear.maxed'), '</button>',
+      on ? '' : '<button class="btn ghost" type="button" data-item="sell">' + T('gear.sell', { n: G.sellPrice(it) }) + '</button>',
+      '<button class="btn ghost" type="button" data-item="close">', T('ui.close'), '</button>',
+      '</div>',
+    ]);
+  }
+
+  el.tabs.addEventListener('click', (ev) => {
+    const b = ev.target.closest('button');
+    if (!b) return;
+    tab = b.dataset.tab;
+    openItem = null;
     Sound.play('click');
-    renderCamp();
-  });
-  el.brk.addEventListener('click', () => {
-    if (!M.breakthrough(save)) return;
-    store();
-    Sound.play('unlock');
-    alert(T('am.breakDone', { n: save.circle }), 2200);
-    renderCamp();
+    renderLobby();
   });
 
-  function showCamp() {
+  el.lobbyBody.addEventListener('click', (ev) => {
+    const b = ev.target.closest('button');
+    if (!b || b.disabled) return;
+    if (b.dataset.night) { night = Number(b.dataset.night); Sound.play('click'); renderLobby(); return; }
+    if (b.dataset.uid) { openItem = Number(b.dataset.uid); lastDrop = null; Sound.play('click'); renderItem(); return; }
+    if (b.dataset.slot) { tab = 'bag'; Sound.play('click'); renderLobby(); return; }
+    if (b.dataset.chest) {
+      const got = G.openChest(save, b.dataset.chest, Math.random);
+      if (!got) return;
+      store();
+      openItem = got.uid;
+      lastDrop = got.uid;
+      Sound.play('discover');
+      renderLobby();
+      return;
+    }
+    const act = b.dataset.act;
+    if (act === 'start') startRun();
+    else if (act === 'break') {
+      if (!M.breakthrough(save)) return;
+      store();
+      Sound.play('unlock');
+      alert(T('am.breakDone', { n: save.circle }), 2200);
+      renderLobby();
+    } else if (act === 'merge') {
+      const made = G.mergeAll(save);
+      store();
+      Sound.play('unlock');
+      alert(T('forge.merged', { n: made.length }), 1800);
+      renderLobby();
+    }
+  });
+
+  el.itemLayer.addEventListener('click', (ev) => {
+    if (ev.target === el.itemLayer) { openItem = null; renderItem(); return; }
+    const b = ev.target.closest('button');
+    if (!b || b.disabled) return;
+    const it = G.find(save, openItem);
+    const act = b.dataset.item;
+    if (act === 'close' || !it) { openItem = null; renderItem(); return; }
+    if (act === 'on') { G.equip(save, it.uid); Sound.play('engrave'); }
+    else if (act === 'off') { G.unequip(save, it.slot); Sound.play('click'); }
+    else if (act === 'up') { if (!G.upgrade(save, it.uid)) return; Sound.play('level'); }
+    else if (act === 'sell') { G.sell(save, it.uid); openItem = null; Sound.play('gem'); }
+    lastDrop = null;
+    store();
+    renderPurse();
+    el.lobbyBody.innerHTML = TABS[tab]();
+    renderItem();
+  });
+
+  function showLobby() {
     mode = 'camp';
     setPaused(false);
     state = S.create({ circle: save.circle, night, seed: 1 });
     state.pending = null;
     fx = [];
-    renderCamp();
     el.result.hidden = true;
     el.levelup.hidden = true;
-    el.camp.hidden = false;
-    slotSig = '';
-    renderSlots();
+    el.lobby.hidden = false;
+    el.slots.hidden = true;
+    // 레벨·처치·남은 시간은 싸우는 동안의 것이라 로비에서는 감춘다.
+    el.status.style.visibility = 'hidden';
+    layout();
+    renderLobby();
   }
 
   function startRun() {
     mode = 'run';
     seenThisRun = new Set();
-    state = S.create({ circle: save.circle, night, seed: (Date.now() ^ (Math.random() * 1e9)) >>> 0 });
+    state = S.create({ circle: save.circle, night, gear: G.loadout(save), seed: (Date.now() ^ (Math.random() * 1e9)) >>> 0 });
     if (state.bossNight) alert(T('am.bossNightAlert'), 2400);
     fx = [];
     acc = 0;
-    el.camp.hidden = true;
+    el.lobby.hidden = true;
+    el.slots.hidden = false;
+    el.status.style.visibility = '';
     el.result.hidden = true;
     slotSig = '';
     renderSlots();
+    layout();
     Sound.play('click');
     showLevelUp();
   }
-  el.start.addEventListener('click', startRun);
 
   function finish() {
     const res = S.summary(state);
-    const { gained, found, opened } = M.settle(save, res);
+    const { gained, gold, drops, found, opened } = M.settle(save, res, Math.random);
     // 넘긴 밤이 가장 깊은 밤이면 다음 회차는 새로 열린 밤에서 시작한다.
     if (opened) night = save.night;
     store();
@@ -1237,13 +1435,15 @@
       T('am.reportLevel', { n: res.level }),
       T('am.reportKills', { n: res.kills }),
       T('am.reportMana', { n: gained }),
+      T('am.reportGold', { n: gold }),
       T('am.reportFound', { n: found.length }),
-    ].concat(opened ? [T('am.nightOpened', { night: nightName(save.night) })] : [])
+    ].concat(drops.map((it) => T('am.reportDrop', { name: '<b style="color:' + rarityColor(it.rarity) + '">' + itemName(it) + '</b>' })))
+      .concat(opened ? [T('am.nightOpened', { night: nightName(save.night) })] : [])
       .map((s) => '<li>' + s + '</li>').join('');
     el.result.hidden = false;
     Sound.play(won ? 'won' : 'lost');
   }
-  el.regress.addEventListener('click', () => { Sound.play('click'); showCamp(); });
+  el.regress.addEventListener('click', () => { Sound.play('click'); showLobby(); });
 
   // --- 한 프레임 ---
   let last = 0, acc = 0;
@@ -1291,7 +1491,9 @@
   bindSoundToggle(el.toggleBgm, 'bgm', (on) => Sound.setBgm(on));
   bindSoundToggle(el.toggleSfx, 'sfx', (on) => Sound.setSfx(on));
 
-  showCamp();
+  // 로비의 아이콘. HTML에는 이름만 적고 경로는 icons.js에서 가져온다.
+  for (const node of document.querySelectorAll('[data-glyph]')) node.innerHTML = I.svg(node.dataset.glyph);
+  showLobby();
   layout();
   requestAnimationFrame((now) => { last = now; requestAnimationFrame(frame); });
 
