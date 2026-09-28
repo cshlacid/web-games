@@ -1,0 +1,658 @@
+'use strict';
+
+// 멸망의 밤 한 판. 화면을 모르는 결정적 시뮬레이션이라 node에서 판 하나를 끝까지
+// 돌려 규칙과 균형을 본다. 화면은 state를 읽어 그리고, 손은 state.input만 쓴다.
+//
+// 난수를 둘로 나눴다. 적이 오는 차례(world)는 서클로만 정해져 **회차마다 같은 밤이
+// 온다** — 회귀자가 미래를 아는 근거다. 룬 제시(fate)는 회차마다 달라 같은 밤을
+// 다른 조합으로 넘게 된다.
+(function () {
+  const Runes = typeof module !== 'undefined' && module.exports ? require('./runes.js') : window.ArchmageRunes;
+  const { ELEMENTS, MODIFIERS, compose } = Runes;
+
+  const PLAYER = { hp: 120, r: 12, speed: 118, pickup: 80 };
+  // 적은 화면 바깥 이 거리의 고리에서 나온다. 화면의 반대각선(약 330)보다 멀어야
+  // 눈앞에서 솟아나지 않는다.
+  const SPAWN_RING = 420;
+  // 이보다 멀어진 적은 다시 고리로 데려온다. 도망쳐서 떼어 낸 적이 영영 안 오면
+  // 밤이 싱거워지고, 쫓아오게 두면 뒤에 수백 마리가 쌓인다.
+  const LEASH = 760;
+  const MAX_FOES = 320;
+  const MAX_GEMS = 280;
+  const RANGE = 330;
+  const CELL = 48;
+
+  const FOES = {
+    slime: { hp: 14, speed: 40, r: 11, dmg: 8, xp: 1, from: 0, weight: 4 },
+    goblin: { hp: 22, speed: 56, r: 11, dmg: 10, xp: 1, from: 0.12, weight: 4 },
+    wolf: { hp: 16, speed: 92, r: 10, dmg: 8, xp: 1, from: 0.3, weight: 3 },
+    wraith: { hp: 36, speed: 66, r: 12, dmg: 12, xp: 2, from: 0.5, weight: 2 },
+    golem: { hp: 150, speed: 32, r: 18, dmg: 18, xp: 6, from: 0.62, weight: 1 },
+    boss: { hp: 1500, speed: 50, r: 34, dmg: 28, xp: 0 },
+  };
+
+  // 룬 제시의 무게. 원소가 없으면 마법이 나가지 않으므로 수식어보다 자주 나온다.
+  const WEIGHT = { element: 3, modifier: 1 };
+  // 판 안에서 마법진이 늘어나는 레벨.
+  const CIRCLE_UNLOCK = [1, 4, 10];
+  const ECHO_GAP = 0.35;
+  const ECHO_MULT = 0.6;
+
+  function rng(seed) {
+    // 1, 2, 3처럼 붙은 씨앗은 첫 값들이 서로 닮아 나온다. 한 번 섞어서 쓴다.
+    let a = Math.imul((seed >>> 0) ^ 0x5bd1e995, 0x27d4eb2d) >>> 0;
+    return function () {
+      a = (a + 0x6d2b79f5) >>> 0;
+      let t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  // 서클이 오를수록 밤이 길다. 9서클이면 15분.
+  const nightLength = (circle) => 300 + 75 * (circle - 1);
+  const xpNext = (level) => Math.floor(3 + level * 1.6 + level * level * 0.05);
+
+  function create({ circle = 1, seed = 1 } = {}) {
+    const state = {
+      circle, seed,
+      world: rng(0x9e3779b9 ^ circle),
+      fate: rng(seed),
+      t: 0, duration: nightLength(circle),
+      player: { x: 0, y: 0, hp: PLAYER.hp, maxHp: PLAYER.hp, r: PLAYER.r, inv: 0, face: 1 },
+      input: { x: 0, y: 0 },
+      foes: [], gems: [], shots: [], orbits: [], zones: [], echoes: [],
+      circles: [0, 1, 2].map(() => ({ runes: [], spell: null, cd: 0, active: 0 })),
+      unlocked: 1,
+      level: 1, xp: 0, kills: 0, picks: 0,
+      queued: 1, pending: null,
+      spawnAcc: 0, nextBurst: 60, boss: null, bossSpawned: false,
+      over: null, events: [], formed: new Set(),
+      nextId: 1,
+    };
+    offerNext(state);
+    return state;
+  }
+
+  // --- 룬 제시와 새기기 ---
+
+  function capacity(state) { return state.circle; }
+
+  function placeMode(state, id, ci) {
+    if (ci >= state.unlocked) return null;
+    const c = state.circles[ci];
+    if (c.runes.length < capacity(state)) return 'add';
+    if (c.runes.some((r) => r.id === id)) return 'grade';
+    return null;
+  }
+
+  const placeable = (state, id) => [0, 1, 2].some((ci) => placeMode(state, id, ci));
+  const anyFull = (state) => state.circles.slice(0, state.unlocked).some((c) => c.runes.length >= capacity(state));
+
+  function offerNext(state) {
+    if (state.pending || state.queued <= 0 || state.over) return;
+    state.queued -= 1;
+    const first = state.picks === 0;
+    // 처음 하나는 원소만 낸다. 수식어부터 새기면 첫 마법이 나가지 않는다. 1서클도
+    // 수식어를 내지 않는다 — 한 칸짜리 마법진에서는 원소와 함께 새길 자리가 없어,
+    // 고르는 순간 그 마법진이 영영 시전하지 않는 함정이 된다.
+    const pool = [];
+    for (const id of ELEMENTS) pool.push({ id, w: WEIGHT.element });
+    if (!first && capacity(state) >= 2) for (const id of MODIFIERS) pool.push({ id, w: WEIGHT.modifier });
+    const options = [];
+    const left = pool.filter((p) => placeable(state, p.id));
+    while (options.length < 3 && left.length) {
+      let total = 0;
+      for (const p of left) total += p.w;
+      let roll = state.fate() * total;
+      let i = 0;
+      while (i < left.length - 1 && roll >= left[i].w) { roll -= left[i].w; i++; }
+      options.push({ type: 'rune', id: left[i].id });
+      left.splice(i, 1);
+    }
+    // 칸이 찼으면 가끔 재각인을 낸다. 없으면 첫 선택에 묶여 새 조합을 찾을 길이 없다.
+    if (!first && anyFull(state) && state.fate() < 0.3) {
+      if (options.length >= 3) options.pop();
+      options.push({ type: 'erase' });
+    }
+    while (options.length < 3) options.push({ type: 'heal' });
+    state.pending = { options, level: state.level };
+  }
+
+  function previewPlace(state, id, ci) {
+    const mode = placeMode(state, id, ci);
+    if (!mode) return null;
+    const runes = state.circles[ci].runes.map((r) => ({ id: r.id, grade: r.grade }));
+    if (mode === 'add') runes.push({ id, grade: 0 });
+    else runes.find((r) => r.id === id).grade += 1;
+    return { mode, runes, spell: compose(runes) };
+  }
+
+  function previewErase(state, ci, slot) {
+    const runes = state.circles[ci].runes.filter((_, i) => i !== slot).map((r) => ({ id: r.id, grade: r.grade }));
+    return { runes, spell: compose(runes) };
+  }
+
+  // target: 룬이면 마법진 번호, 재각인이면 { ci, slot }.
+  function choose(state, index, target) {
+    const offer = state.pending;
+    if (!offer) return false;
+    const opt = offer.options[index];
+    if (!opt) return false;
+    if (opt.type === 'rune') {
+      const p = previewPlace(state, opt.id, target);
+      if (!p) return false;
+      setRunes(state, target, p.runes);
+    } else if (opt.type === 'erase') {
+      if (!target || !state.circles[target.ci] || !state.circles[target.ci].runes[target.slot]) return false;
+      setRunes(state, target.ci, previewErase(state, target.ci, target.slot).runes);
+    } else if (opt.type === 'heal') {
+      state.player.hp = Math.min(state.player.maxHp, state.player.hp + state.player.maxHp * 0.4);
+    }
+    state.picks += 1;
+    state.pending = null;
+    offerNext(state);
+    return true;
+  }
+
+  function setRunes(state, ci, runes) {
+    const c = state.circles[ci];
+    const before = c.spell ? c.spell.kind : null;
+    c.runes = runes;
+    c.spell = compose(runes);
+    // 형태가 바뀌면 지금 떠 있는 것과 어긋나므로 곧바로 새 마법으로 다시 시작한다.
+    if (!c.spell || c.spell.kind !== before) { c.cd = 0; c.active = 0; }
+    if (c.spell) {
+      state.events.push({ type: 'formed', ci, key: c.spell.key });
+      state.formed.add(c.spell.key);
+    }
+  }
+
+  // --- 한 걸음 ---
+
+  function step(state, dt) {
+    if (state.over || state.pending) return;
+    state.t += dt;
+    movePlayer(state, dt);
+    spawn(state, dt);
+    moveFoes(state, dt);
+    const grid = buildGrid(state);
+    separate(state, grid);
+    cast(state, dt, grid);
+    updateShots(state, dt, grid);
+    updateOrbits(state, dt, grid);
+    updateZones(state, dt, grid);
+    contact(state, dt, grid);
+    updateGems(state, dt);
+    sweep(state);
+    levelUp(state);
+  }
+
+  function movePlayer(state, dt) {
+    const p = state.player;
+    let { x, y } = state.input;
+    const len = Math.hypot(x, y);
+    if (len > 1) { x /= len; y /= len; }
+    p.x += x * PLAYER.speed * dt;
+    p.y += y * PLAYER.speed * dt;
+    if (Math.abs(x) > 0.1) p.face = x > 0 ? 1 : -1;
+    p.moving = len > 0.1;
+    if (p.inv > 0) p.inv -= dt;
+  }
+
+  function foeScale(state) {
+    return (1 + 0.6 * (state.circle - 1)) * (1 + 1.2 * Math.min(1, state.t / state.duration));
+  }
+
+  function addFoe(state, type, angle, dist) {
+    const def = FOES[type];
+    const p = state.player;
+    const hp = def.hp * foeScale(state);
+    const foe = {
+      id: state.nextId++, type,
+      x: p.x + Math.cos(angle) * dist, y: p.y + Math.sin(angle) * dist,
+      hp, maxHp: hp, r: def.r, speed: def.speed, dmg: def.dmg * (1 + 0.2 * (state.circle - 1)),
+      slowT: 0, slow: 0, burnT: 0, burn: 0, kx: 0, ky: 0, flash: 0, dead: false,
+      phase: state.world() * Math.PI * 2,
+    };
+    state.foes.push(foe);
+    return foe;
+  }
+
+  function pickType(state) {
+    const frac = state.t / state.duration;
+    let total = 0;
+    const open = [];
+    for (const type in FOES) {
+      const d = FOES[type];
+      if (d.weight && frac >= d.from) { open.push(type); total += d.weight; }
+    }
+    let roll = state.world() * total;
+    for (const type of open) {
+      if (roll < FOES[type].weight) return type;
+      roll -= FOES[type].weight;
+    }
+    return open[open.length - 1];
+  }
+
+  function spawn(state, dt) {
+    const frac = Math.min(1, state.t / state.duration);
+    let rate = (0.8 + 3.2 * frac) * (1 + 0.2 * (state.circle - 1));
+    if (state.bossSpawned) rate *= 0.4;
+    state.spawnAcc += rate * dt;
+    while (state.spawnAcc >= 1) {
+      state.spawnAcc -= 1;
+      if (state.foes.length >= MAX_FOES) continue;
+      addFoe(state, pickType(state), state.world() * Math.PI * 2, SPAWN_RING + state.world() * 60);
+    }
+    // 1분마다 사방에서 한꺼번에 조여 온다. 고르게만 오면 한자리에서 버티는 것이
+    // 정답이 되어 움직일 이유가 없어진다.
+    if (state.t >= state.nextBurst && !state.bossSpawned) {
+      const n = 10 + Math.floor(state.nextBurst / 60) * 3;
+      const type = state.nextBurst % 120 === 0 ? 'wolf' : 'slime';
+      // 포위에는 틈을 하나 남긴다. 빈틈없이 두르면 빠른 늑대 떼에게는 피할 길이 없다.
+      const gap = state.world() * Math.PI * 2;
+      for (let i = 0; i < n && state.foes.length < MAX_FOES; i++) {
+        addFoe(state, type, gap + 0.6 + (i / n) * (Math.PI * 2 - 1.2), SPAWN_RING - 40);
+      }
+      state.events.push({ type: 'burst' });
+      state.nextBurst += 60;
+    }
+    if (!state.bossSpawned && state.t >= state.duration) {
+      state.bossSpawned = true;
+      const boss = addFoe(state, 'boss', state.world() * Math.PI * 2, SPAWN_RING);
+      boss.hp = boss.maxHp = FOES.boss.hp * (1 + 0.9 * (state.circle - 1));
+      boss.charge = 0;
+      boss.chargeCd = 4;
+      state.boss = boss;
+      state.events.push({ type: 'boss' });
+    }
+  }
+
+  function moveFoes(state, dt) {
+    const p = state.player;
+    for (const f of state.foes) {
+      if (f.flash > 0) f.flash -= dt;
+      if (f.slowT > 0) { f.slowT -= dt; if (f.slowT <= 0) f.slow = 0; }
+      if (f.burnT > 0) {
+        f.burnT -= dt;
+        damage(state, f, f.burn * dt, null);
+        if (f.burnT <= 0) f.burn = 0;
+      }
+      let dx = p.x - f.x;
+      let dy = p.y - f.y;
+      const d = Math.hypot(dx, dy) || 1;
+      if (d > LEASH) {
+        const a = Math.atan2(-dy, -dx) + Math.PI + (state.world() - 0.5) * 1.2;
+        f.x = p.x + Math.cos(a) * SPAWN_RING;
+        f.y = p.y + Math.sin(a) * SPAWN_RING;
+        continue;
+      }
+      dx /= d; dy /= d;
+      let speed = f.speed * (1 - f.slow);
+      if (f.type === 'boss') {
+        // 사도는 가끔 몸을 던진다. 쫓기만 하면 도는 것만으로 영영 안 닿는다.
+        f.chargeCd -= dt;
+        if (f.charge > 0) { f.charge -= dt; speed *= 3.4; }
+        else if (f.chargeCd <= 0 && d < 300) { f.charge = 0.8; f.chargeCd = 6; state.events.push({ type: 'charge' }); }
+      }
+      f.x += (dx * speed + f.kx) * dt;
+      f.y += (dy * speed + f.ky) * dt;
+      const decay = Math.exp(-8 * dt);
+      f.kx *= decay; f.ky *= decay;
+    }
+  }
+
+  function buildGrid(state) {
+    const grid = new Map();
+    const foes = state.foes;
+    for (let i = 0; i < foes.length; i++) {
+      const f = foes[i];
+      const k = cellKey(Math.floor(f.x / CELL), Math.floor(f.y / CELL));
+      const list = grid.get(k);
+      if (list) list.push(f); else grid.set(k, [f]);
+    }
+    return grid;
+  }
+
+  const cellKey = (cx, cy) => (cx + 32768) * 65536 + (cy + 32768);
+
+  function near(grid, x, y, r, fn) {
+    const x0 = Math.floor((x - r - 20) / CELL), x1 = Math.floor((x + r + 20) / CELL);
+    const y0 = Math.floor((y - r - 20) / CELL), y1 = Math.floor((y + r + 20) / CELL);
+    for (let cx = x0; cx <= x1; cx++) {
+      for (let cy = y0; cy <= y1; cy++) {
+        const list = grid.get(cellKey(cx, cy));
+        if (!list) continue;
+        for (const f of list) {
+          if (f.dead) continue;
+          const rr = r + f.r;
+          const dx = f.x - x, dy = f.y - y;
+          if (dx * dx + dy * dy <= rr * rr) fn(f);
+        }
+      }
+    }
+  }
+
+  // 겹친 적을 밀어낸다. 이것이 없으면 수백 마리가 한 점에 겹쳐 무리가 아니라 한 마리로 보인다.
+  function separate(state, grid) {
+    for (const list of grid.values()) {
+      for (let i = 0; i < list.length; i++) {
+        const a = list[i];
+        for (let j = i + 1; j < list.length; j++) {
+          const b = list[j];
+          const dx = b.x - a.x, dy = b.y - a.y;
+          const rr = a.r + b.r;
+          const d2 = dx * dx + dy * dy;
+          if (d2 >= rr * rr || d2 === 0) continue;
+          const d = Math.sqrt(d2);
+          const push = (rr - d) * 0.5 / d;
+          // 큰 적은 작은 적에게 덜 밀린다.
+          const wa = b.r / rr, wb = a.r / rr;
+          a.x -= dx * push * wa * 2; a.y -= dy * push * wa * 2;
+          b.x += dx * push * wb * 2; b.y += dy * push * wb * 2;
+        }
+      }
+    }
+  }
+
+  function nearest(state, x, y, range, skip) {
+    let best = null, bd = range * range;
+    for (const f of state.foes) {
+      if (f.dead || (skip && skip.has(f))) continue;
+      const dx = f.x - x, dy = f.y - y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < bd) { bd = d2; best = f; }
+    }
+    return best;
+  }
+
+  function cast(state, dt, grid) {
+    state.circles.forEach((c, ci) => {
+      if (ci >= state.unlocked || !c.spell) return;
+      if (c.active > 0) c.active -= dt;
+      if (c.cd > 0) { c.cd -= dt; return; }
+      if (!fire(state, ci, c.spell, 1)) return;
+      c.active = c.spell.dur;
+      // 쿨타임은 유지 시간이 끝난 뒤부터 센다. 겹쳐 세면 유지가 긴 마법이 끊김 없이
+      // 이어져 쿨타임이 뜻을 잃는다.
+      c.cd = c.spell.dur + c.spell.cd;
+      for (let k = 1; k <= c.spell.echo; k++) state.echoes.push({ ci, at: state.t + ECHO_GAP * k, mult: ECHO_MULT });
+      state.events.push({ type: 'cast', ci, el: c.spell.primary, kind: c.spell.kind });
+    });
+    if (state.echoes.length) {
+      const due = state.echoes.filter((e) => e.at <= state.t);
+      if (due.length) {
+        state.echoes = state.echoes.filter((e) => e.at > state.t);
+        for (const e of due) {
+          const s = state.circles[e.ci].spell;
+          if (s && fire(state, e.ci, s, e.mult)) state.events.push({ type: 'echo', ci: e.ci, el: s.primary });
+        }
+      }
+    }
+  }
+
+  function fire(state, ci, s, mult) {
+    const p = state.player;
+    const dmg = s.dmg * mult;
+    const common = { ci, el: s.primary, dmg, slow: s.slow, burn: s.burn, knock: s.knock, chain: s.chain, homing: s.homing };
+    if (s.kind === 'orbit') {
+      const count = s.count + 2 * s.omni;
+      state.orbits.push(Object.assign({}, common, {
+        life: s.dur, total: s.dur, count, blade: s.size,
+        radius: 58 + s.size * 1.4 + 18 * s.homing, spin: s.speed, angle: state.fate() * Math.PI * 2,
+      }));
+      return true;
+    }
+    const target = nearest(state, p.x, p.y, RANGE);
+    if (!target) return false;
+    if (s.kind === 'zone') {
+      const taken = new Set();
+      let t = target;
+      for (let i = 0; i < 1 + s.omni && t; i++) {
+        taken.add(t);
+        state.zones.push(Object.assign({}, common, { x: t.x, y: t.y, r: s.size, life: s.dur, total: s.dur, tick: 0 }));
+        t = nearest(state, p.x, p.y, RANGE, taken);
+      }
+      return true;
+    }
+    const base = Math.atan2(target.y - p.y, target.x - p.x);
+    const n = s.count + 3 * s.omni;
+    for (let i = 0; i < n; i++) {
+      // 전방위면 고르게 두르고, 아니면 겨눈 쪽으로 부채꼴을 편다.
+      const a = s.omni ? base + (i / n) * Math.PI * 2 : base + (i - (n - 1) / 2) * 0.18;
+      state.shots.push(Object.assign({}, common, {
+        kind: s.kind, x: p.x, y: p.y, vx: Math.cos(a) * s.speed, vy: Math.sin(a) * s.speed, speed: s.speed,
+        r: s.kind === 'bolt' ? 8 : s.size, aoe: s.kind === 'bolt' ? s.size : 0,
+        pierce: s.pierce, life: 1.6, hit: new Set(),
+      }));
+    }
+    return true;
+  }
+
+  function damage(state, f, amount, src) {
+    if (f.dead) return;
+    f.hp -= amount;
+    if (src) {
+      f.flash = 0.08;
+      if (src.slow) { f.slow = Math.max(f.slow, src.slow); f.slowT = 1.6; }
+      if (src.burn) { f.burn = Math.max(f.burn, src.burn); f.burnT = 2; }
+      if (src.knock && f.type !== 'boss') {
+        const dx = f.x - (src.fromX !== undefined ? src.fromX : state.player.x);
+        const dy = f.y - (src.fromY !== undefined ? src.fromY : state.player.y);
+        const d = Math.hypot(dx, dy) || 1;
+        f.kx += (dx / d) * src.knock * 4;
+        f.ky += (dy / d) * src.knock * 4;
+      }
+    }
+    if (f.hp <= 0) kill(state, f);
+  }
+
+  function kill(state, f) {
+    f.dead = true;
+    state.kills += 1;
+    const xp = FOES[f.type].xp;
+    if (xp) {
+      if (state.gems.length < MAX_GEMS) state.gems.push({ x: f.x, y: f.y, v: xp, pull: false });
+      else state.gems[state.kills % state.gems.length].v += xp;
+    }
+    state.events.push({ type: 'kill', x: f.x, y: f.y, foe: f.type });
+    if (f.type === 'boss') {
+      state.over = 'won';
+      state.events.push({ type: 'won' });
+    }
+  }
+
+  // 맞은 적에서 가까운 적으로 번진다. 번질 때마다 조금씩 약해진다.
+  function chainFrom(state, from, s, dmg) {
+    const seen = new Set([from]);
+    let cur = from;
+    const pts = [{ x: from.x, y: from.y }];
+    for (let i = 0; i < s.chain; i++) {
+      const next = nearest(state, cur.x, cur.y, 130, seen);
+      if (!next) break;
+      seen.add(next);
+      dmg *= 0.75;
+      damage(state, next, dmg, { slow: s.slow, burn: s.burn });
+      pts.push({ x: next.x, y: next.y });
+      cur = next;
+    }
+    if (pts.length > 1) state.events.push({ type: 'chain', el: s.el, pts });
+  }
+
+  function steer(state, sh, dt) {
+    const t = nearest(state, sh.x, sh.y, 260, sh.hit);
+    if (!t) return;
+    const want = Math.atan2(t.y - sh.y, t.x - sh.x);
+    const cur = Math.atan2(sh.vy, sh.vx);
+    let d = want - cur;
+    while (d > Math.PI) d -= Math.PI * 2;
+    while (d < -Math.PI) d += Math.PI * 2;
+    const turn = Math.max(-1, Math.min(1, d)) * 5 * sh.homing * dt;
+    const a = cur + turn;
+    sh.vx = Math.cos(a) * sh.speed;
+    sh.vy = Math.sin(a) * sh.speed;
+  }
+
+  function updateShots(state, dt, grid) {
+    for (const sh of state.shots) {
+      if (sh.homing) steer(state, sh, dt);
+      sh.x += sh.vx * dt;
+      sh.y += sh.vy * dt;
+      sh.life -= dt;
+      if (sh.life <= 0) { sh.done = true; continue; }
+      let hitOne = null;
+      near(grid, sh.x, sh.y, sh.r, (f) => {
+        if (hitOne || sh.done || sh.hit.has(f)) return;
+        hitOne = f;
+      });
+      if (!hitOne) continue;
+      if (sh.kind === 'bolt') {
+        sh.done = true;
+        const src = { slow: sh.slow, burn: sh.burn, knock: sh.knock, fromX: sh.x, fromY: sh.y };
+        near(grid, sh.x, sh.y, sh.aoe, (f) => damage(state, f, sh.dmg, src));
+        state.events.push({ type: 'burst-hit', el: sh.el, x: sh.x, y: sh.y, r: sh.aoe });
+        if (sh.chain) chainFrom(state, hitOne, sh, sh.dmg);
+      } else {
+        sh.hit.add(hitOne);
+        damage(state, hitOne, sh.dmg, sh);
+        if (sh.chain) chainFrom(state, hitOne, sh, sh.dmg);
+        if (sh.hit.size > sh.pierce) sh.done = true;
+      }
+    }
+    state.shots = state.shots.filter((s) => !s.done);
+  }
+
+  const ORBIT_TICK = 0.45;
+  const ZONE_TICK = 0.4;
+
+  function orbitBlades(o, p) {
+    const out = [];
+    for (let i = 0; i < o.count; i++) {
+      const a = o.angle + (i / o.count) * Math.PI * 2;
+      out.push({ x: p.x + Math.cos(a) * o.radius, y: p.y + Math.sin(a) * o.radius });
+    }
+    return out;
+  }
+
+  // 칼날은 매 걸음 맞는지 보고, 같은 적은 ORBIT_TICK에 한 번만 벤다. 틱마다 한 번만
+  // 보면 빠른 칼날이 그 사이에 적을 건너뛴다.
+  function updateOrbits(state, dt, grid) {
+    const p = state.player;
+    for (const o of state.orbits) {
+      o.life -= dt;
+      o.angle += o.spin * dt;
+      if (!o.hitAt) o.hitAt = new Map();
+      for (const b of orbitBlades(o, p)) {
+        near(grid, b.x, b.y, o.blade, (f) => {
+          if ((o.hitAt.get(f) || 0) > state.t) return;
+          o.hitAt.set(f, state.t + ORBIT_TICK);
+          damage(state, f, o.dmg, o);
+          if (o.chain && state.fate() < 0.25) chainFrom(state, f, o, o.dmg);
+        });
+      }
+    }
+    state.orbits = state.orbits.filter((o) => o.life > 0);
+  }
+
+  function updateZones(state, dt, grid) {
+    for (const z of state.zones) {
+      z.life -= dt;
+      if (z.homing) {
+        const t = nearest(state, z.x, z.y, 240);
+        if (t) {
+          const dx = t.x - z.x, dy = t.y - z.y;
+          const d = Math.hypot(dx, dy) || 1;
+          const v = Math.min(d, 55 * z.homing * dt);
+          z.x += (dx / d) * v; z.y += (dy / d) * v;
+        }
+      }
+      z.tick -= dt;
+      if (z.tick > 0) continue;
+      z.tick = ZONE_TICK;
+      const src = { slow: z.slow, burn: z.burn, knock: z.knock, fromX: z.x, fromY: z.y };
+      let first = null;
+      near(grid, z.x, z.y, z.r, (f) => { if (!first) first = f; damage(state, f, z.dmg, src); });
+      if (first && z.chain) chainFrom(state, first, z, z.dmg);
+    }
+    state.zones = state.zones.filter((z) => z.life > 0);
+  }
+
+  function contact(state, dt, grid) {
+    const p = state.player;
+    if (p.inv > 0) return;
+    let worst = 0;
+    near(grid, p.x, p.y, p.r - 3, (f) => { worst = Math.max(worst, f.dmg); });
+    if (!worst) return;
+    p.hp -= worst;
+    p.inv = 0.5;
+    state.events.push({ type: 'hurt' });
+    if (p.hp <= 0) {
+      p.hp = 0;
+      state.over = 'lost';
+      state.events.push({ type: 'lost' });
+    }
+  }
+
+  function updateGems(state, dt) {
+    const p = state.player;
+    const reach = PLAYER.pickup * PLAYER.pickup;
+    for (const g of state.gems) {
+      const dx = p.x - g.x, dy = p.y - g.y;
+      const d2 = dx * dx + dy * dy;
+      if (!g.pull && d2 < reach) g.pull = true;
+      if (!g.pull) continue;
+      const d = Math.sqrt(d2) || 1;
+      if (d < p.r + 6) {
+        g.taken = true;
+        state.xp += g.v;
+        state.events.push({ type: 'gem' });
+        continue;
+      }
+      const v = Math.min(d, 360 * dt);
+      g.x += (dx / d) * v; g.y += (dy / d) * v;
+    }
+    state.gems = state.gems.filter((g) => !g.taken);
+  }
+
+  function sweep(state) {
+    if (state.foes.some((f) => f.dead)) state.foes = state.foes.filter((f) => !f.dead);
+  }
+
+  function levelUp(state) {
+    while (state.xp >= xpNext(state.level)) {
+      state.xp -= xpNext(state.level);
+      state.level += 1;
+      state.queued += 1;
+      const unlocked = CIRCLE_UNLOCK.filter((lv) => state.level >= lv).length;
+      if (unlocked > state.unlocked) {
+        state.unlocked = unlocked;
+        state.events.push({ type: 'unlock', ci: unlocked - 1 });
+      }
+      state.events.push({ type: 'level', level: state.level });
+    }
+    offerNext(state);
+  }
+
+  function drain(state) {
+    const ev = state.events;
+    state.events = [];
+    return ev;
+  }
+
+  function summary(state) {
+    return {
+      circle: state.circle, won: state.over === 'won', t: state.t, duration: state.duration,
+      kills: state.kills, level: state.level, formed: Array.from(state.formed),
+    };
+  }
+
+  const api = {
+    FOES, PLAYER, CIRCLE_UNLOCK, RANGE,
+    create, step, choose, drain, summary, previewPlace, previewErase, placeMode, orbitBlades,
+    nightLength, xpNext, capacity, rng,
+  };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  else window.ArchmageSim = api;
+})();
