@@ -10,7 +10,7 @@
 
       'rune.fire': '불', 'rune.water': '물', 'rune.wind': '바람', 'rune.earth': '땅',
       'rune.chain': '연쇄', 'rune.omni': '전방위', 'rune.echo': '메아리', 'rune.focus': '집중',
-      'rune.magna': '거대', 'rune.anima': '혼', 'rune.chrono': '시간',
+      'rune.magna': '거대', 'rune.anima': '흡혈', 'rune.chrono': '시간',
       'rune.erase': '재각인', 'rune.heal': '회복',
 
       // 원소 룬은 두 줄이다: 주원소일 때의 형태, 더할 때의 성질.
@@ -23,7 +23,7 @@
       'desc.echo': '잠시 뒤 한 번 더 시전한다',
       'desc.focus': '범위를 좁혀 피해를 모은다',
       'desc.magna': '크게 키운다. 쿨타임이 조금 는다',
-      'desc.anima': '적을 스스로 쫓는다',
+      'desc.anima': '입힌 피해의 일부로 생명력을 되찾는다',
       'desc.chrono': '쿨타임을 줄이고 유지를 늘린다',
       'desc.erase': '마법진에서 룬 하나를 지운다',
       'desc.heal': '생명력을 40% 되찾는다',
@@ -38,7 +38,7 @@
       'spell.unknown': '???',
       'spell.noElement': '원소가 없어 시전되지 않습니다',
 
-      'stat.dmg': '피해', 'stat.cd': '쿨타임', 'stat.dur': '유지', 'stat.count': '개수',
+      'stat.dmg': '피해', 'stat.leech': '흡혈 {n}%', 'stat.cd': '쿨타임', 'stat.dur': '유지', 'stat.count': '개수',
       'stat.sec': '{n}초',
 
       'am.circle': '{n}서클',

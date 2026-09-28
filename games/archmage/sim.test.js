@@ -144,6 +144,20 @@ function engrave(state, id, ci) {
   check('연쇄는 둘레의 적에게 번진다', b.hp < 1000, true);
 }
 
+{
+  const st = S.create({ circle: 2, seed: 1 });
+  engrave(st, 'fire', 0);
+  engrave(st, 'anima', 0);
+  st.player.hp = 50;
+  foe(st, 'slime', 100, 0);
+  run(st, 1.5);
+  check('흡혈은 입힌 피해로 생명력을 되찾는다', st.player.hp > 50, true);
+  const hp = st.player.hp;
+  for (let i = 0; i < 40; i++) foe(st, 'slime', 100 + (i % 5) * 4, (i / 5 | 0) * 4);
+  run(st, 1);
+  check('흡혈은 초당 한도를 넘지 않는다', st.player.hp - hp <= 6 + 0.01, true);
+}
+
 // --- 적과 끝 ---
 {
   const st = S.create({ circle: 1, seed: 1 });

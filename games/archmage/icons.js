@@ -14,7 +14,7 @@
     echo: 'M10 12a2 2 0 1 0 4 0a2 2 0 1 0-4 0M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4M4.9 4.9a10 10 0 0 0 0 14.2M19.1 4.9a10 10 0 0 1 0 14.2',
     focus: 'M6 12a6 6 0 1 0 12 0a6 6 0 1 0-12 0M12 2v5M12 17v5M2 12h5M17 12h5',
     magna: 'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5M9 9L4 4M15 9l5-5M9 15l-5 5M15 15l5 5',
-    anima: 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM9 12a3 3 0 1 0 6 0a3 3 0 1 0-6 0',
+    anima: 'M3 5h18M6 5l2.5 7L11 5M13 5l2.5 7L18 5M12 14c1.8 2.4 3 3.8 3 5a3 3 0 0 1-6 0c0-1.2 1.2-2.6 3-5z',
     chrono: 'M6 3h12M6 21h12M7 3c0 5 10 6 10 9s-10 4-10 9M17 3c0 5-10 6-10 9s10 4 10 9',
     erase: 'M4 20h16M6 16l9-11 5 4-9 11H7z',
     heal: 'M10 4h4v6h6v4h-6v6h-4v-6H4v-4h6z',
@@ -24,7 +24,7 @@
   // 한눈에 가르려는 것이다.
   const COLORS = {
     fire: '#ff7a3d', water: '#4fb3ff', wind: '#6fe0ae', earth: '#d4a45e',
-    arcane: '#b99bff', heal: '#7fdc8a',
+    arcane: '#b99bff', heal: '#7fdc8a', leech: '#ff5470',
   };
 
   const colorOf = (id) => COLORS[id] || COLORS.arcane;
