@@ -40,36 +40,36 @@
       // 터지며 파편이 흩어져 둘레에서 한 번 더 터진다.
       2: { cluster: true },
       // 하늘에서 떨어진다. 적이 있는 자리 여러 곳을 한꺼번에 친다.
-      3: { kind: 'meteor', dmg: 44, cd: 2.4, size: 62, count: 2 },
+      3: { kind: 'meteor', dmg: 62, cd: 2.2, size: 64, count: 2 },
       5: { kind: 'rain', sub: 'meteor', dmg: 48, cd: 4, dur: 3, size: 58, count: 2, every: 0.35, delay: 0.5 },
       7: { kind: 'aura', dmg: 26, cd: 5, dur: 4, size: 150, every: 0.3, burn: 12 },
-      9: { kind: 'aura', dmg: 60, cd: 6, dur: 4, size: 470, every: 0.5, burn: 20, screen: true },
+      9: { kind: 'aura', dmg: 110, cd: 5, dur: 4, size: 470, every: 0.5, burn: 20, screen: true },
     },
     water: {
       // 맞힌 자리에서 냉기가 퍼져 둘레를 얼린다.
       2: { nova: true },
       // 넓은 물결이 밀고 나가며 닿는 것을 모두 밀어낸다.
-      3: { kind: 'wave', dmg: 30, cd: 2.2, size: 64, speed: 250, count: 1, pierce: 0 },
-      5: { kind: 'rain', sub: 'ice', dmg: 40, cd: 3.6, dur: 3, size: 44, count: 3, every: 0.3, delay: 0.3, freeze: true },
-      7: { kind: 'wave', ring: true, dmg: 40, cd: 3, size: 70, speed: 230, count: 12 },
-      9: { kind: 'aura', dmg: 50, cd: 6, dur: 3, size: 470, every: 0.6, freeze: true, screen: true },
+      3: { kind: 'wave', dmg: 48, cd: 2.0, size: 66, speed: 250, count: 1, pierce: 0 },
+      5: { kind: 'rain', sub: 'ice', dmg: 55, cd: 3.6, dur: 3, size: 44, count: 3, every: 0.3, delay: 0.3, freeze: true },
+      7: { kind: 'wave', ring: true, dmg: 64, cd: 2.6, size: 70, speed: 230, count: 12 },
+      9: { kind: 'aura', dmg: 90, cd: 5, dur: 3.5, size: 470, every: 0.5, freeze: true, screen: true },
     },
     wind: {
       // 칼날이 도는 반경이 크게 들고 난다.
       2: { pulse: true },
       // 회오리가 스스로 적을 찾아다니며 빨아들인다.
       3: { kind: 'tornado', dmg: 20, cd: 2.4, dur: 4, size: 44, speed: 150, count: 2 },
-      5: { kind: 'rain', sub: 'bolt', dmg: 34, cd: 3, dur: 3, size: 26, count: 3, every: 0.2, delay: 0.12 },
+      5: { kind: 'rain', sub: 'bolt', dmg: 45, cd: 3, dur: 3, size: 26, count: 3, every: 0.2, delay: 0.12 },
       7: { kind: 'aura', dmg: 22, cd: 4.5, dur: 4, size: 170, every: 0.25, pull: true },
-      9: { kind: 'rain', sub: 'bolt', dmg: 70, cd: 5, dur: 4, size: 32, count: 6, every: 0.15, delay: 0.1, screen: true },
+      9: { kind: 'rain', sub: 'bolt', dmg: 70, cd: 5, dur: 4, size: 32, count: 4, every: 0.2, delay: 0.1, screen: true },
     },
     earth: {
       // 지대가 긁을 때마다 바깥으로 충격파가 번진다.
       2: { shock: true },
       // 발밑부터 넓게 땅이 흔들려 둘레를 한꺼번에 치고 묶는다.
-      3: { kind: 'quake', dmg: 30, cd: 3.8, dur: 1.6, size: 170, count: 1 },
+      3: { kind: 'quake', dmg: 24, cd: 3.8, dur: 1.6, size: 170, count: 1 },
       5: { kind: 'rain', sub: 'rock', dmg: 90, cd: 4, dur: 3, size: 72, count: 1, every: 0.45, delay: 0.6, knock: 80 },
-      7: { kind: 'aura', dmg: 34, cd: 4.5, dur: 4, size: 120, every: 0.35, knock: 60 },
+      7: { kind: 'aura', dmg: 90, cd: 4, dur: 4, size: 130, every: 0.3, knock: 60 },
       9: { kind: 'quake', dmg: 80, cd: 6, dur: 2.5, size: 470, screen: true },
     },
   };
@@ -106,12 +106,18 @@
     [3, 5, 9].forEach((tier, i) => {
       const counts = { fire: 0, water: 0, wind: 0, earth: 0 };
       for (const el of els) counts[el] = i + 1;
-      RECIPES[keyOf(counts)] = { form, tier, grafts: els.filter((el) => el !== form) };
+      // 불+바람+땅은 불 형태에 빨아들임과 파편이 겹쳐, 같은 룬 수의 다른 조합보다 두 배 넘게
+      // 셌다. 몫을 줄여 맞춘다.
+      const dmg = form === 'fire' ? 0.7 : 1;
+      RECIPES[keyOf(counts)] = { form, tier, grafts: els.filter((el) => el !== form), dmg };
     });
   }
   // 원소의 조화: 넷이 서로를 북돋는 칼날. 원소 폭주: 화면을 태우며 모든 접목이 붙는다.
-  RECIPES['fire1-water1-wind1-earth1'] = { form: 'wind', tier: 2, grafts: ['fire', 'water', 'earth'] };
-  RECIPES['fire2-water2-wind2-earth2'] = { form: 'fire', tier: 9, grafts: ['water', 'wind', 'earth'] };
+  // 네 원소는 한 형태를 빌리지 않고 **네 원소의 마법을 한꺼번에** 쓴다(harmony). 칼날 하나에
+  // 접목 셋을 붙였을 때는 같은 네 룬의 다른 조합보다 네 배 가까이 약했다.
+  // 원소의 조화는 넷의 2단계, 원소 폭주는 넷의 3단계다.
+  RECIPES['fire1-water1-wind1-earth1'] = { form: 'all', tier: 2, grafts: [] };
+  RECIPES['fire2-water2-wind2-earth2'] = { form: 'all', tier: 3, grafts: [] };
   // 이름 있는 마법은 찾아낸 값을 치러 규칙으로 만든 같은 단계보다 조금 더 세다.
   const RECIPE_DMG = 1.25;
 
@@ -122,7 +128,8 @@
     if (el === 'fire') { s.ignite = true; s.burn += 8; }
     else if (el === 'water') s.freeze = true;
     else if (el === 'wind') s.vortex = true;
-    else if (el === 'earth') { s.shatter = true; s.knock += 30; }
+    // 땅은 무게다. 파편은 맞히는 형태에서만 튀므로, 둘레를 도는 형태에서도 느껴지게 피해를 얹는다.
+    else if (el === 'earth') { s.shatter = true; s.knock += 30; s.dmg *= 1.3; }
   }
 
   // 둘째 이하 원소가 더하는 성질. t는 그 원소 룬의 수에 등급을 더한 것이다.
@@ -141,13 +148,17 @@
   //
   // 곱으로 쌓으면 열 번 겹쳤을 때 수천 배가 된다. 겹친 횟수 n을 모아 더하기로 건다.
   const MAX_EXTRA = 10;
+  // 유지 시간은 1.5배 넘게 늘지 않는다 — 땅 아홉의 지진이 8초 넘게 이어져 다른 9단계의 세
+  // 배를 냈다. 쏟아지는 것(rain)은 한 번에 떨어지는 수를 절반만 늘린다 — 번개 아홉이 한 번에
+  // 열넷씩 떨어져 다른 9단계의 네 배를 냈다.
   function empower(s, n) {
     if (!n) return;
-    const more = Math.min(n, MAX_EXTRA);
+    const more = s.kind === 'rain' ? Math.min(Math.floor(n / 2), 6) : Math.min(n, MAX_EXTRA);
+    const longer = (k) => 1 + Math.min(1.5, k * n);
     if (s.primary === 'fire') { s.count += more; s.dmg *= 1 + 0.35 * n; s.size *= 1 + Math.min(0.8, 0.12 * n); }
     else if (s.primary === 'water') { s.count += more; s.pierce += n; s.dmg *= 1 + 0.3 * n; }
-    else if (s.primary === 'wind') { s.count += more; s.dur *= 1 + 0.15 * n; s.dmg *= 1 + 0.3 * n; }
-    else if (s.primary === 'earth') { s.size *= 1 + Math.min(1, 0.15 * n); s.dur *= 1 + 0.3 * n; s.dmg *= 1 + 0.35 * n; }
+    else if (s.primary === 'wind') { s.count += more; s.dur *= longer(0.15); s.dmg *= 1 + 0.3 * n; }
+    else if (s.primary === 'earth') { s.size *= 1 + Math.min(1, 0.15 * n); s.dur *= longer(0.3); s.dmg *= 1 + 0.35 * n; }
   }
 
   // 수식어. l은 그 수식어 룬의 수에 등급을 더한 것이고, 오르면 **그 수식어의 효과만**
@@ -196,6 +207,7 @@
     if (!primary) return null;
     const key = keyOf(counts);
     const recipe = RECIPES[key] || null;
+    if (recipe && recipe.form === 'all') return harmony(runes, key, recipe);
     const formEl = recipe ? recipe.form : primary;
     const form = recipe ? recipe.tier : formTierOf(counts[primary]);
     const f = FORMS[formEl];
@@ -225,14 +237,44 @@
     }
     if (recipe) {
       for (const el of recipe.grafts) applyGraft(s, el);
-      s.dmg *= RECIPE_DMG;
+      s.dmg *= RECIPE_DMG * (recipe.dmg || 1);
+      // 1단계 형태를 빌리는 1:1 조합은 같은 두 룬의 순수 마법(2단계)이 받는 몫도 받는다.
+      if (recipe.tier === 1) s.dmg *= 1.6;
     } else {
       for (const el of ELEMENTS) if (el !== primary) applyTrait(s, el, level[el] || 0);
     }
-    empower(s, counts[formEl] - 1 + formGrade);
+    // 특수 조합은 한 마법이라 든 원소 룬이 모두 강화로 센다. 형태 원소만 세었을 때는 1:1
+    // 조합이 같은 두 룬의 순수 마법보다 여섯 배 약했다.
+    let elements = 0;
+    for (const el of ELEMENTS) elements += counts[el];
+    empower(s, (recipe ? elements : counts[formEl]) - 1 + formGrade);
     for (const mod of MODIFIERS) applyModifier(s, mod, level[mod] || 0);
     s.grade = grade;
     s.cd = Math.max(0.25, s.cd);
+    return s;
+  }
+
+  // 네 원소를 같은 수로 새긴 마법. 네 원소 각각의 tier단계 마법을 따로 만들어 한꺼번에
+  // 쓴다. 수식어는 넷 모두에 걸리고, 원소 룬의 등급은 넷에 고르게 나눈다.
+  function harmony(runes, key, recipe) {
+    const mods = runes.filter((r) => isModifier(r.id));
+    let grades = 0;
+    for (const r of runes) if (isElement(r.id)) grades += r.grade || 0;
+    const parts = ELEMENTS.map((el) => {
+      const own = [];
+      // 넷으로 나뉘는 대신 원소마다 한 칸씩 더 겹친 것으로 친다.
+      for (let i = 0; i < recipe.tier; i++) own.push({ id: el, grade: i === 0 ? grades + recipe.tier - 1 : 0 });
+      const part = compose(own.concat(mods));
+      part.dmg *= RECIPE_DMG;
+      return part;
+    });
+    const s = {
+      key, primary: 'arcane', counts: countElements(runes), recipe: true, form: recipe.tier, kind: 'harmony', parts,
+      dmg: 0, cd: 0, dur: 0, size: 0, speed: 0, count: parts.length, pierce: 0,
+      slow: 0, burn: 0, knock: 0, chain: 0, omni: 0, echo: 0, leech: 0, mods: {}, runes: runes.length, tier: recipe.tier, grade: grades,
+    };
+    for (const p of parts) { s.dmg += p.dmg; s.cd = Math.max(s.cd, p.cd); s.dur = Math.max(s.dur, p.dur); }
+    for (const r of mods) s.mods[r.id] = (s.mods[r.id] || 0) + 1 + (r.grade || 0);
     return s;
   }
 

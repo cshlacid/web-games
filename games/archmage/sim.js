@@ -428,6 +428,11 @@
   }
 
   function fire(state, ci, s, mult) {
+    if (s.kind === 'harmony') {
+      let any = false;
+      for (const part of s.parts) any = fire(state, ci, part, mult) || any;
+      return any;
+    }
     const p = state.player;
     const dmg = s.dmg * mult;
     const common = {
@@ -616,17 +621,17 @@
   function graftAt(state, e, x, y, r, grid) {
     if (e.ignite) {
       state.zones.push({
-        kind: 'zone', el: 'fire', x, y, r: Math.max(24, r * 0.6), life: 1.4, total: 1.4, tick: 0,
-        dmg: e.dmg * 0.2, burn: 6, slow: 0, knock: 0, chain: 0, leech: e.leech,
+        kind: 'zone', el: 'fire', x, y, r: Math.max(24, r * 0.6), life: 1.2, total: 1.2, tick: 0,
+        dmg: e.dmg * 0.08, burn: 6, slow: 0, knock: 0, chain: 0, leech: e.leech,
       });
     }
-    if (e.vortex) pull(grid, x, y, r * 1.8, 1400);
+    if (e.vortex) pull(grid, x, y, r * 1.6, 800);
     if (e.shatter) {
-      for (let i = 0; i < 3; i++) {
+      for (let i = 0; i < 2; i++) {
         const a = state.fate() * Math.PI * 2;
         const v = 140 + state.fate() * 80;
         state.shots.push({
-          kind: 'bolt', frag: true, ci: e.ci, el: 'earth', dmg: e.dmg * 0.35, slow: 0, burn: 0, knock: 20, chain: 0,
+          kind: 'bolt', frag: true, ci: e.ci, el: 'earth', dmg: e.dmg * 0.2, slow: 0, burn: 0, knock: 20, chain: 0,
           leech: e.leech, x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, speed: v, r: 6, aoe: 22, pierce: 0,
           life: 0.4, hit: new Set(),
         });
@@ -742,6 +747,7 @@
           if ((o.hitAt.get(f) || 0) > state.t) return;
           o.hitAt.set(f, state.t + ORBIT_TICK);
           damage(state, f, o.dmg, o);
+          if (o.shatter && state.fate() < 0.3) graftAt(state, o, f.x, f.y, 24, grid);
           spread(state, Object.assign(o, { kind: 'orbit' }), f.x, f.y, null);
         });
       }
