@@ -45,7 +45,7 @@
   const save = loadSave();
 
   let mode = 'camp';
-  let night = save.circle;
+  let night = save.night;
   let state = S.create({ circle: night, seed: 1 });
   let paused = false;
   let seenThisRun = new Set();
@@ -78,7 +78,8 @@
     mods.sort((a, b) => spell.mods[b] - spell.mods[a] || Runes.MODIFIERS.indexOf(a) - Runes.MODIFIERS.indexOf(b));
     return T('spell.withMods', { mods: mods.map((id) => T('rune.' + id)).join(T('spell.modJoin')), name });
   }
-  const nightName = (n) => T('am.night' + n);
+  // 아홉 번째 밤까지는 말로, 그 뒤로는 숫자로 부른다.
+  const nightName = (n) => (n <= 9 ? T('am.night' + n) : T('am.nightN', { n }));
   const known = (key) => !!save.grimoire[key] || (mode === 'run' && state.formed.has(key)) || seenThisRun.has(key);
 
   function runesFromKey(key) {
@@ -1116,10 +1117,10 @@
   let hudSig = '';
   function hud() {
     const time = state.bossSpawned ? T('am.boss') : fmt(state.duration - state.t);
-    const sig = state.circle + '|' + state.level + '|' + state.kills + '|' + time;
+    const sig = state.night + '|' + state.level + '|' + state.kills + '|' + time;
     if (sig === hudSig) return;
     hudSig = sig;
-    el.circleChip.textContent = nightName(state.circle);
+    el.circleChip.textContent = nightName(state.night);
     el.levelChip.textContent = T(state.level >= S.maxLevel(state.circle) ? 'am.levelMax' : 'am.level', { n: state.level });
     el.killsChip.textContent = T('am.kills', { n: state.kills });
     el.timeChip.textContent = time;
@@ -1150,17 +1151,21 @@
     const b = M.breakCheck(save);
     el.brk.textContent = b.why === 'max' ? T('am.breakMax') : T('am.break', { n: save.circle + 1 }) + ' · ' + T('am.breakCost', { n: b.cost });
     el.brk.disabled = !b.ok;
-    el.breakNote.textContent = b.why === 'clear' ? T('am.breakNeedClear', { night: nightName(save.circle) })
+    el.breakNote.textContent = b.why === 'boss' ? T('am.breakNeedBoss', { n: b.need, have: b.have })
       : b.why === 'mana' ? T('am.breakNeedMana', { n: b.cost - save.mana }) : '';
-    if (night > save.circle) night = save.circle;
+    if (night > save.night) night = save.night;
+    // 밤은 끝없이 늘어나므로 열린 것 가운데 가장 깊은 다섯만 보인다. 지난 밤을 다시 하는
+    // 것은 마나를 모으거나 조합을 찾으러 가는 것이라 가까운 밤이면 된다.
     let list = '';
-    for (let c = 1; c <= save.circle; c++) {
-      list += '<button class="btn small" type="button" data-c="' + c + '" aria-pressed="' + (c === night) + '">' + nightName(c) + '</button>';
+    for (let n = Math.max(1, save.night - 4); n <= save.night; n++) {
+      const tag = S.isBossNight(n) ? ' <span class="tag">' + T('am.bossTag') + '</span>' : '';
+      list += '<button class="btn small" type="button" data-c="' + n + '" aria-pressed="' + (n === night) + '">' + nightName(n) + tag + '</button>';
     }
     el.nightList.innerHTML = list;
-    let info = T('am.nightInfo', { m: Math.round(S.nightLength(night) / 60 * 10) / 10, n: night, max: S.maxLevel(night) });
+    let info = T('am.nightInfo', { m: Math.round(S.nightLength(night) / 60 * 10) / 10, n: save.circle, max: S.maxLevel(save.circle) });
+    if (S.isBossNight(night)) info = T('am.bossNightInfo') + ' · ' + info;
     if (save.best[night]) info += ' · ' + T('am.best', { t: fmt(save.best[night]) });
-    el.nightInfo.innerHTML = sockets([], night) + '<br>' + info;
+    el.nightInfo.innerHTML = sockets([], save.circle) + '<br>' + info;
     const g = M.grimoireCount(save, save.circle);
     el.grimoireCount.textContent = T('am.grimoireCount', g) + ' · ' + T('am.specialCount', { found: g.specialFound, total: g.special });
     const keys = Runes.allKeys(save.circle).filter((key) => save.grimoire[key]);
@@ -1183,7 +1188,6 @@
   el.brk.addEventListener('click', () => {
     if (!M.breakthrough(save)) return;
     store();
-    night = save.circle;
     Sound.play('unlock');
     alert(T('am.breakDone', { n: save.circle }), 2200);
     renderCamp();
@@ -1192,7 +1196,7 @@
   function showCamp() {
     mode = 'camp';
     setPaused(false);
-    state = S.create({ circle: night, seed: 1 });
+    state = S.create({ circle: save.circle, night, seed: 1 });
     state.pending = null;
     fx = [];
     renderCamp();
@@ -1206,7 +1210,8 @@
   function startRun() {
     mode = 'run';
     seenThisRun = new Set();
-    state = S.create({ circle: night, seed: (Date.now() ^ (Math.random() * 1e9)) >>> 0 });
+    state = S.create({ circle: save.circle, night, seed: (Date.now() ^ (Math.random() * 1e9)) >>> 0 });
+    if (state.bossNight) alert(T('am.bossNightAlert'), 2400);
     fx = [];
     acc = 0;
     el.camp.hidden = true;
@@ -1220,10 +1225,12 @@
 
   function finish() {
     const res = S.summary(state);
-    const { gained, found } = M.settle(save, res);
+    const { gained, found, opened } = M.settle(save, res);
+    // 넘긴 밤이 가장 깊은 밤이면 다음 회차는 새로 열린 밤에서 시작한다.
+    if (opened) night = save.night;
     store();
     const won = res.won;
-    el.resultTitle.textContent = T(won ? 'am.wonTitle' : 'am.lostTitle', { night: nightName(res.circle) });
+    el.resultTitle.textContent = T(won ? 'am.wonTitle' : 'am.lostTitle', { night: nightName(res.night) });
     el.resultNote.textContent = T(won ? 'am.wonNote' : 'am.lostNote');
     el.report.innerHTML = [
       T('am.reportTime', { t: fmt(res.t) }),
@@ -1231,7 +1238,8 @@
       T('am.reportKills', { n: res.kills }),
       T('am.reportMana', { n: gained }),
       T('am.reportFound', { n: found.length }),
-    ].map((s) => '<li>' + s + '</li>').join('');
+    ].concat(opened ? [T('am.nightOpened', { night: nightName(save.night) })] : [])
+      .map((s) => '<li>' + s + '</li>').join('');
     el.result.hidden = false;
     Sound.play(won ? 'won' : 'lost');
   }

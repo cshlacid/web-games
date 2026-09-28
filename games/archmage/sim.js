@@ -30,7 +30,7 @@
     wolf: { hp: 16, speed: 92, r: 10, dmg: 8, xp: 1, from: 0.3, weight: 3 },
     wraith: { hp: 36, speed: 66, r: 12, dmg: 12, xp: 2, from: 0.5, weight: 2 },
     golem: { hp: 150, speed: 32, r: 18, dmg: 18, xp: 6, from: 0.62, weight: 1 },
-    boss: { hp: 5500, speed: 50, r: 34, dmg: 28, xp: 0 },
+    boss: { hp: 6000, speed: 50, r: 34, dmg: 20, xp: 0 },
   };
 
   // 룬 제시의 무게. 원소가 없으면 마법이 나가지 않으므로 수식어보다 자주 나온다.
@@ -55,9 +55,16 @@
     };
   }
 
-  // 서클이 오를수록 밤이 길다. 1서클 3분, 9서클 10분. 처음의 5분·15분은 폰으로 한 판을
-  // 하기에 길었다.
-  const nightLength = (circle) => Math.round(180 + 52.5 * (circle - 1));
+  // 밤은 서클과 상관없이 끝없이 이어진다(첫 번째 밤, 두 번째 밤, …). 뒤로 갈수록 조금씩
+  // 길어져 3분에서 10분까지 간다 — 처음의 5분·15분은 폰으로 한 판을 하기에 길었다.
+  const nightLength = (night) => Math.min(600, 180 + 12 * (night - 1));
+  // 다섯 번째 밤마다 강력한 보스가 온다. 보통 밤은 끝까지 버티면 넘기고, 보스의 밤은 끝에
+  // 오는 보스를 쓰러뜨려야 넘긴다.
+  const BOSS_EVERY = 5;
+  const isBossNight = (night) => night % BOSS_EVERY === 0;
+  // 밤의 깊이. 적의 체력·수·피해가 이것으로 는다. 다섯 밤이 한 서클쯤의 값이다 — 보스를
+  // 하나 잡을 때마다 서클 하나를 돌파할 수 있으므로 그 걸음에 맞췄다.
+  const depthOf = (night) => (night - 1) / BOSS_EVERY;
   // 레벨이 오를 때마다 다음까지가 빠르게 멀어진다. 처음 곡선(3 + 1.6L + 0.05L²)은
   // 1서클 한 판에 서른 번 넘게 올라 고르는 화면이 너무 자주 끊었다.
   const xpNext = (level) => Math.floor(5 + level * 2 + level * level * 0.2);
@@ -65,12 +72,12 @@
   // 쌓여 서클을 올릴 까닭이 흐려진다.
   const maxLevel = (circle) => 15 + 5 * circle;
 
-  function create({ circle = 1, seed = 1 } = {}) {
+  function create({ circle = 1, night = 1, seed = 1 } = {}) {
     const state = {
-      circle, seed,
-      world: rng(0x9e3779b9 ^ circle),
+      circle, night, seed, depth: depthOf(night), bossNight: isBossNight(night),
+      world: rng(0x9e3779b9 ^ night),
       fate: rng(seed),
-      t: 0, duration: nightLength(circle),
+      t: 0, duration: nightLength(night),
       player: { x: 0, y: 0, hp: PLAYER.hp, maxHp: PLAYER.hp, r: PLAYER.r, inv: 0, face: 1, leechLeft: LEECH_RATE, healed: 0 },
       input: { x: 0, y: 0 },
       foes: [], gems: [], shots: [], orbits: [], zones: [], echoes: [],
@@ -230,10 +237,10 @@
   }
 
   function foeScale(state) {
-    // 서클의 몫은 밤이 깊을수록 커진다. 처음부터 다 걸면 구멍이 비어 있는 초반에
-    // 높은 서클일수록 레벨 하나 올리기도 버거워진다.
+    // 깊이의 몫은 그 밤이 깊을수록 커진다. 처음부터 다 걸면 구멍이 비어 있는 초반에
+    // 깊은 밤일수록 레벨 하나 올리기도 버거워진다.
     const frac = Math.min(1, state.t / state.duration);
-    return (1 + (state.circle - 1) * (0.3 + 0.6 * frac)) * (1 + 1.8 * frac);
+    return (1 + state.depth * (0.3 + 0.6 * frac)) * (1 + 1.8 * frac);
   }
 
   function addFoe(state, type, angle, dist) {
@@ -243,7 +250,7 @@
     const foe = {
       id: state.nextId++, type,
       x: p.x + Math.cos(angle) * dist, y: p.y + Math.sin(angle) * dist,
-      hp, maxHp: hp, r: def.r, speed: def.speed, dmg: def.dmg * (1 + 0.2 * (state.circle - 1)),
+      hp, maxHp: hp, r: def.r, speed: def.speed, dmg: def.dmg * (1 + 0.2 * state.depth),
       slowT: 0, slow: 0, burnT: 0, burn: 0, kx: 0, ky: 0, flash: 0, dead: false,
       phase: state.world() * Math.PI * 2,
     };
@@ -269,7 +276,7 @@
 
   function spawn(state, dt) {
     const frac = Math.min(1, state.t / state.duration);
-    let rate = (1.8 + 6 * frac) * (1 + 0.2 * (state.circle - 1));
+    let rate = (1.8 + 6 * frac) * (1 + 0.2 * state.depth);
     if (state.bossSpawned) rate *= 0.4;
     state.spawnAcc += rate * dt;
     while (state.spawnAcc >= 1) {
@@ -293,10 +300,15 @@
       state.events.push({ type: 'burst' });
       state.nextBurst += 60;
     }
-    if (!state.bossSpawned && state.t >= state.duration) {
+    if (state.t >= state.duration && !state.bossNight && !state.over) {
+      state.over = 'won';
+      state.events.push({ type: 'won' });
+      return;
+    }
+    if (state.bossNight && !state.bossSpawned && state.t >= state.duration) {
       state.bossSpawned = true;
       const boss = addFoe(state, 'boss', state.world() * Math.PI * 2, SPAWN_RING);
-      boss.hp = boss.maxHp = FOES.boss.hp * (1 + 0.6 * (state.circle - 1));
+      boss.hp = boss.maxHp = FOES.boss.hp * (1 + 0.6 * state.depth);
       boss.charge = 0;
       boss.chargeCd = 4;
       state.boss = boss;
@@ -328,8 +340,8 @@
       if (f.type === 'boss') {
         // 사도는 가끔 몸을 던진다. 쫓기만 하면 도는 것만으로 영영 안 닿는다.
         f.chargeCd -= dt;
-        if (f.charge > 0) { f.charge -= dt; speed *= 3.4; }
-        else if (f.chargeCd <= 0 && d < 300) { f.charge = 0.8; f.chargeCd = 6; state.events.push({ type: 'charge' }); }
+        if (f.charge > 0) { f.charge -= dt; speed *= 2.6; }
+        else if (f.chargeCd <= 0 && d < 300) { f.charge = 0.8; f.chargeCd = 7; state.events.push({ type: 'charge' }); }
       }
       f.x += (dx * speed + f.kx) * dt;
       f.y += (dy * speed + f.ky) * dt;
@@ -1002,7 +1014,8 @@
 
   function summary(state) {
     return {
-      circle: state.circle, won: state.over === 'won', t: state.t, duration: state.duration,
+      circle: state.circle, night: state.night, boss: state.bossNight,
+      won: state.over === 'won', t: state.t, duration: state.duration,
       kills: state.kills, level: state.level, formed: Array.from(state.formed),
     };
   }
@@ -1010,7 +1023,7 @@
   const api = {
     FOES, PLAYER, CIRCLE_UNLOCK, RANGE,
     create, step, choose, drain, summary, previewPlace, previewErase, placeMode, placeModes, orbitBlades, orbitRadius,
-    nightLength, xpNext, maxLevel, capacity, rng,
+    nightLength, isBossNight, BOSS_EVERY, xpNext, maxLevel, capacity, rng,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else window.ArchmageSim = api;
