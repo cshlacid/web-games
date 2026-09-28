@@ -302,6 +302,7 @@
       if (ev.type === 'cast' || ev.type === 'echo') {
         sound('cast', ev.el, 90);
         fx.push({ kind: 'cast', ci: ev.ci, el: ev.el, t: 0, life: 0.35 });
+        mageKick = 1; mageKickEl = ev.el;
       } else if (ev.type === 'burst-hit') {
         fx.push({ kind: 'ring', x: ev.x, y: ev.y, r: ev.r, el: ev.el, t: 0, life: 0.3 });
         sound('hit', null, 60);
@@ -727,6 +728,7 @@
     if (f.type === 'boss') light(f.x, f.y - 20, 110);
   }
 
+  let mageLast = 0, mageLean = 0, mageKick = 0, magePose = 0, mageKickEl = 'arcane';
   function drawMageAt(p) {
     // 흡혈로 생명력이 차오르는 동안 몸이 붉게 빛난다. 숫자를 띄우면 수십 번씩 겹친다.
     if (p.healed > 0) {
@@ -739,24 +741,41 @@
     const fr = p.moving ? ((clock * 14) | 0) % FRAMES : 0;
     const blink = p.inv > 0 && ((clock * 20) | 0) % 2;
     const sp = sprites.mage[fr];
+    const M = A.MAGE;
+    const dt = Math.min(0.05, Math.max(0, clock - mageLast));
+    mageLast = clock;
+    // 걸을 때는 가는 쪽으로 몸을 기울이고, 시전하면 앞으로 내지르듯 숙였다 돌아온다.
+    // 그림이 한 장이라 자세는 발끝을 축으로 한 기울기와 눌림으로 낸다. 곧바로 꺾으면 시전이
+    // 잦을 때 떨려 보여 목표값을 따라가게 둔다.
+    mageLean += ((p.moving ? 0.07 : 0) - mageLean) * Math.min(1, dt * 10);
+    mageKick = Math.max(0, mageKick - dt * 4);
+    magePose += (mageKick - magePose) * Math.min(1, dt * 25);
     const breathe = p.moving ? 0 : Math.sin(clock * 2.2) * 0.6;
-    const top = p.y + 6 - A.MAGE.foot + breathe;
+    const top = breathe - M.foot;
     ctx.save();
-    ctx.translate(p.x, 0);
+    ctx.translate(p.x, p.y + 6);
     if (p.face < 0) ctx.scale(-1, 1);
+    ctx.translate(magePose * 1.5, 0);
+    ctx.rotate(mageLean + magePose * 0.12);
+    ctx.scale(1 + magePose * 0.05, 1 - magePose * 0.04);
     ctx.drawImage(sp.img, -sp.w / 2, top, sp.w, sp.h);
     if (blink) { ctx.globalAlpha = 0.7; ctx.drawImage(sprites.mage_[fr].img, -sp.w / 2, top, sp.w, sp.h); ctx.globalAlpha = 1; }
-    ctx.restore();
     // 지팡이 끝의 수정이 빛난다.
     ctx.globalCompositeOperation = 'lighter';
-    const M = A.MAGE;
+    const cx = M.crystal[0] - M.box[0] / 2, fx0 = M.flame[0] - M.box[0] / 2;
     ctx.globalAlpha = 0.55 + 0.25 * Math.sin(clock * 4);
-    glowAt('arcane', p.x + p.face * (M.crystal[0] - M.box[0] / 2), top + M.crystal[1], 20);
+    glowAt('arcane', cx, top + M.crystal[1], 20 + magePose * 10);
     // 앞손의 마력이 흔들린다. 그림에 든 불꽃은 멈춰 있어 빛으로 살린다.
     ctx.globalAlpha = 0.45 + 0.3 * Math.sin(clock * 9) * Math.sin(clock * 5.3);
-    glowAt('arcane', p.x + p.face * (M.flame[0] - M.box[0] / 2), top + M.flame[1], 16);
+    glowAt('arcane', fx0, top + M.flame[1], 16);
+    // 시전하는 순간 손에서 그 마법의 빛깔이 터진다.
+    if (magePose > 0.02) {
+      ctx.globalAlpha = Math.min(1, magePose * 1.4);
+      glowAt(mageKickEl, fx0 + magePose * 3, top + M.flame[1], 18 + magePose * 26);
+    }
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
+    ctx.restore();
   }
 
   // 발밑의 마법진. 고리의 수가 서클이고, 새긴 룬이 고리 위에서 빛난다.
@@ -1089,7 +1108,7 @@
       ctx.lineWidth = 2 * (1 - t) + 0.5;
       const r = 14 + t * 32;
       ctx.beginPath(); ctx.ellipse(p.x, p.y + 6, r, r * 0.5, 0, 0, Math.PI * 2); ctx.stroke();
-      glowAt(f.el, p.x + p.face * 12, p.y - 26, 26 * (1 - t));
+      glowAt(f.el, p.x + p.face * (A.MAGE.flame[0] - A.MAGE.box[0] / 2), p.y + 6 - A.MAGE.foot + A.MAGE.flame[1], 26 * (1 - t));
       ctx.globalAlpha = 1;
     }
   }
