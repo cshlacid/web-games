@@ -66,6 +66,7 @@
       player: { x: 0, y: 0, hp: PLAYER.hp, maxHp: PLAYER.hp, r: PLAYER.r, inv: 0, face: 1, leechLeft: LEECH_RATE, healed: 0 },
       input: { x: 0, y: 0 },
       foes: [], gems: [], shots: [], orbits: [], zones: [], echoes: [],
+      meteors: [], waves: [], tornados: [], quakes: [],
       circles: [0, 1, 2].map(() => ({ runes: [], spell: null, cd: 0, active: 0 })),
       unlocked: 1,
       level: 1, xp: 0, kills: 0, picks: 0,
@@ -186,6 +187,10 @@
     updateShots(state, dt, grid);
     updateOrbits(state, dt, grid);
     updateZones(state, dt, grid);
+    updateMeteors(state, dt, grid);
+    updateWaves(state, dt, grid);
+    updateTornados(state, dt, grid);
+    updateQuakes(state, dt, grid);
     contact(state, dt, grid);
     updateGems(state, dt);
     sweep(state);
@@ -404,16 +409,19 @@
   function fire(state, ci, s, mult) {
     const p = state.player;
     const dmg = s.dmg * mult;
-    const common = { ci, el: s.primary, dmg, slow: s.slow, burn: s.burn, knock: s.knock, chain: s.chain, leech: s.leech };
+    const common = {
+      ci, el: s.primary, dmg, slow: s.slow, burn: s.burn, knock: s.knock, chain: s.chain, leech: s.leech,
+      cluster: s.cluster, nova: s.nova, pulse: s.pulse, shock: s.shock,
+    };
     if (s.kind === 'orbit') {
       const count = s.count + 2 * s.omni;
       state.orbits.push(Object.assign({}, common, {
         life: s.dur, total: s.dur, count, blade: s.size,
-        radius: 58 + s.size * 1.4, spin: s.speed, angle: state.fate() * Math.PI * 2,
+        radius: 58 + s.size * 1.4, spin: s.speed, angle: state.fate() * Math.PI * 2, phase: 0,
       }));
       return true;
     }
-    const target = nearest(state, p.x, p.y, RANGE);
+    const target = nearest(state, p.x, p.y, s.kind === 'quake' ? s.size : RANGE);
     if (!target) return false;
     if (s.kind === 'zone') {
       const taken = new Set();
@@ -423,6 +431,41 @@
         state.zones.push(Object.assign({}, common, { x: t.x, y: t.y, r: s.size, life: s.dur, total: s.dur, tick: 0 }));
         t = nearest(state, p.x, p.y, RANGE, taken);
       }
+      return true;
+    }
+    if (s.kind === 'meteor') {
+      // 가까운 적만 노리면 한 무리에 겹쳐 떨어진다. 사거리 안에서 고르게 흩는다.
+      const pool = state.foes.filter((f) => !f.dead && Math.hypot(f.x - p.x, f.y - p.y) < RANGE);
+      const n = s.count + 2 * s.omni;
+      for (let i = 0; i < n && pool.length; i++) {
+        const f = pool.splice(Math.floor(state.fate() * pool.length), 1)[0];
+        state.meteors.push(Object.assign({}, common, { x: f.x, y: f.y, r: s.size, delay: 0.55 + i * 0.09, total: 0.55 + i * 0.09 }));
+      }
+      return true;
+    }
+    if (s.kind === 'wave') {
+      const base = Math.atan2(target.y - p.y, target.x - p.x);
+      const n = s.count + 2 * s.omni;
+      for (let i = 0; i < n; i++) {
+        const a = s.omni ? base + (i / n) * Math.PI * 2 : base + (i - (n - 1) / 2) * 0.55;
+        state.waves.push(Object.assign({}, common, {
+          x: p.x, y: p.y, dx: Math.cos(a), dy: Math.sin(a), w: s.size, speed: s.speed, life: 1.4, total: 1.4, hit: new Set(),
+        }));
+      }
+      return true;
+    }
+    if (s.kind === 'tornado') {
+      const n = s.count + s.omni;
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2;
+        state.tornados.push(Object.assign({}, common, {
+          x: p.x + Math.cos(a) * 30, y: p.y + Math.sin(a) * 30, r: s.size, speed: s.speed, life: s.dur, total: s.dur, tick: 0,
+        }));
+      }
+      return true;
+    }
+    if (s.kind === 'quake') {
+      state.quakes.push(Object.assign({}, common, { r: s.size, life: s.dur, total: s.dur, tick: 0 }));
       return true;
     }
     const base = Math.atan2(target.y - p.y, target.x - p.x);
@@ -505,7 +548,15 @@
       sh.x += sh.vx * dt;
       sh.y += sh.vy * dt;
       sh.life -= dt;
-      if (sh.life <= 0) { sh.done = true; continue; }
+      if (sh.life <= 0) {
+        sh.done = true;
+        if (sh.frag) {
+          const src = { burn: sh.burn, leech: sh.leech, fromX: sh.x, fromY: sh.y };
+          near(grid, sh.x, sh.y, sh.aoe, (f) => damage(state, f, sh.dmg, src));
+          state.events.push({ type: 'burst-hit', el: sh.el, x: sh.x, y: sh.y, r: sh.aoe });
+        }
+        continue;
+      }
       let hitOne = null;
       near(grid, sh.x, sh.y, sh.r, (f) => {
         if (hitOne || sh.done || sh.hit.has(f)) return;
@@ -521,24 +572,48 @@
         near(grid, sh.x, sh.y, sh.aoe, (f) => { sh.hit.add(f); damage(state, f, sh.dmg, src); });
         state.events.push({ type: 'burst-hit', el: sh.el, x: sh.x, y: sh.y, r: sh.aoe });
         if (sh.chain) chainFrom(state, hitOne, sh, sh.dmg);
+        if (sh.cluster && !sh.frag) scatter(state, sh);
       } else {
         sh.hit.add(hitOne);
         damage(state, hitOne, sh.dmg, sh);
         if (sh.chain) chainFrom(state, hitOne, sh, sh.dmg);
+        if (sh.nova) {
+          const src = { slow: Math.max(0.5, sh.slow), leech: sh.leech };
+          near(grid, hitOne.x, hitOne.y, NOVA_R, (f) => { if (f !== hitOne) damage(state, f, sh.dmg * 0.5, src); });
+          state.events.push({ type: 'burst-hit', el: sh.el, x: hitOne.x, y: hitOne.y, r: NOVA_R });
+        }
         if (sh.hit.size > sh.pierce) sh.done = true;
       }
     }
     state.shots = state.shots.filter((s) => !s.done);
   }
 
+  const NOVA_R = 36;
+  const FRAGMENTS = 4;
+
+  function scatter(state, sh) {
+    for (let i = 0; i < FRAGMENTS; i++) {
+      const a = state.fate() * Math.PI * 2;
+      const v = 150 + state.fate() * 80;
+      state.shots.push({
+        kind: 'bolt', frag: true, ci: sh.ci, el: sh.el, dmg: sh.dmg * 0.45, slow: sh.slow, burn: sh.burn,
+        knock: 0, chain: 0, leech: sh.leech, x: sh.x, y: sh.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v,
+        speed: v, r: 6, aoe: sh.aoe * 0.55, pierce: 0, life: 0.45, hit: new Set(sh.hit),
+      });
+    }
+  }
+
   const ORBIT_TICK = 0.45;
   const ZONE_TICK = 0.4;
 
+  const orbitRadius = (o) => o.radius * (o.pulse ? 1 + 0.9 * Math.abs(Math.sin(o.phase)) : 1);
+
   function orbitBlades(o, p) {
     const out = [];
+    const r = orbitRadius(o);
     for (let i = 0; i < o.count; i++) {
       const a = o.angle + (i / o.count) * Math.PI * 2;
-      out.push({ x: p.x + Math.cos(a) * o.radius, y: p.y + Math.sin(a) * o.radius });
+      out.push({ x: p.x + Math.cos(a) * r, y: p.y + Math.sin(a) * r });
     }
     return out;
   }
@@ -550,6 +625,7 @@
     for (const o of state.orbits) {
       o.life -= dt;
       o.angle += o.spin * dt;
+      o.phase += 2.2 * dt;
       if (!o.hitAt) o.hitAt = new Map();
       for (const b of orbitBlades(o, p)) {
         near(grid, b.x, b.y, o.blade, (f) => {
@@ -573,8 +649,97 @@
       let first = null;
       near(grid, z.x, z.y, z.r, (f) => { if (!first) first = f; damage(state, f, z.dmg, src); });
       if (first && z.chain) chainFrom(state, first, z, z.dmg);
+      if (z.shock) {
+        const out = { knock: 60, leech: z.leech, fromX: z.x, fromY: z.y };
+        near(grid, z.x, z.y, z.r * 1.8, (f) => {
+          if (Math.hypot(f.x - z.x, f.y - z.y) > z.r) damage(state, f, z.dmg * 0.6, out);
+        });
+        state.events.push({ type: 'shock', el: z.el, x: z.x, y: z.y, r: z.r * 1.8 });
+      }
     }
     state.zones = state.zones.filter((z) => z.life > 0);
+  }
+
+  function updateMeteors(state, dt, grid) {
+    for (const m of state.meteors) {
+      m.delay -= dt;
+      if (m.delay > 0) continue;
+      m.done = true;
+      const src = { slow: m.slow, burn: m.burn, knock: 30 + m.knock, leech: m.leech, fromX: m.x, fromY: m.y };
+      let first = null;
+      near(grid, m.x, m.y, m.r, (f) => { if (!first) first = f; damage(state, f, m.dmg, src); });
+      if (first && m.chain) chainFrom(state, first, m, m.dmg);
+      state.events.push({ type: 'impact', el: m.el, x: m.x, y: m.y, r: m.r });
+    }
+    state.meteors = state.meteors.filter((m) => !m.done);
+  }
+
+  // 물결은 진행 방향으로 얇고 옆으로 넓은 띠다. 띠 안에 든 적을 한 번씩 치고 민다.
+  function updateWaves(state, dt, grid) {
+    for (const w of state.waves) {
+      w.life -= dt;
+      w.x += w.dx * w.speed * dt;
+      w.y += w.dy * w.speed * dt;
+      const src = { slow: Math.max(0.3, w.slow), burn: w.burn, leech: w.leech };
+      near(grid, w.x, w.y, w.w, (f) => {
+        if (w.hit.has(f)) return;
+        const rx = f.x - w.x, ry = f.y - w.y;
+        const along = rx * w.dx + ry * w.dy;
+        const across = -rx * w.dy + ry * w.dx;
+        if (Math.abs(along) > 14 + f.r || Math.abs(across) > w.w) return;
+        w.hit.add(f);
+        damage(state, f, w.dmg, src);
+        if (f.type !== 'boss') { f.kx += w.dx * 260; f.ky += w.dy * 260; }
+        if (w.chain && w.hit.size % 5 === 1) chainFrom(state, f, w, w.dmg);
+      });
+    }
+    state.waves = state.waves.filter((w) => w.life > 0);
+  }
+
+  const TORNADO_TICK = 0.35;
+  function updateTornados(state, dt, grid) {
+    for (const t of state.tornados) {
+      t.life -= dt;
+      const aim = nearest(state, t.x, t.y, 420);
+      if (aim) {
+        const dx = aim.x - t.x, dy = aim.y - t.y;
+        const d = Math.hypot(dx, dy) || 1;
+        const v = Math.min(d, t.speed * dt);
+        t.x += (dx / d) * v; t.y += (dy / d) * v;
+      }
+      // 둘레의 적을 안으로 끌어당긴다. 모아 둔 무리를 다른 마법이 한꺼번에 치게 된다.
+      near(grid, t.x, t.y, t.r * 2.2, (f) => {
+        if (f.type === 'boss') return;
+        const dx = t.x - f.x, dy = t.y - f.y;
+        const d = Math.hypot(dx, dy) || 1;
+        f.kx += (dx / d) * 220 * dt * 8; f.ky += (dy / d) * 220 * dt * 8;
+      });
+      t.tick -= dt;
+      if (t.tick > 0) continue;
+      t.tick = TORNADO_TICK;
+      const src = { slow: t.slow, burn: t.burn, leech: t.leech };
+      let first = null;
+      near(grid, t.x, t.y, t.r, (f) => { if (!first) first = f; damage(state, f, t.dmg, src); });
+      if (first && t.chain) chainFrom(state, first, t, t.dmg);
+    }
+    state.tornados = state.tornados.filter((t) => t.life > 0);
+  }
+
+  const QUAKE_TICK = 0.5;
+  function updateQuakes(state, dt, grid) {
+    const p = state.player;
+    for (const q of state.quakes) {
+      q.life -= dt;
+      q.tick -= dt;
+      if (q.tick > 0) continue;
+      q.tick = QUAKE_TICK;
+      const src = { slow: 0.85, burn: q.burn, knock: 20 + q.knock, leech: q.leech, fromX: p.x, fromY: p.y };
+      let first = null;
+      near(grid, p.x, p.y, q.r, (f) => { if (!first) first = f; damage(state, f, q.dmg, src); f.slowT = 0.6; });
+      if (first && q.chain) chainFrom(state, first, q, q.dmg);
+      state.events.push({ type: 'quake', x: p.x, y: p.y, r: q.r });
+    }
+    state.quakes = state.quakes.filter((q) => q.life > 0);
   }
 
   function contact(state, dt, grid) {
@@ -648,7 +813,7 @@
 
   const api = {
     FOES, PLAYER, CIRCLE_UNLOCK, RANGE,
-    create, step, choose, drain, summary, previewPlace, previewErase, placeMode, orbitBlades,
+    create, step, choose, drain, summary, previewPlace, previewErase, placeMode, orbitBlades, orbitRadius,
     nightLength, xpNext, capacity, rng,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
