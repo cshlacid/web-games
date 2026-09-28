@@ -5,15 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title data-i18n="game.archmage">회귀하는 대마법사</title>
 <meta name="description" content="회귀하며 룬을 조합해 멸망의 밤을 버틴다" data-i18n-attr="content=meta.desc">
-<meta name="color-scheme" content="light dark">
+<meta name="color-scheme" content="dark">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><rect x='1' y='1' width='22' height='22' rx='4' fill='%23191a2c'/><circle cx='12' cy='12' r='8' fill='none' stroke='%23b99bff' stroke-width='1.6'/><path d='M12 5.5 L17.7 15.3 H6.3 Z' fill='none' stroke='%23ff9a5e' stroke-width='1.6' stroke-linejoin='round'/></svg>">
 <link rel="manifest" href="../../manifest.json">
 <link rel="apple-touch-icon" href="../../icons/icon-180.png">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="회귀하는 대마법사" data-i18n-attr="content=game.archmage">
-<meta name="theme-color" content="#f3f1f7" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#121320" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#0b0a12">
 <link rel="stylesheet" href="../../shared/base.css">
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="../../shared/result.css">
@@ -37,17 +36,21 @@
         <button class="toggle sound" id="toggle-sfx" type="button" aria-pressed="true" data-i18n="ui.sfx">효과음</button>
       </div>
     </div>
-    <div class="status" id="status">
-      <span class="chip circle" id="circle-chip"></span>
-      <span class="chip" id="level-chip"></span>
-      <span class="chip" id="kills-chip"></span>
-      <span class="chip time" id="time-chip">0:00</span>
-      <button class="toggle pause" id="pause" type="button" aria-pressed="false" data-i18n="am.paused">멈춤</button>
-    </div>
   </header>
 
   <div class="board-wrap" id="board-wrap">
     <canvas class="board" id="board"></canvas>
+    <!-- 싸우는 동안의 상태. 판 위 맨 위에 경험치 막대, 그 아래 밤·남은 시간·처치 수. -->
+    <div class="hud" id="status">
+      <div class="xp"><span class="xp-lv" id="level-chip"></span><span class="xp-track"><i id="xp-fill"></i></span></div>
+      <div class="hud-row">
+        <span class="hud-night" id="circle-chip"></span>
+        <span class="hud-time" id="time-chip">0:00</span>
+        <span class="hud-kills"><span data-glyph="skull"></span><b id="kills-chip"></b></span>
+        <button class="hud-pause" id="pause" type="button" aria-pressed="false" aria-label="멈춤" data-i18n-attr="aria-label=am.paused"><span data-glyph="pause"></span></button>
+      </div>
+      <div class="boss-bar" id="boss-bar" hidden><span class="boss-name" data-i18n="am.boss">재앙의 사도</span><span class="boss-track"><i id="boss-fill"></i></span></div>
+    </div>
     <p class="alert" id="alert" role="status" aria-live="polite"></p>
 
     <!-- 판을 흐리게 남기고 덮는 안내들. 모양은 shared/result.css의 것을 쓴다. -->
@@ -129,6 +132,7 @@
 <script src="gear.js"></script>
 <script src="meta.js"></script>
 <script src="icons.js"></script>
+<script src="art.js"></script>
 <script src="../../shared/audio.js"></script>
 <script src="audio.js"></script>
 <script src="../../shared/sheet.js"></script>
