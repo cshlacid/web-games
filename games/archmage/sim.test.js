@@ -175,6 +175,52 @@ for (const [el, name] of [['fire', '메테오'], ['water', '해일'], ['wind', '
   check('폭염탄은 터지며 파편을 흩는다', frag, true);
 }
 
+// --- 빈 구멍이 있어도 강화 ---
+{
+  const st = S.create({ circle: 3, seed: 1 });
+  engrave(st, 'fire', 0);
+  check('빈 구멍이 있으면 새기기와 강화 둘 다', S.placeModes(st, 'fire', 0), ['add', 'grade']);
+  st.pending = { options: [{ type: 'rune', id: 'fire' }] };
+  S.choose(st, 0, { ci: 0, mode: 'grade' });
+  check('강화를 고르면 구멍을 쓰지 않는다', st.circles[0].runes.map((r) => r.id + r.grade), ['fire1']);
+}
+
+// --- 연쇄는 마법 자체가 번진다 ---
+{
+  const st = S.create({ circle: 2, seed: 1 });
+  engrave(st, 'earth', 0);
+  engrave(st, 'chain', 0);
+  foe(st, 'slime', 90, 0);
+  foe(st, 'slime', 190, 60);
+  let zones = 0;
+  for (let i = 0; i < 90; i++) { S.step(st, 1 / 60); S.drain(st); zones = Math.max(zones, st.zones.length); }
+  check('연쇄 지대는 다음 무리에 지대를 새로 깐다', zones >= 2, true);
+}
+
+// --- 비·오라·접목 ---
+{
+  const st = S.create({ circle: 5, seed: 1 });
+  for (let i = 0; i < 5; i++) engrave(st, 'wind', 0);
+  const f = foe(st, 'slime', 120, 40);
+  const ev = run(st, 1.5);
+  check('뇌우는 번개를 떨어뜨린다', ev.some((e) => e.type === 'impact' && e.sub === 'bolt') && f.hp < 1000, true);
+}
+{
+  const st = S.create({ circle: 7, seed: 1 });
+  for (let i = 0; i < 7; i++) engrave(st, 'fire', 0);
+  const f = foe(st, 'slime', 100, 0);
+  run(st, 1);
+  check('태양은 둘레를 태운다', f.hp < 1000 && f.burn > 0, true);
+}
+{
+  const st = S.create({ circle: 2, seed: 1 });
+  engrave(st, 'fire', 0);
+  engrave(st, 'water', 0);
+  const f = foe(st, 'slime', 90, 0);
+  run(st, 1.5);
+  check('서리불꽃은 맞힌 적을 얼린다', f.slow >= 0.95, true);
+}
+
 // --- 적과 끝 ---
 {
   const st = S.create({ circle: 1, seed: 1 });

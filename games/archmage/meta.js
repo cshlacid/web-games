@@ -85,9 +85,12 @@
   // 이 서클까지에서 찾은 것과 찾을 수 있는 것.
   function grimoireCount(save, circle) {
     const keys = Runes.allKeys(circle);
-    let found = 0;
-    for (const k of keys) if (save.grimoire[k]) found += 1;
-    return { found, total: keys.length };
+    let found = 0, special = 0, specialFound = 0;
+    for (const k of keys) {
+      if (save.grimoire[k]) found += 1;
+      if (Runes.isSpecial(k)) { special += 1; if (save.grimoire[k]) specialFound += 1; }
+    }
+    return { found, total: keys.length, specialFound, special };
   }
 
   const api = { MAX_CIRCLE, BREAK_COST, fresh, parse, manaFor, settle, breakCheck, breakthrough, grimoireCount };

@@ -26,7 +26,7 @@ check('물 하나는 창', R.compose(rs('water')).kind, 'lance');
 check('바람 하나는 둘레', R.compose(rs('wind')).kind, 'orbit');
 check('땅 하나는 지대', R.compose(rs('earth')).kind, 'zone');
 check('가장 많은 원소가 형태를 정한다', R.compose(rs('fire', 'wind', 'wind')).kind, 'orbit');
-check('비기면 정해진 차례로 가른다', R.compose(rs('wind', 'fire')).primary, 'fire');
+check('비기면 정해진 차례로 가른다', R.compose(rs('wind', 'wind', 'fire', 'fire', 'earth')).primary, 'fire');
 check('순서를 따지지 않는다',
   JSON.stringify(R.compose(rs('wind', 'fire', 'earth'))), JSON.stringify(R.compose(rs('earth', 'fire', 'wind'))));
 check('열쇠에 수식어는 들어가지 않는다', R.compose(rs('fire', 'chain', 'fire')).key, 'fire2');
@@ -49,9 +49,9 @@ check('열쇠는 원소 차례로 적는다', R.compose(rs('earth', 'fire', 'fir
   check('단계가 오르면 강해진다', two.dmg > one.dmg * 1.5, true);
   check('다른 원소로 더한 불은 화상을 붙인다', R.compose(rs('wind', 'wind', 'fire')).burn > 0, true);
   check('첫 불에는 성질이 붙지 않는다', one.burn, 0);
-  check('물을 더하면 둔화', R.compose(rs('fire', 'water')).slow > 0, true);
-  check('바람을 더하면 개수가 는다', R.compose(rs('fire', 'wind')).count, 2);
-  check('땅을 더하면 커진다', R.compose(rs('fire', 'earth')).size > one.size, true);
+  check('물을 더하면 둔화', R.compose(rs('fire', 'fire', 'water')).slow > 0, true);
+  check('바람을 더하면 개수가 는다', R.compose(rs('fire', 'fire', 'wind')).count, R.compose(rs('fire', 'fire')).count + 1);
+  check('땅을 더하면 커진다', R.compose(rs('fire', 'fire', 'earth')).size > R.compose(rs('fire', 'fire')).size, true);
   check('연쇄', R.compose(rs('fire', 'chain')).chain, 2);
   check('연쇄는 겹친다', R.compose(rs('fire', 'chain', 'chain')).chain, 4);
   check('시간은 쿨타임을 줄인다', R.compose(rs('fire', 'chrono')).cd < one.cd, true);
@@ -64,6 +64,33 @@ check('열쇠는 원소 차례로 적는다', R.compose(rs('earth', 'fire', 'fir
   check('물을 겹치면 관통이 는다', R.compose([{ id: 'water', grade: 2 }]).pierce, R.compose(rs('water')).pierce + 2);
   check('수식어 개수를 센다', R.compose(rs('fire', 'echo', 'echo')).mods, { echo: 2 });
   check('등급이 피해를 올린다', R.compose([{ id: 'fire', grade: 2 }]).dmg > one.dmg, true);
+}
+
+// --- 9서클까지의 단계와 특수 조합 ---
+{
+  const n = (el, k) => { const a = []; for (let i = 0; i < k; i++) a.push({ id: el, grade: 0 }); return a; };
+  check('단계가 바뀌는 자리', [1, 2, 3, 4, 5, 6, 7, 8, 9].map(R.formTierOf), [1, 2, 3, 3, 5, 5, 7, 7, 9]);
+  check('불 다섯은 유성우', R.compose(n('fire', 5)).kind, 'rain');
+  check('물 일곱은 대해일', [R.compose(n('water', 7)).kind, !!R.compose(n('water', 7)).ring], ['wave', true]);
+  check('바람 일곱은 태풍의 눈', R.compose(n('wind', 7)).kind, 'aura');
+  check('땅 아홉은 화면 전체', !!R.compose(n('earth', 9)).screen, true);
+  check('특수 조합은 서른여덟', Object.keys(R.RECIPES).length, 38);
+  const steam = R.compose(rs('fire', 'water'));
+  check('불+물은 특수 조합(얼리는 화염구)', [steam.recipe, steam.kind, !!steam.freeze], [true, 'bolt', true]);
+  check('특수 조합은 접목이 붙는다', !!R.compose(rs('fire', 'wind')).ignite, true);
+  check('조합을 벗어나면 규칙으로 돌아간다', R.compose(rs('fire', 'fire', 'water')).recipe, false);
+  check('특수 조합은 어느 원소를 강화해도 강해진다', R.compose([{ id: 'fire', grade: 3 }, { id: 'earth', grade: 0 }]).dmg > R.compose(rs('fire', 'earth')).dmg, true);
+  check('수식어는 특수 조합을 깨지 않는다', R.compose(rs('fire', 'water', 'chain')).recipe, true);
+  let bad = 0;
+  for (const key of Object.keys(R.RECIPES)) {
+    const runes = [];
+    for (const part of key.split('-')) {
+      const m = /^([a-z]+)(\d+)$/.exec(part);
+      for (let i = 0; i < Number(m[2]); i++) runes.push({ id: m[1], grade: 0 });
+    }
+    if (runes.length > 9 || !R.compose(runes).recipe) bad++;
+  }
+  check('모든 특수 조합이 9서클 안에서 만들어진다', bad, 0);
 }
 
 // --- 모든 조합이 정의되는지 ---
