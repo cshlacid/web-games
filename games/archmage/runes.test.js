@@ -46,6 +46,9 @@ check('열쇠는 원소 차례로 적는다', R.compose(rs('earth', 'fire', 'fir
   check('연쇄는 겹친다', R.compose(rs('fire', 'chain', 'chain')).chain, 4);
   check('시간은 쿨타임을 줄인다', R.compose(rs('fire', 'chrono')).cd < one.cd, true);
   check('집중은 피해를 모은다', R.compose(rs('fire', 'focus')).dmg > one.dmg, true);
+  check('바람을 겹쳐 올리면 개수가 는다', R.compose([{ id: 'wind', grade: 1 }]).count, R.compose(rs('wind')).count + 1);
+  check('땅을 겹쳐 올리면 범위가 는다', R.compose([{ id: 'earth', grade: 1 }]).size > R.compose(rs('earth')).size, true);
+  check('수식어를 겹쳐 올리면 한 번 더 걸린다', R.compose([{ id: 'fire', grade: 0 }, { id: 'chain', grade: 1 }]).chain, 4);
   check('흡혈', R.compose(rs('fire', 'anima')).leech > 0, true);
   check('수식어 개수를 센다', R.compose(rs('fire', 'echo', 'echo')).mods, { echo: 2 });
   check('등급이 피해를 올린다', R.compose([{ id: 'fire', grade: 2 }]).dmg > one.dmg, true);
