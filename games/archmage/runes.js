@@ -34,6 +34,22 @@
     else if (el === 'earth') { s.size *= 1.22; s.dur *= 1.3; s.knock += 40; }
   }
 
+  // 같은 룬을 겹쳤을 때의 강화. 1서클은 구멍이 하나라 판 안의 성장이 거의 이것뿐이다 —
+  // 성질 하나만 붙였더니 적이 안 죽고 쌓여 피곤하기만 했다. 그래서 한 번 겹칠 때마다
+  // 피해·쿨타임에 형태별로 개수·관통·유지까지 함께 올려 한 단계가 두 배를 넘게 한다.
+  // 곱으로 쌓으면 열 번 겹쳤을 때 수천 배가 되어 사도가 한 방에 녹았다. 그래서 겹친
+  // 횟수 n을 모아 마지막에 한 번, 대부분 더하기로 건다.
+  const MAX_EXTRA = 10;
+  function empower(s, n) {
+    if (!n) return;
+    s.dmg *= 1 + 0.5 * n;
+    s.cd *= Math.pow(0.9, n);
+    s.count += Math.min(n, MAX_EXTRA);
+    if (s.kind === 'bolt') { s.pierce += n; s.size *= 1 + Math.min(0.5, 0.05 * n); }
+    else if (s.kind === 'lance') s.pierce += 2 * n;
+    else { s.dur *= 1 + 0.15 * n; s.size *= 1 + Math.min(0.5, 0.05 * n); }
+  }
+
   // 수식어. 같은 것이 겹치면 같은 효과가 한 번 더 걸린다.
   function applyModifier(s, mod) {
     if (mod === 'chain') s.chain += 2;
@@ -84,29 +100,27 @@
       slow: 0, burn: 0, knock: 0, chain: 0, omni: 0, echo: 0, leech: 0,
       mods: {}, runes: runes.length,
     };
-    let skipped = false;
+    // 주원소를 구멍에 더 넣은 것도 같은 룬을 겹친 것이라 등급과 똑같이 강해진다.
+    // 그러지 않으면 구멍을 써서 넣는 쪽이 칸을 안 쓰는 등급보다 약해진다.
+    let stacks = counts[primary] - 1;
     for (const el of ELEMENTS) {
-      for (let i = 0; i < counts[el]; i++) {
-        if (el === primary && !skipped) { skipped = true; continue; }
-        applyTrait(s, el);
-      }
+      for (let i = el === primary ? 1 : 0; i < counts[el]; i++) applyTrait(s, el);
     }
     for (const r of runes) {
       if (!isModifier(r.id)) continue;
       s.mods[r.id] = (s.mods[r.id] || 0) + 1;
       applyModifier(s, r.id);
     }
-    // 같은 룬을 다시 얻어 올린 등급. 칸을 쓰지 않는 대신 그 룬의 성질이 한 번 더
-    // 붙는다 — 바람이면 개수가, 땅이면 범위가 는다. 피해만 올리면 강해진 것이 화면에
-    // 보이지 않는다.
+    // 같은 룬을 다시 얻어 올린 등급. 칸을 쓰지 않는 대신 겹친 것으로 세어 크게
+    // 강해진다. 수식어의 등급은 그 수식어가 한 번 더 걸린다.
     let grade = 0;
     for (const r of runes) {
-      for (let g = 0; g < (r.grade || 0); g++) {
-        if (isElement(r.id)) applyTrait(s, r.id);
-        else applyModifier(s, r.id);
-      }
-      grade += r.grade || 0;
+      const g = r.grade || 0;
+      grade += g;
+      stacks += g;
+      if (isModifier(r.id)) for (let i = 0; i < g; i++) applyModifier(s, r.id);
     }
+    empower(s, stacks);
     s.grade = grade;
     s.cd = Math.max(0.25, s.cd);
     return s;
