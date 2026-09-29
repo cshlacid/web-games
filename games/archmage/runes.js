@@ -18,6 +18,8 @@
   // 빛과 어둠은 서로 맞서는 특수 원소다. 언데드가 빛에 약하고 어둠에 강해(sim.js의
   // UNDEAD_BANE) 둘이 판에서 갈린다 — 다른 원소는 적을 가리지 않는다.
   const OPPOSITE = { light: 'dark', dark: 'light' };
+  // 특수 원소는 덜 나오는 대신(sim.js의 WEIGHT) 형태를 정하면 그만큼 세다.
+  const SPECIAL_DMG = 1.25;
   // 앞 넷은 원소와 상관없이 같은 효과, 뒤 다섯은 원소 상성이 있다. 집중·거대·시간은
   // 뺐다 — 피해·범위·쿨타임을 올리는 것뿐이라 고를 때 생각할 거리가 없었다.
   const MODIFIERS = ['chain', 'omni', 'echo', 'anima', 'frost', 'heat', 'gravity', 'gale', 'resonance'];
@@ -51,9 +53,10 @@
     thunder: { kind: 'zap', dmg: 24, cd: 1.1, dur: 0, size: 110, speed: 0, count: 1, pierce: 0, jumps: 2 },
     // 적 쪽으로 광선을 last초 동안 쏜다. 선 위의 모든 적을 every마다 긁는다. size는 광선의 굵기.
     light: { kind: 'beam', dmg: 4.5, cd: 1.8, dur: 0, size: 10, speed: 0, count: 1, pierce: 0, length: 300, last: 1.2, every: 0.2 },
-    // 가까운 적 몇에게 저주를 건다. 초당 dmg의 피해가 last초 이어지고, 저주받은 적이 죽으면
-    // 곁의 적에게 옮겨 간다.
-    dark: { kind: 'curse', dmg: 9, cd: 2.0, dur: 0, size: 0, speed: 0, count: 2, pierce: 0, last: 3.5 },
+    // 가까운 적 쪽으로 그림자 낫을 휘둘러 부채꼴(arc 라디안, 반지름 size) 안을 한꺼번에 벤다.
+    // count는 휘두르는 횟수다. 처음에는 적 몇에게 도트를 거는 저주였는데, 맞는 순간이 보이지
+    // 않아 손맛이 없었다.
+    dark: { kind: 'reap', dmg: 22, cd: 1.5, dur: 0, size: 110, speed: 0, count: 1, pierce: 0, arc: 2.3 },
   };
 
   // 같은 원소를 구멍에 여럿 새기면 마법 자체가 바뀐다(단계). 등급처럼 수치만 오르면
@@ -72,7 +75,7 @@
       // 하늘에서 떨어진다. 적이 있는 자리 여러 곳을 한꺼번에 친다.
       3: { kind: 'meteor', dmg: 62, cd: 2.2, size: 64, count: 2 },
       4: { kind: 'rain', sub: 'meteor', dmg: 48, cd: 4, dur: 3, size: 58, count: 2, every: 0.35, delay: 0.5 },
-      5: { kind: 'aura', dmg: 26, cd: 5, dur: 4, size: 150, every: 0.3, burn: 12 },
+      5: { kind: 'aura', dmg: 36, cd: 5, dur: 4, size: 150, every: 0.3, burn: 12 },
       7: { kind: 'aura', dmg: 110, cd: 5, dur: 4, size: 470, every: 0.5, burn: 20, screen: true },
     },
     water: {
@@ -80,9 +83,9 @@
       2: { nova: true },
       // 넓은 물결이 밀고 나가며 닿는 것을 모두 밀어낸다.
       3: { kind: 'wave', dmg: 48, cd: 2.0, size: 66, speed: 250, count: 1, pierce: 0 },
-      4: { kind: 'rain', sub: 'ice', dmg: 55, cd: 3.6, dur: 3, size: 44, count: 3, every: 0.3, delay: 0.3, freeze: true },
-      5: { kind: 'wave', ring: true, dmg: 64, cd: 2.6, size: 70, speed: 230, count: 12 },
-      7: { kind: 'aura', dmg: 90, cd: 5, dur: 3.5, size: 470, every: 0.5, freeze: true, screen: true },
+      4: { kind: 'rain', sub: 'ice', dmg: 45, cd: 3.6, dur: 3, size: 44, count: 3, every: 0.3, delay: 0.3, freeze: true },
+      5: { kind: 'wave', ring: true, dmg: 58, cd: 2.6, size: 70, speed: 230, count: 12 },
+      7: { kind: 'aura', dmg: 140, cd: 5, dur: 3.5, size: 470, every: 0.5, freeze: true, screen: true },
     },
     wind: {
       // 칼날이 도는 반경이 크게 들고 난다.
@@ -100,41 +103,41 @@
       // 발밑부터 넓게 땅이 흔들려 둘레를 한꺼번에 치고 묶는다.
       3: { kind: 'quake', dmg: 24, cd: 3.8, dur: 1.6, size: 170, count: 1 },
       4: { kind: 'rain', sub: 'rock', dmg: 90, cd: 4, dur: 3, size: 72, count: 1, every: 0.45, delay: 0.6, knock: 80 },
-      5: { kind: 'aura', dmg: 90, cd: 4, dur: 4, size: 130, every: 0.3, knock: 60 },
-      7: { kind: 'quake', dmg: 80, cd: 6, dur: 2.5, size: 470, screen: true },
+      5: { kind: 'aura', dmg: 34, cd: 4, dur: 4, size: 140, every: 0.3, knock: 20 },
+      7: { kind: 'quake', dmg: 100, cd: 6, dur: 2.5, size: 470, screen: true },
     },
     thunder: {
       // 튀는 수가 는다.
       2: { jumps: 4 },
       // 하늘에서 여러 곳에 벼락이 떨어진다.
       3: { kind: 'meteor', sub: 'bolt', dmg: 55, cd: 2.0, size: 44, count: 3 },
-      4: { kind: 'rain', sub: 'bolt', dmg: 45, cd: 3, dur: 3, size: 26, count: 3, every: 0.2, delay: 0.12 },
-      5: { kind: 'aura', dmg: 24, cd: 4.5, dur: 4, size: 160, every: 0.25 },
-      7: { kind: 'rain', sub: 'bolt', dmg: 70, cd: 5, dur: 4, size: 32, count: 4, every: 0.2, delay: 0.1, screen: true },
+      4: { kind: 'rain', sub: 'bolt', dmg: 36, cd: 3, dur: 3, size: 26, count: 3, every: 0.2, delay: 0.12 },
+      5: { kind: 'aura', dmg: 40, cd: 4.5, dur: 4, size: 160, every: 0.25 },
+      7: { kind: 'rain', sub: 'bolt', dmg: 90, cd: 5, dur: 4, size: 32, count: 4, every: 0.2, delay: 0.1, screen: true },
     },
     light: {
       // 광선이 두 갈래가 된다.
-      2: { count: 2 },
+      2: { count: 2, dmg: 3.6 },
       // 마법사 둘레로 성광이 두 번 터진다.
       3: { kind: 'aura', dmg: 30, cd: 2.4, dur: 0.7, size: 150, every: 0.3 },
       4: { kind: 'rain', sub: 'light', dmg: 50, cd: 3.5, dur: 3, size: 36, count: 3, every: 0.3, delay: 0.35 },
-      5: { kind: 'aura', dmg: 28, cd: 4.5, dur: 4, size: 150, every: 0.3, vuln: 0.2 },
+      5: { kind: 'aura', dmg: 38, cd: 4.5, dur: 4, size: 150, every: 0.3, vuln: 0.2 },
       7: { kind: 'aura', dmg: 100, cd: 5, dur: 3, size: 470, every: 0.5, screen: true },
     },
     dark: {
-      // 저주가 넷에게 걸린다.
-      2: { count: 4 },
+      // 낫을 두 번, 번갈아 휘두른다. 휘두르는 수가 곧 피해의 곱이라 한 번의 몫을 줄인다.
+      2: { count: 2, dmg: 12 },
       // 적 무리 아래 어둠의 늪이 열려 빨아들인다.
       3: { kind: 'zone', dmg: 8, cd: 2.4, dur: 3.5, size: 70, count: 1, vortex: true },
       4: { kind: 'rain', sub: 'void', dmg: 52, cd: 3.8, dur: 3, size: 50, count: 2, every: 0.35, delay: 0.45 },
-      5: { kind: 'aura', dmg: 26, cd: 4.5, dur: 4, size: 160, every: 0.3, fear: 0.5 },
+      5: { kind: 'aura', dmg: 36, cd: 4.5, dur: 4, size: 160, every: 0.3, fear: 0.5 },
       7: { kind: 'aura', dmg: 95, cd: 5, dur: 3.5, size: 470, every: 0.5, screen: true },
     },
   };
   const TIER_STEPS = [7, 5, 4, 3, 2, 1];
   const formTierOf = (n) => TIER_STEPS.find((t) => t <= n);
   // 형태가 바뀌지 않는 단계(6)에서 한 칸마다 더 붙는 피해.
-  const TIER_DMG = 0.8;
+  const TIER_DMG = 0.35;
 
   // 특수 조합. 이 원소 수를 **정확히** 맞춘 룬들로 이름 있는 마법이 된다. 더 많은 룬을 쓰는
   // 마법이 없으면 이것이 발동한다. 모든 조합에 두지 않은 것은 찾는 재미를 남기려는 것이다.
@@ -148,6 +151,9 @@
   // 불붙은 번개여야 처음 보는 마법이 된다. name은 이름과 마도서의 열쇠다.
   const RECIPES = {};
   const counts0 = () => { const c = {}; for (const el of ELEMENTS) c[el] = 0; return c; };
+  // 형태마다 몫을 맞춘다. 낫은 한 번에 부채꼴을 다 베어 1:1 조합이 같은 룬 수의 두 배쯤
+  // 나왔고, 4단계 회오리는 떠돌아 한 적을 오래 붙잡지 못해 6룬 조합이 순수 바람 여섯보다 약했다.
+  const pairDmg = (form, tier) => (form === 'dark' && tier === 1 ? 0.6 : form === 'wind' && tier === 4 ? 1.4 : 1);
   const OLD_FORMS = { 'fire-water': 'fire', 'fire-wind': 'wind', 'fire-earth': 'earth', 'water-wind': 'water', 'water-earth': 'earth', 'wind-earth': 'wind' };
   for (let i = 0; i < ELEMENTS.length; i++) for (let j = i + 1; j < ELEMENTS.length; j++) {
     const a = ELEMENTS[i], b = ELEMENTS[j];
@@ -158,7 +164,7 @@
     for (const [n, tier] of steps) {
       const counts = counts0();
       counts[a] = n; counts[b] = n;
-      RECIPES[keyOf(counts)] = { form, tier, grafts: [other] };
+      RECIPES[keyOf(counts)] = { form, tier, grafts: [other], dmg: pairDmg(form, tier) };
     }
   }
   const TRIOS = [
@@ -170,8 +176,8 @@
       const counts = counts0();
       for (const el of els) counts[el] = n;
       // 불+바람+땅은 불 형태에 빨아들임과 파편이 겹쳐, 같은 룬 수의 다른 조합보다 두 배 넘게
-      // 셌다. 몫을 줄여 맞춘다.
-      const dmg = form === 'fire' ? 0.7 : 1;
+      // 셌다. 물+바람+땅의 물결은 단일 대상에 세 배쯤 셌고, 불+물+바람의 회오리는 약했다.
+      const dmg = form === 'fire' ? 0.7 : form === 'wind' && n === 2 ? 1.4 : form === 'water' && n === 1 ? 0.75 : 1;
       RECIPES[keyOf(counts)] = { form, tier, grafts: els.filter((el) => el !== form), dmg };
     });
   }
@@ -231,10 +237,10 @@
     else if (s.primary === 'water') { s.count += more; s.pierce += n; s.dmg *= 1 + 0.3 * n; }
     else if (s.primary === 'wind') { s.count += more; s.dur *= longer(0.15); s.dmg *= 1 + 0.3 * n; }
     else if (s.primary === 'earth') { s.size *= 1 + Math.min(1, 0.15 * n); s.dur *= longer(0.3); s.dmg *= 1 + 0.35 * n; }
-    // 번개는 튀는 수, 빛은 광선이 머무는 시간, 어둠은 저주를 거는 수가 는다.
+    // 번개는 튀는 수, 빛은 광선이 머무는 시간, 어둠은 휘두르는 횟수와 낫의 길이가 는다.
     else if (s.primary === 'thunder') { if (s.kind === 'zap') s.jumps += n; else s.count += more; s.dmg *= 1 + 0.35 * n; }
     else if (s.primary === 'light') { if (s.kind === 'beam') s.last *= longer(0.15); else s.count += more; s.dmg *= 1 + 0.35 * n; }
-    else if (s.primary === 'dark') { s.count += more; if (s.last) s.last *= longer(0.15); s.dmg *= 1 + 0.35 * n; }
+    else if (s.primary === 'dark') { s.count += more; if (s.kind === 'reap') s.size *= 1 + Math.min(0.6, 0.08 * n); s.dmg *= 1 + 0.35 * n; }
   }
 
   // 수식어. l은 그 수식어 룬의 수에 등급을 더한 것이고, 오르면 **그 수식어의 효과만**
@@ -248,10 +254,10 @@
     // 상성이면 효과에 더해 피해도 오른다 — 고를 때 "어울린다"가 곧 "세진다"로 읽혀야 한다.
     if (likes) { s.synergy.push(mod); s.dmg *= SYNERGY_DMG; }
     if (hates) s.clash.push(mod);
-    // 연쇄: 번지는 것이 없는 번개·광선·저주에서는 튀는 수·광선·저주 대상을 늘린다.
+    // 연쇄: 번지는 것이 없는 번개·광선·낫에서는 튀는 수·광선 수·휘두르는 횟수를 늘린다.
     if (mod === 'chain') {
       if (s.kind === 'zap') s.jumps += 2 * l;
-      else if (s.kind === 'beam' || s.kind === 'curse') s.count += l;
+      else if (s.kind === 'beam' || s.kind === 'reap') s.count += l;
       else s.chain += 2 * l;
     }
     else if (mod === 'omni') s.omni += l;
@@ -368,12 +374,13 @@
       count: f.count, pierce: f.pierce,
       slow: 0, burn: 0, knock: f.knock || 0, chain: 0, omni: 0, echo: 0, leech: 0,
       splash: 0, splashBoost: 0, root: 0, rootDur: 0, freezeChance: 0, zap: 0, vuln: 0, fear: 0,
-      jumps: f.jumps || 0, length: f.length || 0, last: f.last || 0, every: f.every || 0,
+      jumps: f.jumps || 0, length: f.length || 0, last: f.last || 0, every: f.every || 0, arc: f.arc || 0,
       mods: {}, synergy: [], clash: [], runes: total, tier: counts[formEl],
     };
     if (form >= 2) Object.assign(s, TIERS[formEl][form]);
     // 2단계는 형태를 빌리지 않고 동작만 얹으므로 피해를 따로 올려 준다.
     if (form === 2) s.dmg *= 1.6;
+    if (OPPOSITE[formEl]) s.dmg *= SPECIAL_DMG;
     if (!recipe && counts[primary] > form) s.dmg *= 1 + TIER_DMG * (counts[primary] - form);
     // 마법에 든 원소 룬의 등급은 모두 그 마법의 강화로 센다. 특수 조합은 한 마법이라
     // 어느 원소 룬을 올려도 강해진다 — 형태 원소만 세었더니 용암 지대의 불을 올린 것이 헛것이었다.
@@ -450,7 +457,7 @@
     return out;
   }
 
-  const api = { ELEMENTS, OPPOSITE, MODIFIERS, AFFINITY, SOCKETS, ALL, FORMS, TIERS, RECIPES, fits, maxElements, formTierOf, isSpecial, isElement, isModifier, isSpecialElement, compose, keyOf, keyRunes, countElements, allKeys };
+  const api = { ELEMENTS, OPPOSITE, SPECIAL_DMG, MODIFIERS, AFFINITY, SOCKETS, ALL, FORMS, TIERS, RECIPES, fits, maxElements, formTierOf, isSpecial, isElement, isModifier, isSpecialElement, compose, keyOf, keyRunes, countElements, allKeys };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else window.ArchmageRunes = api;
 })();

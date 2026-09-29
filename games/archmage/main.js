@@ -355,8 +355,10 @@
       } else if (ev.type === 'zap') {
         if (fx.length < 300) fx.push({ kind: 'zap', pts: ev.pts, small: ev.small, el: ev.el, t: 0, life: ev.small ? 0.14 : 0.22, seed: Math.random() * 1000 });
         if (!ev.small) sound('hit', null, 60);
-      } else if (ev.type === 'curse') {
-        if (fx.length < 300) fx.push({ kind: 'ring', x: ev.x, y: ev.y, r: 16, el: 'dark', t: 0, life: 0.35 });
+      } else if (ev.type === 'reap') {
+        if (fx.length < 300) fx.push({ kind: 'reap', angle: ev.angle, r: ev.r, arc: ev.arc, dir: ev.dir, hits: ev.hits, el: ev.el, t: 0, life: 0.34 });
+        if (ev.hits.length) { shake = Math.max(shake, 2.5); sound('hit', null, 60); }
+        sound('cast', ev.el, 90);
       } else if (ev.type === 'splash') {
         if (fx.length < 300) fx.push({ kind: 'ring', x: ev.x, y: ev.y, r: ev.r, el: 'fire', t: 0, life: 0.25 });
       } else if (ev.type === 'kill') {
@@ -747,15 +749,6 @@
         ctx.strokeStyle = 'rgba(140,210,255,0.55)'; ctx.lineWidth = 1.4;
         ctx.beginPath(); ctx.ellipse(f.x, f.y + f.r * 0.55, f.r * 0.9, f.r * 0.32, 0, 0, Math.PI * 2); ctx.stroke();
       }
-    }
-    // 저주받은 적: 몸에서 검붉은 기운이 피어오른다.
-    if (f.curseT > 0) {
-      ctx.globalCompositeOperation = 'lighter';
-      const u = (clock * 1.2 + f.phase) % 1;
-      ctx.globalAlpha = 0.7 * (1 - u);
-      glowAt('dark', f.x + Math.sin(f.phase * 5) * f.r * 0.4, f.y - f.r * 0.3 - u * 14, 14 * (1 - u) + 6);
-      ctx.globalAlpha = 1;
-      ctx.globalCompositeOperation = 'source-over';
     }
     // 빛에 드러난 적: 발밑에 빛의 표식.
     if (f.vulnT > 0) {
@@ -1185,6 +1178,44 @@
       glowAt(f.el, last[0], last[1], f.small ? 16 : 30);
       ctx.globalAlpha = 1;
       light(last[0], last[1], 60);
+    } else if (f.kind === 'reap') {
+      // 그림자 낫: 칼끝이 부채꼴을 쓸고 지나가며 초승달 자국을 남긴다. 자국은 칼끝 쪽이 두껍고
+      // 꼬리로 갈수록 가늘어지며, 앞날은 희게 빛난다. 마법사를 따라 움직인다.
+      const sweep = 1 - Math.pow(1 - Math.min(1, t / 0.45), 3);
+      const a0 = f.angle - (f.dir * f.arc) / 2;
+      const a1 = a0 + f.dir * f.arc * sweep;
+      const tail = a0 + (a1 - a0) * Math.max(0, (t - 0.25) / 0.75);
+      const color = I.colorOf(f.el);
+      const crescent = (outer, thick) => {
+        const N = 18;
+        ctx.beginPath();
+        for (let k = 0; k <= N; k++) { const a = tail + ((a1 - tail) * k) / N; ctx.lineTo(p.x + Math.cos(a) * outer, p.y + Math.sin(a) * outer); }
+        for (let k = N; k >= 0; k--) {
+          const a = tail + ((a1 - tail) * k) / N, w = thick * Math.pow(k / N, 0.8);
+          ctx.lineTo(p.x + Math.cos(a) * (outer - w), p.y + Math.sin(a) * (outer - w));
+        }
+        ctx.closePath();
+      };
+      const fade = t < 0.45 ? 1 : 1 - (t - 0.45) / 0.55;
+      ctx.globalAlpha = 0.45 * fade; ctx.fillStyle = color; crescent(f.r + 6, f.r * 0.62); ctx.fill();
+      ctx.globalAlpha = 0.9 * fade; ctx.fillStyle = '#23082e'; crescent(f.r, f.r * 0.42); ctx.fill();
+      ctx.globalAlpha = fade; ctx.strokeStyle = '#ffe6fb'; ctx.lineWidth = 2.2;
+      ctx.beginPath(); ctx.arc(p.x, p.y, f.r, a1 - f.dir * 0.5 * sweep, a1, f.dir < 0); ctx.stroke();
+      const tx = p.x + Math.cos(a1) * f.r, ty = p.y + Math.sin(a1) * f.r;
+      glowAt(f.el, tx, ty, 34 * fade);
+      light(tx, ty, 70);
+      // 벤 자리마다 비스듬한 칼자국.
+      if (t < 0.6) {
+        const u = t / 0.6;
+        ctx.globalAlpha = 1 - u;
+        for (const [hx, hy] of f.hits) {
+          const d = 12 + 6 * u;
+          ctx.strokeStyle = hexA(color, 0.8); ctx.lineWidth = 4;
+          ctx.beginPath(); ctx.moveTo(hx - d, hy - d * 0.6); ctx.lineTo(hx + d, hy + d * 0.6); ctx.stroke();
+          ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.4; ctx.stroke();
+        }
+      }
+      ctx.globalAlpha = 1;
     } else if (f.kind === 'levelup') {
       // 레벨업: 발밑에서 금빛 기둥이 솟고 고리가 퍼진다.
       ctx.globalAlpha = 1 - t;
@@ -1794,17 +1825,12 @@
   }
 
   // --- 마도서 ---
-  // 원소 마법(한 원소만의 마법)과 특수 조합을 나눠 보이고 원소로 거른다. 누르면 그 마법의
-  // 성능과 수치·효과를 펼친다. 성능은 실제로 10초 동안 넣은 초당 피해다(sim.js의 benchmark) —
-  // 번지는 것·쏟아지는 것·도는 것은 피해 수치만으로는 견줄 수 없다. 마법 하나에 수십 ms라
-  // 누를 때 재고 기억해 둔다. 목록 전체를 미리 재면 탭이 열리는 데 1.5초가 걸린다.
+  // 원소 마법(한 원소만의 마법)과 특수 조합을 나눠 보이고 원소·서클로 거른다. 누르면 그
+  // 마법이 무엇을 하는지와 수치·효과를 펼친다. 초당 피해는 보여 주지 않는다 — 숫자 하나로
+  // 줄 세우면 고르는 재미가 "가장 큰 수"로 좁아진다.
   let bookEl = 'all';
   let bookCircle = 0;
   let bookSel = null;
-  const benchCache = {};
-  // 막대의 끝. 9서클까지 발견할 수 있는 마법 가운데 가장 센 값쯤이고, 값의 폭이 수백 배라
-  // 로그로 잰다 — 곧게 재면 1·2단계 마법의 막대가 모두 바닥에 붙는다.
-  const PERF_MAX = { single: 1500, crowd: 22000 };
   const isRecipeKey = (key) => key === 'genesis' || !!Runes.RECIPES[key];
   // 서클 필터는 그 서클에서 **새로 열리는** 마법이다. 원소 칸이 늘지 않는 서클(3·6)은 새로
   // 열리는 것이 없어 고를 칸을 두지 않는다.
@@ -1813,19 +1839,6 @@
     for (let c = 1; c <= 9; c++) if (Runes.maxElements(c) >= n) return c;
     return 9;
   };
-
-  function bench(key) {
-    if (!benchCache[key]) {
-      const runes = Runes.keyRunes(key);
-      benchCache[key] = { single: S.benchmark(runes, 'single'), crowd: S.benchmark(runes, 'crowd') };
-    }
-    return benchCache[key];
-  }
-
-  function meter(label, v, max) {
-    const w = Math.max(3, Math.min(100, (Math.log(1 + v) / Math.log(1 + max)) * 100));
-    return '<div class="meter"><span>' + label + '</span><i><b style="width:' + w.toFixed(0) + '%"></b></i><em>' + Math.round(v) + '</em></div>';
-  }
 
   // 수치 줄(statsDiff)에 나오지 않는 성질. 이름만 보고는 알 수 없는 것들이다.
   function effectsOf(s) {
@@ -1843,7 +1856,6 @@
   }
 
   function bookDetail(key, spell) {
-    const b = bench(key);
     let body;
     if (spell.kind === 'harmony') {
       body = '<p class="book-stats">' + T('book.parts') + ' ' + spell.parts.map((p) => '<span style="color:' + I.colorOf(p.primary) + '">' + spellName(p) + '</span>').join(' · ') + '</p>';
@@ -1852,8 +1864,7 @@
       body = '<p class="book-stats">' + statsDiff(null, spell) + '</p>' + (fx ? '<p class="book-fx">' + fx + '</p>' : '');
     }
     return '<div class="book-detail"><p class="book-kind">' + T('kind.' + spell.kind) + (spell.screen ? ' · ' + T('kind.screen') : '') + '</p>' +
-      '<div class="book-perf">' + meter(T('book.single'), b.single, PERF_MAX.single) + meter(T('book.crowd'), b.crowd, PERF_MAX.crowd) + '</div>' +
-      body + '<p class="sheet-note small">' + T('book.benchNote') + '</p></div>';
+      body + '</div>';
   }
 
   function bookRow(key) {

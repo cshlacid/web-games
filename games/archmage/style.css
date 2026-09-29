@@ -479,12 +479,6 @@ button.socket.filled:disabled, button.socket.misfit:disabled { opacity: 0.7; }
 .book-stats { font-size: 12px; color: var(--muted); line-height: 1.6; font-variant-numeric: tabular-nums; }
 .book-fx { display: flex; flex-wrap: wrap; gap: 4px; }
 .book-fx .fx { font-size: 11px; padding: 2px 7px; border-radius: 10px; color: #f3e6ff; background: color-mix(in srgb, var(--c) 22%, rgba(0, 0, 0, 0.4)); }
-.book-perf { display: flex; flex-direction: column; gap: 4px; }
-.meter { display: grid; grid-template-columns: 30px 1fr 46px; align-items: center; gap: 8px; font-size: 12px; font-variant-numeric: tabular-nums; }
-.meter span { color: var(--muted); }
-.meter i { height: 7px; border-radius: 4px; background: rgba(255, 255, 255, 0.07); overflow: hidden; }
-.meter b { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, color-mix(in srgb, var(--c) 45%, #1a1630), var(--c)); }
-.meter em { font-style: normal; text-align: right; color: #fff4dc; font-weight: 700; }
 
 /* 장비 아이콘: 등급 색 테두리, 지팡이는 원소 색으로 칠한다. */
 .item-icon {
