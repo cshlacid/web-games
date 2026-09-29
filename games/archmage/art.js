@@ -178,7 +178,9 @@
   // 캐릭터를 여섯 번 똑같이 그려 주지 않아 프레임마다 얼굴과 옷이 달라지기 때문이다.
   // 두 발이 번갈아 들리며 앞뒤로 엇갈리고, 보폭이 벌어질 때 몸이 내려앉고, 마도서는 따로 뜬다.
   // 몸을 올리지 않고 내리는 것은 몸이 발을 덮는 순서라서다 — 올리면 허리와 발 사이가 벌어진다.
-  // 이 그림은 지팡이를 뒷손(화면 왼쪽)에, 마력을 앞손에 든다.
+  // 시안은 왼쪽을 보는 그림이라(지팡이를 앞손에 든다) 좌우를 뒤집어 그린다. 다른 그림처럼
+  // 오른쪽을 보게 해 두어야 화면이 가는 쪽으로 뒤집는 규칙을 같이 쓴다. 처음에는 오른쪽을
+  // 본다고 읽어 걷는 방향과 반대로 보였다.
   const MAGE_IMG = typeof Image === 'undefined' ? null : new Image();
   if (MAGE_IMG) MAGE_IMG.src = 'mage.png';
   // 자리는 그림을 180×200으로 본 단위로 적는다. 그림 파일의 해상도를 바꿔도 자리를 다시 재지 않게.
@@ -187,12 +189,18 @@
   // 조각은 [x, y, 너비, 높이]. 발은 망토 자락과 앞자락 금테 아래만 떼어야 들렸을
   // 때 옷이 함께 뜯겨 나가지 않는다.
   const BOOK = [136, 46, 44, 60];
-  const LEG_B = [46, 174, 40, 26];
-  const LEG_F = [86, 174, 30, 26];
+  const LEG_F = [46, 174, 40, 26];
+  const LEG_B = [86, 174, 30, 26];
   function mage(g, f) {
     const t = cycle(f), w = Math.sin(t);
+    g.save();
+    g.translate(MU * MS, 0);
+    g.scale(-1, 1);
     shadow(g, 23, 55, 13, 3.4);
-    if (!MAGE_IMG || !MAGE_IMG.complete || !MAGE_IMG.naturalWidth) return;
+    if (MAGE_IMG && MAGE_IMG.complete && MAGE_IMG.naturalWidth) mageBody(g, t, w);
+    g.restore();
+  }
+  function mageBody(g, t, w) {
     const u = MAGE_IMG.naturalWidth / MU;
     const piece = (r, dx, dy) => g.drawImage(MAGE_IMG, r[0] * u, r[1] * u, r[2] * u, r[3] * u, r[0] * MS + dx, r[1] * MS + dy, r[2] * MS, r[3] * MS);
     const lift = (s) => -Math.max(0, s) * 1.5;
@@ -564,7 +572,7 @@
     boss: { draw: boss, box: [92, 92], foot: 88 },
   };
   // crystal·flame은 지팡이 수정과 손의 마력이 있는 자리다. 화면이 그 자리에 빛을 얹는다.
-  const MAGE = { draw: mage, box: [51, 56], foot: 55, img: MAGE_IMG, crystal: [4.5, 12.6], flame: [34.2, 31.4] };
+  const MAGE = { draw: mage, box: [51, 56], foot: 55, img: MAGE_IMG, crystal: [45.9, 12.6], flame: [16.2, 31.4] };
 
 
   // --- 소품 ---
