@@ -226,6 +226,8 @@
     spawn(state, dt);
     moveFoes(state, dt);
     const grid = buildGrid(state);
+    // 맞힐 때 번지는 스플래시가 둘레를 찾는 데 쓴다.
+    state.grid = grid;
     separate(state, grid);
     cast(state, dt, grid);
     updateShots(state, dt, grid);
@@ -274,7 +276,7 @@
       id: state.nextId++, type,
       x: p.x + Math.cos(angle) * dist, y: p.y + Math.sin(angle) * dist,
       hp, maxHp: hp, r: def.r, speed: def.speed, dmg: def.dmg * (1 + 0.5 * state.depth),
-      slowT: 0, slow: 0, burnT: 0, burn: 0, kx: 0, ky: 0, flash: 0, dead: false,
+      slowT: 0, slow: 0, burnT: 0, burn: 0, rootT: 0, rootAt: 0, splashAt: 0, kx: 0, ky: 0, flash: 0, dead: false,
       phase: state.world() * Math.PI * 2,
     };
     state.foes.push(foe);
@@ -358,6 +360,8 @@
         f.y = p.y + Math.sin(a) * SPAWN_RING;
         continue;
       }
+      // 발이 묶이면 밀려나지도 않고 그 자리에 선다.
+      if (f.rootT > 0) { f.rootT -= dt; f.kx = 0; f.ky = 0; continue; }
       dx /= d; dy /= d;
       let speed = f.speed * (1 - f.slow);
       if (f.type === 'boss') {
@@ -474,6 +478,7 @@
       ci, el: s.primary, dmg, slow: s.slow, burn: s.burn, knock: s.knock, chain: s.chain, leech: s.leech,
       cluster: s.cluster, nova: s.nova, pulse: s.pulse, shock: s.shock,
       freeze: s.freeze, ignite: s.ignite, vortex: s.vortex, shatter: s.shatter,
+      splash: s.splash, splashBoost: s.splashBoost, root: s.root, rootDur: s.rootDur, freezeChance: s.freezeChance,
     };
     if (s.kind === 'orbit') {
       const count = s.count + 2 * s.omni;
@@ -565,17 +570,51 @@
       if (src.leech) leech(state, dealt * src.leech);
       f.flash = 0.08;
       if (src.slow) { f.slow = Math.max(f.slow, src.slow); f.slowT = 1.6; }
-      if (src.freeze) { f.slow = 0.95; f.slowT = Math.max(f.slowT, 0.8); }
+      if (src.freeze || (src.freezeChance && state.fate() < src.freezeChance)) { f.slow = 0.95; f.slowT = Math.max(f.slowT, 0.8); }
       if (src.burn) { f.burn = Math.max(f.burn, src.burn); f.burnT = 2; }
-      if (src.knock && f.type !== 'boss') {
+      // 넉백은 한 적에 KNOCK_GAP마다 한 번이다. 틱마다 치는 지대가 매번 밀어내면 무리가
+      // 지대 밖으로 쫓겨나 피해가 3분의 1로 줄었다.
+      if (src.knock && f.type !== 'boss' && (f.knockAt || 0) <= state.t) {
+        f.knockAt = state.t + KNOCK_GAP;
         const dx = f.x - (src.fromX !== undefined ? src.fromX : state.player.x);
         const dy = f.y - (src.fromY !== undefined ? src.fromY : state.player.y);
         const d = Math.hypot(dx, dy) || 1;
         f.kx += (dx / d) * src.knock * 4;
         f.ky += (dy / d) * src.knock * 4;
       }
+      // 발묶기. 풀린 뒤 잠깐은 다시 묶이지 않는다 — 틱마다 치는 지대 위에서는 영영 못 움직였다.
+      // 사도는 3분의 1만 묶인다.
+      if (src.root && (f.rootAt || 0) <= state.t && state.fate() < src.root) {
+        const hold = (src.rootDur || 0.6) * (f.type === 'boss' ? 1 / 3 : 1);
+        f.rootT = Math.max(f.rootT, hold);
+        f.rootAt = state.t + hold + ROOT_GAP;
+      }
+      if (src.splash && state.grid && (f.splashAt || 0) <= state.t) splash(state, f, amount, src);
     }
     if (f.hp <= 0) kill(state, f);
+  }
+
+  // 불의 스플래시: 맞은 적 둘레로 피해의 일부가 번진다. 번진 피해는 다시 번지지 않고, 한
+  // 적에서 번지는 것은 SPLASH_GAP에 한 번이다 — 틱마다 치는 마법이 무리 위에서 번지고
+  // 또 번져 몇 배로 불어나지 않게.
+  const SPLASH_GAP = 0.3;
+  const KNOCK_GAP = 0.6;
+  const ROOT_GAP = 0.6;
+  function splash(state, f, amount, src) {
+    f.splashAt = state.t + SPLASH_GAP;
+    const r = 22 + 6 * (src.splash + (src.splashBoost || 0));
+    const out = { leech: src.leech, burn: src.burn * 0.5 };
+    const part = amount * Math.min(0.8, 0.25 + 0.1 * src.splash);
+    near(state.grid, f.x, f.y, r, (g) => { if (g !== f) damage(state, g, part, out); });
+    state.events.push({ type: 'splash', x: f.x, y: f.y, r });
+  }
+
+  // 맞힐 때 얹는 효과들. 마법의 조각(탄·지대·운석…)에서 모은다. from은 밀어내는 기준점이다.
+  function hitOf(e, fromX, fromY) {
+    return {
+      slow: e.slow, burn: e.burn, knock: e.knock, leech: e.leech, freeze: e.freeze, freezeChance: e.freezeChance,
+      splash: e.splash, splashBoost: e.splashBoost, root: e.root, rootDur: e.rootDur, fromX, fromY,
+    };
   }
 
   function leech(state, amount) {
@@ -710,8 +749,7 @@
         // 무리는 다시 맞히지 않는다 — 안 그러면 한 자리에서 연달아 터진다.
         sh.blasts = (sh.blasts || 0) + 1;
         if (sh.blasts > sh.pierce) sh.done = true;
-        const src = { slow: sh.slow, burn: sh.burn, knock: sh.knock, leech: sh.leech, fromX: sh.x, fromY: sh.y };
-        src.freeze = sh.freeze;
+        const src = hitOf(sh, sh.x, sh.y);
         near(grid, sh.x, sh.y, sh.aoe, (f) => { sh.hit.add(f); damage(state, f, sh.dmg, src); });
         state.events.push({ type: 'burst-hit', el: sh.el, x: sh.x, y: sh.y, r: sh.aoe });
         if (sh.cluster && !sh.frag) scatter(state, sh);
@@ -796,9 +834,8 @@
       z.tick -= dt;
       if (z.tick > 0) continue;
       z.tick = ZONE_TICK;
-      const src = { slow: z.slow, burn: z.burn, knock: z.knock, leech: z.leech, fromX: z.x, fromY: z.y };
+      const src = hitOf(z, z.x, z.y);
       let first = null;
-      src.freeze = z.freeze;
       near(grid, z.x, z.y, z.r, (f) => { if (!first) first = f; damage(state, f, z.dmg, src); });
       if (z.vortex) pull(grid, z.x, z.y, z.r * 1.6, 700);
       if (first) spread(state, Object.assign(z, { kind: 'zone' }), z.x, z.y, null);
@@ -818,7 +855,7 @@
       m.delay -= dt;
       if (m.delay > 0) continue;
       m.done = true;
-      const src = { slow: m.slow, burn: m.burn, knock: (m.sub === 'bolt' ? 0 : 30) + m.knock, leech: m.leech, freeze: m.freeze, fromX: m.x, fromY: m.y };
+      const src = Object.assign(hitOf(m, m.x, m.y), { knock: (m.sub === 'bolt' ? 0 : 30) + m.knock });
       let first = null;
       near(grid, m.x, m.y, m.r, (f) => { if (!first) first = f; damage(state, f, m.dmg, src); });
       graftAt(state, m, m.x, m.y, m.r, grid);
@@ -834,7 +871,7 @@
       w.life -= dt;
       w.x += w.dx * w.speed * dt;
       w.y += w.dy * w.speed * dt;
-      const src = { slow: Math.max(0.3, w.slow), burn: w.burn, leech: w.leech, freeze: w.freeze };
+      const src = Object.assign(hitOf(w, w.x - w.dx * 20, w.y - w.dy * 20), { slow: Math.max(0.3, w.slow) });
       near(grid, w.x, w.y, w.w, (f) => {
         if (w.hit.has(f)) return;
         const rx = f.x - w.x, ry = f.y - w.y;
@@ -890,7 +927,7 @@
       t.tick -= dt;
       if (t.tick > 0) continue;
       t.tick = TORNADO_TICK;
-      const src = { slow: t.slow, burn: t.burn, leech: t.leech, freeze: t.freeze };
+      const src = hitOf(t, t.x, t.y);
       let first = null;
       near(grid, t.x, t.y, t.r, (f) => { if (!first) first = f; damage(state, f, t.dmg, src); });
       if (first) spread(state, Object.assign(t, { kind: 'tornado' }), t.x, t.y, null);
@@ -906,7 +943,7 @@
       q.tick -= dt;
       if (q.tick > 0) continue;
       q.tick = QUAKE_TICK;
-      const src = { slow: 0.85, burn: q.burn, knock: 20 + q.knock, leech: q.leech, freeze: q.freeze, fromX: p.x, fromY: p.y };
+      const src = Object.assign(hitOf(q, p.x, p.y), { slow: 0.85, knock: 20 + q.knock });
       near(grid, p.x, p.y, q.r, (f) => { damage(state, f, q.dmg, src); f.slowT = Math.max(f.slowT, 0.6); });
       if (q.vortex) pull(grid, p.x, p.y, q.r, 900);
       aftershock(state, q, p.x, p.y, q.r);
@@ -963,7 +1000,7 @@
       a.tick -= dt;
       if (a.tick > 0) continue;
       a.tick = a.every;
-      const src = { slow: a.slow, burn: a.burn, knock: a.knock, leech: a.leech, freeze: a.freeze, fromX: p.x, fromY: p.y };
+      const src = hitOf(a, p.x, p.y);
       near(grid, p.x, p.y, a.r, (f) => damage(state, f, a.dmg, src));
       aftershock(state, a, p.x, p.y, a.r);
       state.events.push({ type: 'aura', el: a.el, x: p.x, y: p.y, r: a.r, screen: a.screen });
