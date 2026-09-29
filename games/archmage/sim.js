@@ -1233,10 +1233,33 @@
     };
   }
 
+  // 마도서가 보여 주는 성능. 룬 묶음 하나로 10초 동안 넣은 초당 피해를 잰다 — 단일은 사도
+  // 하나, 무리는 둘레에 가만히 선 60마리다. 수치(피해·쿨타임)만으로는 번지는 것·쏟아지는 것·
+  // 도는 것이 서로 얼마나 센지 견줄 수 없다. 씨앗이 고정이라 같은 묶음은 늘 같은 값이 나온다.
+  function benchmark(runes, mode) {
+    const st = create({ circle: 9, seed: 3 });
+    st.pending = null; st.queued = 0;
+    st.circles[0].runes = runes.map((r, i) => Object.assign({ grade: 0, slot: i }, r));
+    st.circles[0].spell = Runes.compose(st.circles[0].runes);
+    st.spawnAcc = -1e9; st.nextBurst = 1e9;
+    st.player.hp = st.player.maxHp = 1e9;
+    const pick = rng(9);
+    const n = mode === 'single' ? 1 : 60;
+    for (let i = 0; i < n; i++) {
+      const a = pick() * Math.PI * 2, d = mode === 'single' ? 100 : 40 + pick() * 200;
+      const f = addFoe(st, mode === 'single' ? 'boss' : 'goblin', a, d);
+      f.hp = f.maxHp = 1e9; f.speed = 0; f.dmg = 0;
+    }
+    for (let t = 0; t < 10; t += 1 / 60) { step(st, 1 / 60); st.events.length = 0; }
+    let total = 0;
+    for (const f of st.foes) total += 1e9 - f.hp;
+    return total / 10;
+  }
+
   const api = {
     FOES, UNDEAD_BANE, PLAYER, CIRCLE_UNLOCK, RANGE,
     create, step, choose, drain, summary, previewPlace, previewErase, placeMode, placeModes, orbitBlades, orbitRadius,
-    nightLength, isBossNight, BOSS_EVERY, xpNext, maxLevel, capacity, openSlots, rng,
+    nightLength, isBossNight, BOSS_EVERY, xpNext, maxLevel, capacity, openSlots, rng, benchmark,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else window.ArchmageSim = api;

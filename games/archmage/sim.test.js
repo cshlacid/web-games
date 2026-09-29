@@ -339,5 +339,14 @@ check('밤은 길어지다 10분에서 멈춘다', [S.nightLength(1), S.nightLen
   check('언데드는 셋', Object.keys(S.FOES).filter((k) => S.FOES[k].undead).sort(), ['skeleton', 'wraith', 'zombie']);
 }
 
+// 마도서의 성능: 같은 묶음은 늘 같은 값이고, 범위 마법은 무리에서 단일보다 훨씬 세다.
+{
+  const R = require('./runes.js');
+  const meteor = R.keyRunes('fire3');
+  check('성능은 늘 같은 값', S.benchmark(meteor, 'crowd'), S.benchmark(meteor, 'crowd'));
+  check('메테오는 무리에서 더 세다', S.benchmark(meteor, 'crowd') > 3 * S.benchmark(meteor, 'single'), true);
+  check('궁극기도 잴 수 있다', S.benchmark(R.keyRunes('genesis'), 'single') > 0, true);
+}
+
 console.log(`${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);

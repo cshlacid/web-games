@@ -454,6 +454,37 @@ button.socket.filled:disabled, button.socket.misfit:disabled { opacity: 0.7; }
 .grimoire-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; text-align: left; font-size: 13px; }
 .grimoire-list li { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; background: rgba(255, 255, 255, 0.025); }
 .grimoire-list .glyphs { display: inline-flex; gap: 1px; }
+.grimoire-list li { flex-direction: column; align-items: stretch; padding: 0; gap: 0; }
+.grimoire-list li.open { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 55%, transparent); background: color-mix(in srgb, var(--c) 7%, rgba(0, 0, 0, 0.3)); }
+.book-row {
+  display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 8px; text-align: left;
+  font: inherit; color: inherit; background: none; border: 0; border-radius: 8px; cursor: pointer;
+}
+.book-row[aria-expanded="true"] .book-name { color: #fff4dc; font-weight: 700; }
+.book-chips { display: flex; flex-wrap: wrap; gap: 5px; margin: 2px 0 8px; }
+.book-chip {
+  min-width: 34px; height: 30px; padding: 0 9px; display: inline-grid; place-items: center;
+  font: inherit; font-size: 12px; font-weight: 700; color: var(--c, var(--fg)); cursor: pointer;
+  background: rgba(0, 0, 0, 0.35); border: 0; border-radius: 15px; box-shadow: 0 0 0 1px var(--line);
+}
+.book-chip .glyph { width: 17px; height: 17px; }
+.book-chip[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--c, #b99bff) 25%, #0d0b1a);
+  box-shadow: 0 0 0 1.5px var(--c, var(--arcane)), 0 0 10px color-mix(in srgb, var(--c, #b99bff) 45%, transparent);
+}
+.book-chip[aria-pressed="true"] .glyph { filter: drop-shadow(0 0 3px currentColor); }
+.book-detail { padding: 2px 10px 10px; display: flex; flex-direction: column; gap: 6px; }
+.book-detail p { margin: 0; }
+.book-kind { font-size: 12px; color: #d8cfe8; }
+.book-stats { font-size: 12px; color: var(--muted); line-height: 1.6; font-variant-numeric: tabular-nums; }
+.book-fx { display: flex; flex-wrap: wrap; gap: 4px; }
+.book-fx .fx { font-size: 11px; padding: 2px 7px; border-radius: 10px; color: #f3e6ff; background: color-mix(in srgb, var(--c) 22%, rgba(0, 0, 0, 0.4)); }
+.book-perf { display: flex; flex-direction: column; gap: 4px; }
+.meter { display: grid; grid-template-columns: 30px 1fr 46px; align-items: center; gap: 8px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.meter span { color: var(--muted); }
+.meter i { height: 7px; border-radius: 4px; background: rgba(255, 255, 255, 0.07); overflow: hidden; }
+.meter b { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, color-mix(in srgb, var(--c) 45%, #1a1630), var(--c)); }
+.meter em { font-style: normal; text-align: right; color: #fff4dc; font-weight: 700; }
 
 /* 장비 아이콘: 등급 색 테두리, 지팡이는 원소 색으로 칠한다. */
 .item-icon {
