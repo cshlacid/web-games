@@ -2,14 +2,23 @@
 
 // 룬과 마법의 조합. 화면을 모르는 순수 로직이라 node로 모든 조합을 검사한다.
 //
-// 마법진 하나에 새긴 룬 묶음이 곧 그 마법진의 마법이다. **순서는 따지지 않는다** —
-// 순서까지 따지면 9서클에서 조합이 26만 가지로 불어나 사람이 기억할 수 없다.
-// 원소 넷으로 순서 없이 고르면 1~9서클 합쳐 714가지이고, 이것을 하나씩 설계할 수는
-// 없으므로 **규칙으로 만든다**: 가장 많은 원소가 형태를, 나머지 원소가 성질을,
-// 수식어가 강화를 정한다.
+// 마법진 하나에 새긴 룬 묶음에서 **마법 하나**와 **덧붙는 효과**가 나온다.
+//   1. 새긴 원소 룬으로 만들 수 있는 마법(같은 원소만의 마법, 특수 조합) 가운데 룬을
+//      가장 많이 쓰는 것이 발동한다. 같은 수가 여럿이면 먼저 새긴 룬을 쓰는 쪽이다.
+//   2. 그 마법에 들지 못하고 남은 원소 룬은 원소마다 정해진 효과를 더한다(불 스플래시,
+//      물 둔화, 바람 넉백, 땅 발묶기). 여럿이면 더하기로 쌓인다.
+//   3. 수식어는 마법을 강화한다. 원소 상성이 있는 수식어는 어울리는 원소에서 보너스를,
+//      상극 원소에서는 오히려 약화를 준다.
+// 처음에는 가장 많은 원소가 형태, 나머지 원소가 성질을 정했다. 규칙은 짧았지만 무엇이
+// 나갈지 예측하기 어려웠다 — 지금은 "발동 마법 + 덧붙는 효과"로 한 줄에 읽힌다.
 (function () {
   const ELEMENTS = ['fire', 'water', 'wind', 'earth'];
-  const MODIFIERS = ['chain', 'omni', 'echo', 'focus', 'magna', 'anima', 'chrono'];
+  // 앞 넷은 원소와 상관없이 같은 효과, 뒤 다섯은 원소 상성이 있다. 집중·거대·시간은
+  // 뺐다 — 피해·범위·쿨타임을 올리는 것뿐이라 고를 때 생각할 거리가 없었다.
+  const MODIFIERS = ['chain', 'omni', 'echo', 'anima', 'frost', 'heat', 'gravity', 'gale', 'resonance'];
+  // 수식어의 [어울리는 원소, 상극 원소]. 마법의 형태를 정한 원소로 가른다.
+  const AFFINITY = { frost: ['water', 'fire'], heat: ['fire', 'water'], gravity: ['earth', 'wind'], gale: ['wind', 'earth'] };
+  const SYNERGY_DMG = 1.2;
   const ALL = ELEMENTS.concat(MODIFIERS);
 
   // 주원소가 정하는 형태. 값은 1서클 기초 마법의 것이다.
@@ -78,11 +87,11 @@
   // 형태가 바뀌지 않는 단계(4·6·8, 그리고 9 넘게)에서 한 칸마다 더 붙는 피해.
   const TIER_DMG = 0.8;
 
-  // 특수 조합. 이 원소 수를 **정확히** 맞추면 규칙으로 만든 마법 대신 이름 있는 마법이
-  // 된다. 모든 조합에 두지 않은 것은 찾는 재미를 남기려는 것이다 — 714가지 중 58가지.
+  // 특수 조합. 이 원소 수를 **정확히** 맞춘 룬들로 이름 있는 마법이 된다. 더 많은 룬을 쓰는
+  // 마법이 없으면 이것이 발동한다. 모든 조합에 두지 않은 것은 찾는 재미를 남기려는 것이다.
   // 형태는 form 원소의 tier단계를 빌리고, 나머지 원소는 성질 대신 접목(graft)으로 붙는다.
   //   불 접목: 맞힌 자리에 불길이 남는다   물 접목: 얼려 묶는다
-  //   바람 접목: 맞힌 자리로 빨아들인다    땅 접목: 돌 파편이 튄다
+  //   바람 접목: 맞힌 자리로 빨아들인다    땅 접목: 돌 파편이 튀고 발을 묶는다
   // 두 원소는 1:1부터 4:4까지 단계를 1·3·5·7로 올리고, 세 원소는 1:1:1·2:2:2·3:3:3에서
   // 3·5·9단계를, 네 원소는 1:1:1:1과 2:2:2:2에 따로 둔다.
   const RECIPES = {};
@@ -129,16 +138,18 @@
     else if (el === 'water') s.freeze = true;
     else if (el === 'wind') s.vortex = true;
     // 땅은 무게다. 파편은 맞히는 형태에서만 튀므로, 둘레를 도는 형태에서도 느껴지게 피해를 얹는다.
-    else if (el === 'earth') { s.shatter = true; s.knock += 30; s.dmg *= 1.3; }
+    else if (el === 'earth') { s.shatter = true; s.root = Math.min(0.6, s.root + 0.3); s.rootDur = Math.max(s.rootDur, 0.8); s.dmg *= 1.3; }
   }
 
-  // 둘째 이하 원소가 더하는 성질. t는 그 원소 룬의 수에 등급을 더한 것이다.
-  function applyTrait(s, el, t) {
+  // 마법에 들지 못하고 남은 원소 룬의 효과. t는 남은 그 원소 룬의 수에 등급을 더한 것이고
+  // 더하기로 쌓인다. 원소마다 성격을 한 가지씩만 준다 — 불은 번지고, 물은 느리게 하고,
+  // 바람은 밀어내고, 땅은 붙잡는다.
+  function applyExtra(s, el, t) {
     if (!t) return;
-    if (el === 'fire') { s.dmg *= 1 + 0.25 * t; s.size *= 1 + 0.1 * t; s.burn += 5 * t; }
-    else if (el === 'water') { s.slow = Math.min(0.7, 0.25 * t); s.pierce += t; }
-    else if (el === 'wind') { s.count += t; s.cd /= 1 + 0.12 * t; }
-    else if (el === 'earth') { s.size *= 1 + 0.22 * t; s.dur *= 1 + 0.3 * t; s.knock += 40 * t; }
+    if (el === 'fire') s.splash += t;
+    else if (el === 'water') s.slow = Math.min(0.7, s.slow + 0.25 * t);
+    else if (el === 'wind') s.knock += 40 * t;
+    else if (el === 'earth') { s.root = Math.min(0.6, s.root + 0.2 * t); s.rootDur = Math.max(s.rootDur, Math.min(1.2, 0.5 + 0.1 * t)); }
   }
 
   // 주원소를 겹쳤을 때(구멍에 더 넣거나 등급을 올렸을 때)의 강화. **그 원소가 원래
@@ -162,17 +173,46 @@
   }
 
   // 수식어. l은 그 수식어 룬의 수에 등급을 더한 것이고, 오르면 **그 수식어의 효과만**
-  // 커진다. 원소의 강화와 섞지 않는다.
-  function applyModifier(s, mod, l) {
+  // 커진다. 원소의 강화와 섞지 않는다. 상성은 마법의 형태를 정한 원소(primary)로 가른다 —
+  // 불 형태의 마법에 냉각을 걸면 불길이 식는다. pure는 원소 룬이 모두 한 원소일 때 그 수다.
+  function applyModifier(s, mod, l, pure) {
     if (!l) return;
+    const aff = AFFINITY[mod];
+    const likes = !!aff && s.primary === aff[0];
+    const hates = !!aff && s.primary === aff[1];
+    // 상성이면 효과에 더해 피해도 오른다 — 고를 때 "어울린다"가 곧 "세진다"로 읽혀야 한다.
+    if (likes) { s.synergy.push(mod); s.dmg *= SYNERGY_DMG; }
+    if (hates) s.clash.push(mod);
     if (mod === 'chain') s.chain += 2 * l;
     else if (mod === 'omni') s.omni += l;
     else if (mod === 'echo') s.echo += Math.min(l, 4);
-    else if (mod === 'focus') { s.dmg *= 1 + 0.5 * l; s.size *= 0.8; }
-    else if (mod === 'magna') { s.size *= 1 + 0.3 * l; s.dmg *= 1 + 0.1 * l; s.cd *= 1.1; }
     // 흡혈. 맞힌 피해의 일부로 생명력을 되찾는다(한도는 sim.js의 LEECH_RATE).
     else if (mod === 'anima') s.leech += 0.05 * l;
-    else if (mod === 'chrono') { s.cd /= 1 + 0.25 * l; s.dur *= 1 + 0.3 * l; }
+    else if (mod === 'frost') {
+      s.slow = Math.min(0.8, s.slow + 0.15 + 0.1 * l);
+      if (likes) { s.freezeChance = Math.min(0.6, 0.15 + 0.1 * l); s.pierce += l; }
+      if (hates) { s.dmg *= 0.75; s.burn *= 0.5; }
+    } else if (mod === 'heat') {
+      // 물 위에서는 증기로 흩어져 화상이 붙지 않고 힘만 빠진다.
+      if (hates) s.dmg *= 0.85;
+      else s.burn += 6 * l;
+      if (likes) { s.burn += 6 * l; s.size *= 1 + 0.12 * l; s.splashBoost += l; }
+    } else if (mod === 'gravity') {
+      // 바람의 밀어냄과 서로 상쇄된다.
+      if (hates) { s.knock *= 0.5; s.dmg *= 0.9; }
+      else s.vortex = true;
+      if (likes) { s.root = Math.min(0.6, s.root + 0.15 + 0.1 * l); s.rootDur = Math.max(s.rootDur, 0.9); }
+    } else if (mod === 'gale') {
+      s.speed *= 1 + 0.25 * l;
+      s.cd /= 1 + 0.08 * l;
+      // 넉백은 주지 않는다. 칼날에서 밀어내면 둘레를 도는 칼날이 헛돌았다.
+      if (likes) s.count += 1;
+      if (hates) { s.root *= 0.5; s.dmg *= 0.9; }
+    } else if (mod === 'resonance') {
+      // 한 원소만 새긴 마법진에서만 울린다. 섞이면 아무 일도 없다.
+      if (pure) { s.dmg *= 1 + 0.2 * pure * l; s.synergy.push(mod); }
+      else s.clash.push(mod);
+    }
   }
 
   const isElement = (id) => ELEMENTS.indexOf(id) >= 0;
@@ -192,125 +232,140 @@
     return parts.join('-');
   }
 
-  // 같은 수로 비기면 ELEMENTS 차례로 가른다. 먼저 새긴 쪽으로 가르면 같은 묶음이
-  // 새긴 순서에 따라 다른 마법이 되어, "순서를 따지지 않는다"가 깨진다.
   function primaryOf(counts) {
     let best = null;
     for (const el of ELEMENTS) if (counts[el] && (!best || counts[el] > counts[best])) best = el;
     return best;
   }
 
-  // 룬 묶음 → 마법. 원소가 하나도 없으면 null(시전하지 않는다).
+  // 새긴 원소 룬으로 만들 수 있는 마법인가: 한 원소만이거나 특수 조합.
+  function isSkill(counts) {
+    let kinds = 0;
+    for (const el of ELEMENTS) if (counts[el]) kinds += 1;
+    return kinds === 1 || !!RECIPES[keyOf(counts)];
+  }
+
+  // 발동할 마법에 쓰일 룬을 고른다. 원소 룬의 모든 부분 묶음 가운데 마법이 되는 것에서
+  // 룬을 가장 많이 쓰는 것, 같으면 먼저 새긴 룬을 쓰는 것(새긴 차례를 앞에서부터 견준다).
+  // 한 마법진의 룬은 아홉 개까지라 부분 묶음은 511개뿐이다.
+  function pickSkill(els) {
+    let best = 0, bestIdx = null;
+    for (let mask = 1; mask < 1 << els.length; mask++) {
+      const counts = { fire: 0, water: 0, wind: 0, earth: 0 };
+      const idx = [];
+      for (let i = 0; i < els.length; i++) if (mask & (1 << i)) { counts[els[i].id] += 1; idx.push(i); }
+      if (!isSkill(counts)) continue;
+      if (bestIdx && (idx.length < bestIdx.length || (idx.length === bestIdx.length && !earlier(idx, bestIdx)))) continue;
+      best = mask; bestIdx = idx;
+    }
+    return best;
+  }
+  function earlier(a, b) {
+    for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] < b[i];
+    return false;
+  }
+
+  // 룬 묶음 → 마법. 룬의 차례는 새긴 차례다. 원소가 하나도 없으면 null(시전하지 않는다).
   function compose(runes) {
-    const counts = countElements(runes);
+    const els = runes.filter((r) => isElement(r.id));
+    if (!els.length) return null;
+    const mask = pickSkill(els);
+    const skill = [], extra = {};
+    els.forEach((r, i) => {
+      if (mask & (1 << i)) skill.push(r);
+      else extra[r.id] = (extra[r.id] || 0) + 1 + (r.grade || 0);
+    });
+    const mods = runes.filter((r) => isModifier(r.id));
+    // 공명이 울리는 한 원소 마법진: 원소 룬이 모두 같은 원소일 때 그 수.
+    const pure = els.every((r) => r.id === els[0].id) ? els.length : 0;
+    return build(skill, extra, mods, pure, runes.length);
+  }
+
+  // 발동할 마법(skill)에 남은 원소의 효과(extra)와 수식어(mods)를 얹는다.
+  function build(skill, extra, mods, pure, total) {
+    const counts = countElements(skill);
     const primary = primaryOf(counts);
-    if (!primary) return null;
     const key = keyOf(counts);
     const recipe = RECIPES[key] || null;
-    if (recipe && recipe.form === 'all') return harmony(runes, key, recipe);
+    if (recipe && recipe.form === 'all') return harmony(skill, extra, mods, key, recipe, total);
     const formEl = recipe ? recipe.form : primary;
     const form = recipe ? recipe.tier : formTierOf(counts[primary]);
     const f = FORMS[formEl];
     const s = {
-      key, primary: formEl, counts, recipe: !!recipe, form,
+      key, primary: formEl, counts, extra, recipe: !!recipe, form,
       kind: f.kind, dmg: f.dmg, cd: f.cd, dur: f.dur, size: f.size, speed: f.speed,
       count: f.count, pierce: f.pierce,
       slow: 0, burn: 0, knock: f.knock || 0, chain: 0, omni: 0, echo: 0, leech: 0,
-      mods: {}, runes: runes.length, tier: counts[formEl],
+      splash: 0, splashBoost: 0, root: 0, rootDur: 0, freezeChance: 0,
+      mods: {}, synergy: [], clash: [], runes: total, tier: counts[formEl],
     };
     if (form >= 2) Object.assign(s, TIERS[formEl][form]);
     // 2단계는 형태를 빌리지 않고 동작만 얹으므로 피해를 따로 올려 준다.
     if (form === 2) s.dmg *= 1.6;
     if (!recipe && counts[primary] > form) s.dmg *= 1 + TIER_DMG * (counts[primary] - form);
-    // 룬마다 수(구멍에 넣은 개수)와 등급을 모은다. 구멍에 더 넣은 주원소는 단계를
-    // 올리는 것에 더해 등급과 똑같이 강화로도 센다 — 같은 원소로 구멍을 채우는 쪽이
-    // 수식어를 넣고 등급을 올리는 쪽보다 분명히 강해야 한다.
-    const level = {};
+    // 마법에 든 원소 룬의 등급은 모두 그 마법의 강화로 센다. 특수 조합은 한 마법이라
+    // 어느 원소 룬을 올려도 강해진다 — 형태 원소만 세었더니 용암 지대의 불을 올린 것이 헛것이었다.
     let grade = 0;
-    let formGrade = 0;
-    for (const r of runes) {
-      level[r.id] = (level[r.id] || 0) + 1 + (r.grade || 0);
-      grade += r.grade || 0;
-      // 특수 조합은 한 마법이라 어느 원소 룬을 강화해도 그 마법이 강해진다.
-      if (r.id === formEl || (recipe && isElement(r.id))) formGrade += r.grade || 0;
-      if (isModifier(r.id)) s.mods[r.id] = (s.mods[r.id] || 0) + 1 + (r.grade || 0);
-    }
+    for (const r of skill) grade += r.grade || 0;
+    const level = {};
+    for (const r of mods) level[r.id] = (level[r.id] || 0) + 1 + (r.grade || 0);
+    Object.assign(s.mods, level);
     if (recipe) {
       for (const el of recipe.grafts) applyGraft(s, el);
       s.dmg *= RECIPE_DMG * (recipe.dmg || 1);
       // 1단계 형태를 빌리는 1:1 조합은 같은 두 룬의 순수 마법(2단계)이 받는 몫도 받는다.
       if (recipe.tier === 1) s.dmg *= 1.6;
-    } else {
-      for (const el of ELEMENTS) if (el !== primary) applyTrait(s, el, level[el] || 0);
     }
-    // 특수 조합은 한 마법이라 든 원소 룬이 모두 강화로 센다. 형태 원소만 세었을 때는 1:1
+    // 마법에 든 원소 룬은 모두 강화로 센다. 특수 조합에서 형태 원소만 세었을 때는 1:1
     // 조합이 같은 두 룬의 순수 마법보다 여섯 배 약했다.
-    let elements = 0;
-    for (const el of ELEMENTS) elements += counts[el];
-    empower(s, (recipe ? elements : counts[formEl]) - 1 + formGrade);
-    for (const mod of MODIFIERS) applyModifier(s, mod, level[mod] || 0);
+    empower(s, skill.length - 1 + grade);
+    for (const el of ELEMENTS) applyExtra(s, el, extra[el] || 0);
+    for (const mod of MODIFIERS) applyModifier(s, mod, level[mod] || 0, pure);
     s.grade = grade;
     s.cd = Math.max(0.25, s.cd);
     return s;
   }
 
   // 네 원소를 같은 수로 새긴 마법. 네 원소 각각의 tier단계 마법을 따로 만들어 한꺼번에
-  // 쓴다. 수식어는 넷 모두에 걸리고, 원소 룬의 등급은 넷에 고르게 나눈다.
-  function harmony(runes, key, recipe) {
-    const mods = runes.filter((r) => isModifier(r.id));
+  // 쓴다. 남은 원소와 수식어는 넷 모두에 걸리고(수식어 상성도 넷이 제각각 받는다), 원소 룬의
+  // 등급은 넷에 고르게 나눈다.
+  function harmony(skill, extra, mods, key, recipe, total) {
     let grades = 0;
-    for (const r of runes) if (isElement(r.id)) grades += r.grade || 0;
+    for (const r of skill) grades += r.grade || 0;
     const parts = ELEMENTS.map((el) => {
       const own = [];
       // 넷으로 나뉘는 대신 원소마다 한 칸씩 더 겹친 것으로 친다.
       for (let i = 0; i < recipe.tier; i++) own.push({ id: el, grade: i === 0 ? grades + recipe.tier - 1 : 0 });
-      const part = compose(own.concat(mods));
+      const part = build(own, extra, mods, 0, total);
       part.dmg *= RECIPE_DMG;
       return part;
     });
     const s = {
-      key, primary: 'arcane', counts: countElements(runes), recipe: true, form: recipe.tier, kind: 'harmony', parts,
+      key, primary: 'arcane', counts: countElements(skill), extra, recipe: true, form: recipe.tier, kind: 'harmony', parts,
       dmg: 0, cd: 0, dur: 0, size: 0, speed: 0, count: parts.length, pierce: 0,
-      slow: 0, burn: 0, knock: 0, chain: 0, omni: 0, echo: 0, leech: 0, mods: {}, runes: runes.length, tier: recipe.tier, grade: grades,
+      slow: 0, burn: 0, knock: 0, chain: 0, omni: 0, echo: 0, leech: 0,
+      splash: 0, splashBoost: 0, root: 0, rootDur: 0, freezeChance: 0,
+      mods: {}, synergy: [], clash: [], runes: total, tier: recipe.tier, grade: grades,
     };
     for (const p of parts) { s.dmg += p.dmg; s.cd = Math.max(s.cd, p.cd); s.dur = Math.max(s.dur, p.dur); }
     for (const r of mods) s.mods[r.id] = (s.mods[r.id] || 0) + 1 + (r.grade || 0);
     return s;
   }
 
-  // 서클 n에서 나올 수 있는 원소 조합의 수(1~n개를 순서 없이). 마도서의 분모다.
-  function comboCount(circle) {
-    let total = 0;
-    for (let k = 1; k <= circle; k++) total += choose(k + ELEMENTS.length - 1, ELEMENTS.length - 1);
-    return total;
-  }
-
-  function choose(n, k) {
-    let r = 1;
-    for (let i = 1; i <= k; i++) r = (r * (n - k + i)) / i;
-    return Math.round(r);
-  }
-
-  // 서클 n에서 만들 수 있는 모든 원소 조합의 열쇠.
+  // 서클 n에서 발동할 수 있는 마법의 열쇠: 한 원소만의 마법(1~n개)과 룬 n개 이하의 특수
+  // 조합. 마도서의 분모다. 남은 원소 룬은 효과만 더하므로 열쇠에 들지 않는다.
   function allKeys(circle) {
     const out = [];
-    const counts = { fire: 0, water: 0, wind: 0, earth: 0 };
-    (function walk(i, left) {
-      if (i === ELEMENTS.length) {
-        const key = keyOf(counts);
-        if (key) out.push(key);
-        return;
-      }
-      for (let c = 0; c <= left; c++) {
-        counts[ELEMENTS[i]] = c;
-        walk(i + 1, left - c);
-      }
-      counts[ELEMENTS[i]] = 0;
-    })(0, circle);
+    for (const el of ELEMENTS) for (let n = 1; n <= circle; n++) out.push(el + n);
+    for (const key in RECIPES) {
+      let n = 0;
+      for (const part of key.split('-')) n += Number(part.replace(/\D/g, ''));
+      if (n <= circle) out.push(key);
+    }
     return out;
   }
 
-  const api = { ELEMENTS, MODIFIERS, ALL, FORMS, TIERS, RECIPES, formTierOf, isSpecial, isElement, isModifier, compose, keyOf, countElements, primaryOf, comboCount, allKeys };
+  const api = { ELEMENTS, MODIFIERS, AFFINITY, ALL, FORMS, TIERS, RECIPES, formTierOf, isSpecial, isElement, isModifier, compose, keyOf, countElements, allKeys };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else window.ArchmageRunes = api;
 })();

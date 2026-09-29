@@ -52,16 +52,10 @@
   let seenThisRun = new Set();
 
   // --- 마법의 이름 ---
-  function secondOf(spell) {
-    let second = null;
-    for (const e of ELEMENTS) {
-      if (e !== spell.primary && spell.counts[e] && (!second || spell.counts[e] > spell.counts[second])) second = e;
-    }
-    return second;
-  }
+  // 발동한 마법의 이름에, 수식어는 앞에(연쇄의 대지 균열), 남은 원소의 효과는 뒤에 붙인다
+  // (화염구 +둔화). 마도서처럼 마법만 부를 때는 남은 효과가 없다.
   function spellName(spell) {
     if (!spell) return T('spell.none');
-    const second = secondOf(spell);
     let n = 0;
     for (const e of ELEMENTS) n += spell.counts[e];
     // 같은 원소를 여럿 새겨 단계가 오르면 그 단계의 이름을 쓴다(메테오, 해일). 로마
@@ -69,15 +63,27 @@
     let name;
     if (spell.recipe) name = T('recipe.' + spell.key);
     else {
-      const base = spell.form >= 2 ? T('spell.' + spell.primary + '.' + spell.form)
-        : T(second ? 'spell.' + spell.primary + '-' + second : 'spell.' + spell.primary);
+      const base = spell.form >= 2 ? T('spell.' + spell.primary + '.' + spell.form) : T('spell.' + spell.primary);
       name = n > spell.form ? base + ' ' + ROMAN[n] : base;
     }
-    // 수식어가 있으면 이름 앞에 붙인다(연쇄의 대지 균열). 많이 넣은 것부터.
+    const extras = ELEMENTS.filter((e) => spell.extra && spell.extra[e]);
+    if (extras.length) name = T('spell.withExtras', { name, extras: extras.map((e) => T('extra.' + e)).join(T('spell.modJoin')) });
+    // 수식어가 있으면 이름 앞에 붙인다. 많이 넣은 것부터.
     const mods = Object.keys(spell.mods || {});
     if (!mods.length) return name;
     mods.sort((a, b) => spell.mods[b] - spell.mods[a] || Runes.MODIFIERS.indexOf(a) - Runes.MODIFIERS.indexOf(b));
     return T('spell.withMods', { mods: mods.map((id) => T('rune.' + id)).join(T('spell.modJoin')), name });
+  }
+
+  // 수식어의 상성·상극. 원소의 조화는 넷이 제각각 받으므로 모두 모은다.
+  function affinityTags(spell) {
+    if (!spell) return '';
+    const good = new Set(spell.synergy), bad = new Set(spell.clash);
+    for (const p of spell.parts || []) { p.synergy.forEach((m) => good.add(m)); p.clash.forEach((m) => bad.add(m)); }
+    let out = '';
+    for (const m of good) out += ' <span class="tag good">' + T('am.synergy') + ' ' + T('rune.' + m) + '</span>';
+    for (const m of bad) out += ' <span class="tag bad">' + T('am.clash') + ' ' + T('rune.' + m) + '</span>';
+    return out;
   }
   // 아홉 번째 밤까지는 말로, 그 뒤로는 숫자로 부른다.
   const nightName = (n) => (n <= 9 ? T('am.night' + n) : T('am.nightN', { n }));
@@ -326,6 +332,8 @@
         if (ev.screen) fx.push({ kind: 'flash', el: 'earth', t: 0, life: 0.35 });
         shake = Math.max(shake, 4);
         sound('cast', 'earth', 120);
+      } else if (ev.type === 'splash') {
+        if (fx.length < 300) fx.push({ kind: 'ring', x: ev.x, y: ev.y, r: ev.r, el: 'fire', t: 0, life: 0.25 });
       } else if (ev.type === 'kill') {
         if (fx.length < 400) fx.push({ kind: 'puff', x: ev.x, y: ev.y, foe: ev.foe, t: 0, life: 0.5 });
         sound('kill', null, 45);
@@ -634,7 +642,7 @@
     }
     ctx.stroke();
     // 고리 위를 도는 룬 문양
-    const ids = ['fire', 'water', 'wind', 'earth', 'chain', 'omni', 'echo', 'focus', 'magna'];
+    const ids = ['fire', 'water', 'wind', 'earth', 'chain', 'frost', 'heat', 'gravity', 'gale'];
     const n = Math.min(ids.length, 3 + rings);
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2 - clock * 0.3;
@@ -712,6 +720,18 @@
       } else {
         ctx.strokeStyle = 'rgba(140,210,255,0.55)'; ctx.lineWidth = 1.4;
         ctx.beginPath(); ctx.ellipse(f.x, f.y + f.r * 0.55, f.r * 0.9, f.r * 0.32, 0, 0, Math.PI * 2); ctx.stroke();
+      }
+    }
+    // 발이 묶인 적: 발밑에 흙이 솟아 둘러싼다.
+    if (f.rootT > 0) {
+      const fy = f.y + f.r * 0.55;
+      ctx.strokeStyle = 'rgba(212,164,94,0.85)'; ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.ellipse(f.x, fy, f.r * 0.95, f.r * 0.35, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = '#b8864a';
+      for (let i = 0; i < 4; i++) {
+        const a = i * 1.57 + 0.4;
+        const x = f.x + Math.cos(a) * f.r * 0.8, y = fy + Math.sin(a) * f.r * 0.3;
+        ctx.beginPath(); ctx.moveTo(x - 2.2, y); ctx.lineTo(x, y - 6); ctx.lineTo(x + 2.2, y); ctx.fill();
       }
     }
     if (f.burn > 0) {
@@ -1286,6 +1306,11 @@
       dmg: Math.round(spell.dmg), cd: spell.cd.toFixed(1), dur: spell.dur ? spell.dur.toFixed(1) : null,
       size: Math.round(spell.size), count: spell.count + (spell.kind === 'orbit' ? 2 : 3) * spell.omni,
       leech: spell.leech ? Math.round(spell.leech * 100) : null,
+      slow: spell.slow ? Math.round(spell.slow * 100) : null,
+      splash: spell.splash ? spell.splash + spell.splashBoost : null,
+      root: spell.root ? Math.round(spell.root * 100) : null,
+      knock: spell.knock ? Math.round(spell.knock) : null,
+      freeze: spell.freezeChance ? Math.round(spell.freezeChance * 100) : null,
     };
   }
 
@@ -1299,9 +1324,11 @@
       dmg: (v) => T('stat.dmg') + ' ' + v, cd: (v) => T('stat.cd') + ' ' + T('stat.sec', { n: v }),
       dur: (v) => T('stat.dur') + ' ' + T('stat.sec', { n: v }), size: (v) => T('stat.size') + ' ' + v,
       count: (v) => T('stat.count') + ' ' + v, leech: (v) => T('stat.leech', { n: v }),
+      slow: (v) => T('stat.slow', { n: v }), splash: (v) => T('stat.splash', { n: v }), root: (v) => T('stat.root', { n: v }),
+      knock: (v) => T('stat.knock', { n: v }), freeze: (v) => T('stat.freeze', { n: v }),
     };
     const parts = [];
-    for (const k of ['dmg', 'cd', 'dur', 'size', 'count', 'leech']) {
+    for (const k of ['dmg', 'cd', 'dur', 'size', 'count', 'leech', 'slow', 'splash', 'root', 'knock', 'freeze']) {
       if (a[k] === null || (k === 'count' && a[k] <= 1 && (!b || b[k] <= 1))) continue;
       if (b && b[k] !== null && b[k] !== a[k]) parts.push('<b>' + label[k](b[k] + '→' + a[k]) + '</b>');
       else parts.push(label[k](a[k]));
@@ -1423,7 +1450,7 @@
       const c = state.circles[picked.ci];
       const pv = act.kind === 'erase' ? S.previewErase(state, picked.ci, picked.slot)
         : S.previewPlace(state, opt.id, picked.ci, act.target.mode, picked.slot);
-      html += '<div class="preview"><div><span class="tag">' + T('am.' + act.kind) + '</span> ' + nameFor(pv.spell) +
+      html += '<div class="preview"><div><span class="tag">' + T('am.' + act.kind) + '</span> ' + nameFor(pv.spell) + affinityTags(pv.spell) +
         '<span class="stats">' + statsDiff(c.spell, pv.spell) + '</span></div>' +
         '<button class="btn" type="button" data-confirm="1">' + T('am.confirm') + '</button></div>';
     }
