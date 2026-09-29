@@ -323,5 +323,21 @@ check('밤은 길어지다 10분에서 멈춘다', [S.nightLength(1), S.nightLen
   check('한 판 시뮬레이션이 5초 안', Date.now() - t0 < 5000, true);
 }
 
+// 언데드는 빛에 두 배, 어둠에 절반으로 맞는다. 같은 자리의 같은 체력으로 견준다.
+{
+  const taken = (rune, type) => {
+    const st = S.create({ circle: 1, seed: 3 });
+    engrave(st, rune, 0);
+    const f = foe(st, type, st.player.x + 80, st.player.y);
+    run(st, 3);
+    return f.maxHp - f.hp;
+  };
+  const light = taken('light', 'skeleton') / taken('light', 'goblin');
+  const dark = taken('dark', 'skeleton') / taken('dark', 'goblin');
+  check('언데드는 빛에 두 배', Math.abs(light - S.UNDEAD_BANE.light) < 0.05, true);
+  check('언데드는 어둠에 절반', Math.abs(dark - S.UNDEAD_BANE.dark) < 0.05, true);
+  check('언데드는 셋', Object.keys(S.FOES).filter((k) => S.FOES[k].undead).sort(), ['skeleton', 'wraith', 'zombie']);
+}
+
 console.log(`${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);

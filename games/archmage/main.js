@@ -91,16 +91,42 @@
 
   // 마법진의 룬 구멍. 서클 수만큼 파 두고 새긴 룬을 끼운다 — 칸이 보이지 않으면
   // 서클이 무엇을 정하는지, 왜 더 못 넣는지 알아볼 길이 없다.
-  // 구멍의 모양이 받는 룬을 알린다: 원소는 원, 수식어는 마름모, 아무것이나는 금테 원.
-  const socketType = (i) => ' t-' + Runes.SOCKETS[i];
+  // 모양이 받는 룬을 알린다. 룬은 원소가 원, 수식어가 삼각형이고 둘 다 정사각형에 내접한다.
+  // 전용 구멍은 그 룬의 모양으로, 자유 구멍은 둘 다 담기는 정사각형으로 판다 — 모양이 다른
+  // 룬을 대 보면 모서리가 구멍 밖으로 삐져나와 안 맞는 것이 글 없이 읽힌다.
+  const SHAPE = {
+    F: '<rect x="1.5" y="1.5" width="21" height="21" rx="2.5"/>',
+    E: '<circle cx="12" cy="12" r="10.5"/>',
+    M: '<path d="M12 1.6 22.6 21.4H1.4Z"/>',
+  };
+  const STONE = {
+    E: '<circle cx="12" cy="12" r="8.6"/>',
+    M: '<path d="M12 4.6 19.6 19H4.4Z"/>',
+  };
+  const shapeOf = (id) => Runes.isModifier(id) ? 'M' : 'E';
+  const socketType = (i) => Runes.SOCKETS[i];
   const runeAt = (runes, i) => runes.find((r) => r.slot === i);
+  const svgOf = (cls, body) => '<svg class="' + cls + '" viewBox="0 0 24 24" aria-hidden="true">' + body + '</svg>';
+  // 구멍 하나의 속. id가 있으면 그 룬이 끼워져 있고, trial은 끼울지 대 보는 룬이다(맞지 않으면
+  // 룬 크기 그대로 겹쳐 모서리가 삐져나온다).
+  function socketInner(type, id, grade, trial) {
+    let out = svgOf('hole', SHAPE[type]);
+    if (id) {
+      const sp = Runes.isSpecialElement(id) ? ' special' : '';
+      out += svgOf('stone s-' + shapeOf(id) + sp, STONE[shapeOf(id)]) + '<i class="on-' + shapeOf(id) + '">' + I.svg(id) + '</i>';
+    } else if (trial) {
+      out += svgOf('trial', SHAPE[shapeOf(trial)]);
+    }
+    if (grade) out += '<span class="grade">+' + grade + '</span>';
+    return out;
+  }
   function sockets(runes, cap, mark) {
     let out = '<span class="sockets">';
     for (let i = 0; i < cap; i++) {
       const r = runeAt(runes, i);
-      if (!r) { out += '<span class="socket' + socketType(i) + '"></span>'; continue; }
-      const g = r.grade ? '<span class="grade">+' + r.grade + '</span>' : '';
-      out += '<span class="socket filled' + socketType(i) + (mark === i ? ' new' : '') + '" style="--c:' + I.colorOf(r.id) + '"><i>' + I.svg(r.id) + '</i>' + g + '</span>';
+      const t = socketType(i);
+      if (!r) { out += '<span class="socket t-' + t + '">' + socketInner(t) + '</span>'; continue; }
+      out += '<span class="socket filled t-' + t + (mark === i ? ' new' : '') + '" style="--c:' + I.colorOf(r.id) + '">' + socketInner(t, r.id, r.grade) + '</span>';
     }
     return out + '</span>';
   }
@@ -678,7 +704,7 @@
   }
 
   // 걸음 빠르기. 늑대는 달리고 골렘은 쿵쿵 걷는다.
-  const FOE_ANIM = { slime: 8, goblin: 13, wolf: 19, wraith: 7, golem: 7, boss: 6 };
+  const FOE_ANIM = { slime: 8, goblin: 13, wolf: 19, skeleton: 12, wraith: 7, zombie: 6, golem: 7, boss: 6 };
 
   function drawFoe(f, p) {
     const def = A.FOES[f.type];
@@ -1189,7 +1215,7 @@
   }
 
   // 쓰러진 적. 흰 실루엣이 주저앉으며 사라지고, 제 빛깔의 조각이 튄다.
-  const PUFF = { slime: '#8fd35a', goblin: '#9ccf5a', wolf: '#9aa3c0', wraith: '#a9b6ff', golem: '#c9bfa6', boss: '#ff5a5a' };
+  const PUFF = { slime: '#8fd35a', goblin: '#9ccf5a', wolf: '#9aa3c0', skeleton: '#e6dcc4', wraith: '#a9b6ff', zombie: '#8fa77a', golem: '#c9bfa6', boss: '#ff5a5a' };
   function drawPuff(f) {
     const t = f.t / f.life;
     const def = A.FOES[f.foe];
@@ -1405,7 +1431,8 @@
       // 마도서가 자리를 고를 때 보여 준다.
       return '<b>' + T('desc.primary') + '</b> ' + T('form.' + opt.id) +
         '<br><b>' + T('desc.stacked') + '</b> ' + T('stack.' + opt.id) +
-        '<br><b>' + T('desc.added') + '</b> ' + T('trait.' + opt.id);
+        '<br><b>' + T('desc.added') + '</b> ' + T('trait.' + opt.id) +
+        (Runes.isSpecialElement(opt.id) ? '<br><b>' + T('desc.special') + '</b> ' + T('special.' + opt.id) : '');
     }
     return T('desc.' + opt.id) + '<br><b>' + T('desc.stacked') + '</b> ' + T('desc.modStack');
   }
@@ -1432,8 +1459,16 @@
       if (opt.type === 'rune' && targetsFor(opt).some((t) => t.pv.spell && !known(t.pv.spell.key))) {
         tag = '<span class="tag">' + T('am.new') + '</span>';
       }
-      return '<button class="choice" type="button" data-i="' + i + '" style="--c:' + I.colorOf(id) + '">' +
-        '<span class="icon" style="color:' + I.colorOf(id) + '">' + I.svg(id) + '</span>' +
+      // 룬은 제 모양의 돌로 보여 준다(원소는 원, 수식어는 삼각형). 어느 구멍에 들어갈지가
+      // 고르기 전부터 보인다.
+      let icon = '<span class="icon" style="color:' + I.colorOf(id) + '">' + I.svg(id) + '</span>';
+      if (opt.type === 'rune') {
+        const sh = shapeOf(id);
+        icon = '<span class="icon rune-' + sh + (Runes.isSpecialElement(id) ? ' special' : '') + '" style="color:' + I.colorOf(id) + '">' +
+          (sh === 'M' ? svgOf('stone-bg', SHAPE.M) : '') + '<i class="on-' + sh + '">' + I.svg(id) + '</i></span>';
+        if (Runes.isSpecialElement(id)) tag = '<span class="tag special">' + T('am.special') + '</span>' + tag;
+      }
+      return '<button class="choice" type="button" data-i="' + i + '" style="--c:' + I.colorOf(id) + '">' + icon +
         '<span><span class="choice-name">' + T('rune.' + id) + tag + '</span>' +
         '<span class="choice-desc">' + optionDesc(opt) + '</span></span></button>';
     }).join('');
@@ -1469,18 +1504,25 @@
     const r = runeAt(state.circles[ci].runes, slot);
     const act = actionFor(opt, ci, slot);
     const sel = picked && picked.ci === ci && picked.slot === slot;
-    let cls = 'socket' + socketType(slot) + (act ? ' can' : '');
+    const t = socketType(slot);
+    let cls = 'socket t-' + t + (act ? ' can' : '');
     let color = r ? r.id : null;
-    let inner = '';
+    let inner;
     if (r) {
       cls += ' filled';
-      const g = r.grade + (sel && act.kind === 'grade' ? 1 : 0);
-      inner = '<i>' + I.svg(r.id) + '</i>' + (g ? '<span class="grade">+' + g + '</span>' : '');
+      inner = socketInner(t, r.id, r.grade + (sel && act.kind === 'grade' ? 1 : 0));
       if (sel && act.kind === 'erase') cls += ' removing';
     } else if (sel) {
       cls += ' filled ghost';
       color = opt.id;
-      inner = '<i>' + I.svg(opt.id) + '</i>';
+      inner = socketInner(t, opt.id);
+    } else if (opt.type === 'rune' && ci < state.unlocked) {
+      // 빈 구멍마다 고른 룬을 대 본다. 맞으면 쏙 들어가고, 안 맞으면 모서리가 삐져나온다.
+      if (!act) cls += ' misfit';
+      color = opt.id;
+      inner = socketInner(t, null, 0, opt.id);
+    } else {
+      inner = socketInner(t);
     }
     if (sel) cls += ' new';
     return '<button type="button" class="' + cls + '"' + (color ? ' style="--c:' + I.colorOf(color) + '"' : '') +

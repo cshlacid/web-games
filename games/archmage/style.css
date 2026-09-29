@@ -278,21 +278,25 @@ h1 {
 .report li:last-child { border-bottom: 0; }
 
 /* --- 룬 구멍 ---
-   빈 구멍은 돌판에 파인 듯 안쪽 그늘을, 끼운 룬은 제 색으로 빛나게 둔다. */
+   구멍과 룬은 SVG로 긋는다 — 원·삼각형·정사각형의 테두리와 빛을 CSS 상자로는 낼 수 없다.
+   빈 구멍은 돌판에 파인 듯 어둡고, 끼운 룬은 제 색으로 빛난다. */
 .sockets { display: flex; flex-wrap: wrap; gap: 4px; margin: 3px 0; }
 .socket {
-  position: relative; width: 24px; height: 24px; border-radius: 50%; flex: none;
-  display: grid; place-items: center;
-  border: 1px solid rgba(205, 170, 100, 0.35);
-  background: radial-gradient(circle at 50% 60%, #07060e, #1c1830);
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.9), 0 1px 0 rgba(255, 255, 255, 0.06);
+  position: relative; width: 24px; height: 24px; flex: none;
+  display: grid; place-items: center; color: var(--c, #b99bff);
 }
-.socket.filled {
-  border: 1.5px solid var(--c);
-  color: var(--c);
-  background: radial-gradient(circle, color-mix(in srgb, var(--c) 35%, #0d0b1a), #0d0b1a 80%);
-  box-shadow: 0 0 8px color-mix(in srgb, var(--c) 55%, transparent), inset 0 0 6px color-mix(in srgb, var(--c) 40%, transparent);
+.socket > svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; stroke-linejoin: round; }
+.socket .hole { fill: #07060e; stroke: rgba(205, 170, 100, 0.45); stroke-width: 1.2; }
+.socket.filled .hole { stroke: color-mix(in srgb, var(--c) 40%, transparent); }
+.socket .stone {
+  fill: color-mix(in srgb, var(--c) 32%, #0d0b1a); stroke: var(--c); stroke-width: 1.5;
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--c) 70%, transparent));
 }
+/* 빛과 어둠은 특수 원소라 테가 굵고 흰 빛을 한 겹 더 두른다. */
+.socket .stone.special { stroke-width: 2.1; filter: drop-shadow(0 0 1.5px #fff) drop-shadow(0 0 4px var(--c)); }
+.socket > i { position: relative; display: grid; place-items: center; font-style: normal; color: var(--c); }
+/* 삼각형은 무게중심이 아래에 있어 그림을 내리고 줄여야 안에 든다. */
+.socket > i.on-M { transform: translateY(16%) scale(0.72); }
 .socket .glyph { width: 15px; height: 15px; filter: drop-shadow(0 0 3px currentColor); }
 .socket .grade {
   position: absolute; right: -6px; top: -6px;
@@ -300,14 +304,18 @@ h1 {
   background: linear-gradient(180deg, #ffe39a, #c28a22); color: #2a1606;
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.7);
 }
+/* 고른 룬을 빈 구멍에 대 본 자리. 맞으면 구멍 안에 들고, 안 맞으면 기울어진 채 모서리가
+   구멍 밖으로 삐져나온다. */
+.socket .trial { fill: none; stroke: var(--c); stroke-width: 1.2; stroke-dasharray: 2.4 1.8; opacity: 0.85; }
+.socket.misfit .trial { stroke: #ff7a86; transform: translate(1.5px, -1px) rotate(10deg); opacity: 0.8; }
 /* 방금 끼울 자리. 무엇이 어디로 들어가는지 눈이 먼저 찾게 한다. */
-.socket.new { animation: socket-in 0.9s ease-in-out infinite alternate; }
+.socket.new .stone { animation: socket-in 0.9s ease-in-out infinite alternate; }
 @keyframes socket-in {
-  from { box-shadow: 0 0 2px var(--c); }
-  to { box-shadow: 0 0 14px var(--c), 0 0 2px var(--c) inset; }
+  from { filter: drop-shadow(0 0 1px var(--c)); }
+  to { filter: drop-shadow(0 0 7px var(--c)); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .socket.new { animation: none; box-shadow: 0 0 10px var(--c); }
+  .socket.new .stone { animation: none; filter: drop-shadow(0 0 5px var(--c)); }
   .btn.big, .choice { animation: none; }
 }
 .choice.target .sockets { margin: 5px 0 3px; }
@@ -351,11 +359,11 @@ h1 {
 .sockets.big { gap: 8px; margin: 0; }
 .sockets.big .socket { width: 38px; height: 38px; }
 .sockets.big .socket .glyph { width: 20px; height: 20px; }
-button.socket { padding: 0; font: inherit; color: inherit; cursor: pointer; appearance: none; -webkit-appearance: none; }
+button.socket { padding: 0; font: inherit; color: inherit; background: none; border: 0; cursor: pointer; appearance: none; -webkit-appearance: none; }
 button.socket:disabled { cursor: default; opacity: 0.4; }
-button.socket.filled:disabled { opacity: 0.55; }
-.socket.can { border-color: var(--arcane); border-style: solid; box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.9), 0 0 8px rgba(185, 155, 255, 0.45); }
-.socket.filled.can { border-color: var(--c); }
+button.socket.filled:disabled, button.socket.misfit:disabled { opacity: 0.7; }
+.socket.can .hole { stroke: var(--arcane); stroke-width: 1.5; filter: drop-shadow(0 0 3px rgba(185, 155, 255, 0.7)); }
+.socket.filled.can .hole { stroke: var(--c); }
 .socket.ghost .glyph { opacity: 0.75; }
 .socket.removing { opacity: 0.3; box-shadow: none; }
 .preview {
@@ -518,9 +526,16 @@ button.socket.filled:disabled { opacity: 0.55; }
 }
 .train-dot.next { color: var(--arcane); box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.9), 0 0 0 1.5px var(--arcane), 0 0 8px rgba(185, 155, 255, 0.45); }
 
-/* 구멍의 종류: 원소는 원, 수식어는 마름모, 아무것이나는 금테를 한 겹 더 두른 원.
-   모양만으로 무엇을 넣을 수 있는지 읽혀야 한다. */
-.socket > i { display: grid; place-items: center; font-style: normal; }
-.socket.t-M { border-radius: 5px; transform: rotate(45deg) scale(0.84); }
-.socket.t-M > i, .socket.t-M .grade { transform: rotate(-45deg); }
-.socket.t-F { outline: 1px solid rgba(230, 192, 103, 0.6); outline-offset: 2px; }
+/* 레벨업 카드의 룬도 제 모양의 돌이다. 수식어는 삼각형 돌이라 둥근 돌 장식을 걷는다. */
+.choice .icon.rune-M { position: relative; background: none; box-shadow: none; border-radius: 0; }
+.choice .icon .stone-bg {
+  position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; stroke-linejoin: round;
+  fill: color-mix(in srgb, var(--c) 35%, #0d0b1a); stroke: var(--c); stroke-width: 1.1;
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--c) 45%, transparent));
+}
+.choice .icon > i { position: relative; display: grid; place-items: center; font-style: normal; }
+.choice .icon > i.on-M { transform: translateY(14%) scale(0.8); }
+.choice .icon.special {
+  box-shadow: 0 0 0 1.5px var(--c), 0 0 0 3.5px rgba(0, 0, 0, 0.6), 0 0 0 5px #fff4dc, 0 0 20px color-mix(in srgb, var(--c) 60%, transparent);
+}
+.tag.special { color: #f3e6ff; }

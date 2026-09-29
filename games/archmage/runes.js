@@ -15,6 +15,9 @@
   // 원소는 일곱이다. 9서클의 원소 칸이 일곱이라(`SOCKETS`) 일곱을 하나씩 모두 모은 것이
   // 궁극기(천지개벽)가 된다. 처음 넷에 번개·빛·어둠을 더했다.
   const ELEMENTS = ['fire', 'water', 'wind', 'earth', 'thunder', 'light', 'dark'];
+  // 빛과 어둠은 서로 맞서는 특수 원소다. 언데드가 빛에 약하고 어둠에 강해(sim.js의
+  // UNDEAD_BANE) 둘이 판에서 갈린다 — 다른 원소는 적을 가리지 않는다.
+  const OPPOSITE = { light: 'dark', dark: 'light' };
   // 앞 넷은 원소와 상관없이 같은 효과, 뒤 다섯은 원소 상성이 있다. 집중·거대·시간은
   // 뺐다 — 피해·범위·쿨타임을 올리는 것뿐이라 고를 때 생각할 거리가 없었다.
   const MODIFIERS = ['chain', 'omni', 'echo', 'anima', 'frost', 'heat', 'gravity', 'gale', 'resonance'];
@@ -284,6 +287,7 @@
 
   const isElement = (id) => ELEMENTS.indexOf(id) >= 0;
   const isModifier = (id) => MODIFIERS.indexOf(id) >= 0;
+  const isSpecialElement = (id) => !!OPPOSITE[id];
 
   function countElements(runes) {
     const counts = counts0();
@@ -446,7 +450,7 @@
     return out;
   }
 
-  const api = { ELEMENTS, MODIFIERS, AFFINITY, SOCKETS, ALL, FORMS, TIERS, RECIPES, fits, maxElements, formTierOf, isSpecial, isElement, isModifier, compose, keyOf, keyRunes, countElements, allKeys };
+  const api = { ELEMENTS, OPPOSITE, MODIFIERS, AFFINITY, SOCKETS, ALL, FORMS, TIERS, RECIPES, fits, maxElements, formTierOf, isSpecial, isElement, isModifier, isSpecialElement, compose, keyOf, keyRunes, countElements, allKeys };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else window.ArchmageRunes = api;
 })();
