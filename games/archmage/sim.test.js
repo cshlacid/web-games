@@ -43,7 +43,7 @@ function engrave(state, id, ci) {
 {
   const st = S.create({ circle: 1, seed: 5 });
   check('시작하자마자 룬을 고른다', !!st.pending, true);
-  check('첫 제시는 원소만', st.pending.options.every((o) => o.type === 'rune' && ['fire', 'water', 'wind', 'earth'].includes(o.id)), true);
+  check('첫 제시는 원소만', st.pending.options.every((o) => o.type === 'rune' && require('./runes.js').ELEMENTS.includes(o.id)), true);
   check('제시는 셋', st.pending.options.length, 3);
   const before = st.t;
   S.step(st, 1);
@@ -78,7 +78,7 @@ function engrave(state, id, ci) {
     // 다음 제시를 열어 본다.
     st.queued = 1;
     S.step(st, 0);
-    if (st.pending && st.pending.options.some((o) => o.type === 'rune' && !['fire', 'water', 'wind', 'earth'].includes(o.id))) modifier = true;
+    if (st.pending && st.pending.options.some((o) => o.type === 'rune' && !require('./runes.js').ELEMENTS.includes(o.id))) modifier = true;
   }
   check('1서클 제시에는 수식어가 없다', modifier, false);
 }
@@ -200,8 +200,9 @@ for (const [el, name] of [['fire', '메테오'], ['water', '해일'], ['wind', '
 
 // --- 비·오라·접목 ---
 {
+  // 5서클은 원소 칸이 넷이다. 번개 넷은 뇌우.
   const st = S.create({ circle: 5, seed: 1 });
-  for (let i = 0; i < 5; i++) engrave(st, 'wind', 0);
+  for (let i = 0; i < 4; i++) engrave(st, 'thunder', 0);
   const f = foe(st, 'slime', 120, 40);
   const ev = run(st, 1.5);
   check('뇌우는 번개를 떨어뜨린다', ev.some((e) => e.type === 'impact' && e.sub === 'bolt') && f.hp < 1000, true);

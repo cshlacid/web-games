@@ -69,8 +69,9 @@ check('서클에 묶인 옛 저장본은 첫 번째 밤부터', M.parse('{"v":1,
 {
   const save = M.fresh();
   save.grimoire = { fire1: { run: 1 }, 'fire1-wind1': { run: 1 }, fire3: { run: 2 } };
-  check('마도서는 그 서클까지에서 센다', M.grimoireCount(save, 2), { found: 2, total: 14, specialFound: 1, special: 10 });
-  check('서클이 오르면 분모가 는다', M.grimoireCount(save, 3), { found: 3, total: 22, specialFound: 2, special: 18 });
+  check('마도서는 그 서클까지에서 센다', M.grimoireCount(save, 2), { found: 2, total: 35, specialFound: 1, special: 28 });
+  // 3서클은 원소 칸이 둘뿐이라 분모가 2서클과 같고, 원소 칸이 셋이 되는 4서클에서 는다.
+  check('원소 칸이 늘면 분모가 는다', M.grimoireCount(save, 4), { found: 3, total: 46, specialFound: 2, special: 39 });
 }
 
 {

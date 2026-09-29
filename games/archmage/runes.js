@@ -6,13 +6,15 @@
 //   1. 새긴 원소 룬으로 만들 수 있는 마법(같은 원소만의 마법, 특수 조합) 가운데 룬을
 //      가장 많이 쓰는 것이 발동한다. 같은 수가 여럿이면 먼저 새긴 룬을 쓰는 쪽이다.
 //   2. 그 마법에 들지 못하고 남은 원소 룬은 원소마다 정해진 효과를 더한다(불 스플래시,
-//      물 둔화, 바람 넉백, 땅 발묶기). 여럿이면 더하기로 쌓인다.
+//      물 둔화, 바람 넉백, 땅 발묶기, 번개 감전, 빛 취약, 어둠 공포). 여럿이면 더하기로 쌓인다.
 //   3. 수식어는 마법을 강화한다. 원소 상성이 있는 수식어는 어울리는 원소에서 보너스를,
 //      상극 원소에서는 오히려 약화를 준다.
 // 처음에는 가장 많은 원소가 형태, 나머지 원소가 성질을 정했다. 규칙은 짧았지만 무엇이
 // 나갈지 예측하기 어려웠다 — 지금은 "발동 마법 + 덧붙는 효과"로 한 줄에 읽힌다.
 (function () {
-  const ELEMENTS = ['fire', 'water', 'wind', 'earth'];
+  // 원소는 일곱이다. 9서클의 원소 칸이 일곱이라(`SOCKETS`) 일곱을 하나씩 모두 모은 것이
+  // 궁극기(천지개벽)가 된다. 처음 넷에 번개·빛·어둠을 더했다.
+  const ELEMENTS = ['fire', 'water', 'wind', 'earth', 'thunder', 'light', 'dark'];
   // 앞 넷은 원소와 상관없이 같은 효과, 뒤 다섯은 원소 상성이 있다. 집중·거대·시간은
   // 뺐다 — 피해·범위·쿨타임을 올리는 것뿐이라 고를 때 생각할 거리가 없었다.
   const MODIFIERS = ['chain', 'omni', 'echo', 'anima', 'frost', 'heat', 'gravity', 'gale', 'resonance'];
@@ -42,6 +44,13 @@
     // 적이 몰린 자리에 깔린다. 느리지만 머무는 동안 계속 긁는다.
     // 지대는 쉬는 틈에 무리가 그대로 걸어 들어온다. 유지를 쿨타임보다 길게 두어 거의 늘 깔려 있게 한다.
     earth: { kind: 'zone', dmg: 12, cd: 2.0, dur: 3.0, size: 52, speed: 0, count: 1, pierce: 0 },
+    // 가장 가까운 적을 곧바로 치고 곁의 적으로 튄다(jumps). size는 튀는 거리다.
+    thunder: { kind: 'zap', dmg: 24, cd: 1.1, dur: 0, size: 110, speed: 0, count: 1, pierce: 0, jumps: 2 },
+    // 적 쪽으로 광선을 last초 동안 쏜다. 선 위의 모든 적을 every마다 긁는다. size는 광선의 굵기.
+    light: { kind: 'beam', dmg: 4.5, cd: 1.8, dur: 0, size: 10, speed: 0, count: 1, pierce: 0, length: 300, last: 1.2, every: 0.2 },
+    // 가까운 적 몇에게 저주를 건다. 초당 dmg의 피해가 last초 이어지고, 저주받은 적이 죽으면
+    // 곁의 적에게 옮겨 간다.
+    dark: { kind: 'curse', dmg: 9, cd: 2.0, dur: 0, size: 0, speed: 0, count: 2, pierce: 0, last: 3.5 },
   };
 
   // 같은 원소를 구멍에 여럿 새기면 마법 자체가 바뀐다(단계). 등급처럼 수치만 오르면
@@ -77,9 +86,10 @@
       2: { pulse: true },
       // 회오리가 스스로 적을 찾아다니며 빨아들인다.
       3: { kind: 'tornado', dmg: 20, cd: 2.4, dur: 4, size: 44, speed: 150, count: 2 },
-      4: { kind: 'rain', sub: 'bolt', dmg: 45, cd: 3, dur: 3, size: 26, count: 3, every: 0.2, delay: 0.12 },
+      // 번개비는 번개 원소로 옮겼다. 바람은 회오리를 늘리고 끝에 화면 전체를 휩쓴다.
+      4: { kind: 'tornado', dmg: 22, cd: 3, dur: 5, size: 50, speed: 150, count: 4 },
       5: { kind: 'aura', dmg: 22, cd: 4.5, dur: 4, size: 170, every: 0.25, pull: true },
-      7: { kind: 'rain', sub: 'bolt', dmg: 70, cd: 5, dur: 4, size: 32, count: 4, every: 0.2, delay: 0.1, screen: true },
+      7: { kind: 'aura', dmg: 60, cd: 5, dur: 4, size: 470, every: 0.4, pull: true, screen: true },
     },
     earth: {
       // 지대가 긁을 때마다 바깥으로 충격파가 번진다.
@@ -89,6 +99,33 @@
       4: { kind: 'rain', sub: 'rock', dmg: 90, cd: 4, dur: 3, size: 72, count: 1, every: 0.45, delay: 0.6, knock: 80 },
       5: { kind: 'aura', dmg: 90, cd: 4, dur: 4, size: 130, every: 0.3, knock: 60 },
       7: { kind: 'quake', dmg: 80, cd: 6, dur: 2.5, size: 470, screen: true },
+    },
+    thunder: {
+      // 튀는 수가 는다.
+      2: { jumps: 4 },
+      // 하늘에서 여러 곳에 벼락이 떨어진다.
+      3: { kind: 'meteor', sub: 'bolt', dmg: 55, cd: 2.0, size: 44, count: 3 },
+      4: { kind: 'rain', sub: 'bolt', dmg: 45, cd: 3, dur: 3, size: 26, count: 3, every: 0.2, delay: 0.12 },
+      5: { kind: 'aura', dmg: 24, cd: 4.5, dur: 4, size: 160, every: 0.25 },
+      7: { kind: 'rain', sub: 'bolt', dmg: 70, cd: 5, dur: 4, size: 32, count: 4, every: 0.2, delay: 0.1, screen: true },
+    },
+    light: {
+      // 광선이 두 갈래가 된다.
+      2: { count: 2 },
+      // 마법사 둘레로 성광이 두 번 터진다.
+      3: { kind: 'aura', dmg: 30, cd: 2.4, dur: 0.7, size: 150, every: 0.3 },
+      4: { kind: 'rain', sub: 'light', dmg: 50, cd: 3.5, dur: 3, size: 36, count: 3, every: 0.3, delay: 0.35 },
+      5: { kind: 'aura', dmg: 28, cd: 4.5, dur: 4, size: 150, every: 0.3, vuln: 0.2 },
+      7: { kind: 'aura', dmg: 100, cd: 5, dur: 3, size: 470, every: 0.5, screen: true },
+    },
+    dark: {
+      // 저주가 넷에게 걸린다.
+      2: { count: 4 },
+      // 적 무리 아래 어둠의 늪이 열려 빨아들인다.
+      3: { kind: 'zone', dmg: 8, cd: 2.4, dur: 3.5, size: 70, count: 1, vortex: true },
+      4: { kind: 'rain', sub: 'void', dmg: 52, cd: 3.8, dur: 3, size: 50, count: 2, every: 0.35, delay: 0.45 },
+      5: { kind: 'aura', dmg: 26, cd: 4.5, dur: 4, size: 160, every: 0.3, fear: 0.5 },
+      7: { kind: 'aura', dmg: 95, cd: 5, dur: 3.5, size: 470, every: 0.5, screen: true },
     },
   };
   const TIER_STEPS = [7, 5, 4, 3, 2, 1];
@@ -101,55 +138,52 @@
   // 형태는 form 원소의 tier단계를 빌리고, 나머지 원소는 성질 대신 접목(graft)으로 붙는다.
   //   불 접목: 맞힌 자리에 불길이 남는다   물 접목: 얼려 묶는다
   //   바람 접목: 맞힌 자리로 빨아들인다    땅 접목: 돌 파편이 튀고 발을 묶는다
-  // 두 원소는 1:1·2:2·3:3에서 1·3·4단계를, 세 원소는 1:1:1·2:2:2에서 3·4단계를 빌린다.
-  // 가장 큰 조합은 형태를 정한 원소에 한 칸을 더 준다(두 원소 4:3은 5단계, 세 원소 3:2:2는
-  // 7단계) — 원소 칸이 일곱뿐이라 4:4와 3:3:3은 넣을 수 없어 옮겼다. 네 원소는 1:1:1:1과,
-  // 칸이 모자라 한 원소가 하나인 2:2:2:1(넷 중 어느 것이든)에 따로 둔다.
-  // name은 이름과 마도서의 열쇠다. 원소 폭주처럼 여러 묶음이 한 마법일 때 하나로 모은다.
+  // 두 원소는 스물한 쌍 모두 1:1과 2:2에서 1·3단계를 빌리고, 처음 넷끼리의 여섯 쌍만 3:3에서
+  // 4단계까지 간다. 세 원소는 처음 넷의 네 묶음이 1:1:1·2:2:2에서 3·4단계다. 원소 칸이 9서클에
+  // 일곱이라 3:3:3·2:2:2:2 같은 큰 묶음은 들지 않아 뺐고, 일곱 원소를 하나씩 모은 궁극기가
+  // 그 자리를 맡는다. 새 원소(번개·빛·어둠)가 든 쌍은 새 원소가 형태를 정한다 — 불+번개가
+  // 불붙은 번개여야 처음 보는 마법이 된다. name은 이름과 마도서의 열쇠다.
   const RECIPES = {};
-  const counts0 = () => ({ fire: 0, water: 0, wind: 0, earth: 0 });
-  const PAIRS = [
-    ['fire', 'water', 'fire'], ['fire', 'wind', 'wind'], ['fire', 'earth', 'earth'],
-    ['water', 'wind', 'water'], ['water', 'earth', 'earth'], ['wind', 'earth', 'wind'],
-  ];
-  for (const [a, b, form] of PAIRS) {
+  const counts0 = () => { const c = {}; for (const el of ELEMENTS) c[el] = 0; return c; };
+  const OLD_FORMS = { 'fire-water': 'fire', 'fire-wind': 'wind', 'fire-earth': 'earth', 'water-wind': 'water', 'water-earth': 'earth', 'wind-earth': 'wind' };
+  for (let i = 0; i < ELEMENTS.length; i++) for (let j = i + 1; j < ELEMENTS.length; j++) {
+    const a = ELEMENTS[i], b = ELEMENTS[j];
+    const old = OLD_FORMS[a + '-' + b];
+    const form = old || b;
     const other = form === a ? b : a;
-    [[1, 1], [2, 3], [3, 4], [4, 5]].forEach(([n, tier]) => {
+    const steps = old ? [[1, 1], [2, 3], [3, 4]] : [[1, 1], [2, 3]];
+    for (const [n, tier] of steps) {
       const counts = counts0();
-      counts[form] = n; counts[other] = Math.min(n, 3);
+      counts[a] = n; counts[b] = n;
       RECIPES[keyOf(counts)] = { form, tier, grafts: [other] };
-    });
+    }
   }
   const TRIOS = [
     [['fire', 'water', 'wind'], 'wind'], [['fire', 'water', 'earth'], 'earth'],
     [['fire', 'wind', 'earth'], 'fire'], [['water', 'wind', 'earth'], 'water'],
   ];
   for (const [els, form] of TRIOS) {
-    [[1, 3], [2, 4], [3, 7]].forEach(([n, tier]) => {
+    [[1, 3], [2, 4]].forEach(([n, tier]) => {
       const counts = counts0();
-      for (const el of els) counts[el] = Math.min(n, 2);
-      counts[form] = n;
+      for (const el of els) counts[el] = n;
       // 불+바람+땅은 불 형태에 빨아들임과 파편이 겹쳐, 같은 룬 수의 다른 조합보다 두 배 넘게
       // 셌다. 몫을 줄여 맞춘다.
       const dmg = form === 'fire' ? 0.7 : 1;
       RECIPES[keyOf(counts)] = { form, tier, grafts: els.filter((el) => el !== form), dmg };
     });
   }
-  // 원소의 조화: 넷이 서로를 북돋는 칼날. 원소 폭주: 화면을 태우며 모든 접목이 붙는다.
-  // 네 원소는 한 형태를 빌리지 않고 **네 원소의 마법을 한꺼번에** 쓴다(harmony). 칼날 하나에
-  // 접목 셋을 붙였을 때는 같은 네 룬의 다른 조합보다 네 배 가까이 약했다.
-  // 원소의 조화는 넷의 2단계, 원소 폭주는 넷의 3단계다.
-  RECIPES['fire1-water1-wind1-earth1'] = { form: 'all', tier: 2, grafts: [] };
-  for (const one of ELEMENTS) {
-    const counts = { fire: 2, water: 2, wind: 2, earth: 2 };
-    counts[one] = 1;
-    RECIPES[keyOf(counts)] = { form: 'all', tier: 3, grafts: [], name: 'surge' };
+  // 궁극기 천지개벽: 일곱 원소를 하나씩. 한 형태를 빌리지 않고 **일곱 원소의 3단계 마법을
+  // 한꺼번에** 쓴다(harmony). 9서클에서만 닿는다.
+  {
+    const counts = counts0();
+    for (const el of ELEMENTS) counts[el] = 1;
+    RECIPES[keyOf(counts)] = { form: 'all', tier: 3, grafts: [], name: 'genesis' };
   }
   // 이름 있는 마법은 찾아낸 값을 치러 규칙으로 만든 같은 단계보다 조금 더 세다.
   const RECIPE_DMG = 1.25;
 
   // 이름 있는 마법: 특수 조합과, 같은 원소만으로 형태가 바뀌는 단계. 마도서가 따로 센다.
-  const isSpecial = (key) => key === 'surge' || !!RECIPES[key] || /^(fire|water|wind|earth)[23457]$/.test(key);
+  const isSpecial = (key) => key === 'genesis' || !!RECIPES[key] || new RegExp('^(' + ELEMENTS.join('|') + ')[23457]$').test(key);
 
   function applyGraft(s, el) {
     if (el === 'fire') { s.ignite = true; s.burn += 8; }
@@ -157,17 +191,23 @@
     else if (el === 'wind') s.vortex = true;
     // 땅은 무게다. 파편은 맞히는 형태에서만 튀므로, 둘레를 도는 형태에서도 느껴지게 피해를 얹는다.
     else if (el === 'earth') { s.shatter = true; s.root = Math.min(0.6, s.root + 0.3); s.rootDur = Math.max(s.rootDur, 0.8); s.dmg *= 1.3; }
+    else if (el === 'thunder') s.zap += 2;
+    else if (el === 'light') s.vuln = Math.min(0.6, s.vuln + 0.25);
+    else if (el === 'dark') { s.fear = Math.max(s.fear, 0.8); s.leech += 0.03; }
   }
 
   // 마법에 들지 못하고 남은 원소 룬의 효과. t는 남은 그 원소 룬의 수에 등급을 더한 것이고
   // 더하기로 쌓인다. 원소마다 성격을 한 가지씩만 준다 — 불은 번지고, 물은 느리게 하고,
-  // 바람은 밀어내고, 땅은 붙잡는다.
+  // 바람은 밀어내고, 땅은 붙잡고, 번개는 곁으로 튀고, 빛은 약점을 드러내고, 어둠은 쫓아낸다.
   function applyExtra(s, el, t) {
     if (!t) return;
     if (el === 'fire') s.splash += t;
     else if (el === 'water') s.slow = Math.min(0.7, s.slow + 0.25 * t);
     else if (el === 'wind') s.knock += 40 * t;
     else if (el === 'earth') { s.root = Math.min(0.6, s.root + 0.2 * t); s.rootDur = Math.max(s.rootDur, Math.min(1.2, 0.5 + 0.1 * t)); }
+    else if (el === 'thunder') s.zap += t;
+    else if (el === 'light') s.vuln = Math.min(0.6, s.vuln + 0.15 * t);
+    else if (el === 'dark') s.fear = Math.min(1.5, s.fear + 0.4 * t);
   }
 
   // 주원소를 겹쳤을 때(구멍에 더 넣거나 등급을 올렸을 때)의 강화. **그 원소가 원래
@@ -188,6 +228,10 @@
     else if (s.primary === 'water') { s.count += more; s.pierce += n; s.dmg *= 1 + 0.3 * n; }
     else if (s.primary === 'wind') { s.count += more; s.dur *= longer(0.15); s.dmg *= 1 + 0.3 * n; }
     else if (s.primary === 'earth') { s.size *= 1 + Math.min(1, 0.15 * n); s.dur *= longer(0.3); s.dmg *= 1 + 0.35 * n; }
+    // 번개는 튀는 수, 빛은 광선이 머무는 시간, 어둠은 저주를 거는 수가 는다.
+    else if (s.primary === 'thunder') { if (s.kind === 'zap') s.jumps += n; else s.count += more; s.dmg *= 1 + 0.35 * n; }
+    else if (s.primary === 'light') { if (s.kind === 'beam') s.last *= longer(0.15); else s.count += more; s.dmg *= 1 + 0.35 * n; }
+    else if (s.primary === 'dark') { s.count += more; if (s.last) s.last *= longer(0.15); s.dmg *= 1 + 0.35 * n; }
   }
 
   // 수식어. l은 그 수식어 룬의 수에 등급을 더한 것이고, 오르면 **그 수식어의 효과만**
@@ -201,7 +245,12 @@
     // 상성이면 효과에 더해 피해도 오른다 — 고를 때 "어울린다"가 곧 "세진다"로 읽혀야 한다.
     if (likes) { s.synergy.push(mod); s.dmg *= SYNERGY_DMG; }
     if (hates) s.clash.push(mod);
-    if (mod === 'chain') s.chain += 2 * l;
+    // 연쇄: 번지는 것이 없는 번개·광선·저주에서는 튀는 수·광선·저주 대상을 늘린다.
+    if (mod === 'chain') {
+      if (s.kind === 'zap') s.jumps += 2 * l;
+      else if (s.kind === 'beam' || s.kind === 'curse') s.count += l;
+      else s.chain += 2 * l;
+    }
     else if (mod === 'omni') s.omni += l;
     else if (mod === 'echo') s.echo += Math.min(l, 4);
     // 흡혈. 맞힌 피해의 일부로 생명력을 되찾는다(한도는 sim.js의 LEECH_RATE).
@@ -237,7 +286,7 @@
   const isModifier = (id) => MODIFIERS.indexOf(id) >= 0;
 
   function countElements(runes) {
-    const counts = { fire: 0, water: 0, wind: 0, earth: 0 };
+    const counts = counts0();
     for (const r of runes) if (isElement(r.id)) counts[r.id] += 1;
     return counts;
   }
@@ -269,7 +318,7 @@
   function pickSkill(els) {
     let best = 0, bestIdx = null;
     for (let mask = 1; mask < 1 << els.length; mask++) {
-      const counts = { fire: 0, water: 0, wind: 0, earth: 0 };
+      const counts = counts0();
       const idx = [];
       for (let i = 0; i < els.length; i++) if (mask & (1 << i)) { counts[els[i].id] += 1; idx.push(i); }
       if (!isSkill(counts)) continue;
@@ -314,7 +363,8 @@
       kind: f.kind, dmg: f.dmg, cd: f.cd, dur: f.dur, size: f.size, speed: f.speed,
       count: f.count, pierce: f.pierce,
       slow: 0, burn: 0, knock: f.knock || 0, chain: 0, omni: 0, echo: 0, leech: 0,
-      splash: 0, splashBoost: 0, root: 0, rootDur: 0, freezeChance: 0,
+      splash: 0, splashBoost: 0, root: 0, rootDur: 0, freezeChance: 0, zap: 0, vuln: 0, fear: 0,
+      jumps: f.jumps || 0, length: f.length || 0, last: f.last || 0, every: f.every || 0,
       mods: {}, synergy: [], clash: [], runes: total, tier: counts[formEl],
     };
     if (form >= 2) Object.assign(s, TIERS[formEl][form]);
@@ -362,7 +412,7 @@
       key, primary: 'arcane', counts: countElements(skill), extra, recipe: true, form: recipe.tier, kind: 'harmony', parts,
       dmg: 0, cd: 0, dur: 0, size: 0, speed: 0, count: parts.length, pierce: 0,
       slow: 0, burn: 0, knock: 0, chain: 0, omni: 0, echo: 0, leech: 0,
-      splash: 0, splashBoost: 0, root: 0, rootDur: 0, freezeChance: 0,
+      splash: 0, splashBoost: 0, root: 0, rootDur: 0, freezeChance: 0, zap: 0, vuln: 0, fear: 0,
       mods: {}, synergy: [], clash: [], runes: total, tier: recipe.tier, grade: grades,
     };
     for (const p of parts) { s.dmg += p.dmg; s.cd = Math.max(s.cd, p.cd); s.dur = Math.max(s.dur, p.dur); }
@@ -385,7 +435,7 @@
     return out;
   }
 
-  // 열쇠 → 그 마법을 이루는 원소 룬. 이름으로 모은 열쇠(surge)는 그 이름의 첫 묶음을 쓴다.
+  // 열쇠 → 그 마법을 이루는 원소 룬. 이름으로 부르는 열쇠(genesis)는 그 이름의 첫 묶음을 쓴다.
   function keyRunes(key) {
     if (!/\d/.test(key)) key = Object.keys(RECIPES).find((k) => RECIPES[k].name === key);
     const out = [];

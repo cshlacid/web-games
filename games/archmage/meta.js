@@ -126,7 +126,7 @@
 
   // 수련으로 오른 능력. 장비의 것(Gear.loadout)과 같은 꼴이라 둘을 더해 판에 넘긴다.
   function training(save) {
-    const out = { dmg: 0, hp: 0, cd: 0, xp: 0, regen: 0, speed: 0, el: { fire: 0, water: 0, wind: 0, earth: 0 } };
+    const out = Gear.empty();
     const n = totalSteps(save);
     for (let k = 0; k < n; k++) {
       const stat = TRAIN_ORDER[k % TRAIN_ORDER.length];

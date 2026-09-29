@@ -84,7 +84,7 @@
       t: 0, duration: nightLength(night),
       player: { x: 0, y: 0, hp: PLAYER.hp + g.hp, maxHp: PLAYER.hp + g.hp, r: PLAYER.r, inv: 0, face: 1, leechLeft: LEECH_RATE, healed: 0 },
       input: { x: 0, y: 0 },
-      foes: [], gems: [], shots: [], orbits: [], zones: [], echoes: [],
+      foes: [], gems: [], shots: [], orbits: [], zones: [], echoes: [], beams: [],
       meteors: [], waves: [], tornados: [], quakes: [], rains: [], auras: [],
       circles: [0, 1, 2].map(() => ({ runes: [], spell: null, cd: 0, active: 0 })),
       unlocked: 1,
@@ -99,7 +99,7 @@
   }
 
   // 장비가 없을 때. 장비의 능력은 판 밖(gear.js)에서 모아 이 꼴로 넘어온다.
-  const NO_GEAR = { dmg: 0, hp: 0, cd: 0, xp: 0, regen: 0, speed: 0, el: { fire: 0, water: 0, wind: 0, earth: 0 } };
+  const NO_GEAR = { dmg: 0, hp: 0, cd: 0, xp: 0, regen: 0, speed: 0, el: {} };
 
   // 장비를 마법에 얹는다. 자리를 고를 때 보이는 수치와 실제로 나가는 것이 같아야 하므로
   // 마법을 만드는 모든 자리(새기기·미리 보기)가 이것을 거친다.
@@ -254,6 +254,7 @@
     updateQuakes(state, dt, grid);
     updateRains(state, dt, grid);
     updateAuras(state, dt, grid);
+    updateBeams(state, dt);
     contact(state, dt, grid);
     updateGems(state, dt);
     sweep(state);
@@ -291,7 +292,8 @@
       id: state.nextId++, type,
       x: p.x + Math.cos(angle) * dist, y: p.y + Math.sin(angle) * dist,
       hp, maxHp: hp, r: def.r, speed: def.speed, dmg: def.dmg * (1 + 0.5 * state.depth),
-      slowT: 0, slow: 0, burnT: 0, burn: 0, rootT: 0, rootAt: 0, splashAt: 0, kx: 0, ky: 0, flash: 0, dead: false,
+      slowT: 0, slow: 0, burnT: 0, burn: 0, rootT: 0, rootAt: 0, splashAt: 0,
+      vuln: 0, vulnT: 0, fearT: 0, curse: 0, curseT: 0, kx: 0, ky: 0, flash: 0, dead: false,
       phase: state.world() * Math.PI * 2,
     };
     state.foes.push(foe);
@@ -366,6 +368,12 @@
         damage(state, f, f.burn * dt, null);
         if (f.burnT <= 0) f.burn = 0;
       }
+      if (f.curseT > 0) {
+        f.curseT -= dt;
+        damage(state, f, f.curse * dt, null);
+        if (f.curseT <= 0) f.curse = 0;
+      }
+      if (f.vulnT > 0) { f.vulnT -= dt; if (f.vulnT <= 0) f.vuln = 0; }
       let dx = p.x - f.x;
       let dy = p.y - f.y;
       const d = Math.hypot(dx, dy) || 1;
@@ -379,6 +387,8 @@
       if (f.rootT > 0) { f.rootT -= dt; f.kx = 0; f.ky = 0; continue; }
       dx /= d; dy /= d;
       let speed = f.speed * (1 - f.slow);
+      // 공포에 질린 적은 마법사에게서 달아난다.
+      if (f.fearT > 0) { f.fearT -= dt; dx = -dx; dy = -dy; speed *= 0.8; }
       if (f.type === 'boss') {
         // 사도는 가끔 몸을 던진다. 쫓기만 하면 도는 것만으로 영영 안 닿는다.
         f.chargeCd -= dt;
@@ -494,7 +504,11 @@
       cluster: s.cluster, nova: s.nova, pulse: s.pulse, shock: s.shock,
       freeze: s.freeze, ignite: s.ignite, vortex: s.vortex, shatter: s.shatter,
       splash: s.splash, splashBoost: s.splashBoost, root: s.root, rootDur: s.rootDur, freezeChance: s.freezeChance,
+      zap: s.zap, vuln: s.vuln, fear: s.fear,
     };
+    if (s.kind === 'zap') return zapAt(state, s, common, dmg);
+    if (s.kind === 'beam') return beamAt(state, s, common, dmg);
+    if (s.kind === 'curse') return curseAt(state, s, common, dmg);
     if (s.kind === 'orbit') {
       const count = s.count + 2 * s.omni;
       state.orbits.push(Object.assign({}, common, {
@@ -533,7 +547,7 @@
       const n = s.count + 2 * s.omni;
       for (let i = 0; i < n && pool.length; i++) {
         const f = takeTarget(state, pool);
-        state.meteors.push(Object.assign({}, common, { x: f.x, y: f.y, r: s.size, delay: 0.55 + i * 0.09, total: 0.55 + i * 0.09 }));
+        state.meteors.push(Object.assign({}, common, { sub: s.sub, x: f.x, y: f.y, r: s.size, delay: 0.55 + i * 0.09, total: 0.55 + i * 0.09 }));
       }
       return true;
     }
@@ -579,6 +593,8 @@
 
   function damage(state, f, amount, src) {
     if (f.dead) return;
+    // 빛에 드러난 적은 무엇에 맞든 더 아프다.
+    if (f.vulnT > 0) amount *= 1 + f.vuln;
     const dealt = Math.min(amount, Math.max(0, f.hp));
     f.hp -= amount;
     if (src) {
@@ -605,6 +621,13 @@
         f.rootAt = state.t + hold + ROOT_GAP;
       }
       if (src.splash && state.grid && (f.splashAt || 0) <= state.t) splash(state, f, amount, src);
+      if (src.vuln) { f.vuln = Math.max(f.vuln || 0, src.vuln); f.vulnT = 2; }
+      // 공포. 사도는 겁먹지 않는다.
+      if (src.fear && f.type !== 'boss' && (f.fearAt || 0) <= state.t) {
+        f.fearT = src.fear;
+        f.fearAt = state.t + src.fear + FEAR_GAP;
+      }
+      if (src.zap && state.grid && (f.zapAt || 0) <= state.t) jolt(state, f, amount, src);
     }
     if (f.hp <= 0) kill(state, f);
   }
@@ -615,6 +638,107 @@
   const SPLASH_GAP = 0.3;
   const KNOCK_GAP = 0.6;
   const ROOT_GAP = 0.6;
+  const FEAR_GAP = 1.2;
+  const ZAP_GAP = 0.3;
+
+  // 감전: 맞은 적 곁의 한 마리에게 작은 번개가 튄다. 튄 번개는 다시 튀지 않는다.
+  function jolt(state, f, amount, src) {
+    f.zapAt = state.t + ZAP_GAP;
+    let best = null, bd = 90 * 90;
+    near(state.grid, f.x, f.y, 90, (g) => {
+      if (g === f) return;
+      const d2 = (g.x - f.x) ** 2 + (g.y - f.y) ** 2;
+      if (d2 < bd) { bd = d2; best = g; }
+    });
+    if (!best) return;
+    damage(state, best, amount * Math.min(0.9, 0.3 + 0.1 * src.zap), { leech: src.leech });
+    state.events.push({ type: 'zap', el: 'thunder', pts: [[f.x, f.y], [best.x, best.y]], small: true });
+  }
+
+  // 번개: 가장 가까운 적을 곧바로 치고, 곁의 적으로 jumps번 튄다. count만큼 따로 친다.
+  function zapAt(state, s, common, dmg) {
+    const p = state.player;
+    const taken = new Set();
+    let any = false;
+    for (let k = 0; k < s.count + s.omni * 2; k++) {
+      let t = nearest(state, p.x, p.y, RANGE, taken);
+      if (!t) break;
+      any = true;
+      const pts = [[p.x, p.y - 20]];
+      const hit = new Set();
+      for (let j = 0; j <= s.jumps && t; j++) {
+        hit.add(t); taken.add(t);
+        pts.push([t.x, t.y]);
+        damage(state, t, dmg * Math.pow(0.85, j), hitOf(common, t.x, t.y));
+        let next = null, bd = s.size * s.size;
+        for (const f of state.foes) {
+          if (f.dead || hit.has(f)) continue;
+          const d2 = (f.x - t.x) ** 2 + (f.y - t.y) ** 2;
+          if (d2 < bd) { bd = d2; next = f; }
+        }
+        t = next;
+      }
+      state.events.push({ type: 'zap', el: common.el, pts });
+    }
+    return any;
+  }
+
+  // 빛: 가장 가까운 적 쪽으로 광선을 쏜다. 광선은 마법사에게 붙어 따라오고 방향은 쏜 때 그대로다.
+  function beamAt(state, s, common, dmg) {
+    const p = state.player;
+    const t = nearest(state, p.x, p.y, RANGE);
+    if (!t) return false;
+    const base = Math.atan2(t.y - p.y, t.x - p.x);
+    const n = s.count + s.omni * 2;
+    for (let i = 0; i < n; i++) {
+      const a = s.omni ? base + (i / n) * Math.PI * 2 : base + (i - (n - 1) / 2) * 0.35;
+      state.beams.push(Object.assign({}, common, {
+        angle: a, len: s.length, w: s.size, every: s.every, tick: 0, life: s.last, total: s.last,
+      }));
+    }
+    return true;
+  }
+
+  function updateBeams(state, dt) {
+    const p = state.player;
+    for (const b of state.beams) {
+      b.life -= dt;
+      b.tick -= dt;
+      if (b.tick > 0) continue;
+      b.tick = b.every;
+      const ux = Math.cos(b.angle), uy = Math.sin(b.angle);
+      const src = hitOf(b, p.x, p.y);
+      for (const f of state.foes) {
+        if (f.dead) continue;
+        const rx = f.x - p.x, ry = f.y - p.y;
+        const along = rx * ux + ry * uy;
+        if (along < 0 || along > b.len) continue;
+        if (Math.abs(-rx * uy + ry * ux) > b.w + f.r) continue;
+        damage(state, f, b.dmg, src);
+      }
+    }
+    state.beams = state.beams.filter((b) => b.life > 0);
+  }
+
+  // 어둠: 가까운 적 몇에게 저주를 건다. 저주받지 않은 적을 먼저 고른다 — 같은 적에게만
+  // 겹쳐 걸면 저주가 퍼지지 않는다. 이미 걸린 적에게 다시 걸면 세기가 쌓인다(세 배까지).
+  function curseAt(state, s, common, dmg) {
+    const p = state.player;
+    const pool = state.foes.filter((f) => !f.dead && Math.hypot(f.x - p.x, f.y - p.y) < RANGE);
+    if (!pool.length) return false;
+    const dist = (f) => Math.hypot(f.x - p.x, f.y - p.y) + (f.curseT > 0 ? 1e4 : 0);
+    pool.sort((a, b) => dist(a) - dist(b));
+    const n = s.count + s.omni * 2;
+    for (let i = 0; i < n && i < pool.length; i++) {
+      const f = pool[i];
+      f.curse = f.curseT > 0 ? Math.min(dmg * 3, (f.curse || 0) + dmg * 0.5) : dmg;
+      f.curseT = Math.max(f.curseT || 0, s.last);
+      damage(state, f, dmg * 0.5, hitOf(common, p.x, p.y));
+      state.events.push({ type: 'curse', el: common.el, x: f.x, y: f.y });
+    }
+    return true;
+  }
+
   function splash(state, f, amount, src) {
     f.splashAt = state.t + SPLASH_GAP;
     const r = 22 + 6 * (src.splash + (src.splashBoost || 0));
@@ -628,7 +752,8 @@
   function hitOf(e, fromX, fromY) {
     return {
       slow: e.slow, burn: e.burn, knock: e.knock, leech: e.leech, freeze: e.freeze, freezeChance: e.freezeChance,
-      splash: e.splash, splashBoost: e.splashBoost, root: e.root, rootDur: e.rootDur, fromX, fromY,
+      splash: e.splash, splashBoost: e.splashBoost, root: e.root, rootDur: e.rootDur,
+      zap: e.zap, vuln: e.vuln, fear: e.fear, fromX, fromY,
     };
   }
 
@@ -644,6 +769,19 @@
   function kill(state, f) {
     f.dead = true;
     state.kills += 1;
+    // 저주받은 적이 죽으면 남은 저주가 곁의 적에게 옮겨 간다.
+    if (f.curseT > 0) {
+      let best = null, bd = 140 * 140;
+      for (const g of state.foes) {
+        if (g.dead || g.curseT > 0) continue;
+        const d2 = (g.x - f.x) ** 2 + (g.y - f.y) ** 2;
+        if (d2 < bd) { bd = d2; best = g; }
+      }
+      if (best) {
+        best.curse = f.curse; best.curseT = Math.max(1, f.curseT);
+        state.events.push({ type: 'curse', el: 'dark', x: best.x, y: best.y });
+      }
+    }
     const xp = FOES[f.type].xp;
     if (xp) {
       if (state.gems.length < MAX_GEMS) state.gems.push({ x: f.x, y: f.y, v: xp, pull: false });

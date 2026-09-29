@@ -517,3 +517,10 @@ button.socket.filled:disabled { opacity: 0.55; }
   box-shadow: 0 0 0 1px var(--line-strong), 0 0 10px rgba(185, 155, 255, 0.6);
 }
 .train-dot.next { color: var(--arcane); box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.9), 0 0 0 1.5px var(--arcane), 0 0 8px rgba(185, 155, 255, 0.45); }
+
+/* 구멍의 종류: 원소는 원, 수식어는 마름모, 아무것이나는 금테를 한 겹 더 두른 원.
+   모양만으로 무엇을 넣을 수 있는지 읽혀야 한다. */
+.socket > i { display: grid; place-items: center; font-style: normal; }
+.socket.t-M { border-radius: 5px; transform: rotate(45deg) scale(0.84); }
+.socket.t-M > i, .socket.t-M .grade { transform: rotate(-45deg); }
+.socket.t-F { outline: 1px solid rgba(230, 192, 103, 0.6); outline-offset: 2px; }

@@ -89,24 +89,18 @@
   const nightName = (n) => (n <= 9 ? T('am.night' + n) : T('am.nightN', { n }));
   const known = (key) => !!save.grimoire[key] || (mode === 'run' && state.formed.has(key)) || seenThisRun.has(key);
 
-  function runesFromKey(key) {
-    const out = [];
-    for (const part of key.split('-')) {
-      const m = /^([a-z]+)(\d+)$/.exec(part);
-      for (let i = 0; i < Number(m[2]); i++) out.push({ id: m[1], grade: 0 });
-    }
-    return out;
-  }
-
   // 마법진의 룬 구멍. 서클 수만큼 파 두고 새긴 룬을 끼운다 — 칸이 보이지 않으면
   // 서클이 무엇을 정하는지, 왜 더 못 넣는지 알아볼 길이 없다.
+  // 구멍의 모양이 받는 룬을 알린다: 원소는 원, 수식어는 마름모, 아무것이나는 금테 원.
+  const socketType = (i) => ' t-' + Runes.SOCKETS[i];
+  const runeAt = (runes, i) => runes.find((r) => r.slot === i);
   function sockets(runes, cap, mark) {
     let out = '<span class="sockets">';
     for (let i = 0; i < cap; i++) {
-      const r = runes[i];
-      if (!r) { out += '<span class="socket"></span>'; continue; }
+      const r = runeAt(runes, i);
+      if (!r) { out += '<span class="socket' + socketType(i) + '"></span>'; continue; }
       const g = r.grade ? '<span class="grade">+' + r.grade + '</span>' : '';
-      out += '<span class="socket filled' + (mark === i ? ' new' : '') + '" style="--c:' + I.colorOf(r.id) + '">' + I.svg(r.id) + g + '</span>';
+      out += '<span class="socket filled' + socketType(i) + (mark === i ? ' new' : '') + '" style="--c:' + I.colorOf(r.id) + '"><i>' + I.svg(r.id) + '</i>' + g + '</span>';
     }
     return out + '</span>';
   }
@@ -332,6 +326,11 @@
         if (ev.screen) fx.push({ kind: 'flash', el: 'earth', t: 0, life: 0.35 });
         shake = Math.max(shake, 4);
         sound('cast', 'earth', 120);
+      } else if (ev.type === 'zap') {
+        if (fx.length < 300) fx.push({ kind: 'zap', pts: ev.pts, small: ev.small, el: ev.el, t: 0, life: ev.small ? 0.14 : 0.22, seed: Math.random() * 1000 });
+        if (!ev.small) sound('hit', null, 60);
+      } else if (ev.type === 'curse') {
+        if (fx.length < 300) fx.push({ kind: 'ring', x: ev.x, y: ev.y, r: 16, el: 'dark', t: 0, life: 0.35 });
       } else if (ev.type === 'splash') {
         if (fx.length < 300) fx.push({ kind: 'ring', x: ev.x, y: ev.y, r: ev.r, el: 'fire', t: 0, life: 0.25 });
       } else if (ev.type === 'kill') {
@@ -442,6 +441,7 @@
     for (const sh of state.shots) { drawShot(sh); light(sh.x, sh.y, sh.kind === 'bolt' ? 46 : 34); }
     for (const w of state.waves) { drawWave(w); light(w.x, w.y, w.w * 1.6); }
     for (const t of state.tornados) { drawTornado(t); light(t.x, t.y, t.r * 2); }
+    for (const b of state.beams) drawBeam(b, p);
     for (const m of state.meteors) drawMeteor(m);
     for (const f of fx) drawFx(f, p);
     ctx.globalCompositeOperation = 'source-over';
@@ -642,7 +642,7 @@
     }
     ctx.stroke();
     // 고리 위를 도는 룬 문양
-    const ids = ['fire', 'water', 'wind', 'earth', 'chain', 'frost', 'heat', 'gravity', 'gale'];
+    const ids = ['fire', 'water', 'wind', 'earth', 'thunder', 'light', 'dark', 'frost', 'gravity'];
     const n = Math.min(ids.length, 3 + rings);
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2 - clock * 0.3;
@@ -721,6 +721,20 @@
         ctx.strokeStyle = 'rgba(140,210,255,0.55)'; ctx.lineWidth = 1.4;
         ctx.beginPath(); ctx.ellipse(f.x, f.y + f.r * 0.55, f.r * 0.9, f.r * 0.32, 0, 0, Math.PI * 2); ctx.stroke();
       }
+    }
+    // 저주받은 적: 몸에서 검붉은 기운이 피어오른다.
+    if (f.curseT > 0) {
+      ctx.globalCompositeOperation = 'lighter';
+      const u = (clock * 1.2 + f.phase) % 1;
+      ctx.globalAlpha = 0.7 * (1 - u);
+      glowAt('dark', f.x + Math.sin(f.phase * 5) * f.r * 0.4, f.y - f.r * 0.3 - u * 14, 14 * (1 - u) + 6);
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+    }
+    // 빛에 드러난 적: 발밑에 빛의 표식.
+    if (f.vulnT > 0) {
+      ctx.strokeStyle = hexA(I.colorOf('light'), 0.8); ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.ellipse(f.x, f.y + f.r * 0.55, f.r * 0.8, f.r * 0.3, 0, 0, Math.PI * 2); ctx.stroke();
     }
     // 발이 묶인 적: 발밑에 흙이 솟아 둘러싼다.
     if (f.rootT > 0) {
@@ -1025,6 +1039,24 @@
     ctx.globalAlpha = 1;
   }
 
+  // 광선: 마법사에게서 뻗는 빛의 띠. 가장자리는 제 빛깔, 심지는 희다.
+  function drawBeam(b, p) {
+    const fade = Math.min(1, b.life / 0.2, (b.total - b.life) / 0.08 + 0.3);
+    const x1 = p.x + Math.cos(b.angle) * b.len, y1 = p.y + Math.sin(b.angle) * b.len;
+    const color = I.colorOf(b.el);
+    ctx.globalAlpha = fade;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = hexA(color, 0.35); ctx.lineWidth = b.w * 2.6;
+    ctx.beginPath(); ctx.moveTo(p.x, p.y - 14); ctx.lineTo(x1, y1); ctx.stroke();
+    ctx.strokeStyle = hexA(color, 0.85); ctx.lineWidth = b.w;
+    ctx.stroke();
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = b.w * 0.35;
+    ctx.stroke();
+    glowAt(b.el, x1, y1, b.w * 5);
+    ctx.globalAlpha = 1;
+    for (let k = 1; k <= 4; k++) light(p.x + Math.cos(b.angle) * b.len * k / 4, p.y + Math.sin(b.angle) * b.len * k / 4, 40);
+  }
+
   function drawTornado(t) {
     const fade = Math.min(1, t.life / 0.3, (t.total - t.life) / 0.2 + 0.2);
     ctx.globalAlpha = fade;
@@ -1104,6 +1136,29 @@
       glowAt(f.el, f.x, f.y, f.r * 2.6);
       ctx.globalAlpha = 1;
       light(f.x, f.y, f.r * 2);
+    } else if (f.kind === 'zap') {
+      // 번개: 과녁을 잇는 꺾인 줄. 굵은 빛줄기 위에 흰 심지.
+      ctx.globalAlpha = 1 - t;
+      const rand = S.rng(f.seed | 0);
+      const path = () => {
+        ctx.beginPath();
+        ctx.moveTo(f.pts[0][0], f.pts[0][1]);
+        for (let i = 1; i < f.pts.length; i++) {
+          const [ax, ay] = f.pts[i - 1], [bx, by] = f.pts[i];
+          for (let k = 1; k <= 3; k++) {
+            const u = k / 4;
+            ctx.lineTo(ax + (bx - ax) * u + (rand() - 0.5) * 12, ay + (by - ay) * u + (rand() - 0.5) * 12);
+          }
+          ctx.lineTo(bx, by);
+        }
+      };
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = hexA(I.colorOf(f.el), 0.55); ctx.lineWidth = f.small ? 3 : 6; path(); ctx.stroke();
+      ctx.strokeStyle = '#fffbe8'; ctx.lineWidth = f.small ? 1 : 2; path(); ctx.stroke();
+      const last = f.pts[f.pts.length - 1];
+      glowAt(f.el, last[0], last[1], f.small ? 16 : 30);
+      ctx.globalAlpha = 1;
+      light(last[0], last[1], 60);
     } else if (f.kind === 'levelup') {
       // 레벨업: 발밑에서 금빛 기둥이 솟고 고리가 퍼진다.
       ctx.globalAlpha = 1 - t;
@@ -1392,10 +1447,10 @@
 
   function actionFor(opt, ci, slot) {
     if (ci >= state.unlocked) return null;
-    const r = state.circles[ci].runes[slot];
+    const r = runeAt(state.circles[ci].runes, slot);
     if (opt.type === 'erase') return r ? { kind: 'erase', target: { ci, slot } } : null;
-    // 빈 구멍은 첫째만 누를 수 있다. 룬 묶음은 순서를 따지지 않아 늘 앞부터 채워진다.
-    if (!r) return slot === state.circles[ci].runes.length && S.placeModes(state, opt.id, ci).includes('add') ? { kind: 'add', target: { ci, mode: 'add' } } : null;
+    // 빈 구멍은 그 룬을 받는 것만 누를 수 있다(원소·수식어·아무것이나).
+    if (!r) return S.openSlots(state, ci, opt.id).includes(slot) ? { kind: 'add', target: { ci, mode: 'add', slot } } : null;
     if (r.id === opt.id) return { kind: 'grade', target: { ci, mode: 'grade', slot } };
     return null;
   }
@@ -1411,21 +1466,21 @@
   }
 
   function socketButton(opt, ci, slot) {
-    const r = state.circles[ci].runes[slot];
+    const r = runeAt(state.circles[ci].runes, slot);
     const act = actionFor(opt, ci, slot);
     const sel = picked && picked.ci === ci && picked.slot === slot;
-    let cls = 'socket' + (act ? ' can' : '');
+    let cls = 'socket' + socketType(slot) + (act ? ' can' : '');
     let color = r ? r.id : null;
     let inner = '';
     if (r) {
       cls += ' filled';
       const g = r.grade + (sel && act.kind === 'grade' ? 1 : 0);
-      inner = I.svg(r.id) + (g ? '<span class="grade">+' + g + '</span>' : '');
+      inner = '<i>' + I.svg(r.id) + '</i>' + (g ? '<span class="grade">+' + g + '</span>' : '');
       if (sel && act.kind === 'erase') cls += ' removing';
     } else if (sel) {
       cls += ' filled ghost';
       color = opt.id;
-      inner = I.svg(opt.id);
+      inner = '<i>' + I.svg(opt.id) + '</i>';
     }
     if (sel) cls += ' new';
     return '<button type="button" class="' + cls + '"' + (color ? ' style="--c:' + I.colorOf(color) + '"' : '') +
@@ -1492,7 +1547,7 @@
   // --- 마법진 셋 ---
   let slotSig = '';
   function renderSlots() {
-    const sig = state.unlocked + '|' + state.circles.map((c) => c.runes.map((r) => r.id + r.grade).join(',')).join('|') + '|' + mode;
+    const sig = state.unlocked + '|' + state.circles.map((c) => c.runes.map((r) => r.id + r.grade + '@' + r.slot).join(',')).join('|') + '|' + mode;
     if (sig === slotSig) return;
     slotSig = sig;
     el.slots.innerHTML = state.circles.map((c, ci) => {
@@ -1701,7 +1756,7 @@
     const keys = Runes.allKeys(save.circle).filter((key) => save.grimoire[key]);
     const list = keys.length
       ? keys.map((key) => {
-        const runes = runesFromKey(key);
+        const runes = Runes.keyRunes(key);
         const tag = Runes.isSpecial(key) ? ' <span class="tag">' + T('am.special') + '</span>' : '';
         return '<li>' + glyphs(runes) + ' ' + spellName(Runes.compose(runes)) + tag + '</li>';
       }).join('')
