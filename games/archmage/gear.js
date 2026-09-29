@@ -7,7 +7,9 @@
 // 두 번째 성장이다.
 (function () {
   const SLOTS = ['staff', 'robe', 'ring', 'amulet', 'belt', 'boots'];
-  const ELEMENTS = ['fire', 'water', 'wind', 'earth'];
+  // 지팡이에 붙는 원소. 룬의 원소와 같다(runes.js의 ELEMENTS).
+  const ELEMENTS = ['fire', 'water', 'wind', 'earth', 'thunder', 'light', 'dark'];
+  const elZero = () => { const o = {}; for (const e of ELEMENTS) o[e] = 0; return o; };
   // 등급은 0(일반)부터 4(전설)까지. 등급이 높을수록 기본값도, 올릴 수 있는 레벨도 크다.
   const RARITIES = 5;
   const MAX_LEVEL = [10, 20, 30, 40, 50];
@@ -147,7 +149,7 @@
 
   // 끼고 있는 장비의 능력을 모은다. 판(sim.js)은 이것만 받는다.
   function loadout(save) {
-    const out = { dmg: 0, hp: 0, cd: 0, xp: 0, regen: 0, speed: 0, el: { fire: 0, water: 0, wind: 0, earth: 0 } };
+    const out = { dmg: 0, hp: 0, cd: 0, xp: 0, regen: 0, speed: 0, el: elZero() };
     for (const slot of SLOTS) {
       const item = equippedIn(save, slot);
       if (!item) continue;
@@ -158,7 +160,7 @@
     return out;
   }
 
-  const empty = () => ({ dmg: 0, hp: 0, cd: 0, xp: 0, regen: 0, speed: 0, el: { fire: 0, water: 0, wind: 0, earth: 0 } });
+  const empty = () => ({ dmg: 0, hp: 0, cd: 0, xp: 0, regen: 0, speed: 0, el: elZero() });
 
   const api = {
     SLOTS, RARITIES, MAX_LEVEL, STATS, CHESTS,

@@ -44,7 +44,7 @@ check('열쇠는 원소 차례로 적는다', R.compose(rs('earth', 'fire')).key
   check('바람 셋은 토네이도', R.compose(rs('wind', 'wind', 'wind')).kind, 'tornado');
   check('땅 셋은 지진', R.compose(rs('earth', 'earth', 'earth')).kind, 'quake');
   check('섞으면 단계는 주원소의 수', R.compose(rs('fire', 'fire', 'wind')).tier, 2);
-  check('넷째부터는 형태는 그대로 피해만 는다', R.compose(rs('fire', 'fire', 'fire', 'fire')).dmg > R.compose(rs('fire', 'fire', 'fire')).dmg, true);
+  check('여섯은 다섯의 형태에 피해만 는다', [R.compose(rs('fire', 'fire', 'fire', 'fire', 'fire', 'fire')).kind, R.compose(rs('fire', 'fire', 'fire', 'fire', 'fire', 'fire')).dmg > R.compose(rs('fire', 'fire', 'fire', 'fire', 'fire')).dmg], [R.compose(rs('fire', 'fire', 'fire', 'fire', 'fire')).kind, true]);
   check('불을 겹쳐도 관통은 붙지 않는다', R.compose([{ id: 'fire', grade: 3 }]).pierce, 0);
   check('불을 강화하면 폭발이 커진다', R.compose([{ id: 'fire', grade: 1 }]).size > one.size, true);
   check('단계가 오르면 강해진다', two.dmg > one.dmg * 1.5, true);
@@ -84,53 +84,59 @@ check('열쇠는 원소 차례로 적는다', R.compose(rs('earth', 'fire')).key
   check('질풍: 땅에는 약화', at('earth', 'gale').dmg < at('earth').dmg, true);
   check('공명: 한 원소만이면 세진다', at('fire', 'fire', 'resonance').dmg > at('fire', 'fire').dmg, true);
   check('공명: 섞이면 아무 일도 없다', [at('fire', 'fire', 'water', 'resonance').dmg, at('fire', 'fire', 'water', 'resonance').clash], [at('fire', 'fire', 'water').dmg, ['resonance']]);
-  check('원소의 조화는 넷이 제각각 상성을 받는다', at('fire', 'water', 'wind', 'earth', 'frost').parts.map((p) => p.clash.length + p.synergy.length), [1, 1, 0, 0]);
+  check('궁극기는 일곱이 제각각 상성을 받는다', at(...R.ELEMENTS, 'frost').parts.map((p) => p.clash.length + p.synergy.length), [1, 1, 0, 0, 0, 0, 0]);
 }
 
-// --- 9서클까지의 단계와 특수 조합 ---
+// --- 단계와 특수 조합 ---
 {
   const n = (el, k) => { const a = []; for (let i = 0; i < k; i++) a.push({ id: el, grade: 0 }); return a; };
-  check('단계가 바뀌는 자리', [1, 2, 3, 4, 5, 6, 7, 8, 9].map(R.formTierOf), [1, 2, 3, 3, 5, 5, 7, 7, 9]);
-  check('불 다섯은 유성우', R.compose(n('fire', 5)).kind, 'rain');
-  check('물 일곱은 대해일', [R.compose(n('water', 7)).kind, !!R.compose(n('water', 7)).ring], ['wave', true]);
-  check('바람 일곱은 태풍의 눈', R.compose(n('wind', 7)).kind, 'aura');
-  check('땅 아홉은 화면 전체', !!R.compose(n('earth', 9)).screen, true);
-  check('특수 조합은 서른여덟', Object.keys(R.RECIPES).length, 38);
+  check('원소는 일곱', R.ELEMENTS.length, 7);
+  check('구멍 배치', R.SOCKETS.join(''), 'EFMEFMEFF');
+  check('서클별 원소 칸', [1, 2, 3, 4, 5, 6, 7, 8, 9].map(R.maxElements), [1, 2, 2, 3, 4, 4, 5, 6, 7]);
+  check('구멍은 룬을 가린다', [R.fits('E', 'fire'), R.fits('E', 'chain'), R.fits('M', 'fire'), R.fits('M', 'chain'), R.fits('F', 'fire'), R.fits('F', 'chain')], [true, false, false, true, true, true]);
+  check('단계가 바뀌는 자리', [1, 2, 3, 4, 5, 6, 7].map(R.formTierOf), [1, 2, 3, 4, 5, 5, 7]);
+  check('불 넷은 유성우', R.compose(n('fire', 4)).kind, 'rain');
+  check('물 다섯은 대해일', [R.compose(n('water', 5)).kind, !!R.compose(n('water', 5)).ring], ['wave', true]);
+  check('바람 넷은 회오리 떼', [R.compose(n('wind', 4)).kind, R.compose(n('wind', 4)).count >= 4], ['tornado', true]);
+  check('땅 일곱은 화면 전체', !!R.compose(n('earth', 7)).screen, true);
+  check('번개는 곧바로 튄다', [R.compose(n('thunder', 1)).kind, R.compose(n('thunder', 1)).jumps], ['zap', 2]);
+  check('번개 넷은 뇌우', [R.compose(n('thunder', 4)).kind, R.compose(n('thunder', 4)).sub], ['rain', 'bolt']);
+  check('빛은 광선', R.compose(n('light', 1)).kind, 'beam');
+  check('빛 둘은 두 갈래', R.compose(n('light', 2)).count, 2);
+  check('어둠은 저주', R.compose(n('dark', 1)).kind, 'curse');
+  check('일곱 원소 모두 7단계가 화면 전체', R.ELEMENTS.map((el) => !!R.compose(n(el, 7)).screen), R.ELEMENTS.map(() => true));
+  check('특수 조합: 두 원소 21쌍×2 + 옛 여섯 쌍 3:3 + 세 원소 넷×2 + 궁극기', Object.keys(R.RECIPES).length, 21 * 2 + 6 + 8 + 1);
   const steam = R.compose(rs('fire', 'water'));
   check('불+물은 특수 조합(얼리는 화염구)', [steam.recipe, steam.kind, !!steam.freeze], [true, 'bolt', true]);
+  check('새 원소가 든 쌍은 새 원소가 형태를 정한다', [R.compose(rs('fire', 'thunder')).kind, R.compose(rs('light', 'dark')).kind], ['zap', 'curse']);
   check('특수 조합은 접목이 붙는다', !!R.compose(rs('fire', 'wind')).ignite, true);
   check('조합을 벗어나면 규칙으로 돌아간다', R.compose(rs('fire', 'fire', 'water')).recipe, false);
   check('특수 조합은 어느 원소를 강화해도 강해진다', R.compose([{ id: 'fire', grade: 3 }, { id: 'earth', grade: 0 }]).dmg > R.compose(rs('fire', 'earth')).dmg, true);
   check('수식어는 특수 조합을 깨지 않는다', R.compose(rs('fire', 'water', 'chain')).recipe, true);
+  const ult = R.compose(R.ELEMENTS.map((id) => ({ id, grade: 0 })));
+  check('일곱 원소를 하나씩 모으면 궁극기', [ult.key, ult.kind, ult.parts.length], ['genesis', 'harmony', 7]);
+  check('궁극기는 9서클에서만', [R.allKeys(8).includes('genesis'), R.allKeys(9).includes('genesis')], [false, true]);
   let bad = 0;
   for (const key of Object.keys(R.RECIPES)) {
-    const runes = [];
-    for (const part of key.split('-')) {
-      const m = /^([a-z]+)(\d+)$/.exec(part);
-      for (let i = 0; i < Number(m[2]); i++) runes.push({ id: m[1], grade: 0 });
-    }
-    if (runes.length > 9 || !R.compose(runes).recipe) bad++;
+    const runes = R.keyRunes(key);
+    if (runes.length > 7 || !R.compose(runes).recipe) bad++;
   }
-  check('모든 특수 조합이 9서클 안에서 만들어진다', bad, 0);
+  check('모든 특수 조합이 원소 칸 일곱 안에서 만들어진다', bad, 0);
 }
 
-// --- 모든 조합이 정의되는지 ---
+// --- 모든 마법이 정의되는지 ---
 {
   let bad = 0;
   for (let circle = 1; circle <= 9; circle++) {
     for (const key of R.allKeys(circle)) {
-      const runes = [];
-      for (const part of key.split('-')) {
-        const m = /^([a-z]+)(\d+)$/.exec(part);
-        for (let i = 0; i < Number(m[2]); i++) runes.push({ id: m[1], grade: 0 });
-      }
-      const s = R.compose(runes);
-      const finite = ['dmg', 'cd', 'dur', 'size', 'count'].every((k) => Number.isFinite(s[k]) && s[k] >= 0);
+      const s = R.compose(R.keyRunes(key));
+      const parts = s.parts || [s];
+      const finite = parts.every((p) => ['dmg', 'cd', 'dur', 'size', 'count'].every((k) => Number.isFinite(p[k]) && p[k] >= 0));
       if (!s || s.key !== key || !finite || s.cd < 0.25) bad++;
     }
   }
   check('1~9서클의 모든 마법이 정의된다', bad, 0);
-  check('서클별 마법 수(한 원소만 + 특수 조합)', [1, 2, 3, 9].map((c) => R.allKeys(c).length), [4, 14, 22, 74]);
+  check('서클별 마법 수(한 원소만 + 특수 조합)', [1, 2, 4, 9].map((c) => R.allKeys(c).length), [7, 35, 46, 106]);
 }
 
 // 원소 룬을 아무렇게나 새겨도 늘 마법이 된다(원소가 하나라도 있으면).
@@ -147,21 +153,6 @@ check('열쇠는 원소 차례로 적는다', R.compose(rs('earth', 'fire')).key
     if (s && !['dmg', 'cd', 'size'].every((k) => Number.isFinite(s[k]))) bad++;
   }
   check('아무 묶음이나 마법이 되거나 원소가 없어 시전하지 않는다', bad, 0);
-}
-
-// 3서클에서 룬 셋을 모두 쓰는 마법으로 기본 형태와 3단계가 모두 나온다.
-{
-  const keys = R.allKeys(3).filter((k) => k.split('-').reduce((n, p) => n + Number(p.replace(/\D/g, '')), 0) === 3);
-  const kinds = new Set();
-  for (const key of keys) {
-    const runes = [];
-    for (const part of key.split('-')) {
-      const m = /^([a-z]+)(\d+)$/.exec(part);
-      for (let i = 0; i < Number(m[2]); i++) runes.push({ id: m[1], grade: 0 });
-    }
-    kinds.add(R.compose(runes).kind);
-  }
-  check('3서클 룬 셋의 마법', [...kinds].sort(), ['meteor', 'quake', 'tornado', 'wave']);
 }
 
 console.log(`${passed}개 통과, ${failed}개 실패`);
