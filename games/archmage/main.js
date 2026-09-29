@@ -1793,19 +1793,100 @@
     return html(['<p class="label">', T('am.tab.shop'), '</p>', chests, '<p class="sheet-note small">', T('shop.note'), '</p>']);
   }
 
+  // --- 마도서 ---
+  // 원소 마법(한 원소만의 마법)과 특수 조합을 나눠 보이고 원소로 거른다. 누르면 그 마법의
+  // 성능과 수치·효과를 펼친다. 성능은 실제로 10초 동안 넣은 초당 피해다(sim.js의 benchmark) —
+  // 번지는 것·쏟아지는 것·도는 것은 피해 수치만으로는 견줄 수 없다. 마법 하나에 수십 ms라
+  // 누를 때 재고 기억해 둔다. 목록 전체를 미리 재면 탭이 열리는 데 1.5초가 걸린다.
+  let bookEl = 'all';
+  let bookCircle = 0;
+  let bookSel = null;
+  const benchCache = {};
+  // 막대의 끝. 9서클까지 발견할 수 있는 마법 가운데 가장 센 값쯤이고, 값의 폭이 수백 배라
+  // 로그로 잰다 — 곧게 재면 1·2단계 마법의 막대가 모두 바닥에 붙는다.
+  const PERF_MAX = { single: 1500, crowd: 22000 };
+  const isRecipeKey = (key) => key === 'genesis' || !!Runes.RECIPES[key];
+  // 서클 필터는 그 서클에서 **새로 열리는** 마법이다. 원소 칸이 늘지 않는 서클(3·6)은 새로
+  // 열리는 것이 없어 고를 칸을 두지 않는다.
+  const openedAt = (key) => {
+    const n = Runes.keyRunes(key).length;
+    for (let c = 1; c <= 9; c++) if (Runes.maxElements(c) >= n) return c;
+    return 9;
+  };
+
+  function bench(key) {
+    if (!benchCache[key]) {
+      const runes = Runes.keyRunes(key);
+      benchCache[key] = { single: S.benchmark(runes, 'single'), crowd: S.benchmark(runes, 'crowd') };
+    }
+    return benchCache[key];
+  }
+
+  function meter(label, v, max) {
+    const w = Math.max(3, Math.min(100, (Math.log(1 + v) / Math.log(1 + max)) * 100));
+    return '<div class="meter"><span>' + label + '</span><i><b style="width:' + w.toFixed(0) + '%"></b></i><em>' + Math.round(v) + '</em></div>';
+  }
+
+  // 수치 줄(statsDiff)에 나오지 않는 성질. 이름만 보고는 알 수 없는 것들이다.
+  function effectsOf(s) {
+    const out = [];
+    const add = (k, n) => out.push('<span class="fx">' + T('fx.' + k, { n }) + '</span>');
+    for (const k of ['cluster', 'nova', 'pulse', 'shock', 'ring', 'pull', 'vortex', 'ignite', 'freeze', 'shatter']) if (s[k]) add(k);
+    if (s.burn) add('burn', Math.round(s.burn));
+    if (s.pierce) add('pierce', s.pierce);
+    if (s.jumps) add('jumps', s.jumps);
+    if (s.zap) add('zap', s.zap);
+    if (s.vuln) add('vuln', Math.round(s.vuln * 100));
+    if (s.fear) add('fear', s.fear.toFixed(1));
+    if (Runes.isSpecialElement(s.primary)) add('undead-' + s.primary);
+    return out.join('');
+  }
+
+  function bookDetail(key, spell) {
+    const b = bench(key);
+    let body;
+    if (spell.kind === 'harmony') {
+      body = '<p class="book-stats">' + T('book.parts') + ' ' + spell.parts.map((p) => '<span style="color:' + I.colorOf(p.primary) + '">' + spellName(p) + '</span>').join(' · ') + '</p>';
+    } else {
+      const fx = effectsOf(spell);
+      body = '<p class="book-stats">' + statsDiff(null, spell) + '</p>' + (fx ? '<p class="book-fx">' + fx + '</p>' : '');
+    }
+    return '<div class="book-detail"><p class="book-kind">' + T('kind.' + spell.kind) + (spell.screen ? ' · ' + T('kind.screen') : '') + '</p>' +
+      '<div class="book-perf">' + meter(T('book.single'), b.single, PERF_MAX.single) + meter(T('book.crowd'), b.crowd, PERF_MAX.crowd) + '</div>' +
+      body + '<p class="sheet-note small">' + T('book.benchNote') + '</p></div>';
+  }
+
+  function bookRow(key) {
+    const runes = Runes.keyRunes(key);
+    const spell = Runes.compose(runes);
+    const open = bookSel === key;
+    return '<li' + (open ? ' class="open"' : '') + ' style="--c:' + I.colorOf(spell.primary) + '"><button type="button" class="book-row" data-book-key="' + key + '" aria-expanded="' + open + '">' +
+      glyphs(runes) + '<span class="book-name">' + spellName(spell) + '</span></button>' + (open ? bookDetail(key, spell) : '') + '</li>';
+  }
+
+  function bookSection(title, keys) {
+    const found = keys.filter((k) => save.grimoire[k]);
+    const missing = keys.length - found.length;
+    return '<p class="label">' + title + ' <b class="count">' + found.length + ' / ' + keys.length + '</b></p>' +
+      (found.length ? '<ul class="grimoire-list">' + found.map(bookRow).join('') + '</ul>' : '') +
+      (missing ? '<p class="sheet-note small">' + T('book.missing', { n: missing }) + '</p>' : '');
+  }
+
   function renderBookTab() {
     const g = M.grimoireCount(save, save.circle);
-    const keys = Runes.allKeys(save.circle).filter((key) => save.grimoire[key]);
-    const list = keys.length
-      ? keys.map((key) => {
-        const runes = Runes.keyRunes(key);
-        const tag = Runes.isSpecial(key) ? ' <span class="tag">' + T('am.special') + '</span>' : '';
-        return '<li>' + glyphs(runes) + ' ' + spellName(Runes.compose(runes)) + tag + '</li>';
-      }).join('')
-      : '<li class="sheet-note">' + T('am.grimoireNone') + '</li>';
+    const all = Runes.allKeys(save.circle);
+    const keys = all.filter((k) => (bookEl === 'all' || Runes.keyRunes(k).some((r) => r.id === bookEl)) && (!bookCircle || openedAt(k) === bookCircle));
+    const chips = ['all'].concat(ELEMENTS).map((el) => '<button type="button" class="book-chip" data-book-el="' + el + '" aria-pressed="' + (bookEl === el) + '"' +
+      (el === 'all' ? '>' + T('book.all') : ' style="--c:' + I.colorOf(el) + '" aria-label="' + T('rune.' + el) + '">' + I.svg(el)) + '</button>').join('');
+    const circles = [0].concat(Array.from(new Set(all.map(openedAt))).sort((a, b) => a - b));
+    const circleChips = circles.map((c) => '<button type="button" class="book-chip" data-book-circle="' + c + '" aria-pressed="' + (bookCircle === c) + '">' +
+      (c ? T('book.circle', { n: c }) : T('book.allCircles')) + '</button>').join('');
     return html([
-      '<p class="label">', T('am.grimoire'), ' <b class="count">', T('am.grimoireCount', g), ' · ',
-      T('am.specialCount', { found: g.specialFound, total: g.special }), '</b></p><ul class="grimoire-list">', list, '</ul>',
+      '<p class="label">', T('am.grimoire'), ' <b class="count">', T('am.grimoireCount', g), '</b></p>',
+      '<div class="book-chips">', chips, '</div>',
+      '<div class="book-chips">', circleChips, '</div>',
+      bookSection(T('book.plain'), keys.filter((k) => !isRecipeKey(k))),
+      bookSection(T('book.recipes'), keys.filter(isRecipeKey)),
     ]);
   }
 
@@ -1860,6 +1941,17 @@
     if (b.dataset.night) { night = Number(b.dataset.night); Sound.play('click'); renderLobby(); return; }
     if (b.dataset.uid) { openItem = Number(b.dataset.uid); lastDrop = null; Sound.play('click'); renderItem(); return; }
     if (b.dataset.slot) { tab = 'bag'; Sound.play('click'); renderLobby(); return; }
+    if (b.dataset.bookEl || b.dataset.bookCircle || b.dataset.bookKey) {
+      if (b.dataset.bookEl) { bookEl = b.dataset.bookEl; bookSel = null; }
+      else if (b.dataset.bookCircle) { bookCircle = Number(b.dataset.bookCircle); bookSel = null; }
+      else bookSel = bookSel === b.dataset.bookKey ? null : b.dataset.bookKey;
+      Sound.play('click');
+      // 펼칠 때마다 맨 위로 튀면 아래쪽 마법을 볼 수 없다.
+      const top = el.lobbyBody.scrollTop;
+      el.lobbyBody.innerHTML = TABS[tab]();
+      el.lobbyBody.scrollTop = top;
+      return;
+    }
     if (b.dataset.chest) {
       const got = G.openChest(save, b.dataset.chest, Math.random);
       if (!got) return;
