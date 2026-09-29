@@ -539,7 +539,7 @@
       for (let i = 0; i < n; i++) {
         const a = (i / n) * Math.PI * 2;
         state.tornados.push(Object.assign({}, common, {
-          x: p.x + Math.cos(a) * 30, y: p.y + Math.sin(a) * 30, r: s.size, speed: s.speed, life: s.dur, total: s.dur, tick: 0,
+          x: p.x + Math.cos(a) * 30, y: p.y + Math.sin(a) * 30, heading: a, r: s.size, speed: s.speed, life: s.dur, total: s.dur, tick: 0,
         }));
       }
       return true;
@@ -681,7 +681,8 @@
       Object.assign(child, { x, y, dx: Math.cos(a), dy: Math.sin(a), life: e.total, hit: new Set(e.hit) });
       state.waves.push(child);
     } else if (e.kind === 'tornado') {
-      state.tornados.push(Object.assign(child, { x: t.x, y: t.y, life: e.total * 0.7, tick: 0 }));
+      // 번진 회오리는 맞힌 적 자리에 머문다. 마법사 곁으로 돌아오게 두면 번진 뜻이 없다.
+      state.tornados.push(Object.assign(child, { x: t.x, y: t.y, anchor: true, life: e.total * 0.7, tick: 0 }));
     } else if (e.kind === 'orbit') {
       // 칼날은 맞힌 적 둘레에 작은 칼날 고리를 새로 만든다.
       state.orbits.push(Object.assign(child, {
@@ -888,30 +889,22 @@
   }
 
   const TORNADO_TICK = 0.35;
-  const TORNADO_LEASH = 150;
+  // 회오리는 마법사도 적도 따르지 않고 제멋대로 떠돈다. 조금씩 방향을 틀며 나아가, 어디로
+  // 갈지 모르는 것이 회오리다운 맛이다. 적을 쫓게 두었을 때는 멀리 가 마법사가 빈손이 되었고,
+  // 마법사 둘레를 돌게 했을 때는 회오리가 아니라 호위병처럼 보였다.
+  const TORNADO_TURN = 5;
+  // 제 속도대로 떠돌면 금세 멀어져 바람 셋의 무리 피해가 4분의 1로 줄었다. 느리게 떠돌며 오래 머문다.
+  const TORNADO_DRIFT = 0.35;
+  
   const PULL_MAX = 110;
   function updateTornados(state, dt, grid) {
+    const p = state.player;
     for (const t of state.tornados) {
       t.life -= dt;
-      // 회오리는 마법사 둘레에서만 사냥한다. 적을 쫓아 멀리 가게 두었더니 마법사가
-      // 빈손이 되어, 바람만 쓰는 3서클 판이 1분 안에 무너졌다.
-      const p = state.player;
-      const aim = nearest(state, p.x, p.y, TORNADO_LEASH);
-      t.orbit = (t.orbit || state.fate() * Math.PI * 2) + dt * 1.4;
-      // 적이 있으면 마법사와 그 적 사이에 선다. 적 위에 서면 둘레의 무리를 마법사 쪽으로
-      // 끌어와 오히려 몸에 부딪히게 했다.
-      let gx = p.x + Math.cos(t.orbit) * 80, gy = p.y + Math.sin(t.orbit) * 80;
-      if (aim) {
-        const ax = aim.x - p.x, ay = aim.y - p.y;
-        const ad = Math.hypot(ax, ay) || 1;
-        const keep = Math.max(70, Math.min(ad, 120));
-        gx = p.x + (ax / ad) * keep; gy = p.y + (ay / ad) * keep;
-      }
-      {
-        const dx = gx - t.x, dy = gy - t.y;
-        const d = Math.hypot(dx, dy) || 1;
-        const v = Math.min(d, t.speed * dt);
-        t.x += (dx / d) * v; t.y += (dy / d) * v;
+      if (!t.anchor) {
+        t.heading += (state.fate() - 0.5) * TORNADO_TURN * dt * 2;
+        t.x += Math.cos(t.heading) * t.speed * TORNADO_DRIFT * dt;
+        t.y += Math.sin(t.heading) * t.speed * TORNADO_DRIFT * dt;
       }
       // 둘레의 적을 안으로 끌어당긴다. 모아 둔 무리를 다른 마법이 한꺼번에 치게 된다.
       // 끄는 속도에는 상한을 둔다. 쌓이게 두었더니 끌려온 적이 회오리를 지나쳐 날아와
