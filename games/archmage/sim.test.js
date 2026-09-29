@@ -118,7 +118,8 @@ function engrave(state, id, ci) {
   check('유지가 끝나야 쿨타임이 돈다', c.cd > c.spell.cd, true);
 }
 {
-  const st = S.create({ circle: 3, seed: 1 });
+  // 3서클은 E F M이라 원소가 둘까지다. 원소 셋은 4서클부터.
+  const st = S.create({ circle: 4, seed: 1 });
   engrave(st, 'earth', 0);
   engrave(st, 'earth', 0);
   engrave(st, 'water', 0);

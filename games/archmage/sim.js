@@ -8,7 +8,7 @@
 // 다른 조합으로 넘게 된다.
 (function () {
   const Runes = typeof module !== 'undefined' && module.exports ? require('./runes.js') : window.ArchmageRunes;
-  const { ELEMENTS, MODIFIERS, compose } = Runes;
+  const { ELEMENTS, MODIFIERS, SOCKETS, fits, compose } = Runes;
 
   const PLAYER = { hp: 120, r: 12, speed: 118, pickup: 80 };
   // 적은 화면 바깥 이 거리의 고리에서 나온다. 화면의 반대각선(약 330)보다 멀어야
@@ -119,13 +119,23 @@
 
   function capacity(state) { return state.circle; }
 
+  // 룬 하나가 들어갈 빈 구멍들(구멍 번호). 구멍마다 받는 룬의 종류가 정해져 있다(`SOCKETS`).
+  // 룬은 구멍 번호(slot)를 들고, 마법진의 룬 목록은 새긴 차례대로다 — 같은 수의 마법이
+  // 여럿이면 새긴 차례로 가르기 때문이다.
+  function openSlots(state, ci, id) {
+    const taken = new Set(state.circles[ci].runes.map((r) => r.slot));
+    const out = [];
+    for (let i = 0; i < capacity(state); i++) if (!taken.has(i) && fits(SOCKETS[i], id)) out.push(i);
+    return out;
+  }
+
   // 새길 수 있는 방법들. 빈 구멍이 있어도 같은 룬이 이미 있으면 강화를 고를 수 있다 —
   // 구멍을 아껴 두었다가 다른 룬으로 조합을 맞추고 싶을 때가 있다.
   function placeModes(state, id, ci) {
     if (ci >= state.unlocked) return [];
     const c = state.circles[ci];
     const out = [];
-    if (c.runes.length < capacity(state)) out.push('add');
+    if (openSlots(state, ci, id).length) out.push('add');
     if (c.runes.some((r) => r.id === id)) out.push('grade');
     return out;
   }
@@ -169,19 +179,24 @@
     const modes = placeModes(state, id, ci);
     const mode = want || modes[0];
     if (!mode || modes.indexOf(mode) < 0) return null;
-    const runes = state.circles[ci].runes.map((r) => ({ id: r.id, grade: r.grade }));
-    if (mode === 'add') runes.push({ id, grade: 0 });
-    else if (slot !== undefined && runes[slot] && runes[slot].id === id) runes[slot].grade += 1;
-    else runes.find((r) => r.id === id).grade += 1;
+    const runes = state.circles[ci].runes.map((r) => ({ id: r.id, grade: r.grade, slot: r.slot }));
+    if (mode === 'add') {
+      const open = openSlots(state, ci, id);
+      runes.push({ id, grade: 0, slot: open.indexOf(slot) >= 0 ? slot : open[0] });
+    } else {
+      const at = runes.find((r) => r.slot === slot && r.id === id) || runes.find((r) => r.id === id);
+      at.grade += 1;
+    }
     return { mode, runes, spell: make(state, runes) };
   }
 
+  // slot은 지울 구멍의 번호다.
   function previewErase(state, ci, slot) {
-    const runes = state.circles[ci].runes.filter((_, i) => i !== slot).map((r) => ({ id: r.id, grade: r.grade }));
+    const runes = state.circles[ci].runes.filter((r) => r.slot !== slot).map((r) => ({ id: r.id, grade: r.grade, slot: r.slot }));
     return { runes, spell: make(state, runes) };
   }
 
-  // target: 룬이면 마법진 번호나 { ci, mode }, 재각인이면 { ci, slot }.
+  // target: 룬이면 마법진 번호나 { ci, mode, slot }, 재각인이면 { ci, slot }. slot은 구멍 번호다.
   function choose(state, index, target) {
     const offer = state.pending;
     if (!offer) return false;
@@ -193,7 +208,7 @@
       if (!p) return false;
       setRunes(state, ci, p.runes);
     } else if (opt.type === 'erase') {
-      if (!target || !state.circles[target.ci] || !state.circles[target.ci].runes[target.slot]) return false;
+      if (!target || !state.circles[target.ci] || !state.circles[target.ci].runes.some((r) => r.slot === target.slot)) return false;
       setRunes(state, target.ci, previewErase(state, target.ci, target.slot).runes);
     } else if (opt.type === 'heal') {
       state.player.hp = Math.min(state.player.maxHp, state.player.hp + state.player.maxHp * 0.4);
@@ -1076,7 +1091,7 @@
   const api = {
     FOES, PLAYER, CIRCLE_UNLOCK, RANGE,
     create, step, choose, drain, summary, previewPlace, previewErase, placeMode, placeModes, orbitBlades, orbitRadius,
-    nightLength, isBossNight, BOSS_EVERY, xpNext, maxLevel, capacity, rng,
+    nightLength, isBossNight, BOSS_EVERY, xpNext, maxLevel, capacity, openSlots, rng,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else window.ArchmageSim = api;

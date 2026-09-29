@@ -16,6 +16,14 @@
   // 앞 넷은 원소와 상관없이 같은 효과, 뒤 다섯은 원소 상성이 있다. 집중·거대·시간은
   // 뺐다 — 피해·범위·쿨타임을 올리는 것뿐이라 고를 때 생각할 거리가 없었다.
   const MODIFIERS = ['chain', 'omni', 'echo', 'anima', 'frost', 'heat', 'gravity', 'gale', 'resonance'];
+  // 마법진의 구멍. 원소 전용(E)·수식어 전용(M)·아무것이나(F)가 서클과 상관없이 이 자리에
+  // 고정되어 있고, 서클 n이면 앞의 n칸을 쓴다. 칸을 가리지 않았을 때는 셋째 칸에 같은 원소를
+  // 하나 더 넣어 단계를 올리는 쪽이 어떤 수식어보다 셌다 — 수식어는 구멍이 남을 때나 넣는
+  // 것이 되었다. 가리고 나니 원소 조합의 가짓수도 줄어 하나씩 맞출 수 있다.
+  const SOCKETS = ['E', 'F', 'M', 'E', 'F', 'M', 'E', 'F', 'F'];
+  const fits = (type, id) => type === 'F' || (type === 'E') === (ELEMENTS.indexOf(id) >= 0);
+  // 서클 n에서 새길 수 있는 원소 룬의 가장 많은 수. 9서클에서 7이다.
+  const maxElements = (circle) => SOCKETS.slice(0, circle).filter((t) => t !== 'M').length;
   // 수식어의 [어울리는 원소, 상극 원소]. 마법의 형태를 정한 원소로 가른다.
   const AFFINITY = { frost: ['water', 'fire'], heat: ['fire', 'water'], gravity: ['earth', 'wind'], gale: ['wind', 'earth'] };
   const SYNERGY_DMG = 1.2;
@@ -39,8 +47,9 @@
   // 같은 원소를 구멍에 여럿 새기면 마법 자체가 바뀐다(단계). 등급처럼 수치만 오르면
   // 물+물+물이 물+수식어+수식어에 등급을 올린 것보다 약해 보여, 구멍을 같은 원소로
   // 채울 까닭이 없었다. 2단계는 원래 형태에 새 동작을 얹고, 3단계부터는 다른 마법이
-  // 된다. **9서클까지 2·3·5·7·9단계에서 바뀌고**, 그 사이(4·6·8)는 앞 단계의 형태에
-  // 피해만 는다 — 한 칸 올릴 때마다 모양이 바뀌면 다음 단계를 기다리는 맛이 없다.
+  // 된다. **같은 원소 2·3·4·5·7개에서 바뀌고**, 6개는 5단계의 형태에 피해만 는다. 원소를
+  // 넣는 칸이 9서클에서 일곱이라(`SOCKETS`) 그 안에 모두 들게 당겼다 — 처음에는
+  // 2·3·5·7·9였다. 4는 쏟아지는 것(rain), 5는 둘레를 계속 치는 것(aura), 7은 화면 전체다.
   //
   // rain은 사거리 안의 적 위로 일정 간격마다 무언가가 떨어지는 것(sub가 무엇인지),
   // aura는 마법사 둘레를 계속 치는 것이다. screen이면 화면 전체에 미친다.
@@ -50,41 +59,41 @@
       2: { cluster: true },
       // 하늘에서 떨어진다. 적이 있는 자리 여러 곳을 한꺼번에 친다.
       3: { kind: 'meteor', dmg: 62, cd: 2.2, size: 64, count: 2 },
-      5: { kind: 'rain', sub: 'meteor', dmg: 48, cd: 4, dur: 3, size: 58, count: 2, every: 0.35, delay: 0.5 },
-      7: { kind: 'aura', dmg: 26, cd: 5, dur: 4, size: 150, every: 0.3, burn: 12 },
-      9: { kind: 'aura', dmg: 110, cd: 5, dur: 4, size: 470, every: 0.5, burn: 20, screen: true },
+      4: { kind: 'rain', sub: 'meteor', dmg: 48, cd: 4, dur: 3, size: 58, count: 2, every: 0.35, delay: 0.5 },
+      5: { kind: 'aura', dmg: 26, cd: 5, dur: 4, size: 150, every: 0.3, burn: 12 },
+      7: { kind: 'aura', dmg: 110, cd: 5, dur: 4, size: 470, every: 0.5, burn: 20, screen: true },
     },
     water: {
       // 맞힌 자리에서 냉기가 퍼져 둘레를 얼린다.
       2: { nova: true },
       // 넓은 물결이 밀고 나가며 닿는 것을 모두 밀어낸다.
       3: { kind: 'wave', dmg: 48, cd: 2.0, size: 66, speed: 250, count: 1, pierce: 0 },
-      5: { kind: 'rain', sub: 'ice', dmg: 55, cd: 3.6, dur: 3, size: 44, count: 3, every: 0.3, delay: 0.3, freeze: true },
-      7: { kind: 'wave', ring: true, dmg: 64, cd: 2.6, size: 70, speed: 230, count: 12 },
-      9: { kind: 'aura', dmg: 90, cd: 5, dur: 3.5, size: 470, every: 0.5, freeze: true, screen: true },
+      4: { kind: 'rain', sub: 'ice', dmg: 55, cd: 3.6, dur: 3, size: 44, count: 3, every: 0.3, delay: 0.3, freeze: true },
+      5: { kind: 'wave', ring: true, dmg: 64, cd: 2.6, size: 70, speed: 230, count: 12 },
+      7: { kind: 'aura', dmg: 90, cd: 5, dur: 3.5, size: 470, every: 0.5, freeze: true, screen: true },
     },
     wind: {
       // 칼날이 도는 반경이 크게 들고 난다.
       2: { pulse: true },
       // 회오리가 스스로 적을 찾아다니며 빨아들인다.
       3: { kind: 'tornado', dmg: 20, cd: 2.4, dur: 4, size: 44, speed: 150, count: 2 },
-      5: { kind: 'rain', sub: 'bolt', dmg: 45, cd: 3, dur: 3, size: 26, count: 3, every: 0.2, delay: 0.12 },
-      7: { kind: 'aura', dmg: 22, cd: 4.5, dur: 4, size: 170, every: 0.25, pull: true },
-      9: { kind: 'rain', sub: 'bolt', dmg: 70, cd: 5, dur: 4, size: 32, count: 4, every: 0.2, delay: 0.1, screen: true },
+      4: { kind: 'rain', sub: 'bolt', dmg: 45, cd: 3, dur: 3, size: 26, count: 3, every: 0.2, delay: 0.12 },
+      5: { kind: 'aura', dmg: 22, cd: 4.5, dur: 4, size: 170, every: 0.25, pull: true },
+      7: { kind: 'rain', sub: 'bolt', dmg: 70, cd: 5, dur: 4, size: 32, count: 4, every: 0.2, delay: 0.1, screen: true },
     },
     earth: {
       // 지대가 긁을 때마다 바깥으로 충격파가 번진다.
       2: { shock: true },
       // 발밑부터 넓게 땅이 흔들려 둘레를 한꺼번에 치고 묶는다.
       3: { kind: 'quake', dmg: 24, cd: 3.8, dur: 1.6, size: 170, count: 1 },
-      5: { kind: 'rain', sub: 'rock', dmg: 90, cd: 4, dur: 3, size: 72, count: 1, every: 0.45, delay: 0.6, knock: 80 },
-      7: { kind: 'aura', dmg: 90, cd: 4, dur: 4, size: 130, every: 0.3, knock: 60 },
-      9: { kind: 'quake', dmg: 80, cd: 6, dur: 2.5, size: 470, screen: true },
+      4: { kind: 'rain', sub: 'rock', dmg: 90, cd: 4, dur: 3, size: 72, count: 1, every: 0.45, delay: 0.6, knock: 80 },
+      5: { kind: 'aura', dmg: 90, cd: 4, dur: 4, size: 130, every: 0.3, knock: 60 },
+      7: { kind: 'quake', dmg: 80, cd: 6, dur: 2.5, size: 470, screen: true },
     },
   };
-  const TIER_STEPS = [9, 7, 5, 3, 2, 1];
+  const TIER_STEPS = [7, 5, 4, 3, 2, 1];
   const formTierOf = (n) => TIER_STEPS.find((t) => t <= n);
-  // 형태가 바뀌지 않는 단계(4·6·8, 그리고 9 넘게)에서 한 칸마다 더 붙는 피해.
+  // 형태가 바뀌지 않는 단계(6)에서 한 칸마다 더 붙는 피해.
   const TIER_DMG = 0.8;
 
   // 특수 조합. 이 원소 수를 **정확히** 맞춘 룬들로 이름 있는 마법이 된다. 더 많은 룬을 쓰는
@@ -92,19 +101,23 @@
   // 형태는 form 원소의 tier단계를 빌리고, 나머지 원소는 성질 대신 접목(graft)으로 붙는다.
   //   불 접목: 맞힌 자리에 불길이 남는다   물 접목: 얼려 묶는다
   //   바람 접목: 맞힌 자리로 빨아들인다    땅 접목: 돌 파편이 튀고 발을 묶는다
-  // 두 원소는 1:1부터 4:4까지 단계를 1·3·5·7로 올리고, 세 원소는 1:1:1·2:2:2·3:3:3에서
-  // 3·5·9단계를, 네 원소는 1:1:1:1과 2:2:2:2에 따로 둔다.
+  // 두 원소는 1:1·2:2·3:3에서 1·3·4단계를, 세 원소는 1:1:1·2:2:2에서 3·4단계를 빌린다.
+  // 가장 큰 조합은 형태를 정한 원소에 한 칸을 더 준다(두 원소 4:3은 5단계, 세 원소 3:2:2는
+  // 7단계) — 원소 칸이 일곱뿐이라 4:4와 3:3:3은 넣을 수 없어 옮겼다. 네 원소는 1:1:1:1과,
+  // 칸이 모자라 한 원소가 하나인 2:2:2:1(넷 중 어느 것이든)에 따로 둔다.
+  // name은 이름과 마도서의 열쇠다. 원소 폭주처럼 여러 묶음이 한 마법일 때 하나로 모은다.
   const RECIPES = {};
+  const counts0 = () => ({ fire: 0, water: 0, wind: 0, earth: 0 });
   const PAIRS = [
     ['fire', 'water', 'fire'], ['fire', 'wind', 'wind'], ['fire', 'earth', 'earth'],
     ['water', 'wind', 'water'], ['water', 'earth', 'earth'], ['wind', 'earth', 'wind'],
   ];
   for (const [a, b, form] of PAIRS) {
-    [1, 3, 5, 7].forEach((tier, i) => {
-      const n = i + 1;
-      const counts = { fire: 0, water: 0, wind: 0, earth: 0 };
-      counts[a] = n; counts[b] = n;
-      RECIPES[keyOf(counts)] = { form, tier, grafts: [form === a ? b : a] };
+    const other = form === a ? b : a;
+    [[1, 1], [2, 3], [3, 4], [4, 5]].forEach(([n, tier]) => {
+      const counts = counts0();
+      counts[form] = n; counts[other] = Math.min(n, 3);
+      RECIPES[keyOf(counts)] = { form, tier, grafts: [other] };
     });
   }
   const TRIOS = [
@@ -112,9 +125,10 @@
     [['fire', 'wind', 'earth'], 'fire'], [['water', 'wind', 'earth'], 'water'],
   ];
   for (const [els, form] of TRIOS) {
-    [3, 5, 9].forEach((tier, i) => {
-      const counts = { fire: 0, water: 0, wind: 0, earth: 0 };
-      for (const el of els) counts[el] = i + 1;
+    [[1, 3], [2, 4], [3, 7]].forEach(([n, tier]) => {
+      const counts = counts0();
+      for (const el of els) counts[el] = Math.min(n, 2);
+      counts[form] = n;
       // 불+바람+땅은 불 형태에 빨아들임과 파편이 겹쳐, 같은 룬 수의 다른 조합보다 두 배 넘게
       // 셌다. 몫을 줄여 맞춘다.
       const dmg = form === 'fire' ? 0.7 : 1;
@@ -126,12 +140,16 @@
   // 접목 셋을 붙였을 때는 같은 네 룬의 다른 조합보다 네 배 가까이 약했다.
   // 원소의 조화는 넷의 2단계, 원소 폭주는 넷의 3단계다.
   RECIPES['fire1-water1-wind1-earth1'] = { form: 'all', tier: 2, grafts: [] };
-  RECIPES['fire2-water2-wind2-earth2'] = { form: 'all', tier: 3, grafts: [] };
+  for (const one of ELEMENTS) {
+    const counts = { fire: 2, water: 2, wind: 2, earth: 2 };
+    counts[one] = 1;
+    RECIPES[keyOf(counts)] = { form: 'all', tier: 3, grafts: [], name: 'surge' };
+  }
   // 이름 있는 마법은 찾아낸 값을 치러 규칙으로 만든 같은 단계보다 조금 더 세다.
   const RECIPE_DMG = 1.25;
 
   // 이름 있는 마법: 특수 조합과, 같은 원소만으로 형태가 바뀌는 단계. 마도서가 따로 센다.
-  const isSpecial = (key) => !!RECIPES[key] || /^(fire|water|wind|earth)([2357]|9)$/.test(key);
+  const isSpecial = (key) => key === 'surge' || !!RECIPES[key] || /^(fire|water|wind|earth)[23457]$/.test(key);
 
   function applyGraft(s, el) {
     if (el === 'fire') { s.ignite = true; s.burn += 8; }
@@ -287,7 +305,7 @@
     const primary = primaryOf(counts);
     const key = keyOf(counts);
     const recipe = RECIPES[key] || null;
-    if (recipe && recipe.form === 'all') return harmony(skill, extra, mods, key, recipe, total);
+    if (recipe && recipe.form === 'all') return harmony(skill, extra, mods, recipe.name || key, recipe, total);
     const formEl = recipe ? recipe.form : primary;
     const form = recipe ? recipe.tier : formTierOf(counts[primary]);
     const f = FORMS[formEl];
@@ -352,20 +370,33 @@
     return s;
   }
 
-  // 서클 n에서 발동할 수 있는 마법의 열쇠: 한 원소만의 마법(1~n개)과 룬 n개 이하의 특수
-  // 조합. 마도서의 분모다. 남은 원소 룬은 효과만 더하므로 열쇠에 들지 않는다.
+  // 서클 n에서 발동할 수 있는 마법의 열쇠: 한 원소만의 마법과 특수 조합 가운데 그 서클의
+  // 원소 칸에 드는 것. 마도서의 분모다. 남은 원소 룬은 효과만 더하므로 열쇠에 들지 않는다.
   function allKeys(circle) {
+    const max = maxElements(circle);
     const out = [];
-    for (const el of ELEMENTS) for (let n = 1; n <= circle; n++) out.push(el + n);
+    for (const el of ELEMENTS) for (let n = 1; n <= max; n++) out.push(el + n);
     for (const key in RECIPES) {
-      let n = 0;
-      for (const part of key.split('-')) n += Number(part.replace(/\D/g, ''));
-      if (n <= circle) out.push(key);
+      const r = RECIPES[key];
+      if (keyRunes(key).length > max) continue;
+      const k = r.name || key;
+      if (out.indexOf(k) < 0) out.push(k);
     }
     return out;
   }
 
-  const api = { ELEMENTS, MODIFIERS, AFFINITY, ALL, FORMS, TIERS, RECIPES, formTierOf, isSpecial, isElement, isModifier, compose, keyOf, countElements, allKeys };
+  // 열쇠 → 그 마법을 이루는 원소 룬. 이름으로 모은 열쇠(surge)는 그 이름의 첫 묶음을 쓴다.
+  function keyRunes(key) {
+    if (!/\d/.test(key)) key = Object.keys(RECIPES).find((k) => RECIPES[k].name === key);
+    const out = [];
+    for (const part of key.split('-')) {
+      const m = /^([a-z]+)(\d+)$/.exec(part);
+      for (let i = 0; i < Number(m[2]); i++) out.push({ id: m[1], grade: 0 });
+    }
+    return out;
+  }
+
+  const api = { ELEMENTS, MODIFIERS, AFFINITY, SOCKETS, ALL, FORMS, TIERS, RECIPES, fits, maxElements, formTierOf, isSpecial, isElement, isModifier, compose, keyOf, keyRunes, countElements, allKeys };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else window.ArchmageRunes = api;
 })();
