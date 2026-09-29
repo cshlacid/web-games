@@ -155,5 +155,7 @@ check('열쇠는 원소 차례로 적는다', R.compose(rs('earth', 'fire')).key
   check('아무 묶음이나 마법이 되거나 원소가 없어 시전하지 않는다', bad, 0);
 }
 
+check('빛과 어둠은 서로 맞서는 특수 원소', [R.OPPOSITE.light, R.OPPOSITE.dark, R.ELEMENTS.filter(R.isSpecialElement)], ['dark', 'light', ['light', 'dark']]);
+
 console.log(`${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);

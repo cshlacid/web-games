@@ -28,10 +28,16 @@
     slime: { hp: 14, speed: 40, r: 11, dmg: 8, xp: 1, from: 0, weight: 4 },
     goblin: { hp: 22, speed: 56, r: 11, dmg: 10, xp: 1, from: 0.12, weight: 4 },
     wolf: { hp: 16, speed: 92, r: 10, dmg: 8, xp: 1, from: 0.3, weight: 3 },
-    wraith: { hp: 36, speed: 66, r: 12, dmg: 12, xp: 2, from: 0.5, weight: 2 },
+    skeleton: { hp: 20, speed: 58, r: 11, dmg: 10, xp: 1, from: 0.2, weight: 2, undead: true },
+    wraith: { hp: 36, speed: 66, r: 12, dmg: 12, xp: 2, from: 0.5, weight: 2, undead: true },
+    zombie: { hp: 46, speed: 30, r: 13, dmg: 14, xp: 2, from: 0.4, weight: 1, undead: true },
     golem: { hp: 150, speed: 32, r: 18, dmg: 18, xp: 6, from: 0.62, weight: 1 },
     boss: { hp: 6000, speed: 50, r: 34, dmg: 20, xp: 0 },
   };
+
+  // 언데드는 빛에 약하고 어둠에 강하다. 원소를 가리는 적이 있어야 빛과 어둠이 서로 맞서는
+  // 원소라는 것이 판에서 읽힌다. 마법의 원소는 그 형태를 정한 원소(el)로 가른다.
+  const UNDEAD_BANE = { light: 2, dark: 0.5 };
 
   // 룬 제시의 무게. 원소가 없으면 마법이 나가지 않으므로 수식어보다 자주 나온다.
   const WEIGHT = { element: 3, modifier: 1 };
@@ -370,7 +376,7 @@
       }
       if (f.curseT > 0) {
         f.curseT -= dt;
-        damage(state, f, f.curse * dt, null);
+        damage(state, f, f.curse * dt * (FOES[f.type].undead ? UNDEAD_BANE.dark : 1), null);
         if (f.curseT <= 0) f.curse = 0;
       }
       if (f.vulnT > 0) { f.vulnT -= dt; if (f.vulnT <= 0) f.vuln = 0; }
@@ -595,6 +601,7 @@
     if (f.dead) return;
     // 빛에 드러난 적은 무엇에 맞든 더 아프다.
     if (f.vulnT > 0) amount *= 1 + f.vuln;
+    if (src && src.el && FOES[f.type].undead) amount *= UNDEAD_BANE[src.el] || 1;
     const dealt = Math.min(amount, Math.max(0, f.hp));
     f.hp -= amount;
     if (src) {
@@ -622,8 +629,8 @@
       }
       if (src.splash && state.grid && (f.splashAt || 0) <= state.t) splash(state, f, amount, src);
       if (src.vuln) { f.vuln = Math.max(f.vuln || 0, src.vuln); f.vulnT = 2; }
-      // 공포. 사도는 겁먹지 않는다.
-      if (src.fear && f.type !== 'boss' && (f.fearAt || 0) <= state.t) {
+      // 공포. 사도도 언데드도 겁먹지 않는다.
+      if (src.fear && f.type !== 'boss' && !FOES[f.type].undead && (f.fearAt || 0) <= state.t) {
         f.fearT = src.fear;
         f.fearAt = state.t + src.fear + FEAR_GAP;
       }
@@ -753,7 +760,7 @@
     return {
       slow: e.slow, burn: e.burn, knock: e.knock, leech: e.leech, freeze: e.freeze, freezeChance: e.freezeChance,
       splash: e.splash, splashBoost: e.splashBoost, root: e.root, rootDur: e.rootDur,
-      zap: e.zap, vuln: e.vuln, fear: e.fear, fromX, fromY,
+      zap: e.zap, vuln: e.vuln, fear: e.fear, el: e.el, fromX, fromY,
     };
   }
 
@@ -1227,7 +1234,7 @@
   }
 
   const api = {
-    FOES, PLAYER, CIRCLE_UNLOCK, RANGE,
+    FOES, UNDEAD_BANE, PLAYER, CIRCLE_UNLOCK, RANGE,
     create, step, choose, drain, summary, previewPlace, previewErase, placeMode, placeModes, orbitBlades, orbitRadius,
     nightLength, isBossNight, BOSS_EVERY, xpNext, maxLevel, capacity, openSlots, rng,
   };

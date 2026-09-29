@@ -428,6 +428,121 @@
     g.restore();
   }
 
+  // --- 해골 병사 ---
+  // 머리가 큰 뼈 병사. 퀭한 눈구멍 속에 도깨비불이 타고, 이 빠진 녹슨 칼을 든다.
+  function skeleton(g, f) {
+    const t = cycle(f), w = Math.sin(t), bob = -Math.abs(Math.sin(t)) * 1.2;
+    shadow(g, 17, 35, 9, 2.6);
+    g.save(); g.translate(0, bob);
+    const BONE = '#e6dcc4';
+    // 뼈는 늑대 다리처럼 외곽선을 두른 굵은 선으로 긋는다.
+    const bone = (pts, color) => {
+      g.lineCap = 'round'; g.lineJoin = 'round';
+      for (const [col, lw] of [[INK, 4.4], [color, 2.2]]) {
+        g.strokeStyle = col; g.lineWidth = lw;
+        g.beginPath(); g.moveTo(pts[0][0], pts[0][1]); for (const q of pts.slice(1)) g.lineTo(q[0], q[1]); g.stroke();
+      }
+    };
+    bone([[14, 28], [13 - w * 2, 31.5], [12 - w * 2.6, 34.5 - Math.max(0, -w) * 1.4]], '#b7ab92');
+    bone([[12.5, 20], [9.5, 23.5 + w], [9, 27 + w]], '#b7ab92');
+    const ribs = (g) => { g.moveTo(12, 18.5); g.quadraticCurveTo(11, 24, 13.5, 27); g.lineTo(21.5, 27); g.quadraticCurveTo(24, 24, 22.5, 18.5); g.closePath(); };
+    const pelvis = (g) => { g.moveTo(13, 26.5); g.lineTo(22, 26.5); g.lineTo(21, 29.5); g.lineTo(14, 29.5); g.closePath(); };
+    const skull = (g) => { g.moveTo(10, 11); g.quadraticCurveTo(10, 2.5, 18.5, 2.5); g.quadraticCurveTo(27, 2.5, 27, 11); g.quadraticCurveTo(27, 15, 24.5, 16.5); g.lineTo(24.5, 19); g.lineTo(14, 19); g.lineTo(13.5, 16.5); g.quadraticCurveTo(10, 15, 10, 11); g.closePath(); };
+    outline(g, [ribs, pelvis, skull], 2.2);
+    part(g, ribs, '#2b2436', {
+      shade: 1, hi: 0.3,
+      detail: (g) => {
+        g.strokeStyle = BONE; g.lineWidth = 1.3; g.lineCap = 'round';
+        g.beginPath(); g.moveTo(17.3, 18.5); g.lineTo(17.3, 27); g.stroke();
+        for (const y of [20.5, 22.8, 25]) { g.beginPath(); g.moveTo(12.5, y); g.quadraticCurveTo(17.3, y + 1.4, 22.5, y); g.stroke(); }
+      },
+    });
+    part(g, pelvis, BONE, { shade: 0.8, hi: 0.4 });
+    part(g, skull, BONE, {
+      shade: 2,
+      detail: (g, c) => {
+        g.strokeStyle = c.lo; g.lineWidth = 0.7; g.beginPath(); g.moveTo(14, 4); g.lineTo(15.5, 7); g.lineTo(14.5, 8.5); g.stroke();
+        g.fillStyle = INK; g.fillRect(14.5, 16.4, 9.5, 2.6);
+        g.fillStyle = BONE; for (const x of [15, 17, 21, 23]) g.fillRect(x, 16.4, 1.4, 1.8);
+      },
+    });
+    // 눈구멍과 도깨비불. 빛에 약한 것들은 모두 이 초록 불을 눈에 켠다.
+    g.fillStyle = INK;
+    g.beginPath(); g.ellipse(17, 10.5, 2.6, 2.9, 0, 0, TAU); g.fill();
+    g.beginPath(); g.ellipse(23.3, 10.5, 2.2, 2.7, 0, 0, TAU); g.fill();
+    g.beginPath(); g.moveTo(20.4, 13); g.lineTo(21.4, 15); g.lineTo(19.6, 15); g.closePath(); g.fill();
+    glowEye(g, 17.3, 10.8, 1.1, '#7dffc8', 1);
+    glowEye(g, 23.4, 10.8, 0.95, '#7dffc8', 1);
+    bone([[20, 28], [21 + w * 2, 31.5], [22.5 + w * 2.6, 34.5 - Math.max(0, w) * 1.4]], BONE);
+    bone([[22, 20], [24.5, 23 - w * 0.5], [27, 22 - w]], BONE);
+    g.save(); g.translate(27, 22 - w); g.rotate(-1.1 + w * 0.2);
+    const blade = (g) => { g.moveTo(0, -1.3); g.lineTo(11, -2.2); g.quadraticCurveTo(13.5, -0.5, 11.5, 1.4); g.lineTo(0, 1.3); g.closePath(); };
+    const guard = (g) => { g.rect(-0.8, -3, 1.8, 6); };
+    outline(g, [blade, guard], 2);
+    part(g, blade, '#9aa0a8', {
+      shade: 0.8, hi: 0.5,
+      detail: (g) => {
+        g.fillStyle = 'rgba(150,80,40,0.6)'; g.beginPath(); g.arc(5, 0.4, 1.2, 0, TAU); g.fill();
+        g.beginPath(); g.arc(9, -0.6, 0.8, 0, TAU); g.fill();
+        g.fillStyle = INK; g.beginPath(); g.moveTo(7, 1.4); g.lineTo(8, 0.4); g.lineTo(9, 1.4); g.fill();
+      },
+    });
+    part(g, guard, '#6b4a2a', { shade: 0.5, hi: 0.3 });
+    g.restore();
+    g.restore();
+  }
+
+  // --- 좀비 ---
+  // 구부정하게 끌려오는 시체. 잿빛 초록 살에 찢긴 옷, 두 팔을 앞으로 뻗고 한쪽 눈이 풀렸다.
+  function zombie(g, f) {
+    const t = cycle(f), w = Math.sin(t), bob = Math.abs(Math.sin(t)) * 0.8;
+    shadow(g, 18, 35, 10, 2.8);
+    g.save(); g.translate(0, bob);
+    const SKIN = '#8fa77a';
+    const legB = (g) => { g.moveTo(12 - w * 1.4, 26); g.lineTo(16 - w * 1.4, 26); g.lineTo(15.5 - w * 1.8, 34); g.lineTo(10.5 - w * 1.8, 34); g.closePath(); };
+    const legF = (g) => { g.moveTo(18 + w * 1.4, 26); g.lineTo(22 + w * 1.4, 26); g.lineTo(23.5 + w * 1.8, 34); g.lineTo(18 + w * 1.8, 34); g.closePath(); };
+    const armB = (g) => { g.moveTo(15, 17); g.quadraticCurveTo(22, 16 + w, 30, 16.5 + w); g.lineTo(30.5, 19.2 + w); g.quadraticCurveTo(22, 19.5 + w, 15.5, 20.5); g.closePath(); };
+    const body = (g) => { g.moveTo(10, 17); g.quadraticCurveTo(12, 13.5, 18, 14); g.quadraticCurveTo(24, 15, 23.5, 21); g.lineTo(23, 27.5); g.lineTo(20, 26); g.lineTo(17.5, 28); g.lineTo(15, 26.2); g.lineTo(11, 27.5); g.quadraticCurveTo(9.5, 22, 10, 17); g.closePath(); };
+    const head = (g) => { g.moveTo(13, 9.5); g.quadraticCurveTo(13.5, 2.5, 20.5, 2.8); g.quadraticCurveTo(27.5, 3.5, 27, 10.5); g.quadraticCurveTo(26.5, 16, 21, 16.5); g.quadraticCurveTo(14, 16.5, 13, 9.5); g.closePath(); };
+    const armF = (g) => { g.moveTo(18, 18); g.quadraticCurveTo(25, 18 - w, 33, 19.5 - w); g.lineTo(33.5, 22.3 - w); g.quadraticCurveTo(25, 22 - w, 18.5, 21.5); g.closePath(); };
+    outline(g, [legB, legF, armB, body, head, armF], 2.2);
+    part(g, legB, '#3d3448', { hi: 0.3 });
+    part(g, legF, '#554a63', { hi: 0.4, detail: (g) => { g.fillStyle = SKIN; g.fillRect(17, 31.5, 8, 3); } });
+    part(g, armB, '#6e8660', { hi: 0.4 });
+    part(g, body, '#7b6a52', {
+      shade: 1.8,
+      detail: (g, c) => {
+        g.fillStyle = SKIN; g.beginPath(); g.moveTo(14.5, 18.5); g.lineTo(18.5, 21.5); g.lineTo(15.5, 24); g.closePath(); g.fill();
+        g.fillStyle = c.deep; g.fillRect(10, 24.3, 14, 1.3);
+      },
+    });
+    part(g, head, SKIN, {
+      shade: 2,
+      detail: (g, c) => {
+        g.fillStyle = c.deep; g.beginPath(); g.moveTo(14, 7); g.quadraticCurveTo(17, 1.5, 24, 3); g.quadraticCurveTo(19, 3.5, 14, 7); g.fill();
+        // 꿰맨 자국
+        g.strokeStyle = INK; g.lineWidth = 0.7;
+        g.beginPath(); g.moveTo(15, 12.5); g.lineTo(17.5, 14.8);
+        for (const [x, y] of [[15.4, 13.8], [16.5, 14.6]]) { g.moveTo(x - 0.8, y + 0.6); g.lineTo(x + 0.8, y - 0.6); }
+        g.stroke();
+        g.fillStyle = '#3a0f14'; g.beginPath(); g.ellipse(23, 13.3, 2.4, 1.4, -0.1, 0, TAU); g.fill();
+        g.fillStyle = '#d8cfae'; g.fillRect(21.6, 12.2, 1, 1); g.fillRect(23.8, 12.1, 1, 1);
+      },
+    });
+    // 눈: 하나는 퀭하고 하나는 풀려 튀어나왔다.
+    g.fillStyle = INK; g.beginPath(); g.ellipse(19.2, 8.8, 1.9, 2, 0, 0, TAU); g.fill();
+    glowEye(g, 19.2, 9, 0.8, '#7dffc8', 1);
+    g.fillStyle = INK; g.beginPath(); g.arc(24.8, 8.6, 2.2, 0, TAU); g.fill();
+    g.fillStyle = '#f2ecd2'; g.beginPath(); g.arc(24.8, 8.6, 1.6, 0, TAU); g.fill();
+    g.fillStyle = INK; g.beginPath(); g.arc(25.4, 9.2, 0.6, 0, TAU); g.fill();
+    part(g, armF, SKIN, { hi: 0.5, detail: (g, c) => { g.fillStyle = c.lo; g.fillRect(24, 18, 1.4, 4); } });
+    g.strokeStyle = INK; g.lineWidth = 1; g.lineCap = 'round';
+    g.beginPath();
+    for (const dy of [0, 1.3, 2.6]) { g.moveTo(33.2, 19.7 - w + dy); g.lineTo(35, 20.3 - w + dy); }
+    g.stroke();
+    g.restore();
+  }
+
   // --- 돌 골렘 ---
   // 등이 굽은 바위 거인. 어깨에 이끼와 수정이 자라고, 금 사이로 룬이 푸르게 빛난다.
   function golem(g, f) {
@@ -567,7 +682,9 @@
     slime: { draw: slime, box: [34, 30], foot: 27 },
     goblin: { draw: goblin, box: [36, 37], foot: 34 },
     wolf: { draw: wolf, box: [42, 30], foot: 27 },
+    skeleton: { draw: skeleton, box: [36, 38], foot: 35 },
     wraith: { draw: wraith, box: [36, 38], foot: 36 },
+    zombie: { draw: zombie, box: [38, 38], foot: 35 },
     golem: { draw: golem, box: [48, 46], foot: 43 },
     boss: { draw: boss, box: [92, 92], foot: 88 },
   };
