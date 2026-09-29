@@ -348,5 +348,25 @@ check('밤은 길어지다 10분에서 멈춘다', [S.nightLength(1), S.nightLen
   check('궁극기도 잴 수 있다', S.benchmark(R.keyRunes('genesis'), 'single') > 0, true);
 }
 
+// 그림자 낫: 앞의 부채꼴 안은 모두 베고, 등 뒤 먼 적은 베지 않는다.
+{
+  const st = S.create({ circle: 1, seed: 3 });
+  engrave(st, 'dark', 0);
+  const front = foe(st, 'goblin', st.player.x + 80, st.player.y + 10);
+  const side = foe(st, 'goblin', st.player.x + 60, st.player.y - 50);
+  const back = foe(st, 'goblin', st.player.x - 90, st.player.y);
+  run(st, 0.5);
+  check('낫은 앞의 부채꼴을 벤다', [front.hp < front.maxHp, side.hp < side.maxHp, back.hp === back.maxHp], [true, true, true]);
+}
+// 빛과 어둠은 절반만 제시된다.
+{
+  let special = 0, all = 0;
+  for (let seed = 1; seed <= 400; seed++) {
+    const st = S.create({ circle: 1, seed });
+    for (const o of st.pending.options) { all++; if (o.id === 'light' || o.id === 'dark') special++; }
+  }
+  check('빛·어둠은 드물다', special / all < 0.25 && special / all > 0.1, true);
+}
+
 console.log(`${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);

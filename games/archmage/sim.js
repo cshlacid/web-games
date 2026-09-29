@@ -40,7 +40,8 @@
   const UNDEAD_BANE = { light: 2, dark: 0.5 };
 
   // 룬 제시의 무게. 원소가 없으면 마법이 나가지 않으므로 수식어보다 자주 나온다.
-  const WEIGHT = { element: 3, modifier: 1 };
+  // 빛과 어둠은 특수 원소라 다른 원소의 절반만 나오고, 그만큼 세다(runes.js의 SPECIAL_DMG).
+  const WEIGHT = { element: 3, special: 1.5, modifier: 1 };
   // 판 안에서 마법진이 늘어나는 레벨.
   const CIRCLE_UNLOCK = [1, 4, 10];
   const ECHO_GAP = 0.35;
@@ -90,7 +91,7 @@
       t: 0, duration: nightLength(night),
       player: { x: 0, y: 0, hp: PLAYER.hp + g.hp, maxHp: PLAYER.hp + g.hp, r: PLAYER.r, inv: 0, face: 1, leechLeft: LEECH_RATE, healed: 0 },
       input: { x: 0, y: 0 },
-      foes: [], gems: [], shots: [], orbits: [], zones: [], echoes: [], beams: [],
+      foes: [], gems: [], shots: [], orbits: [], zones: [], echoes: [], beams: [], reaps: [],
       meteors: [], waves: [], tornados: [], quakes: [], rains: [], auras: [],
       circles: [0, 1, 2].map(() => ({ runes: [], spell: null, cd: 0, active: 0 })),
       unlocked: 1,
@@ -158,7 +159,7 @@
     // 수식어를 내지 않는다 — 한 칸짜리 마법진에서는 원소와 함께 새길 자리가 없어,
     // 고르는 순간 그 마법진이 영영 시전하지 않는 함정이 된다.
     const pool = [];
-    for (const id of ELEMENTS) pool.push({ id, w: WEIGHT.element });
+    for (const id of ELEMENTS) pool.push({ id, w: Runes.isSpecialElement(id) ? WEIGHT.special : WEIGHT.element });
     if (!first && capacity(state) >= 2) for (const id of MODIFIERS) pool.push({ id, w: WEIGHT.modifier });
     const options = [];
     const left = pool.filter((p) => placeable(state, p.id));
@@ -261,6 +262,7 @@
     updateRains(state, dt, grid);
     updateAuras(state, dt, grid);
     updateBeams(state, dt);
+    updateReaps(state, dt);
     contact(state, dt, grid);
     updateGems(state, dt);
     sweep(state);
@@ -299,7 +301,7 @@
       x: p.x + Math.cos(angle) * dist, y: p.y + Math.sin(angle) * dist,
       hp, maxHp: hp, r: def.r, speed: def.speed, dmg: def.dmg * (1 + 0.5 * state.depth),
       slowT: 0, slow: 0, burnT: 0, burn: 0, rootT: 0, rootAt: 0, splashAt: 0,
-      vuln: 0, vulnT: 0, fearT: 0, curse: 0, curseT: 0, kx: 0, ky: 0, flash: 0, dead: false,
+      vuln: 0, vulnT: 0, fearT: 0, kx: 0, ky: 0, flash: 0, dead: false,
       phase: state.world() * Math.PI * 2,
     };
     state.foes.push(foe);
@@ -373,11 +375,6 @@
         f.burnT -= dt;
         damage(state, f, f.burn * dt, null);
         if (f.burnT <= 0) f.burn = 0;
-      }
-      if (f.curseT > 0) {
-        f.curseT -= dt;
-        damage(state, f, f.curse * dt * (FOES[f.type].undead ? UNDEAD_BANE.dark : 1), null);
-        if (f.curseT <= 0) f.curse = 0;
       }
       if (f.vulnT > 0) { f.vulnT -= dt; if (f.vulnT <= 0) f.vuln = 0; }
       let dx = p.x - f.x;
@@ -514,7 +511,7 @@
     };
     if (s.kind === 'zap') return zapAt(state, s, common, dmg);
     if (s.kind === 'beam') return beamAt(state, s, common, dmg);
-    if (s.kind === 'curse') return curseAt(state, s, common, dmg);
+    if (s.kind === 'reap') return reapAt(state, s, common, dmg);
     if (s.kind === 'orbit') {
       const count = s.count + 2 * s.omni;
       state.orbits.push(Object.assign({}, common, {
@@ -727,23 +724,45 @@
     state.beams = state.beams.filter((b) => b.life > 0);
   }
 
-  // 어둠: 가까운 적 몇에게 저주를 건다. 저주받지 않은 적을 먼저 고른다 — 같은 적에게만
-  // 겹쳐 걸면 저주가 퍼지지 않는다. 이미 걸린 적에게 다시 걸면 세기가 쌓인다(세 배까지).
-  function curseAt(state, s, common, dmg) {
+  // 어둠: 가까운 적 쪽으로 그림자 낫을 휘둘러 부채꼴 안을 한꺼번에 벤다. 여럿이면 번갈아
+  // 반대로 휘두르고, 전방위면 사방으로 나눠 휘두른다. 낫이 닿는 거리 안에 적이 있을 때만
+  // 휘두른다 — 허공을 베면 쿨타임만 버린다.
+  const REAP_GAP = 0.16;
+  function reapAt(state, s, common, dmg) {
     const p = state.player;
-    const pool = state.foes.filter((f) => !f.dead && Math.hypot(f.x - p.x, f.y - p.y) < RANGE);
-    if (!pool.length) return false;
-    const dist = (f) => Math.hypot(f.x - p.x, f.y - p.y) + (f.curseT > 0 ? 1e4 : 0);
-    pool.sort((a, b) => dist(a) - dist(b));
-    const n = s.count + s.omni * 2;
-    for (let i = 0; i < n && i < pool.length; i++) {
-      const f = pool[i];
-      f.curse = f.curseT > 0 ? Math.min(dmg * 3, (f.curse || 0) + dmg * 0.5) : dmg;
-      f.curseT = Math.max(f.curseT || 0, s.last);
-      damage(state, f, dmg * 0.5, hitOf(common, p.x, p.y));
-      state.events.push({ type: 'curse', el: common.el, x: f.x, y: f.y });
+    const t = nearest(state, p.x, p.y, s.size + 20);
+    if (!t) return false;
+    const base = Math.atan2(t.y - p.y, t.x - p.x);
+    const n = s.count + 2 * s.omni;
+    for (let i = 0; i < n; i++) {
+      const angle = s.omni ? base + (i / n) * Math.PI * 2 : base + (i % 2 ? 0.25 : -0.25) * Math.min(1, i);
+      state.reaps.push(Object.assign({}, common, { dmg, angle, r: s.size, arc: s.arc, dir: i % 2 ? -1 : 1, delay: i * REAP_GAP }));
     }
     return true;
+  }
+
+  function updateReaps(state, dt) {
+    const p = state.player;
+    for (const r of state.reaps) {
+      r.delay -= dt;
+      if (r.delay > 0) continue;
+      r.done = true;
+      const src = hitOf(r, p.x, p.y);
+      const hits = [];
+      for (const f of state.foes) {
+        if (f.dead) continue;
+        const dx = f.x - p.x, dy = f.y - p.y;
+        const d = Math.hypot(dx, dy);
+        if (d > r.r + f.r) continue;
+        // 몸에 붙은 적은 방향과 상관없이 벤다. 낫자루 안쪽이 비면 붙은 무리를 못 떨친다.
+        const off = Math.abs(((Math.atan2(dy, dx) - r.angle + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
+        if (d > 24 && off > r.arc / 2 + f.r / d) continue;
+        damage(state, f, r.dmg, src);
+        if (hits.length < 6) hits.push([f.x, f.y]);
+      }
+      state.events.push({ type: 'reap', el: r.el, angle: r.angle, r: r.r, arc: r.arc, dir: r.dir, hits });
+    }
+    state.reaps = state.reaps.filter((r) => !r.done);
   }
 
   function splash(state, f, amount, src) {
@@ -776,19 +795,6 @@
   function kill(state, f) {
     f.dead = true;
     state.kills += 1;
-    // 저주받은 적이 죽으면 남은 저주가 곁의 적에게 옮겨 간다.
-    if (f.curseT > 0) {
-      let best = null, bd = 140 * 140;
-      for (const g of state.foes) {
-        if (g.dead || g.curseT > 0) continue;
-        const d2 = (g.x - f.x) ** 2 + (g.y - f.y) ** 2;
-        if (d2 < bd) { bd = d2; best = g; }
-      }
-      if (best) {
-        best.curse = f.curse; best.curseT = Math.max(1, f.curseT);
-        state.events.push({ type: 'curse', el: 'dark', x: best.x, y: best.y });
-      }
-    }
     const xp = FOES[f.type].xp;
     if (xp) {
       if (state.gems.length < MAX_GEMS) state.gems.push({ x: f.x, y: f.y, v: xp, pull: false });

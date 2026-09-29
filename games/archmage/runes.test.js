@@ -103,12 +103,12 @@ check('열쇠는 원소 차례로 적는다', R.compose(rs('earth', 'fire')).key
   check('번개 넷은 뇌우', [R.compose(n('thunder', 4)).kind, R.compose(n('thunder', 4)).sub], ['rain', 'bolt']);
   check('빛은 광선', R.compose(n('light', 1)).kind, 'beam');
   check('빛 둘은 두 갈래', R.compose(n('light', 2)).count, 2);
-  check('어둠은 저주', R.compose(n('dark', 1)).kind, 'curse');
+  check('어둠은 그림자 낫', R.compose(n('dark', 1)).kind, 'reap');
   check('일곱 원소 모두 7단계가 화면 전체', R.ELEMENTS.map((el) => !!R.compose(n(el, 7)).screen), R.ELEMENTS.map(() => true));
   check('특수 조합: 두 원소 21쌍×2 + 옛 여섯 쌍 3:3 + 세 원소 넷×2 + 궁극기', Object.keys(R.RECIPES).length, 21 * 2 + 6 + 8 + 1);
   const steam = R.compose(rs('fire', 'water'));
   check('불+물은 특수 조합(얼리는 화염구)', [steam.recipe, steam.kind, !!steam.freeze], [true, 'bolt', true]);
-  check('새 원소가 든 쌍은 새 원소가 형태를 정한다', [R.compose(rs('fire', 'thunder')).kind, R.compose(rs('light', 'dark')).kind], ['zap', 'curse']);
+  check('새 원소가 든 쌍은 새 원소가 형태를 정한다', [R.compose(rs('fire', 'thunder')).kind, R.compose(rs('light', 'dark')).kind], ['zap', 'reap']);
   check('특수 조합은 접목이 붙는다', !!R.compose(rs('fire', 'wind')).ignite, true);
   check('조합을 벗어나면 규칙으로 돌아간다', R.compose(rs('fire', 'fire', 'water')).recipe, false);
   check('특수 조합은 어느 원소를 강화해도 강해진다', R.compose([{ id: 'fire', grade: 3 }, { id: 'earth', grade: 0 }]).dmg > R.compose(rs('fire', 'earth')).dmg, true);
