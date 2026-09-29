@@ -75,7 +75,7 @@
       // 하늘에서 떨어진다. 적이 있는 자리 여러 곳을 한꺼번에 친다.
       3: { kind: 'meteor', dmg: 62, cd: 2.2, size: 64, count: 2 },
       4: { kind: 'rain', sub: 'meteor', dmg: 48, cd: 4, dur: 3, size: 58, count: 2, every: 0.35, delay: 0.5 },
-      5: { kind: 'aura', dmg: 36, cd: 5, dur: 4, size: 150, every: 0.3, burn: 12 },
+      5: { kind: 'aura', dmg: 38, cd: 5, dur: 4, size: 150, every: 0.3, burn: 12 },
       7: { kind: 'aura', dmg: 110, cd: 5, dur: 4, size: 470, every: 0.5, burn: 20, screen: true },
     },
     water: {
@@ -83,9 +83,9 @@
       2: { nova: true },
       // 넓은 물결이 밀고 나가며 닿는 것을 모두 밀어낸다.
       3: { kind: 'wave', dmg: 48, cd: 2.0, size: 66, speed: 250, count: 1, pierce: 0 },
-      4: { kind: 'rain', sub: 'ice', dmg: 45, cd: 3.6, dur: 3, size: 44, count: 3, every: 0.3, delay: 0.3, freeze: true },
-      5: { kind: 'wave', ring: true, dmg: 58, cd: 2.6, size: 70, speed: 230, count: 12 },
-      7: { kind: 'aura', dmg: 140, cd: 5, dur: 3.5, size: 470, every: 0.5, freeze: true, screen: true },
+      4: { kind: 'rain', sub: 'ice', dmg: 40, cd: 3.6, dur: 3, size: 44, count: 3, every: 0.3, delay: 0.3, freeze: true },
+      5: { kind: 'wave', ring: true, dmg: 60, cd: 2.6, size: 70, speed: 230, count: 12 },
+      7: { kind: 'aura', dmg: 150, cd: 5, dur: 3.5, size: 470, every: 0.5, freeze: true, screen: true },
     },
     wind: {
       // 칼날이 도는 반경이 크게 들고 난다.
@@ -102,9 +102,9 @@
       2: { shock: true },
       // 발밑부터 넓게 땅이 흔들려 둘레를 한꺼번에 치고 묶는다.
       3: { kind: 'quake', dmg: 24, cd: 3.8, dur: 1.6, size: 170, count: 1 },
-      4: { kind: 'rain', sub: 'rock', dmg: 90, cd: 4, dur: 3, size: 72, count: 1, every: 0.45, delay: 0.6, knock: 80 },
+      4: { kind: 'rain', sub: 'rock', dmg: 80, cd: 4, dur: 3, size: 72, count: 1, every: 0.45, delay: 0.6, knock: 80 },
       5: { kind: 'aura', dmg: 34, cd: 4, dur: 4, size: 140, every: 0.3, knock: 20 },
-      7: { kind: 'quake', dmg: 100, cd: 6, dur: 2.5, size: 470, screen: true },
+      7: { kind: 'quake', dmg: 105, cd: 6, dur: 2.5, size: 470, screen: true },
     },
     thunder: {
       // 튀는 수가 는다.
@@ -121,8 +121,8 @@
       // 마법사 둘레로 성광이 두 번 터진다.
       3: { kind: 'aura', dmg: 30, cd: 2.4, dur: 0.7, size: 150, every: 0.3 },
       4: { kind: 'rain', sub: 'light', dmg: 50, cd: 3.5, dur: 3, size: 36, count: 3, every: 0.3, delay: 0.35 },
-      5: { kind: 'aura', dmg: 38, cd: 4.5, dur: 4, size: 150, every: 0.3, vuln: 0.2 },
-      7: { kind: 'aura', dmg: 100, cd: 5, dur: 3, size: 470, every: 0.5, screen: true },
+      5: { kind: 'aura', dmg: 42, cd: 4.5, dur: 4, size: 150, every: 0.3, vuln: 0.2 },
+      7: { kind: 'aura', dmg: 115, cd: 5, dur: 3, size: 470, every: 0.5, screen: true },
     },
     dark: {
       // 낫을 두 번, 번갈아 휘두른다. 휘두르는 수가 곧 피해의 곱이라 한 번의 몫을 줄인다.
@@ -130,8 +130,8 @@
       // 적 무리 아래 어둠의 늪이 열려 빨아들인다.
       3: { kind: 'zone', dmg: 8, cd: 2.4, dur: 3.5, size: 70, count: 1, vortex: true },
       4: { kind: 'rain', sub: 'void', dmg: 52, cd: 3.8, dur: 3, size: 50, count: 2, every: 0.35, delay: 0.45 },
-      5: { kind: 'aura', dmg: 36, cd: 4.5, dur: 4, size: 160, every: 0.3, fear: 0.5 },
-      7: { kind: 'aura', dmg: 95, cd: 5, dur: 3.5, size: 470, every: 0.5, screen: true },
+      5: { kind: 'aura', dmg: 44, cd: 4.5, dur: 4, size: 160, every: 0.3, fear: 0.5 },
+      7: { kind: 'aura', dmg: 110, cd: 5, dur: 3.5, size: 470, every: 0.5, screen: true },
     },
   };
   const TIER_STEPS = [7, 5, 4, 3, 2, 1];
