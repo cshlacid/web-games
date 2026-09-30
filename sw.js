@@ -302,7 +302,7 @@ const FILES = {
   "icons/icon-180.png": 'ce2fa86771c1',
   "icons/icon-192.png": 'a039c60184af',
   "icons/icon-512.png": 'ae1f8f0c2214',
-  "index.html": '0388e86bc527',
+  "index.html": '4c992ddc8d00',
   "manifest.json": '44ddd1ef817a',
   "shared/analytics.js": '2a72c96709d8',
   "shared/audio.js": 'd7a4a52b6f41',
