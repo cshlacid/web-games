@@ -294,7 +294,27 @@ function combinations(state) {
  * 이 줄에서 아직 가능한 배치를 모두 모아, 칸마다 가질 수 있는 값의 합집합으로
  * 후보를 좁힌다. 위의 기법들이 못 잡는 것까지 잡는 가장 강한 단계다.
  */
+// 배치를 사람이 따지는 단위로 센다 — 검은 칸 두 자리와 그 사이에 들어갈 숫자 묶음.
+// 숫자 순서까지 다른 배치로 세면 8×8 한 줄이 천 가지를 넘는데, 사람은 그렇게 따지지
+// 않는다. 묶음마다 어느 칸에 무엇이 들어갈지는 칸의 후보를 보고 바로 갈린다.
+function casesOf(viable) {
+  return new Set(viable.map((a) => {
+    const first = a.indexOf(R.BLOCK);
+    const last = a.lastIndexOf(R.BLOCK);
+    return `${first},${last}:${a.slice(first + 1, last).sort().join('')}`;
+  })).size;
+}
+
+// 배치 좁히기에 쓰는 줄의 상한. 이보다 많은 경우를 따져야 하는 줄은 손으로 따질 수 있는
+// 양을 넘어 "경우의 수를 다 따져 보는" 일이 되므로 쓰지 않는다 — 그런 줄로만 풀리는 판은
+// 논리로 안 풀리는 판으로 쳐서 버린다. 탱고가 한 줄을 통째로 따지는 양(여섯 칸에 열네
+// 가지)을 넘지 않게 잡았다.
+const MAX_CASES = 8;
+
 function lineArrangements(state) {
+  // 좁혀지는 줄 가운데 따질 경우가 가장 적은 줄을 고른다. 앞에서부터 처음 걸린 줄을
+  // 쓰면 8×8에서 배치 천 가지를 따져야 하는 줄이 나왔다.
+  let best = null;
   for (const line of state.lines) {
     const viable = viableArrangements(state, line);
     if (viable.length === 0) { state.broken = true; return { line, why: { code: 'noArrangement' } }; }
@@ -303,16 +323,17 @@ function lineArrangements(state) {
     for (const arrangement of viable) {
       for (let p = 0; p < state.n; p++) union[p] |= bitOf(arrangement[p]);
     }
-    let changed = false;
-    for (let p = 0; p < state.n; p++) changed = restrict(state, line.cells[p], union[p]) || changed;
-    if (changed) {
-      // 배치 수만 말하면 "5가지"가 무엇의 5가지인지 알 수 없다. 사람이 손으로
-      // 따지는 단위는 숫자 순서까지가 아니라 검은 칸 두 자리이므로 함께 센다.
-      const spots = new Set(viable.map((a) => a.reduce((acc, v, p) => (v === R.BLOCK ? `${acc},${p}` : acc), ''))).size;
-      return { line, why: { code: 'arrangements', line: lineOf(line), count: viable.length, spots } };
-    }
+    if (!line.cells.some((cell, p) => (state.cands[cell] & union[p]) !== state.cands[cell])) continue;
+    const cases = casesOf(viable);
+    if (cases > MAX_CASES || (best && cases >= best.cases)) continue;
+    best = { line, viable, union, cases };
   }
-  return null;
+  if (!best) return null;
+  const { line, viable, union, cases } = best;
+  for (let p = 0; p < state.n; p++) restrict(state, line.cells[p], union[p]);
+  // 경우의 수만 말하면 무엇의 수인지 알 수 없다. 검은 칸 자리로도 따로 센다.
+  const spots = new Set(viable.map((a) => a.reduce((acc, v, p) => (v === R.BLOCK ? `${acc},${p}` : acc), ''))).size;
+  return { line, why: { code: 'arrangements', line: lineOf(line), cases, spots } };
 }
 
 /**
@@ -534,15 +555,27 @@ function removalSummary(line, cells, before, after, digits) {
  * 그래서 후보가 좁혀지는 순간마다 끊어 돌려주고, 확정까지 간 경우에만 값을
  * 알려 준다.
  *
- * marks(플레이어의 연필 표시)는 "이미 아는 단계인가"를 가리는 데만 쓰고 추론에는
- * 넣지 않는다. 잘못 적어 둔 후보를 근거로 삼으면 힌트가 거짓말을 하게 된다.
+ * marks(플레이어의 연필 표시)도 알아낸 것으로 치고 거기서 이어 간다 — 사람이 스스로
+ * 좁혀 둔 것을 무시하면 이미 아는 것을 다시 짚거나, 그 위에서 보이는 걸음을 놓친다.
+ * 잘못 적어 둔 후보를 근거로 삼으면 힌트가 거짓말을 하게 되므로, 정답을 지운 표시는
+ * 화면이 먼저 짚고 멈춘다.
  */
 function nextHint(n, rowClues, colClues, placed, marks = null, allowed = TECHNIQUE_NAMES) {
   const state = createState(n, rowClues, colClues);
   for (let i = 0; i < placed.length; i++) {
     if (placed[i] !== R.UNKNOWN) restrict(state, i, bitOf(placed[i]));
+    else if (marks && marks[i]) restrict(state, i, marks[i]);
   }
   if (state.broken) return null;
+
+  // 연필 후보가 하나만 남은 칸은 값을 넣는 것이 다음 걸음이다. 화면은 좁혀진 후보를 이미
+  // 적어 둔 표시와 겹쳐 적으므로 이런 칸이 생긴다 — 그대로 두면 아래 기법이 바꿀 것이 없어
+  // 판이 다 정해졌는데도 힌트가 "찾지 못했다"에 멈췄다.
+  for (let i = 0; i < placed.length; i++) {
+    if (placed[i] !== R.UNKNOWN || popcount(state.cands[i]) !== 1) continue;
+    const value = (state.cands[i] & BLOCK_BIT) ? R.BLOCK : Math.log2(state.cands[i]);
+    return { kind: 'place', cell: i, value, technique: 'nakedSingle', why: { code: 'onlyMark' } };
+  }
 
   const techniques = TECHNIQUES.filter((t) => allowed.includes(t.name));
 
@@ -613,6 +646,7 @@ function clueCombinations(n, clue) {
 }
 
 const Solver = {
+  MAX_CASES,
   BLOCK_BIT, bitOf, popcount, valuesOf,
   TECHNIQUES, TECHNIQUE_NAMES,
   createState, cloneState, gridOf, isSolved, viableArrangements,
