@@ -41,8 +41,11 @@ for (const [n, count] of [[4, 60], [5, 40], [6, 25]]) {
   let wrongAnswer = 0;
   let solvedButNotUnique = 0;
   let solvedCount = 0;
+  // 씨앗을 고정한다. 6×6은 논리로 풀리는 판이 여섯에 하나꼴이라, 그때그때 뽑으면 스물다섯
+  // 판 중 하나도 안 풀려 "풀린 판이 있다"가 가끔 떨어졌다.
+  const rng = require('./generator.js').mulberry32(n * 101);
   for (let i = 0; i < count; i++) {
-    const solution = R.randomSolution(n);
+    const solution = R.randomSolution(n, rng);
     const { rowClues, colClues } = R.cluesOf(n, solution);
 
     if (dropsSolution(n, rowClues, colClues, solution) >= 0) unsound++;
@@ -243,6 +246,57 @@ check('맞물림이 가장 어려운 기법이다',
 // --- 모순된 판 ---
 const contradictory = S.solveLogically(4, [3, 3, 3, 3], [0, 0, 0, 0]);
 check('모순된 단서는 풀리지 않는다', contradictory.solved, false);
+
+// --- 사람이 따질 수 있는 양 ---
+
+// 배치 좁히기는 검은 칸 자리와 숫자 묶음으로 센 경우가 MAX_CASES 이하인 줄에만 쓴다.
+// 구워 둔 큰 판을 힌트로만 끝까지 풀어 보고, 그보다 많이 따지게 하는 걸음이 없는지 본다.
+{
+  const P = require('./puzzles.js');
+  let long = 0;
+  let stuck = 0;
+  for (const n of [7, 8]) {
+    for (const [rowClues, colClues] of P.BAKED[n].slice(0, 6)) {
+      const placed = new Int8Array(n * n).fill(R.UNKNOWN);
+      const marks = new Uint16Array(n * n);
+      for (let guard = 0; guard < 800; guard++) {
+        const step = S.nextHint(n, rowClues, colClues, placed, marks);
+        if (!step) break;
+        if (step.why.code === 'arrangements' && step.why.cases > S.MAX_CASES) long++;
+        if (step.kind === 'place') { placed[step.cell] = step.value; marks[step.cell] = 0; }
+        // 화면처럼 이미 적어 둔 표시와 겹쳐 적는다. 그러면 후보가 하나만 남은 칸이 생기는데,
+        // 그 칸을 넣는 걸음이 없으면 힌트가 거기서 멈췄다.
+        else for (const { cell, mask } of step.cells) marks[cell] = (marks[cell] & mask) || mask;
+      }
+      if (placed.includes(R.UNKNOWN)) stuck++;
+    }
+  }
+  check('큰 판도 힌트만으로 끝까지 간다', stuck, 0);
+  check('배치 좁히기는 따질 경우가 적은 줄에만 쓴다', long, 0);
+}
+
+// 연필 표시는 알아낸 것으로 친다 — 사람이 정답 하나만 남겨 둔 칸은 그 값으로 확정된 것과
+// 같으므로, 그 줄에서 바로 이어지는 걸음이 나온다.
+{
+  const P = require('./puzzles.js');
+  const [rowClues, colClues] = P.BAKED[7][0];
+  const answer = S.solveLogically(7, rowClues, colClues).grid;
+  const placed = new Int8Array(49).fill(R.UNKNOWN);
+  const marks = new Uint16Array(49);
+  for (let i = 0; i < 7; i++) marks[i] = S.bitOf(answer[i]);
+  const step = S.nextHint(7, rowClues, colClues, placed, marks);
+  const plain = S.nextHint(7, rowClues, colClues, placed, null);
+  check('연필 표시로 좁혀 둔 판에서는 다른 걸음이 나온다',
+    JSON.stringify(step) !== JSON.stringify(plain), true);
+  const wrong = step.kind === 'place'
+    ? step.value !== answer[step.cell]
+    : step.cells.some(({ cell, mask }) => !(mask & S.bitOf(answer[cell])));
+  check('그 걸음도 정답을 어기지 않는다', wrong, false);
+  // 연필 후보가 하나만 남은 칸은 그 값을 넣는 것이 다음 걸음이다. 이것이 없으면 판이 다
+  // 정해졌는데도 힌트가 "찾지 못했다"에 멈췄다.
+  check('연필 후보가 하나뿐인 칸은 넣으라고 짚는다',
+    [step.kind, step.cell, step.value, step.why.code], ['place', 0, answer[0], 'onlyMark']);
+}
 
 console.log(`${passed}개 통과, ${failed}개 실패`);
 process.exit(failed ? 1 : 0);

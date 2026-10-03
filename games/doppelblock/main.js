@@ -582,6 +582,18 @@
         return;
       }
     }
+    // 연필 표시도 알아낸 것으로 치고 이어 가므로, 정답을 지워 둔 표시가 있으면 먼저 짚는다.
+    // 그 위에서 좁혀 봐야 정답이 없는 후보만 남는다.
+    for (let i = 0; i < state.values.length; i++) {
+      if (state.values[i] === R.UNKNOWN && state.marks[i] && !(state.marks[i] & S.bitOf(state.solution[i]))) {
+        state.selected = i;
+        state.hinted.clear();
+        render();
+        Sound.play('conflict');
+        toast(t('doppel.badMarks'), true);
+        return;
+      }
+    }
 
     const step = S.nextHint(state.n, state.rowClues, state.colClues, state.values, state.marks);
     if (!step) { toast(t('doppel.noStep')); return; }
