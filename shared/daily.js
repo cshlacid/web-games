@@ -210,7 +210,8 @@ function create() {
 // 그날의 셋은 처음 본 순간 기록에 박는다. 뒤에 미션 표를 고치거나 게임을 더해도
 // 이미 시작한 날의 미션이 바뀌지 않고, 지난 날의 기록도 제 미션과 함께 남는다.
 function day(state, key) {
-  if (!state.days[key]) state.days[key] = { q: pick(key), done: [] };
+  // if (!state.days[key]) 
+  state.days[key] = { q: pick(key), done: [] };
   return state.days[key];
 }
 
