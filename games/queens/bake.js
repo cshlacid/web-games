@@ -9,7 +9,7 @@
 const G = require('./generator.js');
 const S = require('./solver.js');
 
-const COUNT = 60;
+const COUNT = 180;
 
 const out = {};
 const started = Date.now();

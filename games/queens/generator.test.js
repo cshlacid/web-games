@@ -89,7 +89,7 @@ check('지원하지 않는 크기는 거절한다', (() => {
   const D = require('./doubles.js').DOUBLES;
   const bad = { count: 0, shape: 0, oversized: 0, notUnique: 0, solution: 0, order: 0, logic: 0, long: 0 };
   for (const size of G.DOUBLE_SIZES) {
-    if (!D[size] || D[size].length !== 60) bad.count++;
+    if (!D[size] || D[size].length !== 180) bad.count++;
     D[size].forEach((code, id) => {
       const puzzle = G.decodeDouble(size, code);
       if (!R.wellFormed(puzzle)) bad.shape++;
@@ -104,7 +104,7 @@ check('지원하지 않는 크기는 거절한다', (() => {
       if (id < 2 && S.longestTrial(puzzle) > S.SHORT_TRIAL) bad.long++;
     });
   }
-  check('둘인 판 자료: 크기마다 60판', bad.count, 0);
+  check('둘인 판 자료: 크기마다 180판', bad.count, 0);
   check('둘인 판 자료: 영역 모양이 온전하다', bad.shape, 0);
   check('둘인 판 자료: 영역 크기가 상한을 넘지 않는다', bad.oversized, 0);
   check('둘인 판 자료: 모두 유일해다', bad.notUnique, 0);
