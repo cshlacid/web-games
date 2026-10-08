@@ -30,6 +30,7 @@
       'game.nurikabe': '누리카베',
       'game.lightup': '라이트 업',
       'game.kenken': '켄켄',
+      'game.pips': '핍스',
 
       'ui.back': '← 목록',
       'ui.bgm': 'BGM',
@@ -127,6 +128,7 @@
       'game.nurikabe': 'Nurikabe',
       'game.lightup': 'Light Up',
       'game.kenken': 'KenKen',
+      'game.pips': 'Pips',
 
       'ui.back': '← All games',
       'ui.bgm': 'Music',
@@ -224,6 +226,7 @@
       'game.nurikabe': 'ぬりかべ',
       'game.lightup': '美術館',
       'game.kenken': 'ケンケン',
+      'game.pips': 'ピップス',
 
       'ui.back': '← 一覧',
       'ui.bgm': 'BGM',
@@ -321,6 +324,7 @@
       'game.nurikabe': '数墙',
       'game.lightup': '美术馆',
       'game.kenken': '聪明格',
+      'game.pips': 'Pips',
 
       'ui.back': '← 列表',
       'ui.bgm': '音乐',
@@ -418,6 +422,7 @@
       'game.nurikabe': '數牆',
       'game.lightup': '美術館',
       'game.kenken': '聰明格',
+      'game.pips': 'Pips',
 
       'ui.back': '← 列表',
       'ui.bgm': '音樂',
@@ -515,6 +520,7 @@
       'game.nurikabe': 'Nurikabe',
       'game.lightup': 'Light Up',
       'game.kenken': 'KenKen',
+      'game.pips': 'Pips',
 
       'ui.back': '← Lista',
       'ui.bgm': 'Música',

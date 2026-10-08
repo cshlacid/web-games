@@ -33,6 +33,7 @@
       'desc.nurikabe': '섬만 남기고 바다 칠하기',
       'desc.lightup': '전구로 모든 칸 밝히기',
       'desc.kenken': '행과 열, 케이지의 셈 맞추기',
+      'desc.pips': '도미노를 놓아 구역의 조건 맞추기',
 
       'daily.title': '오늘의 도전',
       'daily.calendar': '달력',
@@ -74,6 +75,7 @@
       'desc.nurikabe': 'Shade the sea around the islands',
       'desc.lightup': 'Light every cell with bulbs',
       'desc.kenken': 'Fill rows and columns to make every cage add up',
+      'desc.pips': 'Place dominoes to meet each region’s condition',
 
       'daily.title': 'Daily challenge',
       'daily.calendar': 'Calendar',
@@ -115,6 +117,7 @@
       'desc.nurikabe': '島を残して海を塗る',
       'desc.lightup': '照明ですべてを照らす',
       'desc.kenken': '行と列を埋めてケージの計算を合わせる',
+      'desc.pips': 'ドミノを置いて領域の条件を満たす',
 
       'daily.title': '今日のチャレンジ',
       'daily.calendar': 'カレンダー',
@@ -156,6 +159,7 @@
       'desc.nurikabe': '留下岛屿，涂黑海洋',
       'desc.lightup': '用灯泡照亮所有格子',
       'desc.kenken': '填满行列，凑出每个笼子的算式',
+      'desc.pips': '摆放骨牌，满足每个区域的条件',
 
       'daily.title': '今日挑战',
       'daily.calendar': '日历',
@@ -197,6 +201,7 @@
       'desc.nurikabe': '留下島嶼，塗黑海洋',
       'desc.lightup': '用燈泡照亮所有格子',
       'desc.kenken': '填滿行列，湊出每個籠子的算式',
+      'desc.pips': '擺放骨牌，滿足每個區域的條件',
 
       'daily.title': '今日挑戰',
       'daily.calendar': '日曆',
@@ -238,6 +243,7 @@
       'desc.nurikabe': 'Sombrea el mar entre islas',
       'desc.lightup': 'Ilumina todas las casillas',
       'desc.kenken': 'Completa filas y columnas cuadrando cada jaula',
+      'desc.pips': 'Coloca fichas para cumplir cada región',
 
       'daily.title': 'Reto diario',
       'daily.calendar': 'Calendario',
