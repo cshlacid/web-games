@@ -106,8 +106,8 @@ function colorRegions(puzzle) {
 }
 
 // 구역 경계는 굵게, 칸 사이는 가늘게. 가는 선은 오른쪽·아래 칸 몫만 긋고, 굵은 선은 양쪽
-// 칸이 1px씩 나눠 그어 2px가 된다. 판 바깥(구멍)과 맞닿은 변은 긋지 않는다 — 칸 바탕만으로
-// 판의 모양이 드러난다.
+// 칸이 1px씩 나눠 그어 2px가 된다. 판 바깥(구멍)과 맞닿은 변은 그 칸 혼자 2px를 긋는다 — 조건
+// 없는 칸은 바탕이 페이지와 거의 같아 테두리가 없으면 판이 어디서 끝나는지 보이지 않았다.
 function edgeOf(puzzle, c) {
   const { w, index, regionOf } = puzzle;
   const g = puzzle.pos[c];
@@ -119,16 +119,13 @@ function edgeOf(puzzle, c) {
     if (rr < 0 || rr >= puzzle.h || cc < 0 || cc >= w) return -1;
     return index[rr * w + cc];
   };
-  const other = (d) => regionOf[d] !== regionOf[c];
   const out = [];
-  const right = at(0, 1);
-  const down = at(1, 0);
-  const left = at(0, -1);
-  const up = at(-1, 0);
-  if (right >= 0) out.push(`inset -1px 0 0 var(${other(right) ? '--region-line' : '--line'})`);
-  if (down >= 0) out.push(`inset 0 -1px 0 var(${other(down) ? '--region-line' : '--line'})`);
-  if (left >= 0 && other(left)) out.push('inset 1px 0 0 var(--region-line)');
-  if (up >= 0 && other(up)) out.push('inset 0 1px 0 var(--region-line)');
+  // [이웃, x 방향, y 방향, 가는 선을 이 칸이 긋는가]
+  for (const [d, x, y, own] of [[at(0, 1), -1, 0, true], [at(1, 0), 0, -1, true], [at(0, -1), 1, 0, false], [at(-1, 0), 0, 1, false]]) {
+    if (d < 0) out.push(`inset ${x * 2}px ${y * 2}px 0 var(--region-line)`);
+    else if (regionOf[d] !== regionOf[c]) out.push(`inset ${x}px ${y}px 0 var(--region-line)`);
+    else if (own) out.push(`inset ${x}px ${y}px 0 var(--grid)`);
+  }
   // 비어도 'none'이 아니라 투명한 그림자를 둔다. 끌 때 이 값 뒤에 테두리를 덧붙이는데, 'none'은
   // 목록에 낄 수 없어 덧붙인 것까지 통째로 무시된다.
   return out.join(', ') || '0 0 transparent';
