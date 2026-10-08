@@ -17,7 +17,7 @@
       'pips.rule1': '판의 모든 칸을 <b>아래의 도미노로 빠짐없이</b> 덮습니다. 도미노는 하나도 남기지 않고 다 씁니다.',
       'pips.rule2': '색칠한 <b>구역</b>에는 조건이 있습니다. 숫자는 구역의 눈을 더한 <b>합</b>, <b>&lt;</b>와 <b>&gt;</b>는 합이 그보다 작거나 큼, <b>=</b>는 눈이 모두 같음, <b>≠</b>는 눈이 모두 다름입니다. 색이 없는 칸에는 아무 눈이나 와도 됩니다.',
       'pips.rule3': '도미노 하나가 두 구역에 걸쳐도 됩니다.',
-      'pips.rule4': '아래에서 도미노를 고르고 판의 칸을 누르면 그 칸을 덮도록 놓입니다. 고른 도미노를 한 번 더 누르면 돌아가고, 판에 놓은 도미노를 누르면 다시 아래로 돌아옵니다.',
+      'pips.rule4': '아래에서 도미노를 고르고 판의 칸을 누르면 그 칸을 덮도록 놓입니다. <b>끌어다 놓아도 됩니다.</b> 고른 도미노를 한 번 더 누르면 돌아가고, 판에 놓은 도미노를 누르거나 판 밖으로 끌어내면 다시 아래로 돌아옵니다.',
       'pips.rule5': '<b>모든 판은 도미노가 가는 자리가 하나뿐입니다.</b> 한 구역 안에 통째로 든 도미노는 뒤집어도 맞을 수 있는데, 규칙에 맞게 다 덮었으면 어느 쪽이든 정답입니다.',
       'pips.rule6': '<b>힌트</b>는 틀린 도미노를 짚어 주고, 틀린 것이 없으면 지금 판에서 새로 정할 수 있는 도미노 하나를 까닭과 함께 놓아 줍니다.',
       'pips.rule7': '키보드: <b>R</b> 돌리기, <b>Ctrl+Z</b> 되돌리기.'
@@ -36,7 +36,7 @@
       'pips.rule1': 'Cover every cell of the board <b>with all the dominoes below</b>. Every domino gets used.',
       'pips.rule2': 'Each colored <b>region</b> has a condition. A number is the <b>sum</b> of its pips, <b>&lt;</b> and <b>&gt;</b> mean the sum is less or more than that, <b>=</b> means all pips are equal, and <b>≠</b> means all are different. Uncolored cells can hold anything.',
       'pips.rule3': 'A domino may straddle two regions.',
-      'pips.rule4': 'Pick a domino below, then tap a cell on the board to place it over that cell. Tap the picked domino again to rotate it, and tap a placed domino to send it back.',
+      'pips.rule4': 'Pick a domino below, then tap a cell on the board to place it over that cell — <b>or just drag it there.</b> Tap the picked domino again to rotate it. Tap a placed domino, or drag it off the board, to send it back.',
       'pips.rule5': '<b>On every board, each domino has only one place it can go.</b> A domino lying entirely inside one region may work either way round — if every rule holds, either way is correct.',
       'pips.rule6': 'The <b>hint</b> points out a misplaced domino; if there is none, it places one domino that can now be settled and tells you why.',
       'pips.rule7': 'Keyboard: <b>R</b> to rotate, <b>Ctrl+Z</b> to undo.'
@@ -55,7 +55,7 @@
       'pips.rule1': '盤のすべてのマスを<b>下のドミノで残らず</b>覆います。ドミノはすべて使います。',
       'pips.rule2': '色の付いた<b>領域</b>には条件があります。数字は目の<b>合計</b>、<b>&lt;</b>と<b>&gt;</b>は合計がそれより小さい・大きい、<b>=</b>は目がすべて同じ、<b>≠</b>はすべて違うことです。色のないマスは何の目でもかまいません。',
       'pips.rule3': 'ひとつのドミノが二つの領域にまたがってもかまいません。',
-      'pips.rule4': '下のドミノを選んで盤のマスを押すと、そのマスを覆うように置かれます。選んだドミノをもう一度押すと回転し、盤に置いたドミノを押すと下に戻ります。',
+      'pips.rule4': '下のドミノを選んで盤のマスを押すと、そのマスを覆うように置かれます。<b>ドラッグして置いてもかまいません。</b>選んだドミノをもう一度押すと回転し、盤に置いたドミノを押すか盤の外へドラッグすると下に戻ります。',
       'pips.rule5': '<b>どの盤もドミノの置き場所はひとつに決まります。</b>ひとつの領域にすっぽり入ったドミノは裏返しても合うことがあり、ルールどおりに覆えていればどちらでも正解です。',
       'pips.rule6': '<b>ヒント</b>は間違ったドミノを示し、なければいまの盤から新しく決められるドミノをひとつ、理由と一緒に置きます。',
       'pips.rule7': 'キーボード: <b>R</b>で回転、<b>Ctrl+Z</b>で元に戻す。'
@@ -74,7 +74,7 @@
       'pips.rule1': '用<b>下面的全部骨牌</b>盖满棋盘上的每一格，每张骨牌都要用上。',
       'pips.rule2': '有颜色的<b>区域</b>带有条件：数字是区域内点数的<b>和</b>，<b>&lt;</b> 和 <b>&gt;</b> 表示和小于或大于该数，<b>=</b> 表示点数全部相同，<b>≠</b> 表示全部不同。没有颜色的格子放什么点数都可以。',
       'pips.rule3': '一张骨牌可以跨两个区域。',
-      'pips.rule4': '在下面选一张骨牌，再点棋盘上的格子，骨牌就会盖住那一格。再点一次选中的骨牌可以旋转，点棋盘上的骨牌会把它放回下面。',
+      'pips.rule4': '在下面选一张骨牌，再点棋盘上的格子，骨牌就会盖住那一格，<b>也可以直接拖过去。</b>再点一次选中的骨牌可以旋转；点棋盘上的骨牌或把它拖出棋盘，会把它放回下面。',
       'pips.rule5': '<b>每个棋盘上每张骨牌的位置都是唯一的。</b>整张落在同一区域内的骨牌翻过来也可能成立，只要满足所有规则，哪个方向都算对。',
       'pips.rule6': '<b>提示</b>会指出放错的骨牌；没有放错的话，会根据当前棋盘放下一张能确定的骨牌，并说明理由。',
       'pips.rule7': '键盘：<b>R</b> 旋转，<b>Ctrl+Z</b> 撤销。'
@@ -93,7 +93,7 @@
       'pips.rule1': '用<b>下面的全部骨牌</b>蓋滿棋盤上的每一格，每張骨牌都要用上。',
       'pips.rule2': '有顏色的<b>區域</b>帶有條件：數字是區域內點數的<b>和</b>，<b>&lt;</b> 和 <b>&gt;</b> 表示和小於或大於該數，<b>=</b> 表示點數全部相同，<b>≠</b> 表示全部不同。沒有顏色的格子放什麼點數都可以。',
       'pips.rule3': '一張骨牌可以跨兩個區域。',
-      'pips.rule4': '在下面選一張骨牌，再點棋盤上的格子，骨牌就會蓋住那一格。再點一次選中的骨牌可以旋轉，點棋盤上的骨牌會把它放回下面。',
+      'pips.rule4': '在下面選一張骨牌，再點棋盤上的格子，骨牌就會蓋住那一格，<b>也可以直接拖過去。</b>再點一次選中的骨牌可以旋轉；點棋盤上的骨牌或把它拖出棋盤，會把它放回下面。',
       'pips.rule5': '<b>每個棋盤上每張骨牌的位置都是唯一的。</b>整張落在同一區域內的骨牌翻過來也可能成立，只要滿足所有規則，哪個方向都算對。',
       'pips.rule6': '<b>提示</b>會指出放錯的骨牌；沒有放錯的話，會根據目前棋盤放下一張能確定的骨牌，並說明理由。',
       'pips.rule7': '鍵盤：<b>R</b> 旋轉，<b>Ctrl+Z</b> 復原。'
@@ -112,7 +112,7 @@
       'pips.rule1': 'Cubre todas las casillas del tablero <b>con todas las fichas de abajo</b>. Se usan todas.',
       'pips.rule2': 'Cada <b>región</b> de color tiene una condición. Un número es la <b>suma</b> de sus puntos, <b>&lt;</b> y <b>&gt;</b> indican que la suma es menor o mayor, <b>=</b> que todos los puntos son iguales y <b>≠</b> que todos son distintos. Las casillas sin color admiten cualquier valor.',
       'pips.rule3': 'Una ficha puede ocupar dos regiones.',
-      'pips.rule4': 'Elige una ficha abajo y toca una casilla del tablero para colocarla cubriéndola. Toca otra vez la ficha elegida para girarla, y toca una ficha colocada para devolverla.',
+      'pips.rule4': 'Elige una ficha abajo y toca una casilla del tablero para colocarla cubriéndola, <b>o simplemente arrástrala.</b> Toca otra vez la ficha elegida para girarla. Toca una ficha colocada, o sácala del tablero arrastrando, para devolverla.',
       'pips.rule5': '<b>En cada tablero, cada ficha tiene un único sitio.</b> Una ficha que queda entera dentro de una región puede valer en los dos sentidos: si se cumplen todas las reglas, cualquiera es correcto.',
       'pips.rule6': 'La <b>pista</b> señala una ficha mal colocada; si no hay ninguna, coloca una ficha que ya se puede decidir y te dice por qué.',
       'pips.rule7': 'Teclado: <b>R</b> para girar, <b>Ctrl+Z</b> para deshacer.'

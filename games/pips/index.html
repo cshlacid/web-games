@@ -61,6 +61,7 @@
   <p class="toast" id="toast" role="status" aria-live="polite"></p>
 
   <div class="tray" id="tray" role="group" aria-label="도미노" data-i18n-attr="aria-label=pips.tray"></div>
+  <div class="ghost" id="ghost" aria-hidden="true" hidden></div>
 
   <div class="tools">
     <button class="tool" id="undo" type="button">
@@ -83,7 +84,7 @@
       <li data-i18n-html="pips.rule1">판의 모든 칸을 <b>아래의 도미노로 빠짐없이</b> 덮습니다. 도미노는 하나도 남기지 않고 다 씁니다.</li>
       <li data-i18n-html="pips.rule2">색칠한 <b>구역</b>에는 조건이 있습니다. 숫자는 구역의 눈을 더한 <b>합</b>, <b>&lt;</b>와 <b>&gt;</b>는 합이 그보다 작거나 큼, <b>=</b>는 눈이 모두 같음, <b>≠</b>는 눈이 모두 다름입니다. 색이 없는 칸에는 아무 눈이나 와도 됩니다.</li>
       <li data-i18n-html="pips.rule3">도미노 하나가 두 구역에 걸쳐도 됩니다.</li>
-      <li data-i18n-html="pips.rule4">아래에서 도미노를 고르고 판의 칸을 누르면 그 칸을 덮도록 놓입니다. 고른 도미노를 한 번 더 누르면 돌아가고, 판에 놓은 도미노를 누르면 다시 아래로 돌아옵니다.</li>
+      <li data-i18n-html="pips.rule4">아래에서 도미노를 고르고 판의 칸을 누르면 그 칸을 덮도록 놓입니다. <b>끌어다 놓아도 됩니다.</b> 고른 도미노를 한 번 더 누르면 돌아가고, 판에 놓은 도미노를 누르거나 판 밖으로 끌어내면 다시 아래로 돌아옵니다.</li>
       <li data-i18n-html="pips.rule5"><b>모든 판은 도미노가 가는 자리가 하나뿐입니다.</b> 한 구역 안에 통째로 든 도미노는 뒤집어도 맞을 수 있는데, 규칙에 맞게 다 덮었으면 어느 쪽이든 정답입니다.</li>
       <li data-i18n-html="pips.rule6"><b>힌트</b>는 틀린 도미노를 짚어 주고, 틀린 것이 없으면 지금 판에서 새로 정할 수 있는 도미노 하나를 까닭과 함께 놓아 줍니다.</li>
       <li data-i18n-html="pips.rule7">키보드: <b>R</b> 돌리기, <b>Ctrl+Z</b> 되돌리기.</li>

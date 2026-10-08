@@ -303,6 +303,30 @@ h1 {
 }
 .tile.vertical { flex-direction: column; width: var(--u); height: calc(var(--u) * 2); }
 
+/* 네 방향의 그림을 미리 넣어 두고 하나만 보인다. display를 준 요소라 hidden이 저절로 듣지 않는다. */
+.face[hidden], .tile[hidden] { display: none; }
+
+/* 끌어서 놓는 자리라 페이지가 따라 스크롤되면 안 된다. 그래서 이 안의 조작은 click이 아니라
+   포인터 이벤트로 돈다(main.js). */
+.board, .tray { touch-action: none; }
+
+.piece.lifted { opacity: 0.3; }
+.cell.target { box-shadow: var(--edge, none), inset 0 0 0 3px var(--pick); }
+.cell.blocked { box-shadow: var(--edge, none), inset 0 0 0 3px var(--wrong); }
+
+/* 끄는 동안 손가락을 따라오는 도미노. 크기와 자리는 main.js가 픽셀로 준다. */
+.ghost {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  pointer-events: none;
+  opacity: 0.92;
+}
+.ghost[hidden] { display: none; }
+.ghost .face { margin: 3px; box-shadow: 0 0 0 1.5px var(--tile-edge), 0 6px 14px rgb(0 0 0 / 0.25); }
+
 .toast {
   margin: 0;
   min-height: 20px;
