@@ -32,7 +32,7 @@ const el = {
   levels: document.getElementById('levels'),
   timer: document.getElementById('timer'),
   mistakes: document.getElementById('mistakes'),
-  toast: document.getElementById('toast'),
+  detail: document.getElementById('detail'),
   detailWho: document.getElementById('detail-who'),
   detailText: document.getElementById('detail-text'),
   markInnocent: document.getElementById('mark-innocent'),
@@ -59,10 +59,13 @@ function formatTime(seconds) {
   return `${m}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
 }
 
+// 알림은 판 아래 상세 칸에 잠시 띄운다. 따로 줄을 두면 글이 두 줄이 될 때마다 판 높이가
+// 바뀌어 카드가 출렁인다. 다음 조작이 있으면 바로 상세로 돌아간다.
 function toast(text) {
-  el.toast.textContent = text;
+  game.note = text;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { el.toast.textContent = ''; }, 5000);
+  toastTimer = setTimeout(() => { game.note = ''; paint(); }, 5000);
+  paint();
 }
 
 function loadBest() {
@@ -151,7 +154,11 @@ function paint() {
     card.classList.toggle('scope', Boolean(scope & (1 << i)));
     clue.textContent = open ? clueText(game.puzzle.clues[i]) : '';
   });
-  if (sel < 0) {
+  el.detail.classList.toggle('note', Boolean(game.note));
+  if (game.note) {
+    el.detailWho.textContent = sel >= 0 ? `${nameOf(sel)} · ${jobOf(sel)}` : '';
+    el.detailText.textContent = game.note;
+  } else if (sel < 0) {
     el.detailWho.textContent = '';
     el.detailText.textContent = t('wd.pick');
   } else {
@@ -175,6 +182,7 @@ function started() {
 }
 
 function select(i) {
+  game.note = '';
   game.selected = game.selected === i && isOpen(i) ? -1 : i;
   Sound.play('select');
   paint();
@@ -315,6 +323,7 @@ function start(made) {
     revealed: 1 << made.start,
     selected: made.start,
     mistakes: 0,
+    note: '',
     elapsed: 0,
     running: false,
     done: false,
@@ -323,7 +332,6 @@ function start(made) {
   };
   el.result.hidden = true;
   el.timer.textContent = '0:00';
-  el.toast.textContent = '';
   build();
 }
 
