@@ -3,9 +3,9 @@
 // 화면과 조작. 규칙은 rules.js, 풀이는 solver.js, 판은 generator.js(구워 둔 puzzles.js)가
 // 들고 있고 여기서는 그것들을 부르고 그린다.
 //
-// **도미노마다 판 위의 조각과 아래 칸을 판을 만들 때 한 번 만들어 두고 보이고 감추기만 한다.**
-// 놓을 때마다 요소를 옮기거나 갈아 끼우면 아래 칸의 자리가 밀리고, 눌린 요소가 사라져 조작이
-// 끊긴다(저장소 규칙).
+// **도미노마다 판 위의 조각과 아래 칸을, 네 방향의 그림까지 판을 만들 때 한 번 만들어 두고
+// 보이고 감추기만 한다.** 놓을 때마다 요소를 옮기거나 갈아 끼우면 아래 칸의 자리가 밀리고, 눌린
+// 요소가 사라져 조작이 끊긴다(저장소 규칙). 고른 도미노를 다시 눌러 돌리는 것이 바로 그 경우다.
 (function () {
 
 const R = window.PipsRules;
@@ -41,6 +41,7 @@ const el = {
   board: document.getElementById('board'),
   levels: document.getElementById('levels'),
   tray: document.getElementById('tray'),
+  ghost: document.getElementById('ghost'),
   timer: document.getElementById('timer'),
   toast: document.getElementById('toast'),
   undo: document.getElementById('undo'),
@@ -128,12 +129,34 @@ function edgeOf(puzzle, c) {
   if (down >= 0) out.push(`inset 0 -1px 0 var(${other(down) ? '--region-line' : '--line'})`);
   if (left >= 0 && other(left)) out.push('inset 1px 0 0 var(--region-line)');
   if (up >= 0 && other(up)) out.push('inset 0 1px 0 var(--region-line)');
-  return out.join(', ') || 'none';
+  // 비어도 'none'이 아니라 투명한 그림자를 둔다. 끌 때 이 값 뒤에 테두리를 덧붙이는데, 'none'은
+  // 목록에 낄 수 없어 덧붙인 것까지 통째로 무시된다.
+  return out.join(', ') || '0 0 transparent';
 }
 
 const badgeText = (region) => ({
   sum: String(region.target), lt: `<${region.target}`, gt: `>${region.target}`, eq: '=', ne: '≠',
 }[region.kind]);
+
+// 방향(0: 앞|뒤, 1: 앞/뒤, 2: 뒤|앞, 3: 뒤/앞). 아래 칸에서 돌린 방향과 판에 놓인 모양을
+// 같은 값으로 적어, 들어 올리거나 끌어 옮겨도 보던 모양 그대로 따라온다.
+function rotOf(p) {
+  const [ac, ar] = spot(p.a);
+  const [bc, br] = spot(p.b);
+  const vertical = ac === bc;
+  const aFirst = vertical ? ar < br : ac < bc;
+  return (vertical ? 1 : 0) + (aFirst ? 0 : 2);
+}
+
+function facesOf(k, className) {
+  const [x, y] = game.puzzle.tiles[k];
+  return [0, 1, 2, 3].map((rot) => {
+    const face = faceOf(rot < 2 ? x : y, rot < 2 ? y : x, rot % 2 === 1);
+    face.className = `${className}${rot % 2 ? ' vertical' : ''}`;
+    face.hidden = true;
+    return face;
+  });
+}
 
 function faceOf(first, second, vertical) {
   const face = document.createElement('span');
@@ -186,6 +209,7 @@ function build() {
     piece.className = 'piece';
     piece.dataset.tile = k;
     piece.hidden = true;
+    piece.append(...facesOf(k, 'face'));
     el.board.append(piece);
     return piece;
   });
@@ -196,6 +220,7 @@ function build() {
     slot.type = 'button';
     slot.className = 'slot';
     slot.dataset.tile = k;
+    slot.append(...facesOf(k, 'tile'));
     el.tray.append(slot);
     return slot;
   });
@@ -226,15 +251,9 @@ function paintPiece(k) {
   if (!p) return;
   const [ac, ar] = spot(p.a);
   const [bc, br] = spot(p.b);
-  const vertical = ac === bc;
-  // 왼쪽(위) 반쪽부터 그린다. 앞 눈이 오른쪽(아래)에 있으면 순서를 바꾼다.
-  const firstIsA = vertical ? ar < br : ac < bc;
-  const [x, y] = game.puzzle.tiles[k];
-  const key = `${p.a},${p.b}`;
-  if (piece.dataset.key !== key) {
-    piece.dataset.key = key;
-    piece.replaceChildren(faceOf(firstIsA ? x : y, firstIsA ? y : x, vertical));
-  }
+  const rot = rotOf(p);
+  const vertical = rot % 2 === 1;
+  [...piece.children].forEach((face, r) => { face.hidden = r !== rot; });
   piece.classList.toggle('vertical', vertical);
   piece.style.left = px(Math.min(ac, bc));
   piece.style.top = px(Math.min(ar, br));
@@ -242,22 +261,11 @@ function paintPiece(k) {
   piece.style.height = `calc(var(--cell) * ${vertical ? 2 : 1})`;
 }
 
-// 아래 칸의 도미노. 돌린 방향(0: 앞|뒤, 1: 앞/뒤, 2: 뒤|앞, 3: 뒤/앞)대로 그린다.
 function paintSlot(k) {
   const slot = view.slots[k];
-  const used = Boolean(game.placed[k]);
-  slot.classList.toggle('used', used);
-  slot.disabled = used;
+  slot.classList.toggle('used', Boolean(game.placed[k]));
   slot.setAttribute('aria-pressed', String(game.picked === k));
-  const rot = game.rots[k];
-  const [x, y] = game.puzzle.tiles[k];
-  const key = String(rot);
-  if (slot.dataset.key !== key) {
-    slot.dataset.key = key;
-    const face = faceOf(rot < 2 ? x : y, rot < 2 ? y : x, rot % 2 === 1);
-    face.className = `tile${rot % 2 ? ' vertical' : ''}`;
-    slot.replaceChildren(face);
-  }
+  [...slot.children].forEach((face, r) => { face.hidden = r !== game.rots[k]; });
 }
 
 function paint() {
@@ -330,6 +338,10 @@ function drop(c) {
   const [first, second] = fit;
   game.placed[k] = rot < 2 ? { a: first, b: second } : { a: second, b: first };
   game.picked = -1;
+  landed(k);
+}
+
+function landed(k) {
   const piece = view.pieces[k];
   piece.classList.remove('dropped');
   void piece.offsetWidth;
@@ -348,11 +360,7 @@ function lift(k) {
   const p = game.placed[k];
   if (!p) return;
   snapshot();
-  const [ac, ar] = spot(p.a);
-  const [bc, br] = spot(p.b);
-  const vertical = ac === bc;
-  const aFirst = vertical ? ar < br : ac < bc;
-  game.rots[k] = (vertical ? 1 : 0) + (aFirst ? 0 : 2);
+  game.rots[k] = rotOf(p);
   game.placed[k] = null;
   game.picked = k;
   Sound.play('pick');
@@ -559,17 +567,152 @@ for (const item of LEVELS) {
   el.levels.append(button);
 }
 
-el.board.addEventListener('click', (event) => {
-  const piece = event.target.closest('.piece');
-  if (piece) { lift(Number(piece.dataset.tile)); return; }
-  const cell = event.target.closest('.cell');
-  if (cell) drop(Number(cell.dataset.index));
-});
+// --- 누르기와 끌기 ---
+//
+// **click이 아니라 포인터 이벤트로 짠다.** 끌 때 페이지가 따라 스크롤되지 않게 판과 아래 칸에
+// touch-action: none을 걸었고, 공용 base.js가 그 자리의 touchend를 취소하므로 click이 나지
+// 않는다. 짧게 누르고 떼면 누르기(고르기·돌리기·놓기·들어 올리기), 손가락이 움직이면 끌기다.
 
-el.tray.addEventListener('click', (event) => {
+const TAP = 8;
+let press = null;
+
+function onDown(event) {
+  if (!game || game.done || press) return;
   const slot = event.target.closest('.slot');
-  if (slot && !slot.disabled) pick(Number(slot.dataset.tile));
-});
+  const piece = event.target.closest('.piece');
+  const cell = event.target.closest('.cell');
+  if (slot && !game.placed[Number(slot.dataset.tile)]) press = { kind: 'slot', tile: Number(slot.dataset.tile) };
+  else if (piece) press = { kind: 'piece', tile: Number(piece.dataset.tile), node: piece };
+  else if (cell) press = { kind: 'cell', cell: Number(cell.dataset.index) };
+  else return;
+  event.preventDefault();
+  Object.assign(press, { x: event.clientX, y: event.clientY, id: event.pointerId, host: event.currentTarget });
+  event.currentTarget.setPointerCapture(event.pointerId);
+}
+
+function onMove(event) {
+  if (!press || event.pointerId !== press.id || press.kind === 'cell') return;
+  if (!press.drag) {
+    if (Math.hypot(event.clientX - press.x, event.clientY - press.y) < TAP) return;
+    startDrag(press, event);
+  }
+  moveDrag(press, event);
+}
+
+function onUp(event) {
+  if (!press || event.pointerId !== press.id) return;
+  const one = press;
+  press = null;
+  if (one.drag) { endDrag(one, event); return; }
+  if (one.kind === 'slot') pick(one.tile);
+  else if (one.kind === 'piece') lift(one.tile);
+  else drop(one.cell);
+}
+
+function onCancel(event) {
+  if (!press || event.pointerId !== press.id) return;
+  const one = press;
+  press = null;
+  if (one.drag) finishDrag(one);
+}
+
+const cellSize = () => parseFloat(getComputedStyle(el.board).getPropertyValue('--cell'));
+
+// 끄는 동안 손가락을 따라오는 도미노. 판의 칸 크기로 그린다 — 아래 칸의 작은 모양 그대로
+// 끌면 어느 두 칸에 떨어질지 가늠이 안 된다.
+function startDrag(one, event) {
+  const k = one.tile;
+  const rot = one.kind === 'piece' ? rotOf(game.placed[k]) : game.rots[k];
+  const size = cellSize();
+  const vertical = rot % 2 === 1;
+  const w = size * (vertical ? 1 : 2);
+  const h = size * (vertical ? 2 : 1);
+  let grab;
+  if (one.kind === 'piece') {
+    // 판에서 끌면 잡은 자리가 손가락 밑에 그대로 남는다.
+    const box = one.node.getBoundingClientRect();
+    grab = [one.x - box.left, one.y - box.top];
+    one.node.classList.add('lifted');
+  } else {
+    // 아래 칸에서 끌면 가운데를 잡는다. 손가락으로 끌 때는 조금 위로 띄운다 — 손가락에 가리면
+    // 어디에 놓일지 보이지 않는다.
+    grab = [w / 2, h / 2 + (event.pointerType === 'touch' ? size * 0.7 : 0)];
+  }
+  el.ghost.replaceChildren(facesOf(k, 'face')[rot]);
+  el.ghost.firstChild.hidden = false;
+  el.ghost.classList.toggle('vertical', vertical);
+  el.ghost.style.width = `${w}px`;
+  el.ghost.style.height = `${h}px`;
+  el.ghost.hidden = false;
+  one.drag = { rot, grab, size, target: null, marked: [] };
+  if (game.picked !== k) { game.picked = -1; paint(); }
+  started();
+}
+
+// 도미노의 왼쪽(위) 반쪽 한가운데가 든 칸을 첫 칸으로 본다.
+function moveDrag(one, event) {
+  const d = one.drag;
+  const left = event.clientX - d.grab[0];
+  const top = event.clientY - d.grab[1];
+  el.ghost.style.transform = `translate(${left}px, ${top}px)`;
+  const box = el.board.getBoundingClientRect();
+  const col = Math.floor((left + d.size / 2 - box.left) / d.size);
+  const row = Math.floor((top + d.size / 2 - box.top) / d.size);
+  const { w, h, index } = game.puzzle;
+  const at = (cc, rr) => (cc < 0 || cc >= w || rr < 0 || rr >= h ? -1 : index[rr * w + cc]);
+  const first = at(col, row);
+  const second = d.rot % 2 ? at(col, row + 1) : at(col + 1, row);
+  const ok = first >= 0 && second >= 0 && R.fits(game.puzzle, game.placed, first, second, one.tile);
+  d.target = ok ? (d.rot < 2 ? { a: first, b: second } : { a: second, b: first }) : null;
+  for (const c of d.marked) view.cells[c].classList.remove('target', 'blocked');
+  d.marked = [first, second].filter((c) => c >= 0);
+  for (const c of d.marked) view.cells[c].classList.add(ok ? 'target' : 'blocked');
+  d.outside = event.clientX < box.left || event.clientX > box.right
+    || event.clientY < box.top || event.clientY > box.bottom;
+}
+
+function finishDrag(one) {
+  el.ghost.hidden = true;
+  el.ghost.style.transform = '';
+  for (const c of one.drag.marked) view.cells[c].classList.remove('target', 'blocked');
+  if (one.node) one.node.classList.remove('lifted');
+}
+
+// 놓을 수 있는 자리면 놓는다. 판의 도미노를 판 밖으로 끌어내면 아래로 돌려보낸다. 그 밖에는
+// 원래 자리로 돌아간다.
+function endDrag(one, event) {
+  moveDrag(one, event);
+  const { target, rot, outside } = one.drag;
+  finishDrag(one);
+  const k = one.tile;
+  const was = game.placed[k];
+  if (target && was && was.a === target.a && was.b === target.b) { paint(); return; }
+  if (target) {
+    snapshot();
+    game.placed[k] = target;
+    game.rots[k] = rot;
+    game.picked = -1;
+    landed(k);
+    return;
+  }
+  if (one.kind === 'piece' && outside) {
+    snapshot();
+    game.rots[k] = rot;
+    game.placed[k] = null;
+    Sound.play('pick');
+    afterChange();
+    return;
+  }
+  if (!outside) Sound.play('conflict');
+  paint();
+}
+
+for (const host of [el.board, el.tray]) {
+  host.addEventListener('pointerdown', onDown);
+  host.addEventListener('pointermove', onMove);
+  host.addEventListener('pointerup', onUp);
+  host.addEventListener('pointercancel', onCancel);
+}
 
 el.undo.addEventListener('click', undo);
 el.hint.addEventListener('click', hint);
