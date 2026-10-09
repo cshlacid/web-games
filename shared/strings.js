@@ -32,6 +32,7 @@
       'game.kenken': '켄켄',
       'game.pips': '핍스',
       'game.whodunit': '범인 찾기',
+      'game.amhaeng': '암행',
 
       'ui.back': '← 목록',
       'ui.bgm': 'BGM',
@@ -131,6 +132,7 @@
       'game.kenken': 'KenKen',
       'game.pips': 'Pips',
       'game.whodunit': 'Whodunit',
+      'game.amhaeng': 'Amhaeng',
 
       'ui.back': '← All games',
       'ui.bgm': 'Music',
@@ -230,6 +232,7 @@
       'game.kenken': 'ケンケン',
       'game.pips': 'ピップス',
       'game.whodunit': '犯人探し',
+      'game.amhaeng': '暗行',
 
       'ui.back': '← 一覧',
       'ui.bgm': 'BGM',
@@ -329,6 +332,7 @@
       'game.kenken': '聪明格',
       'game.pips': 'Pips',
       'game.whodunit': '找出真凶',
+      'game.amhaeng': '暗行',
 
       'ui.back': '← 列表',
       'ui.bgm': '音乐',
@@ -428,6 +432,7 @@
       'game.kenken': '聰明格',
       'game.pips': 'Pips',
       'game.whodunit': '找出真兇',
+      'game.amhaeng': '暗行',
 
       'ui.back': '← 列表',
       'ui.bgm': '音樂',
@@ -527,6 +532,7 @@
       'game.kenken': 'KenKen',
       'game.pips': 'Pips',
       'game.whodunit': '¿Quién fue?',
+      'game.amhaeng': 'Amhaeng',
 
       'ui.back': '← Lista',
       'ui.bgm': 'Música',

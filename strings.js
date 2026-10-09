@@ -35,6 +35,7 @@
       'desc.kenken': '행과 열, 케이지의 셈 맞추기',
       'desc.pips': '도미노를 놓아 구역의 조건 맞추기',
       'desc.whodunit': '단서로 스무 명 중 범인 가려내기',
+      'desc.amhaeng': '한 줄 길에서 적의 수 읽고 출두하기',
 
       'daily.title': '오늘의 도전',
       'daily.calendar': '달력',
@@ -78,6 +79,7 @@
       'desc.kenken': 'Fill rows and columns to make every cage add up',
       'desc.pips': 'Place dominoes to meet each region’s condition',
       'desc.whodunit': 'Use the clues to unmask the criminals among twenty',
+      'desc.amhaeng': 'Read the foes on a single road and strike as the secret inspector',
 
       'daily.title': 'Daily challenge',
       'daily.calendar': 'Calendar',
@@ -121,6 +123,7 @@
       'desc.kenken': '行と列を埋めてケージの計算を合わせる',
       'desc.pips': 'ドミノを置いて領域の条件を満たす',
       'desc.whodunit': '手がかりから二十人の中の犯人を見抜く',
+      'desc.amhaeng': '一本道で敵の手を読み、暗行御史として出頭する',
 
       'daily.title': '今日のチャレンジ',
       'daily.calendar': 'カレンダー',
@@ -164,6 +167,7 @@
       'desc.kenken': '填满行列，凑出每个笼子的算式',
       'desc.pips': '摆放骨牌，满足每个区域的条件',
       'desc.whodunit': '根据线索从二十人中找出罪犯',
+      'desc.amhaeng': '在一条路上看穿敌人招数，以暗行御史之名出击',
 
       'daily.title': '今日挑战',
       'daily.calendar': '日历',
@@ -207,6 +211,7 @@
       'desc.kenken': '填滿行列，湊出每個籠子的算式',
       'desc.pips': '擺放骨牌，滿足每個區域的條件',
       'desc.whodunit': '根據線索從二十人中找出罪犯',
+      'desc.amhaeng': '在一條路上看穿敵人招數，以暗行御史之名出擊',
 
       'daily.title': '今日挑戰',
       'daily.calendar': '日曆',
@@ -250,6 +255,7 @@
       'desc.kenken': 'Completa filas y columnas cuadrando cada jaula',
       'desc.pips': 'Coloca fichas para cumplir cada región',
       'desc.whodunit': 'Usa las pistas para descubrir a los culpables entre veinte',
+      'desc.amhaeng': 'Lee los movimientos enemigos en un solo camino y actúa como inspector secreto',
 
       'daily.title': 'Reto diario',
       'daily.calendar': 'Calendario',
