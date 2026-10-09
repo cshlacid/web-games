@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title data-i18n="game.amhaeng">암행</title>
+<meta name="description" content="한 줄 길 위에서 적의 수를 읽고 패를 쌓아 출두하는 암행어사 로그라이트" data-i18n-attr="content=meta.desc">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><ellipse cx='12' cy='10' rx='10.5' ry='2.2' fill='%231f1b17'/><path d='M8 10 L9 3.5 Q12 2.2 15 3.5 L16 10 Z' fill='%231f1b17'/><path d='M7 12 Q12 22 17 12' fill='none' stroke='%231f1b17' stroke-width='1'/><circle cx='12' cy='17' r='3.4' fill='none' stroke='%23b8862b' stroke-width='1.6'/></svg>">
+<link rel="manifest" href="../../manifest.json">
+<link rel="apple-touch-icon" href="../../icons/icon-180.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="암행" data-i18n-attr="content=game.amhaeng">
+<meta name="theme-color" content="#f3eee3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1b1916" media="(prefers-color-scheme: dark)">
+<link rel="stylesheet" href="../../shared/base.css">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="../../shared/result.css">
+<link rel="stylesheet" href="../../shared/sheet.css">
+<script src="../../shared/analytics.js"></script>
+<script src="../../shared/offline.js"></script>
+<script src="../../shared/i18n.js"></script>
+<script src="../../shared/strings.js"></script>
+<script src="strings.js"></script>
+</head>
+<body>
+<main class="app">
+  <header class="head">
+    <div class="title-row">
+      <div class="head-nav">
+        <a class="back" href="../../" data-i18n="ui.back">← 목록</a>
+        <button class="toggle" id="help-open" type="button" aria-pressed="false" data-i18n="ui.help">도움말</button>
+      </div>
+      <h1 data-i18n="game.amhaeng">암행</h1>
+      <div class="head-actions">
+        <button class="toggle sound" id="toggle-bgm" type="button" aria-pressed="true" data-i18n="ui.bgm">BGM</button>
+        <button class="toggle sound" id="toggle-sfx" type="button" aria-pressed="true" data-i18n="ui.sfx">효과음</button>
+      </div>
+    </div>
+    <div class="status-row">
+      <span class="where" id="where"></span>
+      <span class="purse"><span class="stat" id="hp"></span><span class="stat" id="coins"></span></span>
+    </div>
+  </header>
+
+  <section class="screen" id="screen-map" hidden>
+    <h2 class="screen-title" id="map-title"></h2>
+    <ol class="track" id="track"></ol>
+    <div class="hand-list" id="map-hand"></div>
+    <p class="note" id="map-note"></p>
+    <div class="screen-actions">
+      <button class="btn" id="depart" type="button" data-i18n="ah.depart">길을 나선다</button>
+    </div>
+  </section>
+
+  <section class="screen fight" id="screen-fight" hidden>
+    <div class="stage">
+      <div class="backdrop" id="backdrop"></div>
+      <div class="lane" id="lane"></div>
+    </div>
+    <p class="info" id="info"></p>
+    <div class="queue-row">
+      <span class="queue-label" data-i18n="ah.queue">쌓은 패</span>
+      <span class="queue" id="queue"></span>
+      <button class="unleash" id="unleash" type="button"><span class="ico-slot" data-ah-icon="unleash"></span><span data-i18n="ah.unleash">출두</span></button>
+    </div>
+    <div class="hand" id="hand"></div>
+    <div class="moves">
+      <button class="act" id="move-left" type="button" aria-label="왼쪽으로" data-i18n-attr="aria-label=ah.move"><span class="ico-slot" data-ah-icon="left"></span></button>
+      <button class="act" id="turn" type="button"><span class="ico-slot" data-ah-icon="turn"></span><span data-i18n="ah.turn">돌기</span></button>
+      <button class="act" id="wait" type="button"><span class="ico-slot" data-ah-icon="wait"></span><span data-i18n="ah.wait">기다림</span></button>
+      <button class="act" id="move-right" type="button" aria-label="오른쪽으로" data-i18n-attr="aria-label=ah.move"><span class="ico-slot" data-ah-icon="right"></span></button>
+    </div>
+  </section>
+
+  <section class="screen" id="screen-pick" hidden>
+    <h2 class="screen-title" id="pick-title"></h2>
+    <p class="note" id="pick-note"></p>
+    <div class="offers" id="offers"></div>
+    <div class="screen-actions">
+      <button class="btn ghost" id="pick-skip" type="button"></button>
+    </div>
+  </section>
+
+  <section class="screen" id="screen-end" hidden>
+    <h2 class="screen-title" id="end-title"></h2>
+    <p class="note" id="end-note"></p>
+    <p class="note" id="end-best"></p>
+    <div class="screen-actions">
+      <button class="btn" id="restart" type="button" data-i18n="ah.newRun">새 여정</button>
+    </div>
+  </section>
+
+  <p class="toast" id="toast" role="status" aria-live="polite"></p>
+
+  <div class="sheet" id="help" hidden>
+    <p class="sheet-title" data-i18n="ui.rules">규칙</p>
+    <ul class="help-list">
+      <li data-i18n-html="ah.rule1">한 줄 길 위에서 싸웁니다. <b>어사가 한 가지를 하면 적이 모두 한 번씩 움직입니다</b> — 움직이기, 돌아서기, 기다리기, 패 쌓기, 출두가 모두 한 가지입니다.</li>
+      <li data-i18n-html="ah.rule2">적의 머리 위 숫자는 <b>공격까지 남은 차례</b>이고, 칠 칸은 붉게 칠해집니다. 0이 되는 순간 그 칸에 없으면 헛칩니다. 적의 공격은 <b>제 편도 맞힙니다</b>.</li>
+      <li data-i18n-html="ah.rule3">패를 누르면 <b>쌓이고</b>, <b>출두</b>를 누르면 쌓은 차례대로 한꺼번에 나갑니다. 쌓는 데도 차례가 들어 적이 움직이므로, 칠 칸이 노랗게 미리 보입니다. 쓴 패는 숫자만큼 차례가 지나야 다시 쓸 수 있습니다.</li>
+      <li data-i18n-html="ah.rule4">어사는 <b>바라보는 쪽</b>으로만 칩니다. 움직여도 방향은 그대로이고, 돌아서는 데 한 차례가 듭니다. 축지법은 적을 넘어가며 돌아서고, 사병의 방패는 앞에서 오는 피해만 줄입니다.</li>
+      <li data-i18n-html="ah.rule5">고을마다 싸움 몇 번과 우두머리가 기다립니다. 싸움에서 번 엽전은 <b>주막</b>에서 국밥·보약·새 패·벼리기에 쓰고, <b>서낭당</b>에서는 복 하나를 받습니다. 쓰러지면 여정을 처음부터 다시 합니다.</li>
+      <li data-i18n-html="ah.rule6">키보드: 방향키 이동, <b>T</b> 돌기, <b>스페이스</b> 기다림, <b>1~6</b> 패 쌓기, <b>엔터</b> 출두.</li>
+    </ul>
+    <div class="sheet-actions">
+      <button class="btn" id="help-close" type="button" data-i18n="ui.close">닫기</button>
+    </div>
+  </div>
+</main>
+
+<script>SharedI18n.apply();</script>
+<script src="../../shared/base.js"></script>
+<script src="data.js"></script>
+<script src="battle.js"></script>
+<script src="run.js"></script>
+<script src="art.js"></script>
+<script src="../../shared/audio.js"></script>
+<script src="audio.js"></script>
+<script src="../../shared/sheet.js"></script>
+<script src="main.js"></script>
+</body>
+</html>
