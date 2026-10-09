@@ -123,6 +123,16 @@ function setup(foes, tiles = ['sword', 'bow'], hero = 3, extra = {}) {
   check('등 뒤로 옮긴다', s.foes[0].pos === 3 && s.foes[0].face === 1);
 }
 {
+  // 우두머리는 곁에 졸개가 넉넉하면 부르지 않는다.
+  const s = setup([['chief', 0, 1], ['bandit', 6, -1]], ['sword'], 3);
+  s.foes[0].summonIn = 1;
+  B.act(s, { type: 'wait' });
+  check('졸개가 차 있으면 안 부른다', s.foes.length === 2);
+  s.foes.splice(1, 1);
+  B.act(s, { type: 'wait' });
+  check('자리가 나면 부른다', s.foes.length === 2);
+}
+{
   // 끝: 적과 남은 물결이 없으면 이긴다.
   const s = B.create({ waves: [[0, 'bandit']], hp: 8, maxHp: 8, tiles: [{ id: 'sword', lv: 2 }] });
   s.foes[0].pos = s.hero.pos + 1;

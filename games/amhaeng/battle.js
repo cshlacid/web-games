@@ -224,7 +224,8 @@ function step(state, foe, to) {
 
 function foeTurn(state, foe) {
   const def = D.ENEMIES[foe.kind];
-  if (def.summon && --foe.summonIn <= 0) {
+  // 졸개가 쌓이면 우두머리에게 손이 닿지 않는다. 곁에 졸개가 넉넉하면 부르지 않고 기다린다.
+  if (def.summon && --foe.summonIn <= 0 && state.foes.length - 1 < def.summon.max) {
     foe.summonIn = def.summon.every;
     const cell = edgeFor(state);
     if (cell !== undefined) addFoe(state, def.summon.kind, cell);

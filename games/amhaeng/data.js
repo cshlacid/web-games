@@ -33,7 +33,7 @@ const START_TILES = ['sword', 'bow'];
 //   wind: 준비 차례 수(머리 위 숫자). 0이 되는 차례에 그 무늬를 친다 — 그 사이 비키면 헛친다.
 //   pull: 맞은 어사를 제 앞으로 끌어온다.  shield: 앞에서 오는 피해를 1 줄인다.
 //   blink: 닿지 않으면 걷지 않고 어사 뒤 빈칸으로 옮겨 간다.  keep: 붙으면 한 칸 물러선다.
-//   both: 돌아설 필요가 없다(무늬가 양쪽).  summon: 그 차례마다 졸개를 부른다.
+//   both: 돌아설 필요가 없다(무늬가 양쪽).  summon: 그 차례마다 졸개를 부른다(곁에 졸개가 max 미만일 때만).
 const ENEMIES = {
   bandit: { hp: 3, attacks: [{ hits: [1], dmg: 1, wind: 2 }] },
   spearman: { hp: 3, attacks: [{ hits: [1, 2], dmg: 1, wind: 2 }] },
@@ -43,8 +43,10 @@ const ENEMIES = {
   dokkaebi: { hp: 6, both: true, attacks: [{ hits: [-1, 1], dmg: 2, wind: 3 }] },
   gumiho: { hp: 4, blink: true, attacks: [{ hits: [1], dmg: 1, wind: 2 }] },
   mulgwisin: { hp: 3, attacks: [{ line: true, dmg: 1, wind: 2, pull: true }] },
-  chief: { hp: 9, boss: true, summon: { every: 7, kind: 'bandit' }, attacks: [{ hits: [1, 2], dmg: 2, wind: 2 }] },
-  magistrate: { hp: 12, boss: true, shield: true, summon: { every: 5, kind: 'guard' }, attacks: [{ hits: [1], dmg: 1, wind: 1 }] },
+  // 첫 우두머리. 창이 두 칸을 닿아 붙어서 베려면 한 번은 그 안에 들어가야 하므로, 준비를 셋으로 두어
+  // 들어가 베고 빠질 틈을 준다. 둘이었을 때는 맞지 않고 붙을 길이 없어 한 번에 2씩 깎였다.
+  chief: { hp: 8, boss: true, summon: { every: 7, kind: 'bandit', max: 1 }, attacks: [{ hits: [1, 2], dmg: 2, wind: 3 }] },
+  magistrate: { hp: 12, boss: true, shield: true, summon: { every: 5, kind: 'guard', max: 2 }, attacks: [{ hits: [1], dmg: 1, wind: 1 }] },
   imugi: { hp: 18, boss: true, attacks: [{ hits: [-1], dmg: 1, wind: 1 }, { hits: [1, 2, 3], dmg: 2, wind: 3 }] },
 };
 
