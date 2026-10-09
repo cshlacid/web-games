@@ -18,7 +18,7 @@ node games/whodunit/rules.test.js      # 무리·단서 판정, 판 자료 읽�
 node games/whodunit/solver.test.js     # 단서 하나로 정하기, 정해졌는지 가리기, 구운 판·힌트로 끝까지
 node games/whodunit/generator.test.js  # 구워 둔 판 180장을 다시 푼다
 
-node games/whodunit/bake.js > games/whodunit/puzzles.js   # 다시 굽기(1분쯤, 거의 어려움)
+node games/whodunit/bake.js > games/whodunit/puzzles.js   # 다시 굽기(2분쯤, 보통과 어려움)
 ```
 
 ## 밝히기

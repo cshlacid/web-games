@@ -38,7 +38,8 @@ for (const level of Object.keys(B.LEVELS)) {
     check(`${name}: 이름은 목록 순서대로`, p.names.every((n, k) => n < B.NAME_POOL && (k === 0 || n > p.names[k - 1])));
     check(`${name}: 단서는 모두 참`, p.clues.every((clue) => R.holds(clue, p.truth)));
     check(`${name}: 같은 단서가 없다`, new Set(p.clues.map(R.encodeClue)).size === R.N);
-    check(`${name}: 난이도에 없는 단서가 없다`, p.clues.every((clue) => clue.type === '=' || spec.extra.includes(clue.type)));
+    check(`${name}: 난이도에 없는 단서가 없다`, p.clues.every((clue) => (clue.type === '=' || spec.extra.includes(clue.type))
+      && (spec.types.includes('JX') || clue.sets.every((set) => set.job === undefined))));
     check(`${name}: 끝까지 밝혀진다`, play(p, spec.trial) === R.FULL);
   });
 }

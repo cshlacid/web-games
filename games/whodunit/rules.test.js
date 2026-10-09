@@ -21,8 +21,10 @@ check('행은 넷, 열은 다섯', size('R', 2) === 4 && size('C', 1) === 5);
 check('위·아래·왼쪽·오른쪽', size('A', 9) === 2 && size('B', 9) === 2 && size('L', 9) === 1 && size('G', 9) === 2);
 check('가장자리 열넷, 모서리 넷', size('E') === 14 && size('K') === 4);
 check('직업', size('J', 0) === 7);
+check('직업이 낀 무리', R.popcount(R.setMask({ kind: 'R', arg: 0, job: 1 }, puzzle)) === 1
+  && R.popcount(R.setMask({ kind: 'C', arg: 0, job: 0 }, puzzle)) === 2);
 
-for (const code of ['=N5c2', '>R1R3i', '~C0C2c', '%R4i1', '&C3c', '=Ec5', '=J2i0', '=G12c1']) {
+for (const code of ['=N5c2', '>R1R3i', '~C0C2c', '%R4i1', '&C3c', '=Ec5', '=J2i0', '=G12c1', '=R2j1c1', '^N5j0i', '>R0j2R1j2c']) {
   check(`단서 글자 ${code}`, R.encodeClue(R.parseClue(code)) === code);
 }
 
@@ -33,6 +35,13 @@ check('셈', R.holds(clue('=R0c2'), crim) && R.holds(clue('=R0i2'), crim) && !R.
 check('이웃', R.holds(clue('=N4c3'), crim));
 check('비교', R.holds(clue('>R0R1c'), crim) && !R.holds(clue('>R1R0c'), crim) && R.holds(clue('~R2R3c'), crim));
 check('홀짝', R.holds(clue('%R1c1'), crim) && R.holds(clue('%R0c0'), crim));
+check('범인과 무고 비교', R.holds(clue('^R0c'), R.maskOf([0, 1, 2])) && !R.holds(clue('^R0c'), crim) && R.holds(clue('^R1i'), crim));
+{
+  const c = clue('^R0c');
+  check('비교: 남은 사람으로 넘길 수 있다', R.possible(c, R.maskOf([0]), 0));
+  check('비교: 같아지면 못 넘긴다', !R.possible(c, R.maskOf([0, 1]), 0));
+  check('비교: 남은 사람으로 못 넘긴다', !R.possible(c, R.maskOf([0, 1, 2]), R.maskOf([0])));
+}
 check('이어짐', R.holds(clue('&R0c'), crim) && !R.holds(clue('&C1c'), R.maskOf([1, 9])) && R.holds(clue('&C1c'), R.maskOf([1, 5])));
 
 // 일부만 정해졌을 때.

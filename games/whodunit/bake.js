@@ -18,12 +18,14 @@ const R = require('./rules.js');
 const S = require('./solver.js');
 
 // 난이도마다 쓰는 단서 갈래, 가정을 쓰는지, 한 판에 가정이 드는 걸음의 최소·최대.
-//   쉬움: 이웃·줄·위아래·직업의 수만. 보통: 가장자리·모서리, 줄끼리 비교, 홀짝을 더한다.
-//   어려움: 이어짐까지 더하고, 가정이 드는 자리를 일부러 남긴다.
+//   쉬움: 이웃·줄·위아래·직업의 수만. 보통: 가장자리·모서리, 직업이 낀 무리(3행의 요리사),
+//   줄끼리 비교, 범인과 무고 비교, 홀짝을 더하고 가정이 드는 자리를 한두 곳 남긴다.
+//   어려움: 이어짐까지 더하고 가정이 드는 자리를 더 남긴다.
+// 보통도 가정 자리를 남기는 것은, 그러지 않았더니 보통이 쉬움과 단서 종류만 다른 판이 되었기 때문이다.
 const LEVELS = {
   easy: { types: ['N', 'RC', 'ABLG', 'J'], extra: [], trial: false, minTrials: 0, maxTrials: 0, count: 60 },
-  normal: { types: ['N', 'RC', 'ABLG', 'J', 'EK'], extra: ['>', '~', '%'], trial: true, minTrials: 0, maxTrials: 2, count: 60 },
-  hard: { types: ['N', 'RC', 'ABLG', 'J', 'EK'], extra: ['>', '~', '%', '&'], trial: true, minTrials: 2, maxTrials: 8, count: 60 },
+  normal: { types: ['N', 'RC', 'ABLG', 'J', 'EK', 'JX'], extra: ['>', '~', '%', '^'], trial: true, minTrials: 1, maxTrials: 3, count: 60 },
+  hard: { types: ['N', 'RC', 'ABLG', 'J', 'EK', 'JX'], extra: ['>', '~', '%', '^', '&'], trial: true, minTrials: 3, maxTrials: 8, count: 60 },
 };
 
 // 이름 목록의 길이. 판마다 이 중 스물을 골라 번호 순서대로 앉힌다 — 목록이 가나다순이라
@@ -85,6 +87,18 @@ function candidates(puzzle, p, spec) {
   if (has('ABLG')) for (const kind of 'ABLG') sets.push({ kind, arg: p });
   if (has('J')) for (const j of new Set(puzzle.jobs)) sets.push({ kind: 'J', arg: j });
   if (has('EK')) sets.push({ kind: 'E', arg: 0 }, { kind: 'K', arg: 0 });
+  // 직업이 낀 무리. 둘 이상 겹칠 때만 — 하나뿐이면 그 사람 이야기를 돌려 말한 것이다.
+  if (has('JX')) {
+    const bases = [{ kind: 'N', arg: p }, { kind: 'E', arg: 0 }];
+    for (let r = 0; r < R.H; r++) bases.push({ kind: 'R', arg: r });
+    for (let c = 0; c < R.W; c++) bases.push({ kind: 'C', arg: c });
+    for (const base of bases) {
+      for (const job of new Set(puzzle.jobs)) {
+        const set = { ...base, job };
+        if (R.popcount(R.setMask(set, puzzle)) >= 2) sets.push(set);
+      }
+    }
+  }
   const useful = sets.filter((set) => R.popcount(R.setMask(set, puzzle)) >= 1);
   for (const set of useful) {
     for (const side of 'ci') {
@@ -110,6 +124,14 @@ function candidates(puzzle, p, spec) {
           if (spec.extra.includes('~') && a.arg < b.arg) add({ type: '~', sets: [a, b], side, n: 0 });
         }
       }
+    }
+  }
+  if (spec.extra.includes('^')) {
+    for (const set of useful) {
+      const mask = R.setMask(set, puzzle);
+      const c = R.popcount(mask & crim);
+      const i = R.popcount(mask) - c;
+      if (R.popcount(mask) >= 3 && c !== i) add({ type: '^', sets: [set], side: c > i ? 'c' : 'i', n: 0 });
     }
   }
   if (spec.extra.includes('&')) {
@@ -156,13 +178,16 @@ function make(level, seed) {
       // 한 번에 많이 풀어 주는 단서는 뒤로 미룬다. 단서 하나가 서넛을 한꺼번에 정하면 판이 금방 끝난다.
       const good = gain >= 1 && gain <= 3;
       const one = { clue, got, needsTrial };
-      if (level === 'hard' ? needsTrial && gain >= 1 : good) { pick = one; break; }
+      // 가정 자리가 모자라면 그런 단서를 찾고, 채웠으면 바로 정해 주는 단서로 간다.
+      const hungry = trialSteps < spec.minTrials || (level === 'hard' && trialSteps < spec.maxTrials);
+      if (hungry ? needsTrial && gain >= 1 : good) { pick = one; break; }
       if (!fallback || (good && !fallback.good)) fallback = { ...one, good };
-      // 어려움은 당장 아무도 정하지 못하는 단서도 아껴 둔다. 늘 바로 하나씩 정해 주는 단서만 달면
+      // 가정 자리가 모자랄 때는 당장 아무도 정하지 못하는 단서도 아껴 둔다. 늘 바로 하나씩 정해 주는 단서만 달면
       // 판에 정보가 넘쳐 가정이 들 자리가 생기지 않는다.
-      if (level === 'hard' && gain === 0 && !stingy) stingy = one;
+      if (spec.trial && gain === 0 && !stingy) stingy = one;
     }
-    const chosen = pick || (stingy && random() < 0.7 ? stingy : null) || fallback;
+    const hungry = trialSteps < spec.minTrials || (level === 'hard' && trialSteps < spec.maxTrials);
+    const chosen = pick || (hungry && stingy && random() < 0.7 ? stingy : null) || fallback;
     if (!chosen) return null;
     puzzle.clues[speaker] = chosen.clue;
     if (chosen.needsTrial) trialSteps++;
