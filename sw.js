@@ -338,12 +338,6 @@ const FILES = {
   "shared/snap.js": 'ee7ca5dc616c',
   "shared/strings.js": '4de52a48e09e',
   "strings.js": 'a745488e5557',
-  "wd4-en.png": 'ded4a3056b9b',
-  "wd4-es.png": '260bd14f24f3',
-  "wd4-ja.png": 'fd8cefe6400e',
-  "wd4-ko.png": '329f6c06ed4f',
-  "wd4-zh-CN.png": 'b73c3eb25e4a',
-  "wd4-zh-TW.png": '967a0f57bfe5',
 };
 // </files>
 
