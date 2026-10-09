@@ -35,6 +35,9 @@ const el = {
   detail: document.getElementById('detail'),
   detailWho: document.getElementById('detail-who'),
   detailText: document.getElementById('detail-text'),
+  tags: document.getElementById('tags'),
+  used: document.getElementById('used'),
+  share: document.getElementById('share'),
   markInnocent: document.getElementById('mark-innocent'),
   markCriminal: document.getElementById('mark-criminal'),
   hint: document.getElementById('hint'),
@@ -134,9 +137,18 @@ function build() {
     job.textContent = jobOf(i);
     const clue = document.createElement('span');
     clue.className = 'clue';
-    card.append(face, name, job, clue);
+    // 모서리 색 표시. 넷을 미리 넣어 두고 켜고 끄기만 한다.
+    const tags = document.createElement('span');
+    tags.className = 'tags-on';
+    for (let k = 0; k < 4; k++) {
+      const dot = document.createElement('span');
+      dot.className = 'dot';
+      dot.dataset.tag = k;
+      tags.append(dot);
+    }
+    card.append(tags, face, name, job, clue);
     el.board.append(card);
-    cards.push({ card, clue });
+    cards.push({ card, clue, dots: [...tags.children] });
   }
   view = { cards };
 }
@@ -146,7 +158,7 @@ const isOpen = (i) => Boolean(game.revealed & (1 << i));
 function paint() {
   const sel = game.selected;
   const scope = sel >= 0 && isOpen(sel) ? game.puzzle.clues[sel].scope : 0;
-  view.cards.forEach(({ card, clue }, i) => {
+  view.cards.forEach(({ card, clue, dots }, i) => {
     const open = isOpen(i);
     const crim = (game.puzzle.truth >> i) & 1;
     card.classList.toggle('open', open);
@@ -155,7 +167,16 @@ function paint() {
     card.classList.toggle('selected', i === sel);
     card.classList.toggle('scope', Boolean(scope & (1 << i)));
     clue.textContent = open ? clueText(game.puzzle.clues[i]) : '';
+    card.classList.toggle('used', open && Boolean(game.used & (1 << i)));
+    dots.forEach((dot, k) => { dot.hidden = open || !(game.tags[i] & (1 << k)); });
   });
+  // 고른 사람이 안 밝혀졌으면 색 표시를, 밝혀졌으면 단서를 다 썼다는 표시를 내민다.
+  el.tags.hidden = game.done || sel < 0 || isOpen(sel);
+  el.used.hidden = game.done || sel < 0 || !isOpen(sel);
+  if (sel >= 0) {
+    [...el.tags.children].forEach((b, k) => b.setAttribute('aria-pressed', String(Boolean(game.tags[sel] & (1 << k)))));
+    el.used.setAttribute('aria-pressed', String(Boolean(game.used & (1 << sel))));
+  }
   el.detail.classList.toggle('note', Boolean(game.note));
   if (game.note) {
     el.detailWho.textContent = sel >= 0 ? `${nameOf(sel)} · ${jobOf(sel)}` : '';
@@ -221,28 +242,94 @@ function mark(value) {
     return;
   }
   game.mistakes++;
+  game.missed |= 1 << i;
   Sound.play('wrong');
   toast(t('wd.wrong'));
   save();
   paint();
 }
 
+// 원작처럼 두 번에 나눠 돕는다. 처음에는 볼 자리(단서나 사람)만 짚고, 한 번 더 누르면 밝힌다.
+// 단서만 짚어 줘도 대개 혼자 풀 수 있어, 바로 답을 주면 추리할 몫까지 가져간다.
 function hint() {
   if (game.done) return;
-  const step = S.hint(game.puzzle, game.revealed);
-  if (!step) { toast(t('wd.noStep')); return; }
+  const pending = game.hintStep && !isOpen(game.hintStep.cell) ? game.hintStep : null;
   started();
   game.hinted++;
-  game.selected = step.cell;
-  const vars = { who: nameOf(step.cell), status: statusOf(step.value) };
-  if (step.why.code === 'clue') {
-    vars.from = nameOf(step.why.from);
-    flash(step.why.from);
+  if (pending) {
+    game.hintStep = null;
+    game.helped[pending.cell] = 2;
+    game.selected = pending.cell;
+    const vars = { who: nameOf(pending.cell), status: statusOf(pending.value) };
+    if (pending.why.code === 'clue') vars.from = nameOf(pending.why.from);
+    if (pending.why.code === 'trial') vars.assume = t(pending.why.assume ? 'wd.crimIf' : 'wd.innoIf');
+    Sound.play('hint');
+    reveal(pending.cell);
+    toast(t(`wd.why.${pending.why.code}`, vars));
+    return;
   }
-  if (step.why.code === 'trial') vars.assume = t(step.why.assume ? 'wd.crimIf' : 'wd.innoIf');
+  const step = S.hint(game.puzzle, game.revealed);
+  if (!step) { game.hinted--; toast(t('wd.noStep')); return; }
+  game.hintStep = step;
+  game.helped[step.cell] = Math.max(game.helped[step.cell], 1);
   Sound.play('hint');
-  reveal(step.cell);
-  toast(t(`wd.why.${step.why.code}`, vars));
+  if (step.why.code === 'clue') {
+    // 단서를 말한 사람을 골라 두면 그 단서가 가리키는 사람들이 함께 칠해진다.
+    game.selected = step.why.from;
+    flash(step.why.from);
+    toast(t('wd.look.clue', { from: nameOf(step.why.from) }));
+  } else {
+    game.selected = step.cell;
+    flash(step.cell);
+    toast(t(`wd.look.${step.why.code}`, {
+      who: nameOf(step.cell), assume: t(step.why.assume ? 'wd.crimIf' : 'wd.innoIf'),
+    }));
+  }
+  save();
+}
+
+function toggleTag(k) {
+  const i = game.selected;
+  if (game.done || i < 0 || isOpen(i)) return;
+  game.tags[i] ^= 1 << k;
+  Sound.play('select');
+  save();
+  paint();
+}
+
+function toggleUsed() {
+  const i = game.selected;
+  if (i < 0 || !isOpen(i)) return;
+  game.used ^= 1 << i;
+  Sound.play('select');
+  save();
+  paint();
+}
+
+// 원작의 결과 격자. 사람마다 한 칸: 힌트로 밝힘 🟠, 힌트로 짚음 🟡, 틀린 적 있음 🟨, 혼자 🟩.
+function shareText() {
+  const level = LEVELS.find((item) => item.key === game.level);
+  const rows = [];
+  for (let r = 0; r < R.H; r++) {
+    let line = '';
+    for (let c = 0; c < R.W; c++) {
+      const i = r * R.W + c;
+      line += game.helped[i] === 2 ? '🟠' : game.helped[i] === 1 ? '🟡' : game.missed & (1 << i) ? '🟨' : '🟩';
+    }
+    rows.push(line);
+  }
+  const head = t('wd.shareHead', { game: t('game.whodunit'), level: t(level.labelKey), time: formatTime(game.elapsed) });
+  return [head, ...rows].join('\n');
+}
+
+async function share() {
+  try {
+    await navigator.clipboard.writeText(shareText());
+    toast(t('wd.copied'));
+  } catch {
+    // 클립보드 권한이 없거나 http로 열린 경우. 복사 대신 보여주기라도 한다.
+    toast(shareText());
+  }
 }
 
 function showResult() {
@@ -286,6 +373,10 @@ function save() {
       code: game.code,
       revealed: game.revealed,
       mistakes: game.mistakes,
+      missed: game.missed,
+      used: game.used,
+      tags: game.tags,
+      helped: game.helped,
       elapsed: game.elapsed,
       hinted: game.hinted,
       done: game.done,
@@ -303,6 +394,14 @@ function restore() {
   // 처음 밝힌 사람은 늘 밝혀져 있어야 한다. 손댄 저장본이 지워 놓으면 단서가 하나도 없는 판이 된다.
   game.revealed = ((Number(saved.revealed) || 0) & R.FULL) | (1 << game.puzzle.start);
   game.mistakes = Number(saved.mistakes) || 0;
+  game.missed = (Number(saved.missed) || 0) & R.FULL;
+  game.used = (Number(saved.used) || 0) & R.FULL;
+  const list = (value, max) => game.tags.map((_, i) => {
+    const v = Array.isArray(value) ? Number(value[i]) : 0;
+    return Number.isInteger(v) && v >= 0 && v <= max ? v : 0;
+  });
+  game.tags = list(saved.tags, 15);
+  game.helped = list(saved.helped, 2);
   game.elapsed = Number(saved.elapsed) || 0;
   game.hinted = Number(saved.hinted) || 0;
   game.done = game.revealed === R.FULL;
@@ -325,6 +424,11 @@ function start(made) {
     revealed: 1 << made.start,
     selected: made.start,
     mistakes: 0,
+    missed: 0,
+    used: 0,
+    tags: new Array(R.N).fill(0),
+    helped: new Array(R.N).fill(0),
+    hintStep: null,
     note: '',
     elapsed: 0,
     running: false,
@@ -364,6 +468,12 @@ el.board.addEventListener('click', (event) => {
 el.markInnocent.addEventListener('click', () => mark(0));
 el.markCriminal.addEventListener('click', () => mark(1));
 el.hint.addEventListener('click', hint);
+el.tags.addEventListener('click', (event) => {
+  const pick = event.target.closest('.tag-pick');
+  if (pick) toggleTag(Number(pick.dataset.tag));
+});
+el.used.addEventListener('click', toggleUsed);
+el.share.addEventListener('click', share);
 el.newGame.addEventListener('click', () => { Sound.play('click'); newGame(); });
 el.again.addEventListener('click', () => { Sound.play('click'); newGame(); });
 window.SharedSheet.bind({ sheet: el.help, opener: el.helpOpen, closer: el.helpClose });

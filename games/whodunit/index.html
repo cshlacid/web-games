@@ -51,6 +51,7 @@
         <p class="sheet-title" id="result-title"></p>
         <p class="sheet-note" id="result-note"></p>
         <div class="sheet-actions">
+          <button class="btn ghost" id="share" type="button" data-i18n="wd.share">결과 복사</button>
           <button class="btn" id="again" type="button" data-i18n="ui.again">한 판 더</button>
         </div>
       </div>
@@ -58,7 +59,18 @@
   </div>
 
   <div class="detail" id="detail" aria-live="polite">
-    <p class="detail-who" id="detail-who"></p>
+    <div class="detail-head">
+      <p class="detail-who" id="detail-who"></p>
+      <div class="detail-tools">
+        <span class="tags" id="tags">
+          <button class="tag-pick" type="button" data-tag="0" aria-label="표시 1" data-i18n-attr="aria-label=wd.tag0"></button>
+          <button class="tag-pick" type="button" data-tag="1" aria-label="표시 2" data-i18n-attr="aria-label=wd.tag1"></button>
+          <button class="tag-pick" type="button" data-tag="2" aria-label="표시 3" data-i18n-attr="aria-label=wd.tag2"></button>
+          <button class="tag-pick" type="button" data-tag="3" aria-label="표시 4" data-i18n-attr="aria-label=wd.tag3"></button>
+        </span>
+        <button class="used-toggle" id="used" type="button" aria-pressed="false" data-i18n="wd.used">다 씀</button>
+      </div>
+    </div>
     <p class="detail-text" id="detail-text"></p>
   </div>
 
@@ -79,9 +91,9 @@
       <li data-i18n-html="wd.rule1">스무 명은 모두 <b>무고하거나 범인</b>입니다. 정체를 밝히면 그 사람이 <b>단서</b>를 하나 말하고, 단서는 모두 참입니다.</li>
       <li data-i18n-html="wd.rule2">사람을 고르고 <b>무고</b>나 <b>범인</b>을 누릅니다. <b>단서로 정해지는 사람만</b> 밝힐 수 있습니다 — 아직 정해지지 않았으면 근거가 부족하다고 하고, 정해졌는데 틀리게 고르면 실수로 셉니다.</li>
       <li data-i18n-html="wd.rule3"><b>이웃</b>은 대각선까지 둘레의 여덟 칸입니다. <b>위·아래·왼쪽·오른쪽</b>은 같은 열이나 행에서 그쪽 끝까지입니다. <b>이어져 있다</b>는 그 줄에서 사이에 다른 사람 없이 붙어 있다는 뜻입니다.</li>
-      <li data-i18n-html="wd.rule4">밝혀진 사람을 누르면 그 단서가 가리키는 사람들이 표시됩니다.</li>
+      <li data-i18n-html="wd.rule4">밝혀진 사람을 누르면 그 단서가 가리키는 사람들이 표시됩니다. 다 쓴 단서는 <b>다 씀</b>으로 흐려 둘 수 있고, 아직 모르는 사람에게는 <b>색 표시</b>를 네 가지까지 달아 메모할 수 있습니다.</li>
       <li data-i18n-html="wd.rule5"><b>모든 판은 찍지 않고 끝까지 풀립니다.</b> 어려움에는 "이 사람이 범인이라면?"을 따져 봐야 하는 자리가 있습니다.</li>
-      <li data-i18n-html="wd.rule6"><b>힌트</b>는 지금 단서로 정할 수 있는 사람 하나를 까닭과 함께 밝혀 줍니다.</li>
+      <li data-i18n-html="wd.rule6"><b>힌트</b>는 처음에 봐야 할 단서나 사람만 짚어 주고, 한 번 더 누르면 그 사람을 까닭과 함께 밝혀 줍니다. 결과 격자에서 짚어 준 사람은 🟡, 밝혀 준 사람은 🟠, 틀린 적 있는 사람은 🟨로 남습니다.</li>
     </ul>
     <div class="sheet-actions">
       <button class="btn" id="help-close" type="button" data-i18n="ui.close">닫기</button>
