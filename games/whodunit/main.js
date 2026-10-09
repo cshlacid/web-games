@@ -86,19 +86,24 @@ const jobOf = (i) => t(`wd.job.${game.puzzle.jobs[i]}`);
 const statusOf = (v) => t(v ? 'wd.crim' : 'wd.inno');
 
 function placeText(set) {
-  const vars = { name: '', n: '', job: '' };
+  // 영어·스페인어는 직업을 복수로 받는다("among the cooks"). 다른 언어는 두 열쇠가 같다.
+  const vars = { name: '', n: '', job: '', jobs: '' };
   if ('NABLG'.includes(set.kind)) vars.name = nameOf(set.arg);
   if (set.kind === 'R') vars.n = set.arg + 1;
   if (set.kind === 'C') vars.n = COLS[set.arg];
-  if (set.kind === 'J') vars.job = t(`wd.job.${set.arg}`);
+  if (set.kind === 'J') { vars.job = t(`wd.job.${set.arg}`); vars.jobs = t(`wd.jobs.${set.arg}`); }
   const place = t(`wd.place.${set.kind}`, vars);
-  return set.job === undefined ? place : t('wd.place.withJob', { place, job: t(`wd.job.${set.job}`) });
+  if (set.job === undefined) return place;
+  return t('wd.place.withJob', { place, job: t(`wd.job.${set.job}`), jobs: t(`wd.jobs.${set.job}`) });
 }
 
 function clueText(clue) {
   const side = t(`wd.side.${clue.side}`);
   const place = placeText(clue.sets[0]);
-  if (clue.type === '=') return t(clue.n ? 'wd.clue.count' : 'wd.clue.none', { place, side, n: clue.n });
+  if (clue.type === '=') {
+    const key = clue.n === 0 ? 'wd.clue.none' : clue.n === 1 ? 'wd.clue.count1' : 'wd.clue.count';
+    return t(key, { place, side, side1: t(`wd.side1.${clue.side}`), n: clue.n });
+  }
   if (clue.type === '>') return t('wd.clue.more', { a: place, b: placeText(clue.sets[1]), side });
   if (clue.type === '~') return t('wd.clue.same', { a: place, b: placeText(clue.sets[1]), side });
   if (clue.type === '%') return t(clue.n ? 'wd.clue.odd' : 'wd.clue.even', { place, side });
@@ -282,7 +287,9 @@ function hint() {
     game.selected = step.cell;
     flash(step.cell);
     toast(t(`wd.look.${step.why.code}`, {
-      who: nameOf(step.cell), assume: t(step.why.assume ? 'wd.crimIf' : 'wd.innoIf'),
+      who: nameOf(step.cell),
+      assume: t(step.why.assume ? 'wd.crimIf' : 'wd.innoIf'),
+      assumeWord: t(`wd.side1.${step.why.assume ? 'c' : 'i'}`),
     }));
   }
   save();
@@ -361,6 +368,9 @@ function finish() {
   showResult();
   save();
   paint();
+  SharedDailyUI.report('whodunit', {
+    level: game.level, time: game.elapsed, hints: game.hinted, mistakes: game.mistakes,
+  });
 }
 
 // --- 저장 ---

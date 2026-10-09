@@ -150,6 +150,11 @@ const MISSIONS = [
   { id: 'pips.medium', game: 'pips', tier: 2, text: 'medium', test: (r) => r.level === 'normal' || r.level === 'hard' },
   { id: 'pips.clean', game: 'pips', tier: 2, text: 'clean', test: (r) => r.hints === 0 },
   { id: 'pips.hard', game: 'pips', tier: 3, text: 'hard', test: (r) => r.level === 'hard' },
+
+  { id: 'whodunit.any', game: 'whodunit', tier: 1, text: 'anyLevel', test: () => true },
+  { id: 'whodunit.medium', game: 'whodunit', tier: 2, text: 'medium', test: (r) => r.level === 'normal' || r.level === 'hard' },
+  { id: 'whodunit.clean', game: 'whodunit', tier: 2, text: 'clean', test: (r) => r.hints === 0 },
+  { id: 'whodunit.hard', game: 'whodunit', tier: 3, text: 'hard', test: (r) => r.level === 'hard' },
 ];
 
 const BY_ID = new Map(MISSIONS.map((m) => [m.id, m]));
