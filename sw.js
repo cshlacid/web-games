@@ -320,7 +320,7 @@ const FILES = {
   "icons/icon-180.png": 'ce2fa86771c1',
   "icons/icon-192.png": 'a039c60184af',
   "icons/icon-512.png": 'ae1f8f0c2214',
-  "index.html": 'ee0c70f343ba',
+  "index.html": '549fea05c753',
   "manifest.json": '44ddd1ef817a',
   "shared/analytics.js": '2a72c96709d8',
   "shared/audio.js": 'd7a4a52b6f41',
@@ -338,12 +338,6 @@ const FILES = {
   "shared/snap.js": 'ee7ca5dc616c',
   "shared/strings.js": '4de52a48e09e',
   "strings.js": 'a745488e5557',
-  "wd4-en.png": 'ded4a3056b9b',
-  "wd4-es.png": '260bd14f24f3',
-  "wd4-ja.png": 'fd8cefe6400e',
-  "wd4-ko.png": '329f6c06ed4f',
-  "wd4-zh-CN.png": 'b73c3eb25e4a',
-  "wd4-zh-TW.png": '967a0f57bfe5',
 };
 // </files>
 
