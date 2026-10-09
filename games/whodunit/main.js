@@ -88,7 +88,8 @@ function placeText(set) {
   if (set.kind === 'R') vars.n = set.arg + 1;
   if (set.kind === 'C') vars.n = COLS[set.arg];
   if (set.kind === 'J') vars.job = t(`wd.job.${set.arg}`);
-  return t(`wd.place.${set.kind}`, vars);
+  const place = t(`wd.place.${set.kind}`, vars);
+  return set.job === undefined ? place : t('wd.place.withJob', { place, job: t(`wd.job.${set.job}`) });
 }
 
 function clueText(clue) {
@@ -98,6 +99,7 @@ function clueText(clue) {
   if (clue.type === '>') return t('wd.clue.more', { a: place, b: placeText(clue.sets[1]), side });
   if (clue.type === '~') return t('wd.clue.same', { a: place, b: placeText(clue.sets[1]), side });
   if (clue.type === '%') return t(clue.n ? 'wd.clue.odd' : 'wd.clue.even', { place, side });
+  if (clue.type === '^') return t('wd.clue.outnumber', { place, side, other: t(`wd.side.${clue.side === 'c' ? 'i' : 'c'}`) });
   return t('wd.clue.linked', { place, side });
 }
 

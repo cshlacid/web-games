@@ -35,7 +35,13 @@ const all = Array.from({ length: N }, (_, i) => i);
 
 // 무리. 글자 하나에 사람·줄·직업 번호가 붙는다.
 //   N 이웃(대각선 포함)  R 행  C 열  A 위쪽  B 아래쪽  L 왼쪽  G 오른쪽  J 직업  E 가장자리  K 모서리
+// 뒤에 `j직업`이 붙으면 그중 그 직업만(예: 'R2j3' — 3행의 3번 직업).
 function setMask(set, puzzle) {
+  const base = baseMask(set, puzzle);
+  return set.job === undefined ? base : base & maskOf(all.filter((i) => puzzle.jobs[i] === set.job));
+}
+
+function baseMask(set, puzzle) {
   const { kind, arg } = set;
   if (kind === 'R') return maskOf(all.filter((i) => rowOf(i) === arg));
   if (kind === 'C') return maskOf(all.filter((i) => colOf(i) === arg));
@@ -59,6 +65,7 @@ function setMask(set, puzzle) {
 //   ~무리 무리 쪽    두 무리에 그쪽이 같은 수
 //   %무리 쪽 홀짝    그쪽의 수가 홀수(1)·짝수(0)
 //   &무리 쪽         그쪽이 줄 위에서 끊김 없이 이어져 있다(무리는 행이나 열)
+//   ^무리 쪽         그 무리에 그쪽이 반대쪽보다 많다
 //   예) '=N5c2' — 5번의 이웃 중 범인이 정확히 둘
 function parseClue(code) {
   let k = 1;
@@ -66,7 +73,9 @@ function parseClue(code) {
     const kind = code[k++];
     let digits = '';
     while (k < code.length && code[k] >= '0' && code[k] <= '9') digits += code[k++];
-    return { kind, arg: digits ? Number(digits) : 0 };
+    const set = { kind, arg: digits ? Number(digits) : 0 };
+    if (code[k] === 'j') { set.job = Number(code[k + 1]); k += 2; }
+    return set;
   };
   const type = code[0];
   const sets = [readSet()];
@@ -77,7 +86,8 @@ function parseClue(code) {
 }
 
 function setCode(set) {
-  return set.kind === 'E' || set.kind === 'K' ? set.kind : `${set.kind}${set.arg}`;
+  const head = set.kind === 'E' || set.kind === 'K' ? set.kind : `${set.kind}${set.arg}`;
+  return set.job === undefined ? head : `${head}j${set.job}`;
 }
 
 function encodeClue(clue) {
@@ -135,6 +145,7 @@ function holds(clue, crim) {
   if (clue.type === '>') return sideCount(a, clue.side, crim) > sideCount(b, clue.side, crim);
   if (clue.type === '~') return sideCount(a, clue.side, crim) === sideCount(b, clue.side, crim);
   if (clue.type === '%') return sideCount(a, clue.side, crim) % 2 === clue.n;
+  if (clue.type === '^') return sideCount(a, clue.side, crim) > sideCount(a, clue.side === 'c' ? 'i' : 'c', crim);
   return connected(a, clue.side, crim);
 }
 
@@ -158,6 +169,11 @@ function possible(clue, known, crim) {
     // 두 무리가 겹치면 범위만으로는 가를 수 없어 늘 될 수 있는 것으로 본다(겹치는 단서는 굽지 않는다).
     if (clue.type === '>') return ahi > blo;
     return ahi >= blo && bhi >= alo;
+  }
+  if (clue.type === '^') {
+    // 남은 사람을 모두 그쪽으로 몰아도 반대쪽을 못 넘으면 끝났다.
+    const other = sideCount(a & known, clue.side === 'c' ? 'i' : 'c', crim);
+    return range(a)[1] > other;
   }
   return true;
 }
